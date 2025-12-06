@@ -1,0 +1,110 @@
+# =========================
+# ROOT .gitignore (Monorepo)
+# =========================
+
+# Node modules (both frontend & backend)
+node_modules/
+**/node_modules/
+
+# Build outputs
+frontend/build/
+frontend/dist/
+backend/dist/
+.next/
+.out/
+.cache/
+.parcel-cache/
+
+# Environment variables
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime / Temp
+*.pid
+*.seed
+*.pid.lock
+*.tmp
+temp/
+tmp/
+
+# OS Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+
+# Dependency caches
+.npm
+.yarn-integrity
+.pnpm-store
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Uploads (DO NOT COMMIT USER UPLOADED FILES!)
+backend/uploads/
+frontend/public/uploads/
+uploads/
+
+# Local databases
+data/
+.dynamodb/
+*.db
+
+# Package locks (optional — usually commit them!)
+# Remove these lines if you WANT to commit lock files
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# Frontend specific
+frontend/.env*
+frontend/public/robots.txt
+frontend/public/favicon.ico
+frontend/public/logo*.png
+frontend/public/manifest.json
+
+# Default images (only keep in repo if needed)
+# Remove these if you have them in public/
+# frontend/public/default_avatar.jpg
+# frontend/public/default-image.jpg
+
+# Backend uploads (already covered above)
+backend/uploads/**
+
+# Test reports
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Misc
+*.tgz
+*.zip
+*.rar
+*.7z
+
+# =========================
+# END OF FILE
+# =========================

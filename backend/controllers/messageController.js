@@ -1,0 +1,176 @@
+const asyncHandler = require('express-async-handler');
+const Message = require('../models/Message');
+const User = require('../models/User');
+const nodemailer = require('nodemailer');
+const path = require('path');
+const fs = require('fs');
+
+const multer = require('multer');
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadPath = path.join(__dirname, '../uploads');
+    if (!fs.existsSync(uploadPath)) fs.mkdirSync(uploadPath, { recursive: true });
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    cb(null, `chat-${Date.now()}-${file.originalname}`);
+  }
+});
+const upload = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
+    if (allowedTypes.includes(file.mimetype)) cb(null, true);
+    else cb(new Error('Only images and PDFs are allowed'), false);
+  },
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+}).single('image');
+
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+
+const sendMessage = asyncHandler(async (req, res) => {
+  upload(req, res, async (err) => {
+    if (err) {
+      console.error('Multer error:', err.message);
+      return res.status(400).json({ message: err.message });
+    }
+
+    const { receiverId, content, orderId, productId } = req.body;
+    const senderId = req.user._id;
+    const image = req.file ? `${process.env.BACKEND_URL}/uploads/${req.file.filename}` : null;
+
+    if (!receiverId) return res.status(400).json({ message: 'Receiver ID is required' });
+    if (!content && !image) return res.status(400).json({ message: 'Either content or image is required' });
+
+    try {
+      const message = await Message.create({
+        sender: senderId,
+        receiver: receiverId,
+        content: content || '',
+        orderId,
+        productId,
+        image,
+        sentBy: senderId,
+      });
+
+      const populatedMessage = await Message.findById(message._id)
+        .populate('sender', 'name email _id')
+        .populate('receiver', 'name email _id');
+
+      if (!populatedMessage.sender || !populatedMessage.receiver) {
+        throw new Error('Failed to populate sender or receiver');
+      }
+
+      const io = req.app.get('io');
+      io.to(`user_${receiverId}`).emit('NEW_MESSAGE', populatedMessage);
+      io.to('admin').emit('NEW_MESSAGE_ADMIN', populatedMessage);
+
+      const receiver = await User.findById(receiverId);
+      if (!receiver.isOnline) {
+        await transporter.sendMail({
+          from: process.env.EMAIL_USER,
+          to: receiver.email,
+          subject: 'New Message in Rice Mill App',
+          text: `You have a new message from ${req.user.name}: ${content || 'Image/PDF message'}\n\nReply at: ${process.env.FRONTEND_URL}`,
+        });
+      }
+
+      res.status(201).json(populatedMessage);
+    } catch (error) {
+      console.error('Message creation error:', error.message);
+      res.status(400).json({ message: error.message });
+    }
+  });
+});
+
+const getChatHistory = asyncHandler(async (req, res) => {
+  const { receiverId } = req.params;
+  const senderId = req.user._id;
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const skip = (page - 1) * limit;
+
+  const messages = await Message.find({
+    $or: [
+      { sender: senderId, receiver: receiverId },
+      { sender: receiverId, receiver: senderId },
+    ],
+  })
+    .populate('sender', 'name email _id')
+    .populate('receiver', 'name email _id')
+    .sort({ createdAt: 1 })
+    .skip(skip)
+    .limit(limit);
+
+  const totalMessages = await Message.countDocuments({
+    $or: [
+      { sender: senderId, receiver: receiverId },
+      { sender: receiverId, receiver: senderId },
+    ],
+  });
+
+  res.json({ messages, totalPages: Math.ceil(totalMessages / limit), currentPage: page });
+});
+
+const getAllChatsForAdmin = asyncHandler(async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const skip = (page - 1) * limit;
+
+  const messages = await Message.find({})
+    .populate('sender', 'name email _id')
+    .populate('receiver', 'name email _id')
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit);
+
+  const totalMessages = await Message.countDocuments();
+
+  if (messages.some(msg => !msg.sender || !msg.receiver)) {
+    console.warn('Some messages have missing sender or receiver data');
+  }
+
+  res.json({ messages, totalPages: Math.ceil(totalMessages / limit), currentPage: page });
+});
+
+const flagMessage = asyncHandler(async (req, res) => {
+  const message = await Message.findByIdAndUpdate(
+    req.params.messageId,
+    { isFlagged: true },
+    { new: true }
+  )
+    .populate('sender', 'name email _id')
+    .populate('receiver', 'name email _id');
+  if (!message) throw new Error('Message not found');
+  res.json(message);
+});
+
+const deleteMessage = asyncHandler(async (req, res) => {
+  const message = await Message.findByIdAndDelete(req.params.messageId);
+  if (!message) throw new Error('Message not found');
+  res.json({ message: 'Message deleted', success: true });
+});
+
+const blockUser = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const user = await User.findByIdAndUpdate(
+    userId,
+    { active: false },
+    { new: true }
+  );
+  if (!user) throw new Error('User not found');
+
+  const io = req.app.get('io');
+  io.to(`user_${userId}`).emit('USER_BLOCKED', { userId });
+  io.to('admin').emit('USER_BLOCKED', { userId });
+
+  res.json({ message: 'User blocked successfully', success: true });
+});
+
+module.exports = { sendMessage, getChatHistory, getAllChatsForAdmin, flagMessage, deleteMessage, blockUser };

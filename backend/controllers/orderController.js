@@ -1,0 +1,702 @@
+const asyncHandler = require('express-async-handler');
+const mongoose = require('mongoose');
+const Order = require('../models/Order');
+const User = require('../models/User');
+const Product = require('../models/Product');
+const Notification = require('../models/Notification');
+const Payment = require('../models/Payment');
+const BulkOrder = require('../models/BulkOrder');
+const nodemailer = require('nodemailer');
+const crypto = require('crypto');
+const Razorpay = require('razorpay');
+const { emitOrderUpdate } = require('../utils/socketNotifications');
+
+let razorpayInstance = null;
+if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
+  razorpayInstance = new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_KEY_SECRET,
+  });
+}
+
+let transporter = null;
+if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+  transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+  });
+}
+
+// Helper function to map bulk order status to regular order status
+const mapBulkStatusToOrderStatus = (bulkStatus) => {
+  const statusMap = {
+    'requested': 'placed',
+    'quote_sent': 'processing',
+    'negotiating': 'processing',
+    'confirmed': 'confirmed',
+    'processing': 'processing',
+    'shipped': 'shipped',
+    'delivered': 'delivered',
+    'cancelled': 'cancelled'
+  };
+  return statusMap[bulkStatus] || 'placed';
+};
+
+exports.createOrder = asyncHandler(async (req, res) => {
+  const { orderItems, shippingAddressId, paymentMethod, razorpayPaymentId, razorpayOrderId, razorpaySignature } = req.body;
+
+  if (!orderItems || !Array.isArray(orderItems) || orderItems.length === 0) {
+    res.status(400); throw new Error('No valid order items provided');
+  }
+  if (!shippingAddressId || !mongoose.Types.ObjectId.isValid(shippingAddressId)) {
+    res.status(400); throw new Error('Valid shipping address ID is required');
+  }
+  if (!paymentMethod || !['cod', 'razorpay'].includes(paymentMethod)) {
+    res.status(400); throw new Error('Invalid payment method');
+  }
+  if (paymentMethod === 'razorpay' && (!razorpayPaymentId || !razorpayOrderId || !razorpaySignature)) {
+    res.status(400); throw new Error('Missing Razorpay payment details');
+  }
+
+  const user = await User.findById(req.user._id).populate('addresses');
+  if (!user) { res.status(404); throw new Error('User not found'); }
+
+  // Find selected address properly
+  const selectedAddress = user.addresses.find(a => a._id.toString() === shippingAddressId);
+  if (!selectedAddress) {
+    res.status(400); throw new Error('Selected shipping address not found');
+  }
+
+  const ordersBySeller = {};
+  let validationError = null;
+  let grandTotal = 0;
+
+  for (const item of orderItems) {
+    if (!item.product || !item.qty || item.qty <= 0) {
+      validationError = 'Invalid item data (missing product or quantity)'; break;
+    }
+    const product = await Product.findById(item.product).select('name price seller images stock');
+    if (!product) { validationError = `Product not found: ID ${item.product}`; break; }
+    if (product.stock < item.qty) { validationError = `Insufficient stock for ${product.name}`; break; }
+    if (!product.seller) { validationError = `Seller missing for ${product.name}`; break; }
+
+    const sellerId = product.seller.toString();
+    if (!ordersBySeller[sellerId]) {
+      ordersBySeller[sellerId] = { seller: sellerId, orderItems: [], totalPrice: 0 };
+    }
+    const itemPrice = product.price;
+    ordersBySeller[sellerId].orderItems.push({
+      product: product._id,
+      name: product.name,
+      qty: item.qty,              
+      price: itemPrice,
+      image: product.images?.[0] || '/images/default-image.jpg',
+      seller: sellerId,
+    });
+    ordersBySeller[sellerId].totalPrice += itemPrice * item.qty;
+    grandTotal += itemPrice * item.qty;
+  }
+  if (validationError) { res.status(400); throw new Error(validationError); }
+
+  // COD Minimum Check
+  if (paymentMethod === 'cod') {
+    for (const sellerId in ordersBySeller) {
+      if (ordersBySeller[sellerId].totalPrice < 1500) {
+        res.status(400);
+        throw new Error(`Minimum ₹1500 required for COD per seller.`);
+      }
+    }
+  }
+
+  // Razorpay Verification
+  let isPaymentVerified = paymentMethod === 'cod';
+  if (paymentMethod === 'razorpay') {
+    if (!razorpayInstance) {
+      res.status(500); throw new Error("Razorpay not configured");
+    }
+    const body = razorpayOrderId + '|' + razorpayPaymentId;
+    const expectedSignature = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET).update(body).digest('hex');
+    if (expectedSignature !== razorpaySignature) {
+      res.status(400); throw new Error('Invalid Razorpay signature');
+    }
+    try {
+      const payment = await razorpayInstance.payments.fetch(razorpayPaymentId);
+      if (payment.status !== 'captured') throw new Error(`Payment not captured: ${payment.status}`);
+      if (payment.amount !== Math.round(grandTotal * 100)) throw new Error("Amount mismatch");
+      isPaymentVerified = true;
+    } catch (err) {
+      res.status(500); throw new Error("Razorpay verification failed");
+    }
+  }
+
+  if (!isPaymentVerified) {
+    res.status(400); throw new Error("Payment could not be verified");
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  const createdOrders = [];
+
+  try {
+    for (const sellerId in ordersBySeller) {
+      const data = ordersBySeller[sellerId];
+      const commissionRate = 0.15;
+      const commissionAmount = data.totalPrice * commissionRate;
+      const sellerEarnings = data.totalPrice - commissionAmount;
+
+      const order = new Order({
+        user: req.user._id,
+        seller: sellerId,
+        orderItems: data.orderItems,
+        shippingAddress: {
+          name: selectedAddress.name, phone: selectedAddress.phone, street: selectedAddress.street,
+          city: selectedAddress.city, state: selectedAddress.state, pinCode: selectedAddress.pinCode,
+          country: selectedAddress.country, addressType: selectedAddress.addressType,
+        },
+        paymentMethod,
+        totalPrice: data.totalPrice,
+        commissionRate, commissionAmount, sellerEarnings,
+        orderStatus: 'placed',
+        isPaid: paymentMethod === 'razorpay',
+        paidAt: paymentMethod === 'razorpay' ? Date.now() : null,
+        paymentStatus: paymentMethod === 'razorpay' ? 'completed' : 'pending',
+        razorpayOrderId: paymentMethod === 'razorpay' ? razorpayOrderId : null,
+        paymentResult: paymentMethod === 'razorpay' ? { id: razorpayPaymentId, status: 'completed', update_time: new Date() } : null,
+      });
+
+      const savedOrder = await order.save({ session });
+      await Payment.create([{
+        order: savedOrder._id, user: savedOrder.user, seller: savedOrder.seller,
+        amount: savedOrder.totalPrice, currency: 'INR', method: savedOrder.paymentMethod,
+        status: savedOrder.paymentStatus, razorpayOrderId: savedOrder.razorpayOrderId,
+        razorpayPaymentId: paymentMethod === 'razorpay' ? razorpayPaymentId : null,
+        razorpaySignature: paymentMethod === 'razorpay' ? razorpaySignature : null,
+        commissionAmount: savedOrder.commissionAmount, sellerPayoutAmount: savedOrder.sellerEarnings,
+        payoutStatus: 'pending',
+      }], { session });
+
+      for (const item of savedOrder.orderItems) {
+        await Product.findByIdAndUpdate(item.product, { $inc: { stock: -item.qty } }, { session });
+      }
+
+      await Notification.create([{
+        user: sellerId, type: 'ORDER_PLACED',
+        message: `New order #${savedOrder._id.toString().slice(-6)} placed. Total: ₹${savedOrder.totalPrice.toFixed(2)}`,
+        relatedEntity: savedOrder._id, entityModel: 'Order'
+      }], { session });
+
+      createdOrders.push(savedOrder);
+    }
+
+    await session.commitTransaction();
+
+    const io = req.app.get('io');
+    if (io) {
+      createdOrders.forEach(order => {
+        emitOrderUpdate(io, order.user.toString(), order._id, { status: 'placed', isPaid: order.isPaid });
+        emitOrderUpdate(io, order.seller.toString(), order._id, { status: 'placed', isPaid: order.isPaid });
+        io.to('admin').emit('NEW_ORDER', { type: 'NEW_ORDER', data: { orderId: order._id } });
+      });
+    }
+
+    if (transporter && user.email) {
+      try {
+        await transporter.sendMail({
+          from: `"RiceMill Express" <${process.env.EMAIL_USER}>`, to: user.email,
+          subject: 'Order Confirmation',
+          text: `Your order(s) placed successfully! Total: ₹${grandTotal.toFixed(2)}`,
+        });
+      } catch (e) { console.error('Email error:', e); }
+    }
+
+    res.status(201).json({ message: 'Order(s) created', orders: createdOrders });
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
+  }
+});
+
+exports.getOrderById = asyncHandler(async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(400).json({ message: 'Invalid order ID format' });
+  }
+  try {
+    const order = await Order.findById(req.params.id)
+      .populate('user', 'name phone email')
+      .populate('seller', 'name businessDetails.businessName phone email')
+      .populate('orderItems.product', 'name price images')
+      .populate('deliveryPartner', 'name phone');
+
+    if (!order) {
+       return res.status(404).json({ message: 'Order not found' });
+    }
+
+    // Authorization Check
+    if ( req.user.role !== 'admin' &&
+         order.user._id.toString() !== req.user._id.toString() &&
+         order.seller._id.toString() !== req.user._id.toString() )
+    {
+         res.status(403);
+         throw new Error('Not authorized to view this order');
+    }
+
+    res.json(order);
+  } catch (error) {
+    console.error('Error fetching order:', error.message, error.stack);
+    res.status(error.statusCode || 500).json({ message: error.message || 'Server error while fetching order' });
+  }
+});
+
+exports.updateOrderStatus = asyncHandler(async (req, res) => {
+    const { status, reason, partnerId } = req.body;
+    const orderId = req.params.id;
+
+    if (!mongoose.Types.ObjectId.isValid(orderId)) { res.status(400); throw new Error('Invalid order ID'); }
+    if (!status) { res.status(400); throw new Error('Status is required'); }
+
+    const order = await Order.findById(orderId);
+    if (!order) { res.status(404); throw new Error('Order not found'); }
+
+    if (req.user.role !== 'admin' && order.seller.toString() !== req.user._id.toString()) {
+        res.status(403); throw new Error('Not authorized to update this order status');
+    }
+
+    // Status Transition Logic
+    const currentStatus = order.orderStatus;
+    const validTransitions = {
+        placed: ['processing', 'cancelled'], processing: ['packed', 'cancelled'],
+        packed: ['shipped', 'cancelled'], shipped: ['out_for_delivery', 'delivered', 'cancelled'],
+        out_for_delivery: ['delivered', 'cancelled'], delivered: [], cancelled: [],
+    };
+
+    if (!validTransitions[currentStatus] || !validTransitions[currentStatus].includes(status)) {
+        res.status(400);
+        throw new Error(`Invalid status transition from ${currentStatus} to ${status}`);
+    }
+
+    order.orderStatus = status;
+    order.statusHistory.push({ status, timestamp: new Date(), reason: reason || undefined });
+
+    if (status === 'shipped' && partnerId) order.deliveryPartner = partnerId;
+    if (status === 'delivered') { order.isDelivered = true; order.deliveredAt = Date.now(); }
+    if (status === 'cancelled') {
+        order.cancelReason = reason || 'Cancelled by seller/admin';
+        // Restore stock only if order was not already delivered
+        if (!order.isDelivered) {
+             for (const item of order.orderItems) { await Product.findByIdAndUpdate(item.product, { $inc: { stock: item.qty } }); }
+        }
+        // Update payment status (handle potential refunds)
+        const paymentUpdate = { status: order.isPaid ? 'refunded' : 'failed', notes: `Order cancelled. Reason: ${order.cancelReason}` };
+        await Payment.updateOne({ order: order._id }, { $set: paymentUpdate });
+        order.paymentStatus = paymentUpdate.status;
+        if (order.isPaid && order.paymentMethod === 'razorpay') {
+             console.warn(`Order ${orderId} was cancelled but paid online. Manual refund might be required.`);
+             await Notification.create({
+                 user: process.env.ADMIN_USER_ID,
+                 type: 'SYSTEM',
+                 message: `Order #${order._id.toString().slice(-6)} (Paid Online) was cancelled. Manual refund needed.`,
+                 relatedEntity: order._id,
+                 entityModel: 'Order'
+             });
+        }
+    }
+
+    const updatedOrder = await order.save();
+    // Notify user
+    await Notification.create({
+        user: order.user,
+        type: 'ORDER_STATUS_UPDATE',
+        message: `Your order #${order._id.toString().slice(-6)} status: ${status}. ${reason ? `Reason: ${reason}` : ''}`,
+        relatedEntity: order._id,
+        entityModel: 'Order'
+    });
+    // Emit socket events
+    const io = req.app.get('io');
+    if (io) {
+        const updateDataEmit = { status: updatedOrder.orderStatus, isDelivered: updatedOrder.isDelivered, deliveredAt: updatedOrder.deliveredAt };
+        emitOrderUpdate(io, order.user.toString(), order._id, updateDataEmit);
+        emitOrderUpdate(io, order.seller.toString(), order._id, updateDataEmit);
+        io.to('admin').emit('ORDER_UPDATE', { type: 'ORDER_UPDATE', data: { orderId: order._id, ...updateDataEmit } });
+        if (['delivered', 'cancelled'].includes(status)) {
+           io.to(`seller_${order.seller.toString()}`).emit('REFRESH_ANALYTICS', { sellerId: order.seller.toString() });
+        }
+    }
+
+    res.json(updatedOrder);
+});
+
+exports.cancelOrder = asyncHandler(async (req, res) => {
+    const { cancellationReason } = req.body;
+    const orderId = req.params.id;
+
+    if (!cancellationReason) { res.status(400); throw new Error('Cancellation reason is required'); }
+    if (!mongoose.Types.ObjectId.isValid(orderId)) { res.status(400); throw new Error('Invalid order ID'); }
+
+    const order = await Order.findById(orderId);
+    if (!order) { res.status(404); throw new Error('Order not found'); }
+
+    // Authorization: Ensure the user owns the order
+    if (order.user.toString() !== req.user._id.toString()) {
+           res.status(403); throw new Error('Not authorized to cancel this order');
+    }
+    // Check if cancellable (e.g., only 'placed' or 'processing')
+    if (!['placed', 'processing'].includes(order.orderStatus)) {
+        res.status(400); throw new Error(`Order cannot be cancelled. Current status: ${order.orderStatus}`);
+    }
+
+    order.orderStatus = 'cancelled';
+    order.statusHistory.push({ status: 'cancelled', timestamp: new Date(), reason: cancellationReason });
+    order.cancelReason = cancellationReason;
+
+    // Restore stock
+    for (const item of order.orderItems) { await Product.findByIdAndUpdate(item.product, { $inc: { stock: item.qty } }); }
+
+    // Update payment status
+    const paymentUpdate = { status: order.isPaid ? 'refunded' : 'failed', notes: `Order cancelled by user. Reason: ${order.cancelReason}` };
+    await Payment.updateOne({ order: order._id }, { $set: paymentUpdate });
+    order.paymentStatus = paymentUpdate.status;
+
+    // Handle potential refund for paid Razorpay orders
+    if (order.isPaid && order.paymentMethod === 'razorpay') {
+         console.warn(`Order ${orderId} was cancelled by user but paid online. Manual refund might be required.`);
+    }
+
+    const updatedOrder = await order.save();
+    // Notify Seller
+    await Notification.create({
+        user: order.seller,
+        type: 'ORDER_CANCELLED',
+        message: `Order #${order._id.toString().slice(-6)} was cancelled by the customer. Reason: ${cancellationReason}`,
+        relatedEntity: order._id,
+        entityModel: 'Order'
+    });
+    // Emit socket events
+    const io = req.app.get('io');
+    if (io) {
+        const updateDataEmit = { status: 'cancelled' };
+        emitOrderUpdate(io, order.user.toString(), order._id, updateDataEmit);
+        emitOrderUpdate(io, order.seller.toString(), order._id, updateDataEmit);
+        io.to('admin').emit('ORDER_UPDATE', { type: 'ORDER_UPDATE', data: { orderId: order._id, ...updateDataEmit } });
+        io.to(`seller_${order.seller.toString()}`).emit('REFRESH_ANALYTICS', { sellerId: order.seller.toString() });
+     }
+
+    res.json(updatedOrder);
+});
+
+exports.getMyOrders = asyncHandler(async (req, res) => {
+  try {
+    const orders = await Order.find({ user: req.user._id })
+      .populate('seller', 'name businessDetails.businessName')
+      .populate('orderItems.product', 'name images')
+      .sort({ createdAt: -1 })
+      .lean();
+    
+    // Also get bulk orders and merge them
+    const bulkOrders = await BulkOrder.find({ buyer: req.user._id })
+      .populate('seller', 'name businessName phone')
+      .populate('items.product', 'name brand weight price images')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    console.log(`📦 Found ${orders.length} regular orders and ${bulkOrders.length} bulk orders for user ${req.user._id}`);
+
+    // Convert bulk orders to regular order format for frontend compatibility
+    const formattedBulkOrders = bulkOrders.map(bulkOrder => ({
+      _id: bulkOrder._id,
+      orderNumber: bulkOrder.orderNumber,
+      user: req.user._id,
+      seller: bulkOrder.seller,
+      orderItems: bulkOrder.items.map(item => ({
+        product: item.product,
+        name: item.product?.name || 'Bulk Product',
+        qty: item.quantity,
+        price: item.negotiatedPrice || item.requestedPrice || item.product?.price || 0,
+        image: item.product?.images?.[0] || '/images/default-image.jpg'
+      })),
+      shippingAddress: bulkOrder.shippingAddress,
+      paymentMethod: 'bulk_order',
+      totalPrice: bulkOrder.items.reduce((sum, item) => {
+        const price = item.negotiatedPrice || item.requestedPrice || item.product?.price || 0;
+        return sum + (price * item.quantity);
+      }, 0),
+      orderStatus: mapBulkStatusToOrderStatus(bulkOrder.status),
+      isPaid: ['confirmed', 'processing', 'shipped', 'delivered'].includes(bulkOrder.status),
+      paymentStatus: ['confirmed', 'processing', 'shipped', 'delivered'].includes(bulkOrder.status) ? 'completed' : 'pending',
+      isBulkOrder: true,
+      bulkOrderRef: bulkOrder._id,
+      createdAt: bulkOrder.createdAt,
+      updatedAt: bulkOrder.updatedAt
+    }));
+
+    // Combine both regular and bulk orders
+    const allOrders = [...orders, ...formattedBulkOrders].sort((a, b) => 
+      new Date(b.createdAt) - new Date(a.createdAt)
+    );
+
+    res.json(allOrders);
+  } catch (error) {
+    console.error('Error in getMyOrders:', error.message, error.stack);
+    res.status(500).json({ message: 'Failed to fetch your orders', error: error.message });
+  }
+});
+
+exports.getOrders = asyncHandler(async (req, res) => {
+    const pageSize = Number(req.query.limit) || 10;
+    const page = Number(req.query.pageNumber) || 1;
+    const { status, sellerId, userId, sort = '-createdAt' } = req.query;
+
+    // Build query object
+    const query = {};
+    if (status) query.orderStatus = status;
+    if (sellerId && mongoose.Types.ObjectId.isValid(sellerId)) query.seller = sellerId;
+    if (userId && mongoose.Types.ObjectId.isValid(userId)) query.user = userId;
+
+    try {
+        const count = await Order.countDocuments(query);
+        const orders = await Order.find(query)
+            .populate('user', 'name email phone')
+            .populate('seller', 'name email businessDetails.businessName')
+            .populate('deliveryPartner', 'name')
+            .sort(sort)
+            .limit(pageSize)
+            .skip(pageSize * (page - 1))
+            .lean();
+
+        res.json({
+            orders: orders || [],
+            page,
+            pages: Math.ceil(count / pageSize),
+            total: count
+        });
+    } catch (error) {
+        console.error('Error in getOrders (Admin):', error.message, error.stack);
+        res.status(500).json({ message: 'Failed to fetch orders', error: error.message });
+    }
+});
+
+exports.getSellerOrders = asyncHandler(async (req, res) => {
+  const pageSize = Number(req.query.limit) || 50;
+  const page = Number(req.query.pageNumber) || 1;
+  const { status, sort = '-createdAt' } = req.query;
+  
+  const query = { seller: req.user._id };
+  if (status) query.orderStatus = status;
+  
+  try {
+    const count = await Order.countDocuments(query);
+    const orders = await Order.find(query)
+      .populate('user', 'name phone')
+      .populate('orderItems.product', 'name price')
+      .populate('deliveryPartner', 'name phone')
+      .sort(sort)
+      .limit(pageSize)
+      .skip(pageSize * (page - 1))
+      .lean();
+
+    // Also get bulk orders for this seller
+    const bulkOrdersQuery = { seller: req.user._id };
+    if (status) {
+      // Map regular order status to bulk order status
+      const bulkStatusMap = {
+        'placed': 'requested',
+        'processing': ['quote_sent', 'negotiating', 'confirmed', 'processing'],
+        'shipped': 'shipped',
+        'delivered': 'delivered',
+        'cancelled': 'cancelled'
+      };
+      if (bulkStatusMap[status]) {
+        bulkOrdersQuery.status = bulkStatusMap[status];
+      }
+    }
+
+    const bulkOrders = await BulkOrder.find(bulkOrdersQuery)
+      .populate('buyer', 'name phone')
+      .populate('items.product', 'name price images')
+      .sort(sort)
+      .lean();
+
+    // Convert bulk orders to regular order format for consistency
+    const formattedBulkOrders = bulkOrders.map(bulkOrder => ({
+      _id: bulkOrder._id,
+      orderNumber: bulkOrder.orderNumber,
+      user: bulkOrder.buyer,
+      seller: bulkOrder.seller,
+      orderItems: bulkOrder.items.map(item => ({
+        product: item.product,
+        name: item.product?.name || 'Bulk Product',
+        qty: item.quantity,
+        price: item.negotiatedPrice || item.requestedPrice || item.product?.price || 0,
+        image: item.product?.images?.[0] || '/images/default-image.jpg'
+      })),
+      shippingAddress: bulkOrder.shippingAddress,
+      paymentMethod: 'bulk_order',
+      totalPrice: bulkOrder.items.reduce((sum, item) => {
+        const price = item.negotiatedPrice || item.requestedPrice || item.product?.price || 0;
+        return sum + (price * item.quantity);
+      }, 0),
+      orderStatus: mapBulkStatusToOrderStatus(bulkOrder.status),
+      isPaid: ['confirmed', 'processing', 'shipped', 'delivered'].includes(bulkOrder.status),
+      paymentStatus: ['confirmed', 'processing', 'shipped', 'delivered'].includes(bulkOrder.status) ? 'completed' : 'pending',
+      isBulkOrder: true,
+      bulkOrderRef: bulkOrder._id,
+      createdAt: bulkOrder.createdAt,
+      updatedAt: bulkOrder.updatedAt
+    }));
+
+    // Combine both regular and bulk orders
+    const allOrders = [...orders, ...formattedBulkOrders].sort((a, b) => 
+      new Date(b.createdAt) - new Date(a.createdAt)
+    );
+
+    console.log(`📦 Seller ${req.user._id}: Found ${orders.length} regular + ${bulkOrders.length} bulk = ${allOrders.length} total orders`);
+
+    res.json({ 
+      orders: allOrders, 
+      page, 
+      pages: Math.ceil((count + bulkOrders.length) / pageSize),
+      total: count + bulkOrders.length 
+    });
+  } catch (error) {
+    console.error('Error in getSellerOrders:', error.message, error.stack);
+    res.status(500).json({ message: 'Failed to fetch seller orders', error: error.message });
+  }
+});
+
+exports.assignDeliveryPartner = asyncHandler(async (req, res) => {
+    const { partnerId } = req.body;
+    const orderId = req.params.id;
+    if (!mongoose.Types.ObjectId.isValid(orderId)) { res.status(400); throw new Error('Invalid order ID'); }
+    if (partnerId && !mongoose.Types.ObjectId.isValid(partnerId)) { res.status(400); throw new Error('Invalid delivery partner ID'); }
+    const order = await Order.findById(orderId);
+    if (!order) { res.status(404); throw new Error('Order not found'); }
+    // Authorization
+    if (req.user.role !== 'admin' && order.seller.toString() !== req.user._id.toString()) {
+        res.status(403); throw new Error('Not authorized for this order');
+    }
+    const oldPartner = order.deliveryPartner?.toString();
+    order.deliveryPartner = partnerId || null;
+    // Auto-update status to 'shipped' if assigning for the first time on packable orders
+    if (partnerId && !oldPartner && ['packed', 'processing'].includes(order.orderStatus)) {
+        order.orderStatus = 'shipped'; order.statusHistory.push({ status: 'shipped', timestamp: new Date() });
+    }
+    const updatedOrder = await order.save();
+    // Emit socket events
+    const io = req.app.get('io');
+    if (io) {
+        const updateDataEmit = { status: updatedOrder.orderStatus, deliveryPartner: updatedOrder.deliveryPartner };
+        emitOrderUpdate(io, order.user.toString(), order._id, updateDataEmit);
+        emitOrderUpdate(io, order.seller.toString(), order._id, updateDataEmit);
+        io.to('admin').emit('ORDER_UPDATE', { type: 'ORDER_UPDATE', data: { orderId: order._id, ...updateDataEmit } });
+    }
+    res.json({ message: 'Delivery partner updated', order: updatedOrder });
+});
+
+exports.updateOrderToDelivered = asyncHandler(async (req, res) => {
+    const orderId = req.params.id;
+    if (!mongoose.Types.ObjectId.isValid(orderId)) { res.status(400); throw new Error('Invalid order ID'); }
+    const order = await Order.findById(orderId);
+    if (!order) { res.status(404); throw new Error('Order not found'); }
+    // Authorization: Check roles
+    const isSeller = order.seller.toString() === req.user._id.toString();
+    const isDeliveryPartner = order.deliveryPartner?.toString() === req.user._id.toString();
+    const isAdmin = req.user.role === 'admin';
+    const isAllowedRole = req.user.role === 'deliveryPartner';
+
+    if (!isAdmin && !isSeller && !(isDeliveryPartner && isAllowedRole) ) {
+         res.status(403); throw new Error('Not authorized to mark this order as delivered');
+    }
+    // Check if deliverable status
+    if (!['shipped', 'out_for_delivery'].includes(order.orderStatus)) {
+         res.status(400); throw new Error(`Order cannot be marked delivered from status: ${order.orderStatus}`);
+    }
+    // Update order
+    order.orderStatus = 'delivered'; order.isDelivered = true; order.deliveredAt = Date.now();
+    order.statusHistory.push({ status: 'delivered', timestamp: new Date() });
+    const updatedOrder = await order.save();
+    // Notifications
+    await Notification.create([
+         { user: order.user, type: 'ORDER_STATUS_UPDATE', message: `Your order has been delivered` },
+         { user: order.seller, type: 'ORDER_STATUS_UPDATE', message: `Order delivered to customer` }
+    ]);
+    // Emit sockets
+    const io = req.app.get('io');
+    if (io) {
+        const updateDataEmit = { status: 'delivered', isDelivered: true, deliveredAt: order.deliveredAt };
+        emitOrderUpdate(io, order.user.toString(), order._id, updateDataEmit);
+        emitOrderUpdate(io, order.seller.toString(), order._id, updateDataEmit);
+        io.to('admin').emit('ORDER_UPDATE', { type: 'ORDER_UPDATE', data: { orderId: order._id, ...updateDataEmit } });
+        io.to(`seller_${order.seller.toString()}`).emit('REFRESH_ANALYTICS', { sellerId: order.seller.toString() });
+     }
+    res.json({ message: 'Order marked as delivered', order: updatedOrder });
+});
+
+exports.getSellerAnalytics = asyncHandler(async (req, res) => {
+  const sellerId = req.user._id;
+  const timeframe = req.query.timeframe || '30d';
+  const days = parseInt(timeframe.replace('d', ''), 10) || 30;
+  if (req.user.role !== 'seller') { res.status(403); throw new Error('Only sellers can access analytics'); }
+  const startDate = new Date(); startDate.setHours(0, 0, 0, 0); startDate.setDate(startDate.getDate() - days + 1);
+  try {
+    // Aggregation for daily sales from completed orders
+    const salesAggregation = await Order.aggregate([
+      { $match: { seller: sellerId, deliveredAt: { $gte: startDate }, orderStatus: 'delivered', paymentStatus: 'completed' } },
+      { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$deliveredAt" } }, dailySales: { $sum: "$sellerEarnings" }, dailyOrders: { $sum: 1 } } },
+      { $sort: { _id: 1 } }
+    ]);
+    // Count total non-cancelled orders in the period
+    const totalOrders = await Order.countDocuments({ seller: sellerId, createdAt: { $gte: startDate }, orderStatus: { $ne: 'cancelled' } });
+    // Sum total sales from the aggregation
+    const totalSales = salesAggregation.reduce((sum, day) => sum + day.dailySales, 0);
+    // Aggregation for top 5 popular products
+    const popularProductsAggregation = await Order.aggregate([
+       { $match: { seller: sellerId, createdAt: { $gte: startDate }, orderStatus: { $ne: 'cancelled' } } },
+       { $unwind: "$orderItems" },
+       { $group: { _id: "$orderItems.product", totalQuantity: { $sum: "$orderItems.qty" } } },
+       { $sort: { totalQuantity: -1 } }, { $limit: 5 },
+       { $lookup: { from: "products", localField: "_id", foreignField: "_id", as: "productInfo" } },
+       { $unwind: { path: "$productInfo", preserveNullAndEmptyArrays: true } },
+       { $project: { _id: 0, k: "$productInfo.name", v: "$totalQuantity" } }
+    ]);
+    // Prepare daily sales data for charting (fill missing days with 0)
+    const salesMap = salesAggregation.reduce((map, item) => { map[item._id] = item.dailySales; return map; }, {});
+    const sales = [];
+    for (let i = 0; i < days; i++) {
+        const d = new Date(startDate);
+        d.setDate(d.getDate() + i);
+        const key = d.toISOString().split('T')[0];
+        sales.push({ date: key, amount: salesMap[key] || 0 });
+    }
+    // Response object
+    res.json({ totalOrders, totalSales, sales, popularProducts: popularProductsAggregation });
+  } catch (error) {
+     console.error("Error fetching seller analytics:", error);
+     res.status(500).json({ message: "Failed to fetch analytics", error: error.message });
+  }
+});
+
+// Deprecated functions
+exports.updateOrder = asyncHandler(async (req, res) => {
+  console.warn("Usage of deprecated updateOrder route detected.");
+  const order = await Order.findById(req.params.id);
+  res.json(order);
+});
+
+exports.updateOrderToPaid = asyncHandler(async (req, res) => {
+  console.warn("Usage of deprecated updateOrderToPaid route detected.");
+  const order = await Order.findById(req.params.id);
+  res.json({ message: 'Payment updated manually', order });
+});
+
+exports.uploadCodProof = asyncHandler(async (req, res) => {
+    console.warn("Usage of deprecated uploadCodProof route detected.");
+    const order = await Order.findById(req.params.id);
+    res.json(order);
+});
+
+// ✅ FIXED: Add missing shiprocketWebhook function
+exports.shiprocketWebhook = asyncHandler(async (req, res) => {
+  console.log('Shiprocket webhook received:', req.body);
+  res.json({ message: 'Webhook received' });
+});

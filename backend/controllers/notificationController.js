@@ -1,0 +1,224 @@
+const asyncHandler = require('express-async-handler');
+const Notification = require('../models/Notification');
+
+// @desc    Get user notifications
+// @route   GET /api/notifications
+// @access  Private
+const getUserNotifications = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 20, type, read } = req.query;
+  const skip = (page - 1) * limit;
+
+  const query = { user: req.user._id };
+  
+  if (type && type !== 'all') query.type = type;
+  if (read !== undefined) query.read = read === 'true';
+
+  const notifications = await Notification.find(query)
+    .sort({ createdAt: -1 })
+    .limit(parseInt(limit))
+    .skip(skip)
+    .populate('relatedEntity')
+    .lean();
+
+  const total = await Notification.countDocuments(query);
+  const unreadCount = await Notification.countDocuments({ 
+    user: req.user._id, 
+    read: false 
+  });
+
+  res.json({
+    success: true,
+    notifications,
+    total,
+    unreadCount,
+    page: parseInt(page),
+    pages: Math.ceil(total / limit),
+    limit: parseInt(limit)
+  });
+});
+
+// @desc    Get admin notifications
+// @route   GET /api/notifications/admin
+// @access  Private/Admin
+const getAdminNotifications = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 50, priority, read } = req.query;
+  const skip = (page - 1) * limit;
+
+  const query = { user: req.user._id };
+  
+  if (priority && priority !== 'all') query.priority = priority;
+  if (read !== undefined) query.read = read === 'true';
+
+  const notifications = await Notification.find(query)
+    .sort({ createdAt: -1 })
+    .limit(parseInt(limit))
+    .skip(skip)
+    .populate('relatedEntity')
+    .lean();
+
+  const total = await Notification.countDocuments(query);
+  const unreadCount = await Notification.countDocuments({ 
+    user: req.user._id, 
+    read: false 
+  });
+
+  // Get notification statistics for admin
+  const stats = await Notification.aggregate([
+    { $match: { user: req.user._id } },
+    {
+      $group: {
+        _id: '$type',
+        count: { $sum: 1 },
+        unread: {
+          $sum: { $cond: [{ $eq: ['$read', false] }, 1, 0] }
+        }
+      }
+    }
+  ]);
+
+  res.json({
+    success: true,
+    notifications,
+    total,
+    unreadCount,
+    stats,
+    page: parseInt(page),
+    pages: Math.ceil(total / limit),
+    limit: parseInt(limit)
+  });
+});
+
+// @desc    Mark notification as read
+// @route   PUT /api/notifications/:id/read
+// @access  Private
+const markAsRead = asyncHandler(async (req, res) => {
+  const notification = await Notification.findById(req.params.id);
+
+  if (!notification) {
+    res.status(404);
+    throw new Error('Notification not found');
+  }
+
+  if (notification.user.toString() !== req.user._id.toString()) {
+    res.status(403);
+    throw new Error('Not authorized to update this notification');
+  }
+
+  notification.read = true;
+  notification.readAt = new Date();
+  await notification.save();
+
+  // Emit socket event
+  if (req.app.get('io')) {
+    req.app.get('io').to(`user_${req.user._id}`).emit('NOTIFICATION_READ', { 
+      notificationId: notification._id 
+    });
+  }
+
+  res.json({ success: true, message: 'Notification marked as read' });
+});
+
+// @desc    Mark all notifications as read
+// @route   PUT /api/notifications/read-all
+// @access  Private
+const markAllAsRead = asyncHandler(async (req, res) => {
+  await Notification.updateMany(
+    { user: req.user._id, read: false },
+    { 
+      $set: { 
+        read: true, 
+        readAt: new Date() 
+      } 
+    }
+  );
+
+  // Emit socket event
+  if (req.app.get('io')) {
+    req.app.get('io').to(`user_${req.user._id}`).emit('ALL_NOTIFICATIONS_READ');
+  }
+
+  res.json({ success: true, message: 'All notifications marked as read' });
+});
+
+// @desc    Delete notification
+// @route   DELETE /api/notifications/:id
+// @access  Private
+const deleteNotification = asyncHandler(async (req, res) => {
+  const notification = await Notification.findById(req.params.id);
+
+  if (!notification) {
+    res.status(404);
+    throw new Error('Notification not found');
+  }
+
+  if (notification.user.toString() !== req.user._id.toString()) {
+    res.status(403);
+    throw new Error('Not authorized to delete this notification');
+  }
+
+  await Notification.deleteOne({ _id: req.params.id });
+
+  res.json({ success: true, message: 'Notification deleted' });
+});
+
+// @desc    Clear all notifications
+// @route   DELETE /api/notifications
+// @access  Private
+const clearAllNotifications = asyncHandler(async (req, res) => {
+  await Notification.deleteMany({ user: req.user._id });
+
+  res.json({ success: true, message: 'All notifications cleared' });
+});
+
+// @desc    Get notification statistics
+// @route   GET /api/notifications/stats
+// @access  Private
+const getNotificationStats = asyncHandler(async (req, res) => {
+  const stats = await Notification.aggregate([
+    { $match: { user: req.user._id } },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: 1 },
+        unread: {
+          $sum: { $cond: [{ $eq: ['$read', false] }, 1, 0] }
+        },
+        read: {
+          $sum: { $cond: [{ $eq: ['$read', true] }, 1, 0] }
+        }
+      }
+    }
+  ]);
+
+  const typeStats = await Notification.aggregate([
+    { $match: { user: req.user._id } },
+    {
+      $group: {
+        _id: '$type',
+        count: { $sum: 1 },
+        unread: {
+          $sum: { $cond: [{ $eq: ['$read', false] }, 1, 0] }
+        }
+      }
+    },
+    { $sort: { count: -1 } }
+  ]);
+
+  const result = stats[0] || { total: 0, unread: 0, read: 0 };
+  result.byType = typeStats;
+
+  res.json({
+    success: true,
+    ...result
+  });
+});
+
+module.exports = {
+  getUserNotifications,
+  getAdminNotifications,
+  markAsRead,
+  markAllAsRead,
+  deleteNotification,
+  clearAllNotifications,
+  getNotificationStats
+};
