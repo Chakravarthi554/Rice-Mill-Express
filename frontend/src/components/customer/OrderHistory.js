@@ -10,16 +10,19 @@ import OrderTracker from './OrderTracker';
 const OrderHistory = () => {
   const dispatch = useDispatch();
   const { loading, error, orders } = useSelector(state => state.orderListMy);
-  const { success: cancelSuccess } = useSelector(state => state.orderCancel);
+  const { loading: cancelLoading, success: cancelSuccess } = useSelector(state => state.orderCancel);
+  const [cancellingId, setCancellingId] = React.useState(null);
 
   useEffect(() => {
     dispatch(listMyOrders());
   }, [dispatch, cancelSuccess]);
 
-  const handleCancel = (orderId) => {
+  const handleCancel = async (orderId) => {
     const reason = window.prompt('Reason for cancellation:');
     if (reason && window.confirm('Cancel order?')) {
-      dispatch(cancelOrder(orderId, reason));
+      setCancellingId(orderId);
+      await dispatch(cancelOrder(orderId, reason));
+      setCancellingId(null);
     }
   };
 
@@ -48,8 +51,15 @@ const OrderHistory = () => {
               <TableCell>{o.orderStatus}</TableCell>
               <TableCell>
                 {['placed', 'processing', 'packed'].includes(o.orderStatus.toLowerCase()) && (
-                  <Button size="small" color="error" variant="outlined" onClick={() => handleCancel(o._id)}>
-                    Cancel
+                  <Button
+                    size="small"
+                    color="error"
+                    variant="outlined"
+                    onClick={() => handleCancel(o._id)}
+                    disabled={cancellingId === o._id}
+                    startIcon={cancellingId === o._id ? <CircularProgress size={16} /> : null}
+                  >
+                    {cancellingId === o._id ? 'Cancelling...' : 'Cancel'}
                   </Button>
                 )}
               </TableCell>

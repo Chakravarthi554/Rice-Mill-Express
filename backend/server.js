@@ -116,6 +116,7 @@ const loadRoutes = () => {
     { path: "/api/seller", name: "Seller", file: "./routes/sellerRoutes" },
     { path: "/api/messages", name: "Messages", file: "./routes/messageRoutes" },
     { path: "/api/recipes", name: "Recipes", file: "./routes/recipeRoutes" },
+    { path: "/api/legal", name: "Legal", file: "./routes/legalRoutes" },
     { path: "/api/forum", name: "Forum", file: "./routes/forumRoutes" },
     { path: "/api/social", name: "Social", file: "./routes/socialRoutes" },
     { path: "/api/admin/settings", name: "Admin Settings", file: "./routes/adminSettings" },
@@ -149,6 +150,8 @@ try {
   const adminPaymentRoutesPath = path.join(__dirname, './routes/adminPaymentRoutes.js');
   if (fs.existsSync(adminPaymentRoutesPath)) {
     const adminPaymentRoutes = require('./routes/adminPaymentRoutes');
+    const recipeRoutes = require('./routes/recipeRoutes');
+    const legalRoutes = require('./routes/legalRoutes');
     app.use('/api/admin/payments', adminPaymentRoutes);
     console.log('✅ Admin Payments routes loaded at /api/admin/payments');
   } else {

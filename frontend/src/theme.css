@@ -1,0 +1,163 @@
+/* Global Theme Styles for Rice Mill App */
+
+:root {
+  --base-font-size: 16px;
+  --contrast-level: 0;
+  
+  /* Light Mode Colors */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5f5;
+  --text-primary: #212121;
+  --text-secondary: #757575;
+  --border-color: #e0e0e0;
+}
+
+/* Dark Mode */
+.dark-mode {
+  --bg-primary: #121212;
+  --bg-secondary: #1e1e1e;
+  --text-primary: #ffffff;
+  --text-secondary: #b0b0b0;
+  --border-color: #333333;
+}
+
+.dark-mode body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.dark-mode .MuiPaper-root {
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+}
+
+.dark-mode .MuiTypography-root {
+  color: var(--text-primary) !important;
+}
+
+.dark-mode .MuiTypography-colorTextSecondary {
+  color: var(--text-secondary) !important;
+}
+
+.dark-mode .MuiButton-outlined {
+  border-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+.dark-mode .MuiOutlinedInput-root {
+  color: var(--text-primary) !important;
+}
+
+.dark-mode .MuiOutlinedInput-notchedOutline {
+  border-color: var(--border-color) !important;
+}
+
+.dark-mode .MuiInputLabel-root {
+  color: var(--text-secondary) !important;
+}
+
+.dark-mode .MuiTableCell-root {
+  color: var(--text-primary) !important;
+  border-bottom-color: var(--border-color) !important;
+}
+
+.dark-mode .MuiCard-root {
+  background-color: var(--bg-secondary) !important;
+}
+
+.dark-mode .MuiListItem-root {
+  color: var(--text-primary) !important;
+}
+
+.dark-mode .MuiDivider-root {
+  background-color: var(--border-color) !important;
+}
+
+/* High Contrast Mode */
+.high-contrast {
+  filter: contrast(calc(1 + var(--contrast-level) / 100));
+}
+
+.high-contrast .MuiButton-contained {
+  box-shadow: 0 0 0 2px currentColor !important;
+}
+
+.high-contrast .MuiOutlinedInput-root {
+  border-width: 2px !important;
+}
+
+.high-contrast a {
+  text-decoration: underline !important;
+  font-weight: 600 !important;
+}
+
+/* Text Size Scaling */
+html {
+  font-size: var(--base-font-size);
+}
+
+body {
+  font-size: 1rem;
+}
+
+h1 {
+  font-size: 2.5rem;
+}
+
+h2 {
+  font-size: 2rem;
+}
+
+h3 {
+  font-size: 1.75rem;
+}
+
+h4 {
+  font-size: 1.5rem;
+}
+
+h5 {
+  font-size: 1.25rem;
+}
+
+h6 {
+  font-size: 1rem;
+}
+
+/* Smooth Transitions */
+* {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, filter 0.3s ease;
+}
+
+/* Accessibility Improvements */
+.dark-mode *:focus-visible {
+  outline: 2px solid #90caf9 !important;
+  outline-offset: 2px;
+}
+
+.light-mode *:focus-visible {
+  outline: 2px solid #1976d2 !important;
+  outline-offset: 2px;
+}
+
+/* Print Styles */
+@media print {
+  .dark-mode {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f5f5f5;
+    --text-primary: #000000;
+    --text-secondary: #666666;
+  }
+  
+  .high-contrast {
+    filter: none;
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

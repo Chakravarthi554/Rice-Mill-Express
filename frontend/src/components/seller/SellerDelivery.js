@@ -39,7 +39,14 @@ const SellerDelivery = () => {
     phone: '',
     vehicleType: '',
     vehicleNumber: '',
-    licenseNumber: ''
+    licenseNumber: '',
+    aadharNumber: '',
+    panNumber: ''
+  });
+  const [kycFiles, setKycFiles] = useState({
+    aadharPhoto: null,
+    panPhoto: null,
+    driverPhoto: null
   });
   const deliveryPartnerList = useSelector(state => state.deliveryPartnerList || {});
   const {
@@ -65,8 +72,10 @@ const SellerDelivery = () => {
     const { user } = JSON.parse(localStorage.getItem('userInfo')) || {};
     if (user?._id) {
       const socket = new OrderTrackingSocket(user._id, user.role, (data) => {
-        if (data.type === 'orderUpdated') {
-          dispatch(listOrdersForDelivery()); // Refresh orders when updated
+        console.log('🔌 Socket event received:', data);
+        if (data.type === 'ORDER_UPDATE' || data.type === 'orderUpdated') {
+          console.log('🔄 Refreshing orders due to socket update');
+          dispatch(listOrdersForDelivery());
         }
       });
       return () => socket.disconnect();
@@ -76,7 +85,37 @@ const SellerDelivery = () => {
   useEffect(() => {
     dispatch(listDeliveryPartners());
     dispatch(listOrdersForDelivery());
+
+    // Auto-refresh removed to stop blinking. Socket updates handle real-time changes.
+    // const interval = setInterval(() => {
+    //   dispatch(listDeliveryPartners());
+    //   dispatch(listOrdersForDelivery());
+    // }, 10000);
+
+    // return () => clearInterval(interval);
   }, [dispatch, partnerActionSuccess]);
+
+  // Debug logging for partners
+  useEffect(() => {
+    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+    console.log('👤 Current User Info:', {
+      userId: userInfo.user?._id,
+      role: userInfo.user?.role,
+      name: userInfo.user?.name
+    });
+    console.log('📋 Partners state updated:', {
+      loading: partnersLoading,
+      error: partnersError,
+      count: partners.length,
+      partners: partners.map(p => ({
+        id: p._id,
+        name: p.name,
+        kycStatus: p.kycStatus,
+        seller: p.seller,
+        vehicleNumber: p.vehicle_number
+      }))
+    });
+  }, [partners, partnersLoading, partnersError]);
 
   useEffect(() => {
     if (currentPartner) {
@@ -93,17 +132,31 @@ const SellerDelivery = () => {
         phone: '',
         vehicleType: '',
         vehicleNumber: '',
-        licenseNumber: ''
+        licenseNumber: '',
+        aadharNumber: '',
+        panNumber: ''
+      });
+      setKycFiles({
+        aadharPhoto: null,
+        panPhoto: null,
+        driverPhoto: null
       });
     }
   }, [currentPartner]);
+
+  const handleFileChange = (e) => {
+    const { name, files } = e.target;
+    if (files && files[0]) {
+      setKycFiles(prev => ({ ...prev, [name]: files[0] }));
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setPartnerData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const payload = {
       name: partnerData.name,
       phone: partnerData.phone,
@@ -115,12 +168,63 @@ const SellerDelivery = () => {
       alert('All fields are required: Name, Phone, Vehicle Type, Vehicle Number, License Number');
       return;
     }
-    if (currentPartner) {
-      dispatch(updateDeliveryPartner(currentPartner._id, payload));
-    } else {
-      dispatch(createDeliveryPartner(payload));
+
+    try {
+      const userInfo = JSON.parse(localStorage.getItem('userInfo'));
+      let partnerId;
+
+      if (currentPartner) {
+        await dispatch(updateDeliveryPartner(currentPartner._id, payload));
+        partnerId = currentPartner._id;
+      } else {
+        // Create new partner using direct API call to get ID
+        const response = await fetch('/api/delivery-partners/partners', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${userInfo.token}`
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) throw new Error('Failed to create partner');
+        const createdPartner = await response.json();
+        partnerId = createdPartner._id;
+
+        // Update Redux state
+        dispatch(listDeliveryPartners());
+      }
+
+      // Upload KYC files if any
+      if (partnerId && (kycFiles.aadharPhoto || kycFiles.panPhoto || kycFiles.driverPhoto || partnerData.aadharNumber || partnerData.panNumber)) {
+        const formData = new FormData();
+        if (partnerData.aadharNumber) formData.append('aadharNumber', partnerData.aadharNumber);
+        if (partnerData.panNumber) formData.append('panNumber', partnerData.panNumber);
+        if (kycFiles.aadharPhoto) formData.append('aadharPhoto', kycFiles.aadharPhoto);
+        if (kycFiles.panPhoto) formData.append('panPhoto', kycFiles.panPhoto);
+        if (kycFiles.driverPhoto) formData.append('driverPhoto', kycFiles.driverPhoto);
+
+        const kycResponse = await fetch(`/api/delivery-partners/partners/${partnerId}/kyc`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${userInfo.token}`
+          },
+          body: formData
+        });
+
+        if (!kycResponse.ok) throw new Error('KYC upload failed');
+
+        alert('Partner and KYC documents submitted successfully!');
+        dispatch(listDeliveryPartners());
+      } else {
+        alert('Partner created successfully!');
+      }
+
+      setOpenDialog(false);
+    } catch (error) {
+      console.error('Error:', error);
+      alert(error.message || 'Failed to create partner. Please try again.');
     }
-    setOpenDialog(false);
   };
 
   const handleDelete = (id) => {
@@ -136,8 +240,16 @@ const SellerDelivery = () => {
   };
 
   const handleAssign = () => {
+    console.log('👆 Assigning partner:', {
+      orderId: selectedOrder?._id,
+      partnerId: partnerId,
+      order: selectedOrder
+    });
+
     if (selectedOrder && partnerId) {
       dispatch(assignDeliveryPartner(selectedOrder._id, { deliveryPartner: partnerId, trackingNumber: '' }));
+    } else {
+      console.error('❌ Cannot assign: Missing order or partner ID');
     }
     setOpenAssignDialog(false);
     // Refresh the orders list after assignment
@@ -338,6 +450,46 @@ const SellerDelivery = () => {
                 required
               />
             </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Aadhaar Number"
+                name="aadharNumber"
+                value={partnerData.aadharNumber}
+                onChange={handleInputChange}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="PAN Number"
+                name="panNumber"
+                value={partnerData.panNumber}
+                onChange={handleInputChange}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <Typography variant="subtitle2" gutterBottom>Upload KYC Documents</Typography>
+              <Button variant="outlined" component="label" fullWidth sx={{ mb: 1 }}>
+                Upload Aadhaar Photo
+                <input type="file" name="aadharPhoto" hidden accept="image/*" onChange={handleFileChange} />
+              </Button>
+              {kycFiles.aadharPhoto && <Typography variant="caption" color="success.main">✓ {kycFiles.aadharPhoto.name}</Typography>}
+            </Grid>
+            <Grid item xs={12}>
+              <Button variant="outlined" component="label" fullWidth sx={{ mb: 1 }}>
+                Upload PAN Photo
+                <input type="file" name="panPhoto" hidden accept="image/*" onChange={handleFileChange} />
+              </Button>
+              {kycFiles.panPhoto && <Typography variant="caption" color="success.main">✓ {kycFiles.panPhoto.name}</Typography>}
+            </Grid>
+            <Grid item xs={12}>
+              <Button variant="outlined" component="label" fullWidth sx={{ mb: 1 }}>
+                Upload Driver Photo
+                <input type="file" name="driverPhoto" hidden accept="image/*" onChange={handleFileChange} />
+              </Button>
+              {kycFiles.driverPhoto && <Typography variant="caption" color="success.main">✓ {kycFiles.driverPhoto.name}</Typography>}
+            </Grid>
           </Grid>
         </DialogContent>
         <DialogActions>
@@ -361,10 +513,26 @@ const SellerDelivery = () => {
             >
               {partners.map((partner) => (
                 <MenuItem key={partner._id} value={partner._id}>
-                  {partner.name} - {partner.vehicle_number} ({partner.phone})
+                  {partner.name} - {partner.vehicle_number}
+                  {partner.kycStatus === 'approved' && ' ✅ Verified'}
+                  {partner.kycStatus === 'pending' && ' ⏳ Pending'}
+                  {partner.kycStatus === 'rejected' && ' ❌ Rejected'}
                 </MenuItem>
               ))}
             </Select>
+            {partnersLoading ? (
+              <Typography variant="caption" color="info.main" sx={{ mt: 1, display: 'block' }}>
+                Loading partners...
+              </Typography>
+            ) : partners.length === 0 ? (
+              <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
+                No delivery partners found. Please add partners first.
+              </Typography>
+            ) : (
+              <Typography variant="caption" color="info.main" sx={{ mt: 1, display: 'block' }}>
+                Total partners: {partners.length} | Approved: {partners.filter(p => p.kycStatus === 'approved').length}
+              </Typography>
+            )}
           </FormControl>
         </DialogContent>
         <DialogActions>

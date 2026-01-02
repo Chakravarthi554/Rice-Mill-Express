@@ -11,6 +11,7 @@ import axios from 'axios';
 const DownloadInvoices = () => {
   const dispatch = useDispatch();
   const { orders, loading, error } = useSelector(state => state.orderListMy);
+  const { userInfo } = useSelector(state => state.userLogin);
 
   useEffect(() => {
     dispatch(listMyOrders());
@@ -18,19 +19,28 @@ const DownloadInvoices = () => {
 
   const handleDownload = async (orderId) => {
     try {
-      const { data } = await axios.get(`/api/orders/${orderId}/invoice`, {
+      const config = {
         responseType: 'blob',
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-      const url = window.URL.createObjectURL(new Blob([data]));
+        headers: {
+          Authorization: `Bearer ${userInfo?.token}`
+        }
+      };
+
+      const { data } = await axios.get(`/api/orders/${orderId}/invoice`, config);
+
+      // Create blob and download
+      const blob = new Blob([data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `invoice_${orderId}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
+      window.URL.revokeObjectURL(url);
     } catch (err) {
-      alert('Failed to download invoice');
+      console.error('Invoice download error:', err);
+      alert('Failed to download invoice. Please try again.');
     }
   };
 
@@ -40,7 +50,7 @@ const DownloadInvoices = () => {
       {loading && <CircularProgress />}
       {error && <Alert severity="error">{error}</Alert>}
       <List>
-        {orders.map(o => (
+        {orders && orders.map(o => (
           <ListItem key={o._id}>
             <ListItemText
               primary={`Order #${o._id}`}

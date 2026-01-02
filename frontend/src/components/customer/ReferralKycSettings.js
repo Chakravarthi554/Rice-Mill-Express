@@ -3,10 +3,25 @@ import React from 'react';
 import { Paper, Box, Typography, TextField, Button, Grid } from '@mui/material';
 import { Share, ContentCopy } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
+import { useDispatch, useSelector } from 'react-redux';
+import { getReferrals } from '../../redux/actions/userActions';
+import { useState, useEffect } from 'react';
 
 const ReferralKycSettings = () => {
   const { t, user } = useAuth();
-  const referralLink = user?.referralCode ? `${window.location.origin}/register?ref=${user.referralCode}` : '';
+  const dispatch = useDispatch();
+  const [stats, setStats] = useState({ referredUsers: 0, earnedCredits: 0 });
+
+  useEffect(() => {
+    dispatch(getReferrals()).then(data => {
+      if (data) {
+        if (data.stats) setStats(data.stats);
+        if (data.referralCode) setReferralCode(data.referralCode);
+      }
+    });
+  }, [dispatch]);
+  const [referralCode, setReferralCode] = useState(user?.referralCode || '');
+  const referralLink = referralCode ? `${window.location.origin}/register?ref=${referralCode}` : 'Loading...';
 
   const copy = () => {
     navigator.clipboard.writeText(referralLink);
@@ -31,13 +46,13 @@ const ReferralKycSettings = () => {
       <Grid container spacing={2}>
         <Grid item xs={6}>
           <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'primary.light', color: 'white' }}>
-            <Typography variant="h5">{user?.referralStats?.referredUsers || 0}</Typography>
+            <Typography variant="h5">{stats.referredUsers || 0}</Typography>
             <Typography variant="body2">{t('referred') || 'Referred'}</Typography>
           </Paper>
         </Grid>
         <Grid item xs={6}>
           <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'secondary.light', color: 'white' }}>
-            <Typography variant="h5">{user?.referralStats?.earnedCredits || 0}</Typography>
+            <Typography variant="h5">{stats.earnedCredits || 0}</Typography>
             <Typography variant="body2">{t('credits') || 'Credits'}</Typography>
           </Paper>
         </Grid>

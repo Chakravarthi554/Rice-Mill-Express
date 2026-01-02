@@ -1,66 +1,111 @@
 import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { Box, Container, Typography, Card, CardContent, CardMedia, Button, IconButton } from '@mui/material';
-import { Delete as DeleteIcon } from '@mui/icons-material';
-import { getWishlistAction, removeFromWishlist } from '../../redux/actions/userActions'; // FIXED: Use renamed action
+import { Box, Container, Typography, Card, CardContent, CardMedia, Button, IconButton, Grid } from '@mui/material';
+import { Delete as DeleteIcon, ShoppingCart } from '@mui/icons-material';
+import { getWishlistAction, removeFromWishlist } from '../../redux/actions/userActions';
 import { addToCart } from '../../redux/actions/cartActions';
+import { listProducts } from '../../redux/actions/productActions';
 import Message from '../../components/common/Message';
+import Wishlist from '../../components/customer/Wishlist';
+import Price from '../../components/common/Price';
+import { AddShoppingCart } from '@mui/icons-material';
+
 const WishlistPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const { products = [] } = useSelector((state) => state.productList || {});
   const { wishlistItems, loading, error } = useSelector((state) => state.userWishlist || { wishlistItems: [], loading: false, error: null });
+
   useEffect(() => {
-    dispatch(getWishlistAction()); // FIXED: Use updated action
+    dispatch(getWishlistAction());
+    dispatch(listProducts());
   }, [dispatch]);
+
   const handleRemoveFromWishlist = (id) => {
     dispatch(removeFromWishlist(id));
   };
+
   const handleAddToCart = (productId) => {
     dispatch(addToCart(productId, 1));
-    navigate('/cart');
   };
+
+  const handleBuyNow = (productId) => {
+    dispatch(addToCart(productId, 1));
+    navigate('/checkout');
+  };
+
+  // Recommendations: Products not in wishlist
+  const wishlistIds = wishlistItems?.map(item => item._id) || [];
+  const recommendedProducts = products.filter(p => !wishlistIds.includes(p._id));
+
   return (
     <Container sx={{ py: 4 }}>
-      <Typography variant="h4" gutterBottom>
-        Wishlist
+      <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
+        My Wishlist
       </Typography>
-      {loading ? (
-        <Message severity="info">Loading...</Message>
-      ) : error ? (
-        <Message severity="error">{error}</Message>
-      ) : !Array.isArray(wishlistItems) || wishlistItems.length === 0 ? (
-        <Message severity="info">Your wishlist is empty.</Message>
-      ) : (
-        wishlistItems.map((item) => (
-          <Card key={item._id} sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
-            <CardMedia
-              component="img"
-              // FIXED: Use images[0] for populated product
-              image={item.images?.[0] || '/uploads/default-image.jpg'}
-              alt={item.name}
-              sx={{ width: 100, height: 100, objectFit: 'cover', m: 2 }}
-            />
-            <CardContent sx={{ flexGrow: 1 }}>
-              <Typography variant="h6">{item.name || 'Unnamed Product'}</Typography>
-              <Typography variant="body2" color="text.secondary">
-                ₹{item.price || 0}
-              </Typography>
-            </CardContent>
-            <IconButton onClick={() => handleRemoveFromWishlist(item._id)} sx={{ m: 2 }}>
-              <DeleteIcon />
-            </IconButton>
-            <Button
-              variant="contained"
-              onClick={() => handleAddToCart(item._id)}
-              sx={{ m: 2 }}
-            >
-              Add to Cart
-            </Button>
-          </Card>
-        ))
+
+      <Wishlist
+        wishlistItems={wishlistItems}
+        loading={loading}
+        error={error}
+        handleAddToCart={handleAddToCart}
+        handleRemoveFromWishlist={handleRemoveFromWishlist}
+        handleBuyNow={handleBuyNow}
+      />
+
+      {/* Recommendations Section */}
+      {recommendedProducts.length > 0 && (
+        <Box sx={{ mt: 8 }}>
+          <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
+            Recommended For You
+          </Typography>
+          <Grid container spacing={3}>
+            {recommendedProducts.slice(0, 8).map(product => (
+              <Grid item xs={12} sm={6} md={4} lg={3} key={product._id}>
+                <Card
+                  sx={{
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    cursor: 'pointer',
+                    '&:hover': { boxShadow: 4 }
+                  }}
+                  onClick={() => navigate(`/products/${product._id}`)}
+                >
+                  <CardMedia
+                    component="img"
+                    image={product.images?.[0] || product.image || '/uploads/default-image.jpg'}
+                    alt={product.name}
+                    sx={{ height: 200, objectFit: 'contain', backgroundColor: '#f5f5f5', p: 2 }}
+                  />
+                  <CardContent sx={{ flexGrow: 1 }}>
+                    <Typography variant="subtitle1" noWrap sx={{ fontWeight: 'medium' }}>
+                      {product.name}
+                    </Typography>
+                    <Typography variant="h6" color="primary" sx={{ fontWeight: 'bold', my: 1 }}>
+                      <Price amount={product.price} />
+                    </Typography>
+                    <Button
+                      fullWidth
+                      variant="outlined"
+                      startIcon={<AddShoppingCart />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAddToCart(product._id);
+                      }}
+                    >
+                      Add to Cart
+                    </Button>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
       )}
     </Container>
   );
 };
+
 export default WishlistPage;

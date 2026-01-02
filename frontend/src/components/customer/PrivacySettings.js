@@ -4,7 +4,7 @@ import {
   Alert, CircularProgress, Box
 } from '@mui/material';
 import { useDispatch, useSelector } from 'react-redux';
-import { updateUserProfile } from '../../redux/actions/userActions';
+import { updatePrivacySettings } from '../../redux/actions/userActions';
 
 const PrivacySettings = () => {
   const dispatch = useDispatch();
@@ -20,9 +20,9 @@ const PrivacySettings = () => {
 
   const handleSave = (e) => {
     e.preventDefault();
-    dispatch(updateUserProfile({
-      preferences: { ...userInfo?.preferences, adsPersonalization: ads, dataSharing: sharing }
-    }));
+    dispatch(updatePrivacySettings({ adsPersonalization: ads, dataSharing: sharing }))
+      .then(() => alert('Privacy settings saved!'))
+      .catch(err => alert('Failed to save settings'));
   };
 
   return (

@@ -20,7 +20,7 @@ const refreshToken = asyncHandler(async (req, res) => {
   const { refreshToken } = req.body;
 
   if (!refreshToken) {
-    return res.status(401).json({ 
+    return res.status(401).json({
       message: 'Refresh token required',
       code: 'REFRESH_TOKEN_REQUIRED'
     });
@@ -29,7 +29,7 @@ const refreshToken = asyncHandler(async (req, res) => {
   try {
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
     const user = await User.findById(decoded.id).select('-password');
-    
+
     if (!user) {
       return res.status(401).json({
         message: 'User not found',
@@ -155,7 +155,7 @@ const updateUserProfile = asyncHandler(async (req, res) => {
 // ✅ FIXED: Add verifyEmail function
 const verifyEmail = asyncHandler(async (req, res) => {
   const { token } = req.body;
-  
+
   if (!token) {
     return res.status(400).json({ message: 'Verification token required' });
   }
@@ -163,18 +163,18 @@ const verifyEmail = asyncHandler(async (req, res) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.id);
-    
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    
+
     if (user.isVerified) {
       return res.status(400).json({ message: 'Email already verified' });
     }
-    
+
     user.isVerified = true;
     await user.save();
-    
+
     res.json({ success: true, message: 'Email verified successfully' });
   } catch (error) {
     console.error('Email verification error:', error);
@@ -183,6 +183,8 @@ const verifyEmail = asyncHandler(async (req, res) => {
 });
 
 // ✅ FIXED: Add changePassword function (alias for changeUserPassword)
+
+
 const changePassword = asyncHandler(async (req, res) => {
   const { currentPassword, newPassword } = req.body;
   if (!currentPassword || !newPassword) {
@@ -214,7 +216,7 @@ const changePassword = asyncHandler(async (req, res) => {
 // ✅ FIXED: Add updatePreferences function
 const updatePreferences = asyncHandler(async (req, res) => {
   const { language, theme, recommendationsEnabled } = req.body;
-  
+
   const user = await User.findById(req.user._id);
   if (!user) return res.status(404).json({ message: 'User not found' });
 
@@ -225,14 +227,14 @@ const updatePreferences = asyncHandler(async (req, res) => {
 
   await User.updateOne({ _id: user._id }, { $set: updates });
   const updatedUser = await User.findById(user._id).select('-password -refreshToken');
-  
+
   res.json({ success: true, message: 'Preferences updated', user: updatedUser });
 });
 
 // ✅ FIXED: Add updateNotificationPreferences function
 const updateNotificationPreferences = asyncHandler(async (req, res) => {
   const { email, sms, push, categories } = req.body;
-  
+
   const user = await User.findById(req.user._id);
   if (!user) return res.status(404).json({ message: 'User not found' });
 
@@ -250,7 +252,7 @@ const updateNotificationPreferences = asyncHandler(async (req, res) => {
   };
 
   await User.updateOne({ _id: user._id }, { $set: updates });
-  
+
   res.json({ success: true, message: 'Notification preferences updated' });
 });
 
@@ -262,7 +264,7 @@ const getAddresses = asyncHandler(async (req, res) => {
 
 const addAddress = asyncHandler(async (req, res) => {
   const { name, phone, street, city, state, pinCode, landmark, addressType } = req.body;
-  
+
   if (!name || !phone || !street || !city || !state || !pinCode) {
     return res.status(400).json({ message: 'Required address fields missing' });
   }
@@ -292,7 +294,7 @@ const addAddress = asyncHandler(async (req, res) => {
 const updateAddress = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const updates = req.body;
-  
+
   const address = await Address.findOne({ _id: id, user: req.user._id });
   if (!address) {
     return res.status(404).json({ message: 'Address not found' });
@@ -310,7 +312,7 @@ const updateAddress = asyncHandler(async (req, res) => {
 
 const deleteAddress = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  
+
   const address = await Address.findOneAndDelete({ _id: id, user: req.user._id });
   if (!address) {
     return res.status(404).json({ message: 'Address not found' });
@@ -326,7 +328,7 @@ const deleteAddress = asyncHandler(async (req, res) => {
 
 const setDefaultAddress = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  
+
   // First, set all addresses to non-default
   await Address.updateMany(
     { user: req.user._id },
@@ -356,7 +358,7 @@ const getDashboardStats = asyncHandler(async (req, res) => {
     const totalOrders = await Order.countDocuments({ user: user._id });
     const pendingOrders = await Order.countDocuments({ user: user._id, orderStatus: { $in: ['placed', 'processing', 'packed', 'shipped'] } });
     const deliveredOrders = await Order.countDocuments({ user: user._id, orderStatus: 'delivered' });
-    
+
     stats = {
       totalOrders,
       pendingOrders,
@@ -368,7 +370,7 @@ const getDashboardStats = asyncHandler(async (req, res) => {
     const totalOrders = await Order.countDocuments({ seller: user._id });
     const pendingOrders = await Order.countDocuments({ seller: user._id, orderStatus: { $in: ['placed', 'processing', 'packed', 'shipped'] } });
     const deliveredOrders = await Order.countDocuments({ seller: user._id, orderStatus: 'delivered' });
-    
+
     stats = {
       totalOrders,
       pendingOrders,
@@ -381,7 +383,7 @@ const getDashboardStats = asyncHandler(async (req, res) => {
     const totalSellers = await User.countDocuments({ role: 'seller' });
     const totalCustomers = await User.countDocuments({ role: 'customer' });
     const totalOrders = await Order.countDocuments();
-    
+
     stats = {
       totalUsers,
       totalSellers,
@@ -397,7 +399,7 @@ const getDashboardStats = asyncHandler(async (req, res) => {
 // ✅ FIXED: Add getUserById function
 const getUserById = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  
+
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(400).json({ message: 'Invalid user ID' });
   }
@@ -418,7 +420,7 @@ const getUserById = asyncHandler(async (req, res) => {
 // ✅ FIXED: Add updateUser function
 const updateUser = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  
+
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(400).json({ message: 'Invalid user ID' });
   }
@@ -443,7 +445,7 @@ const updateUser = asyncHandler(async (req, res) => {
 // ✅ FIXED: Add deleteUser function
 const deleteUser = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  
+
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(400).json({ message: 'Invalid user ID' });
   }
@@ -497,9 +499,9 @@ const removeFromWishlist = asyncHandler(async (req, res) => {
     req.user._id,
     { $pull: { wishlist: productId } },
     { new: true }
-  ).select('wishlist');
+  ).populate('wishlist').select('wishlist'); // ✅ FIXED: Populate wishlist to return full product details
   if (!user) throw new Error('User not found');
-  res.json(user.wishlist);
+  res.json(user.wishlist); // Returns populated products
 });
 
 const forgotPassword = asyncHandler(async (req, res) => {
@@ -673,12 +675,26 @@ const resetPreferences = asyncHandler(async (req, res) => {
 
 const linkAccount = asyncHandler(async (req, res) => {
   const { provider } = req.body;
+
+  if (!['google', 'facebook', 'twitter'].includes(provider)) {
+    return res.status(400).json({ message: 'Invalid provider' });
+  }
+
   const user = await User.findById(req.user._id);
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
+  if (!user.linkedAccounts) {
+    user.linkedAccounts = [];
+  }
+
   if (!user.linkedAccounts.includes(provider)) {
     user.linkedAccounts.push(provider);
     await user.save();
   }
-  res.json({ success: true });
+
+  res.json({ success: true, message: `${provider} account linked successfully`, linkedAccounts: user.linkedAccounts });
 });
 
 const unlinkAccount = asyncHandler(async (req, res) => {
@@ -702,11 +718,38 @@ const unlinkAccount = asyncHandler(async (req, res) => {
 });
 
 const addPaymentMethod = asyncHandler(async (req, res) => {
-  const { cardNumber, expiry, cvv } = req.body;
+  const { cardNumber, expiry, cvv, last4 } = req.body;
+
+  if (!cardNumber || !expiry || !cvv) {
+    return res.status(400).json({ message: 'All fields are required' });
+  }
+
+  // Detect card type based on first digit
+  let cardType = 'Credit Card';
+  const firstDigit = cardNumber.charAt(0);
+  if (firstDigit === '4') cardType = 'Visa';
+  else if (firstDigit === '5') cardType = 'Mastercard';
+  else if (firstDigit === '3') cardType = 'American Express';
+  else if (firstDigit === '6') cardType = 'Discover';
+
   const user = await User.findById(req.user._id);
-  user.paymentMethods.push({ cardNumber: `****${cardNumber.slice(-4)}`, expiry, cvv: '***' });
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
+  // Store last 4 digits
+  const lastFour = last4 || cardNumber.slice(-4);
+
+  user.paymentMethods.push({
+    cardNumber: `****${lastFour}`,
+    cardType,
+    last4: lastFour,
+    expiry,
+    isDefault: user.paymentMethods.length === 0
+  });
+
   await user.save();
-  res.json({ success: true });
+  res.json({ success: true, message: 'Payment method added successfully', user });
 });
 
 const deletePaymentMethod = asyncHandler(async (req, res) => {
@@ -722,27 +765,12 @@ const deletePaymentMethod = asyncHandler(async (req, res) => {
   res.json({ success: true, message: "Payment method deleted successfully" });
 });
 
-const getRewards = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id);
-  res.json({ balance: user.rewardsBalance || 0, history: user.rewardsHistory || [] });
+const getPaymentMethods = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id).select('paymentMethods');
+  res.json(user.paymentMethods || []);
 });
 
-const subscribe = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id);
-  user.subscription = { active: true, type: 'premium', startDate: new Date() };
-  await user.save();
-  res.json({ success: true });
-});
 
-const unsubscribe = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id);
-  if (!user) {
-    return res.status(404).json({ message: "User not found" });
-  }
-  user.subscription = { active: false };
-  await user.save();
-  res.json({ success: true, message: "Unsubscribed successfully" });
-});
 
 const reportProblem = asyncHandler(async (req, res) => {
   const { description } = req.body;
@@ -757,9 +785,106 @@ const reportProblem = asyncHandler(async (req, res) => {
   res.json({ success: true, message: "Problem reported successfully" });
 });
 
-const exportUserData = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id).populate('orders addresses');
-  res.json(user);
+
+
+const getReferrals = asyncHandler(async (req, res) => {
+  let user = await User.findById(req.user._id).select('referralCode referralStats');
+
+  // Generate referral code if missing
+  if (!user.referralCode) {
+    const crypto = require('crypto');
+    user.referralCode = crypto.randomBytes(4).toString('hex').toUpperCase();
+    await user.save();
+  }
+
+  res.json({
+    referralCode: user.referralCode,
+    stats: user.referralStats || { referredUsers: 0, earnedCredits: 0 }
+  });
+});
+
+const getReviews = asyncHandler(async (req, res) => {
+  const Product = require('../models/Product');
+  // Find all products where this user has a review
+  const reviews = await Product.find({ 'reviews.user': req.user._id })
+    .select('name image reviews.$')
+    .lean();
+
+  const userReviews = reviews.map(p => ({
+    productId: p._id,
+    productName: p.name,
+    productImage: p.image,
+    ...p.reviews[0] // The $ projection returns array with single matching element
+  }));
+
+  res.json(userReviews);
+});
+
+const getPrivacySettings = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id).select('privacySettings');
+  res.json(user.privacySettings || { profileVisibility: 'public', showActivityStatus: true });
+});
+
+const updatePrivacySettings = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+  user.privacySettings = { ...user.privacySettings, ...req.body };
+  await user.save();
+  res.json({ success: true, privacySettings: user.privacySettings });
+});
+
+const getLinkedAccounts = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id).select('linkedAccounts');
+  res.json(user.linkedAccounts || []);
+});
+
+// ✅ RESTORED: Missing Functions
+
+const getSubscription = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+  if (user) {
+    res.json({
+      subscription: user.subscription || { plan: 'free', active: false },
+    });
+  } else {
+    res.status(404);
+    throw new Error('User not found');
+  }
+});
+
+const subscribe = asyncHandler(async (req, res) => {
+  const { plan, duration, paymentMethodId } = req.body;
+  const user = await User.findById(req.user._id);
+  if (user) {
+    user.subscription = {
+      plan: plan || 'premium',
+      active: true,
+      startDate: new Date(),
+      endDate: new Date(Date.now() + (duration || 30) * 24 * 60 * 60 * 1000),
+      paymentMethodId
+    };
+    await user.save();
+    res.json({ message: 'Subscription updated', subscription: user.subscription });
+  } else {
+    res.status(404); throw new Error('User not found');
+  }
+});
+
+const unsubscribe = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+  if (user) {
+    if (user.subscription) { user.subscription.active = false; user.subscription.autoRenew = false; }
+    await user.save();
+    res.json({ message: 'Unsubscribed successfully' });
+  } else {
+    res.status(404); throw new Error('User not found');
+  }
+});
+
+
+
+const getRewards = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+  res.json({ balance: user.rewardsBalance || 0, history: user.rewardsHistory || [] });
 });
 
 // Alias functions for backward compatibility
@@ -774,6 +899,10 @@ module.exports = {
   getWishlist,
   addToWishlist,
   removeFromWishlist,
+  getReviews,
+  getSubscription,
+  subscribe,
+  unsubscribe,
   changeUserPassword: changePassword,
   changePassword, // Export both names
   forgotPassword,
@@ -787,17 +916,20 @@ module.exports = {
   unlinkAccount,
   addPaymentMethod,
   deletePaymentMethod,
+  getPaymentMethods,
   getRewards,
-  subscribe,
-  unsubscribe,
   reportProblem,
-  exportUserData,
+
   // ✅ NEW: Add all the missing functions
   refreshToken,
   verifyEmail,
   updatePreferences,
   updateNotificationPreferences,
   getAddresses,
+  getReferrals,
+  getPrivacySettings,
+  updatePrivacySettings,
+  getLinkedAccounts,
   addAddress,
   updateAddress,
   deleteAddress,

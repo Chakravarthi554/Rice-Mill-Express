@@ -9,6 +9,21 @@ const deliveryPartnerSchema = new mongoose.Schema(
     vehicle_number: { type: String, required: true },
     license_number: { type: String, required: true },
     seller: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+
+    // KYC Fields
+    aadharNumber: { type: String },
+    aadharPhoto: { type: String }, // File path
+    panNumber: { type: String },
+    panPhoto: { type: String }, // File path
+    driverPhoto: { type: String }, // File path
+    kycStatus: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'pending'
+    },
+    kycRejectionReason: { type: String },
+    approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    approvedAt: { type: Date },
   },
   { timestamps: true }
 );

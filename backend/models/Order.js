@@ -123,14 +123,14 @@ const orderSchema = new mongoose.Schema({
   orderStatus: {
     type: String,
     enum: [
-      'placed', 
-      'processing', 
-      'packed', 
-      'shipped', 
-      'out_for_delivery', 
-      'delivered', 
-      'cancelled', 
-      'returned', 
+      'placed',
+      'processing',
+      'packed',
+      'shipped',
+      'out_for_delivery',
+      'delivered',
+      'cancelled',
+      'returned',
       'refunded'
     ],
     default: 'placed'
@@ -157,9 +157,47 @@ const orderSchema = new mongoose.Schema({
   },
   deliveryPartner: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+    ref: 'DeliveryPartner'
   },
   trackingId: {
+    type: String
+  },
+  // Delivery Charge Fields
+  deliveryCharge: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  totalWeight: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  freeDeliveryApplied: {
+    type: Boolean,
+    default: false
+  },
+  deliveryDistance: {
+    type: Number,
+    default: 0
+  },
+  // COD Fields
+  codAmount: {
+    type: Number,
+    default: 0
+  },
+  codCollected: {
+    type: Boolean,
+    default: false
+  },
+  codCollectedAt: {
+    type: Date
+  },
+  codReportedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  codProofPhoto: {
     type: String
   },
   cancelReason: {
@@ -216,12 +254,12 @@ orderSchema.index({ isBulkOrder: 1 });
 orderSchema.index({ bulkOrderRef: 1 });
 
 // Virtual for formatted order number
-orderSchema.virtual('orderNumber').get(function() {
+orderSchema.virtual('orderNumber').get(function () {
   return `ORD-${this._id.toString().substring(18, 24).toUpperCase()}`;
 });
 
 // Pre-save middleware to set seller for order items if missing
-orderSchema.pre('save', function(next) {
+orderSchema.pre('save', function (next) {
   // ✅ FIXED: Set seller for order items if missing
   if (this.orderItems && this.orderItems.length > 0) {
     this.orderItems.forEach(item => {
@@ -230,13 +268,13 @@ orderSchema.pre('save', function(next) {
       }
     });
   }
-  
+
   // Calculate commission and earnings if not set
   if (this.isModified('totalPrice') || this.isNew) {
     this.commissionAmount = this.totalPrice * this.commissionRate;
     this.sellerEarnings = this.totalPrice - this.commissionAmount;
   }
-  
+
   // Add to status history if status changed
   if (this.isModified('orderStatus') && !this.isNew) {
     this.statusHistory.push({
@@ -244,7 +282,7 @@ orderSchema.pre('save', function(next) {
       timestamp: new Date()
     });
   }
-  
+
   next();
 });
 

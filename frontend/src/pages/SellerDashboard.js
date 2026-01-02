@@ -1,24 +1,24 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
-  Container, Typography, Tabs, Tab, Box, Paper, Table, TableBody,
-  TableCell, TableContainer, TableHead, TableRow, Button, Dialog, DialogTitle,
-  DialogContent, DialogActions, FormControl, InputLabel, Select, MenuItem,
-  useTheme, Divider, Alert, CircularProgress, TextField, IconButton, Pagination, Chip,
-  AppBar, Toolbar, Card, CardContent
+    Container, Typography, Tabs, Tab, Box, Paper, Table, TableBody,
+    TableCell, TableContainer, TableHead, TableRow, Button, Dialog, DialogTitle,
+    DialogContent, DialogActions, FormControl, InputLabel, Select, MenuItem,
+    useTheme, Divider, Alert, CircularProgress, TextField, IconButton, Pagination, Chip,
+    AppBar, Toolbar, Card, CardContent
 } from '@mui/material';
 import { grey } from '@mui/material/colors';
-import { 
-  Add as AddIcon, 
-  Edit as EditIcon, 
-  Delete as DeleteIcon, 
-  Chat as ChatIcon, 
-  Download as DownloadIcon,
-  Logout as LogoutIcon,
-  Support as SupportIcon
+import {
+    Add as AddIcon,
+    Edit as EditIcon,
+    Delete as DeleteIcon,
+    Chat as ChatIcon,
+    Download as DownloadIcon,
+    Logout as LogoutIcon,
+    Support as SupportIcon
 } from '@mui/icons-material';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { listSellerOrders, updateOrderStatus } from '../redux/actions/orderActions';
 import { listDeliveryPartners, assignDeliveryPartner } from '../redux/actions/deliveryActions';
 import { listMyRecipes, submitRecipe, deleteRecipe } from '../redux/actions/recipeActions';
@@ -36,26 +36,83 @@ import ChatWindow from '../components/common/ChatWindow';
 import Message from '../components/common/Message';
 import { RECIPE_SUBMIT_RESET } from '../redux/constants/RecipeConstants';
 
+const generatePDF = (order) => {
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text(`Invoice for Order #${order._id?.slice(-6) || 'N/A'}`, 14, 22);
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+
+    doc.text(`Customer: ${order.user?.name || 'N/A'}`, 14, 32);
+    doc.text(`Email: ${order.user?.email || 'N/A'}`, 14, 38);
+    doc.text(`Date: ${order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}`, 14, 44);
+
+    doc.text('Shipping Address:', 14, 54);
+    const addr = order.shippingAddress;
+    doc.text(`${addr?.street || ''}, ${addr?.city || ''}`, 14, 60);
+    doc.text(`${addr?.state || ''} - ${addr?.pinCode || ''}`, 14, 66);
+    doc.text(`Phone: ${addr?.phone || order.user?.phone || 'N/A'}`, 14, 72);
+
+    const tableColumn = ["#", "Product", "Quantity", "Price", "Total"];
+    const tableRows = [];
+    order.orderItems?.forEach((item, index) => {
+        const itemData = [
+            index + 1,
+            item.name,
+            item.qty,
+            `Rs. ${item.price?.toFixed(2) || '0.00'}`,
+            `Rs. ${((item.qty || 0) * (item.price || 0)).toFixed(2)}`
+        ];
+        tableRows.push(itemData);
+    });
+
+    // FIXED: Use autoTable(doc, options) syntax
+    autoTable(doc, {
+        head: [tableColumn],
+        body: tableRows,
+        startY: 80,
+        theme: 'grid',
+        headStyles: { fillColor: [46, 125, 50] },
+        styles: { fontSize: 10 }
+    });
+
+    const finalY = doc.lastAutoTable.finalY || 100;
+    doc.setFontSize(12);
+    doc.text(`Items Price: Rs. ${order.itemsPrice?.toFixed(2) || '0.00'}`, 145, finalY + 10, { align: 'right' });
+    doc.text(`Shipping Price: Rs. ${order.shippingPrice?.toFixed(2) || '0.00'}`, 145, finalY + 16, { align: 'right' });
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Total Price: Rs. ${order.totalPrice?.toFixed(2) || '0.00'}`, 145, finalY + 24, { align: 'right' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text(`Payment Method: ${order.paymentMethod || 'N/A'}`, 14, finalY + 30);
+    doc.text(`Payment Status: ${order.isPaid ? `Paid on ${order.paidAt ? new Date(order.paidAt).toLocaleDateString() : 'N/A'}` : 'Not Paid'}`, 14, finalY + 36);
+
+    doc.save(`invoice_${order._id?.slice(-6) || 'unknown'}.pdf`);
+};
+
+
 // 🔥 NEW: Logout Component for Seller Dashboard
 const SellerLogoutButton = () => {
-  const { logout } = useAuth();
-  
-  const handleLogout = () => {
-    if (window.confirm('Are you sure you want to logout?')) {
-      logout();
-    }
-  };
+    const { logout } = useAuth();
 
-  return (
-    <IconButton 
-      color="inherit" 
-      onClick={handleLogout}
-      sx={{ ml: 'auto' }}
-      title="Logout"
-    >
-      <LogoutIcon />
-    </IconButton>
-  );
+    const handleLogout = () => {
+        if (window.confirm('Are you sure you want to logout?')) {
+            logout();
+        }
+    };
+
+    return (
+        <IconButton
+            color="inherit"
+            onClick={handleLogout}
+            sx={{ ml: 'auto' }}
+            title="Logout"
+        >
+            <LogoutIcon />
+        </IconButton>
+    );
 };
 
 // --- Recipe Form Component ---
@@ -104,8 +161,8 @@ const RecipeForm = ({ open, onClose, onSubmit, sellerProducts = [] }) => {
                 setImagePreview(null);
             }
         }
-        return () => { 
-            if (imagePreview) URL.revokeObjectURL(imagePreview); 
+        return () => {
+            if (imagePreview) URL.revokeObjectURL(imagePreview);
         }
     }, [open, imagePreview]);
 
@@ -115,39 +172,39 @@ const RecipeForm = ({ open, onClose, onSubmit, sellerProducts = [] }) => {
         <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
             <DialogTitle>Submit New Recipe</DialogTitle>
             <DialogContent>
-                <TextField 
-                    margin="dense" 
-                    label="Recipe Title" 
-                    fullWidth 
-                    value={title} 
-                    onChange={(e) => setTitle(e.target.value)} 
-                    required 
+                <TextField
+                    margin="dense"
+                    label="Recipe Title"
+                    fullWidth
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    required
                 />
-                <TextField 
-                    margin="dense" 
-                    label="Ingredients (one per line or comma-separated)" 
-                    fullWidth 
-                    multiline 
-                    rows={4} 
-                    value={ingredients} 
-                    onChange={(e) => setIngredients(e.target.value)} 
-                    required 
+                <TextField
+                    margin="dense"
+                    label="Ingredients (one per line or comma-separated)"
+                    fullWidth
+                    multiline
+                    rows={4}
+                    value={ingredients}
+                    onChange={(e) => setIngredients(e.target.value)}
+                    required
                 />
-                <TextField 
-                    margin="dense" 
-                    label="Steps (one per line or comma-separated)" 
-                    fullWidth 
-                    multiline 
-                    rows={6} 
-                    value={steps} 
-                    onChange={(e) => setSteps(e.target.value)} 
-                    required 
+                <TextField
+                    margin="dense"
+                    label="Steps (one per line or comma-separated)"
+                    fullWidth
+                    multiline
+                    rows={6}
+                    value={steps}
+                    onChange={(e) => setSteps(e.target.value)}
+                    required
                 />
                 <FormControl fullWidth margin="dense" required>
                     <InputLabel>Rice Type</InputLabel>
-                    <Select 
-                        value={riceType} 
-                        label="Rice Type" 
+                    <Select
+                        value={riceType}
+                        label="Rice Type"
                         onChange={(e) => setRiceType(e.target.value)}
                     >
                         {riceTypes.map(type => (
@@ -167,9 +224,9 @@ const RecipeForm = ({ open, onClose, onSubmit, sellerProducts = [] }) => {
                                 {selected.map((id) => {
                                     const product = sellerProducts.find(p => p._id === id);
                                     return (
-                                        <Chip 
-                                            key={id} 
-                                            label={product?.name || `ID:...${id.slice(-6)}`} 
+                                        <Chip
+                                            key={id}
+                                            label={product?.name || `ID:...${id.slice(-6)}`}
                                             size="small"
                                         />
                                     );
@@ -192,16 +249,16 @@ const RecipeForm = ({ open, onClose, onSubmit, sellerProducts = [] }) => {
                     <input type="file" hidden accept="image/*" onChange={handleImageChange} />
                 </Button>
                 {imagePreview && (
-                    <Box 
-                        component="img" 
-                        src={imagePreview} 
-                        alt="Preview" 
-                        sx={{ 
-                            maxHeight: 150, 
-                            display: 'block', 
-                            mt: 1, 
-                            borderRadius: 1 
-                        }} 
+                    <Box
+                        component="img"
+                        src={imagePreview}
+                        alt="Preview"
+                        sx={{
+                            maxHeight: 150,
+                            display: 'block',
+                            mt: 1,
+                            borderRadius: 1
+                        }}
                     />
                 )}
             </DialogContent>
@@ -220,18 +277,18 @@ const SellerRecipesPanel = () => {
     const dispatch = useDispatch();
     const [recipeFormOpen, setRecipeFormOpen] = useState(false);
 
-    const { 
-        loading, 
-        error, 
-        recipes = [], 
-        page = 1, 
-        pages = 1 
-    } = useSelector(state => state.recipeListMy || { 
-        loading: false, 
-        error: null, 
-        recipes: [], 
-        page: 1, 
-        pages: 1 
+    const {
+        loading,
+        error,
+        recipes = [],
+        page = 1,
+        pages = 1
+    } = useSelector(state => state.recipeListMy || {
+        loading: false,
+        error: null,
+        recipes: [],
+        page: 1,
+        pages: 1
     });
 
     const recipeSubmit = useSelector(state => state.recipeSubmit || {});
@@ -287,17 +344,17 @@ const SellerRecipesPanel = () => {
 
     return (
         <Box>
-            <Box sx={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
-                mb: 2 
+            <Box sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                mb: 2
             }}>
                 <Typography variant="h5">My Recipes</Typography>
-                <Button 
-                    variant="contained" 
-                    startIcon={<AddIcon />} 
-                    onClick={handleOpenRecipeForm} 
+                <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={handleOpenRecipeForm}
                     disabled={loadingProducts || submitting}
                 >
                     {loadingProducts ? 'Loading Products...' : (submitting ? 'Submitting...' : 'Submit New Recipe')}
@@ -325,12 +382,12 @@ const SellerRecipesPanel = () => {
                         <Table>
                             <TableHead>
                                 <TableRow sx={{ backgroundColor: grey[100] }}>
-                                    <TableCell sx={{fontWeight: 'bold'}}>Title</TableCell>
-                                    <TableCell sx={{fontWeight: 'bold'}}>Status</TableCell>
-                                    <TableCell sx={{fontWeight: 'bold'}}>Rice Type</TableCell>
-                                    <TableCell sx={{fontWeight: 'bold'}}>Linked Products</TableCell>
-                                    <TableCell sx={{fontWeight: 'bold'}}>Created At</TableCell>
-                                    <TableCell sx={{fontWeight: 'bold'}}>Actions</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>Title</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>Rice Type</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>Linked Products</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>Created At</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -342,16 +399,16 @@ const SellerRecipesPanel = () => {
                                                 label={recipe.status}
                                                 size="small"
                                                 color={
-                                                    recipe.status === 'approved' ? 'success' : 
-                                                    recipe.status === 'rejected' ? 'error' : 
-                                                    'warning'
+                                                    recipe.status === 'approved' ? 'success' :
+                                                        recipe.status === 'rejected' ? 'error' :
+                                                            'warning'
                                                 }
                                             />
                                         </TableCell>
                                         <TableCell>{recipe.riceType}</TableCell>
                                         <TableCell>
-                                            {recipe.linkedProducts?.length > 0 ? 
-                                                recipe.linkedProducts.map(p => p.name).join(', ') : 
+                                            {recipe.linkedProducts?.length > 0 ?
+                                                recipe.linkedProducts.map(p => p.name).join(', ') :
                                                 'None'
                                             }
                                         </TableCell>
@@ -359,12 +416,12 @@ const SellerRecipesPanel = () => {
                                             {new Date(recipe.createdAt).toLocaleDateString()}
                                         </TableCell>
                                         <TableCell>
-                                            <IconButton 
-                                                size="small" 
-                                                onClick={() => handleDeleteRecipe(recipe._id)} 
+                                            <IconButton
+                                                size="small"
+                                                onClick={() => handleDeleteRecipe(recipe._id)}
                                                 disabled={deleting}
                                             >
-                                                <DeleteIcon color={deleting ? 'disabled' : 'error'}/>
+                                                <DeleteIcon color={deleting ? 'disabled' : 'error'} />
                                             </IconButton>
                                         </TableCell>
                                     </TableRow>
@@ -381,12 +438,12 @@ const SellerRecipesPanel = () => {
                     </TableContainer>
                     {pages > 1 && (
                         <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-                            <Pagination 
-                                count={pages} 
-                                page={page} 
-                                onChange={handlePageChange} 
-                                color="primary" 
-                                disabled={loading || submitting || deleting} 
+                            <Pagination
+                                count={pages}
+                                page={page}
+                                onChange={handlePageChange}
+                                color="primary"
+                                disabled={loading || submitting || deleting}
                             />
                         </Box>
                     )}
@@ -418,10 +475,10 @@ const SellerDashboard = () => {
 
     // FIX: Handle orders data structure properly
     const orderListSeller = useSelector((state) => state.orderListSeller || {});
-    const { 
-        orders: rawOrders = [], 
-        loading: ordersLoading = false, 
-        error: ordersError = null 
+    const {
+        orders: rawOrders = [],
+        loading: ordersLoading = false,
+        error: ordersError = null
     } = orderListSeller;
 
     // FIX: Ensure orders is always an array
@@ -432,13 +489,13 @@ const SellerDashboard = () => {
         return [];
     }, [rawOrders]);
 
-    const { 
-        partners = [], 
-        loading: partnersLoading = false, 
-        error: partnersError = null 
+    const {
+        partners = [],
+        loading: partnersLoading = false,
+        error: partnersError = null
     } = useSelector((state) => state.deliveryPartnerList || {});
 
-    const assignPartnerState = useSelector((state) => state.assignDeliveryPartner || {});
+    const assignPartnerState = useSelector((state) => state.deliveryPartnerAction || {});
     const updateStatusState = useSelector((state) => state.orderUpdate || {});
 
     useEffect(() => {
@@ -465,9 +522,9 @@ const SellerDashboard = () => {
 
         if (user?._id) {
             orderSocket = new OrderTrackingSocket(
-                user._id, 
-                user.role, 
-                localStorage.getItem('token'), 
+                user._id,
+                user.role,
+                localStorage.getItem('token'),
                 handleSocketMessage
             );
 
@@ -501,15 +558,43 @@ const SellerDashboard = () => {
 
     const handleAssignPartner = () => {
         if (selectedOrder && partnerId) {
-            dispatch(assignDeliveryPartner(selectedOrder._id, partnerId));
+            // Reverted to correct payload key 'deliveryPartner' matching backend
+            dispatch(assignDeliveryPartner(selectedOrder._id, { deliveryPartner: partnerId, trackingNumber: '' }));
             handleCloseDialog();
         } else {
             alert('Please select a delivery partner.');
         }
     };
 
+    // Reset success flags after action completes to prevent stale state
+    useEffect(() => {
+        if (assignPartnerState.success) {
+            console.log('✅ Assignment completed, resetting flag');
+            const timer = setTimeout(() => {
+                dispatch({ type: 'DELIVERY_ASSIGN_RESET' });
+            }, 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [assignPartnerState.success, dispatch]);
+
+    useEffect(() => {
+        if (updateStatusState.success) {
+            console.log('✅ Status update completed, resetting flag');
+            const timer = setTimeout(() => {
+                dispatch({ type: 'ORDER_UPDATE_RESET' });
+            }, 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [updateStatusState.success, dispatch]);
+
     const handleUpdateStatus = (orderId, status) => {
-        dispatch(updateOrderStatus(orderId, { status }));
+        if (status === 'shipped') {
+            setOpenDialog(true); // Assuming setOpenDialog is used for assigning partner
+            setSelectedOrder(orders.find(o => o._id === orderId)); // Set selected order for the dialog
+        } else {
+            // Pass status directly, not as an object
+            dispatch(updateOrderStatus(orderId, status));
+        }
     };
 
     const handleOpenChat = (customerId) => {
@@ -547,7 +632,7 @@ const SellerDashboard = () => {
             tableRows.push(itemData);
         });
 
-        doc.autoTable({
+        autoTable(doc, {
             head: [tableColumn],
             body: tableRows,
             startY: 80,
@@ -592,17 +677,17 @@ const SellerDashboard = () => {
                     <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
                         Seller Dashboard
                     </Typography>
-                    
+
                     {/* Message Admin Button */}
-                    <Button 
-                        color="inherit" 
+                    <Button
+                        color="inherit"
                         onClick={() => setChatWithAdminOpen(true)}
                         startIcon={<SupportIcon />}
                         sx={{ mr: 2 }}
                     >
                         Message Admin
                     </Button>
-                    
+
                     <SellerLogoutButton />
                 </Toolbar>
             </AppBar>
@@ -620,8 +705,8 @@ const SellerDashboard = () => {
                                     Message our admin team directly for any questions about orders, payments, or platform issues.
                                 </Typography>
                             </Box>
-                            <Button 
-                                variant="contained" 
+                            <Button
+                                variant="contained"
                                 sx={{ bgcolor: 'white', color: 'primary.main', '&:hover': { bgcolor: 'grey.100' } }}
                                 onClick={() => setChatWithAdminOpen(true)}
                                 startIcon={<ChatIcon />}
@@ -634,10 +719,10 @@ const SellerDashboard = () => {
             </Container>
 
             <Container maxWidth="xl" sx={{ mb: 4 }}>
-                <Paper elevation={4} sx={{ 
-                    p: 3, 
-                    mb: 3, 
-                    borderRadius: 3, 
+                <Paper elevation={4} sx={{
+                    p: 3,
+                    mb: 3,
+                    borderRadius: 3,
                     background: 'linear-gradient(135deg, #e8f5e9 30%, #f1f8e9 100%)',
                 }}>
                     <Tabs
@@ -649,30 +734,30 @@ const SellerDashboard = () => {
                         scrollButtons="auto"
                         aria-label="Seller dashboard tabs"
                         sx={{
-                            borderBottom: 1, 
+                            borderBottom: 1,
                             borderColor: 'divider',
                             '& .MuiTab-root': {
-                                fontWeight: 600, 
+                                fontWeight: 600,
                                 textTransform: 'none',
                                 '&.Mui-selected': { color: theme.palette.primary.main },
                             },
                         }}
                     >
                         <Tab label="Profile" id="seller-tab-0" aria-controls="seller-panel-0" />
-                        <Tab label="Orders" id="seller-tab-1" aria-controls="seller-panel-1"/>
-                        <Tab label="Products" id="seller-tab-2" aria-controls="seller-panel-2"/>
-                        <Tab label="Payments" id="seller-tab-3" aria-controls="seller-panel-3"/>
-                        <Tab label="Delivery" id="seller-tab-4" aria-controls="seller-panel-4"/>
-                        <Tab label="Recipes" id="seller-tab-5" aria-controls="seller-panel-5"/>
-                        <Tab label="Community Forum" id="seller-tab-6" aria-controls="seller-panel-6"/>
-                        <Tab label="Analytics" id="seller-tab-7" aria-controls="seller-panel-7"/>
+                        <Tab label="Orders" id="seller-tab-1" aria-controls="seller-panel-1" />
+                        <Tab label="Products" id="seller-tab-2" aria-controls="seller-panel-2" />
+                        <Tab label="Payments" id="seller-tab-3" aria-controls="seller-panel-3" />
+                        <Tab label="Delivery" id="seller-tab-4" aria-controls="seller-panel-4" />
+                        <Tab label="Recipes" id="seller-tab-5" aria-controls="seller-panel-5" />
+                        <Tab label="Community Forum" id="seller-tab-6" aria-controls="seller-panel-6" />
+                        <Tab label="Analytics" id="seller-tab-7" aria-controls="seller-panel-7" />
                     </Tabs>
                 </Paper>
 
                 <Box role="tabpanel" hidden={tabValue !== 0} id="seller-panel-0" aria-labelledby="seller-tab-0">
                     <SellerProfile />
                 </Box>
-                
+
                 <Box role="tabpanel" hidden={tabValue !== 1} id="seller-panel-1" aria-labelledby="seller-tab-1">
                     {ordersLoading && orders.length === 0 ? (
                         <Loader />
@@ -683,15 +768,15 @@ const SellerDashboard = () => {
                             <Table>
                                 <TableHead>
                                     <TableRow sx={{ backgroundColor: grey[100] }}>
-                                        <TableCell sx={{fontWeight: 'bold'}}>Order ID</TableCell>
-                                        <TableCell sx={{fontWeight: 'bold'}}>Customer</TableCell>
-                                        <TableCell sx={{fontWeight: 'bold'}}>Date</TableCell>
-                                        <TableCell sx={{fontWeight: 'bold'}}>Total</TableCell>
-                                        <TableCell sx={{fontWeight: 'bold'}}>Status</TableCell>
-                                        <TableCell sx={{fontWeight: 'bold'}}>Payment</TableCell>
-                                        <TableCell sx={{fontWeight: 'bold'}}>Delivery Partner</TableCell>
-                                        <TableCell sx={{fontWeight: 'bold'}}>Est. Delivery</TableCell>
-                                        <TableCell sx={{fontWeight: 'bold'}}>Actions</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold' }}>Order ID</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold' }}>Customer</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold' }}>Total</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold' }}>Payment</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold' }}>Delivery Partner</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold' }}>Est. Delivery</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
@@ -718,9 +803,9 @@ const SellerDashboard = () => {
                                                 </Select>
                                             </TableCell>
                                             <TableCell>
-                                                <Chip 
-                                                    label={order.isPaid ? 'Paid' : 'Pending'} 
-                                                    color={order.isPaid ? 'success' : 'warning'} 
+                                                <Chip
+                                                    label={order.isPaid ? 'Paid' : 'Pending'}
+                                                    color={order.isPaid ? 'success' : 'warning'}
                                                     size="small"
                                                 />
                                             </TableCell>
@@ -728,27 +813,20 @@ const SellerDashboard = () => {
                                             <TableCell>{order.createdAt ? getEstimatedDeliveryDate(order.createdAt) : 'N/A'}</TableCell>
                                             <TableCell>
                                                 <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'nowrap' }}>
-                                                    <Button 
-                                                        size="small" 
-                                                        variant="outlined" 
-                                                        onClick={() => handleOpenDialog(order)} 
+                                                    <Button
+                                                        size="small"
+                                                        variant="outlined"
+                                                        onClick={() => handleOpenDialog(order)}
                                                         disabled={assignPartnerState.loading}
                                                     >
                                                         Assign
                                                     </Button>
-                                                    <IconButton 
-                                                        size="small" 
-                                                        onClick={() => generatePDF(order)} 
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => generatePDF(order)}
                                                         title="Download Invoice"
                                                     >
                                                         <DownloadIcon />
-                                                    </IconButton>
-                                                    <IconButton 
-                                                        size="small" 
-                                                        onClick={() => handleOpenChat(order.user?._id)} 
-                                                        title="Chat Customer"
-                                                    >
-                                                        <ChatIcon />
                                                     </IconButton>
                                                 </Box>
                                             </TableCell>
@@ -770,23 +848,23 @@ const SellerDashboard = () => {
                 <Box role="tabpanel" hidden={tabValue !== 2} id="seller-panel-2" aria-labelledby="seller-tab-2">
                     <SellerProducts />
                 </Box>
-                
+
                 <Box role="tabpanel" hidden={tabValue !== 3} id="seller-panel-3" aria-labelledby="seller-tab-3">
                     <SellerPayments />
                 </Box>
-                
+
                 <Box role="tabpanel" hidden={tabValue !== 4} id="seller-panel-4" aria-labelledby="seller-tab-4">
                     <SellerDelivery />
                 </Box>
-                
+
                 <Box role="tabpanel" hidden={tabValue !== 5} id="seller-panel-5" aria-labelledby="seller-tab-5">
                     <SellerRecipesPanel />
                 </Box>
-                
+
                 <Box role="tabpanel" hidden={tabValue !== 6} id="seller-panel-6" aria-labelledby="seller-tab-6">
                     <Forum />
                 </Box>
-                
+
                 <Box role="tabpanel" hidden={tabValue !== 7} id="seller-panel-7" aria-labelledby="seller-tab-7">
                     <AnalyticsDashboard />
                 </Box>
@@ -827,9 +905,9 @@ const SellerDashboard = () => {
                     </DialogContent>
                     <DialogActions>
                         <Button onClick={handleCloseDialog}>Cancel</Button>
-                        <Button 
-                            onClick={handleAssignPartner} 
-                            variant="contained" 
+                        <Button
+                            onClick={handleAssignPartner}
+                            variant="contained"
                             disabled={partnersLoading || partners.length === 0 || assignPartnerState.loading || !partnerId}
                         >
                             {assignPartnerState.loading ? <CircularProgress size={24} /> : 'Assign'}
@@ -841,9 +919,9 @@ const SellerDashboard = () => {
                 {chatOpen && user && selectedCustomer && (
                     <ChatWindow
                         receiverId={selectedCustomer}
-                        onClose={() => { 
-                            setChatOpen(false); 
-                            setSelectedCustomer(null); 
+                        onClose={() => {
+                            setChatOpen(false);
+                            setSelectedCustomer(null);
                         }}
                     />
                 )}

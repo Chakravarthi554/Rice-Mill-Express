@@ -52,7 +52,7 @@ const getAuthConfig = (userInfo) => {
     console.error('❌ No user token available for forum request');
     throw new Error('Authentication required. Please log in again.');
   }
-  
+
   return {
     headers: {
       'Content-Type': 'application/json',
@@ -67,7 +67,7 @@ const safeApiCall = async (apiCall, errorMessage) => {
     return await apiCall();
   } catch (error) {
     console.error(`❌ ${errorMessage}:`, error);
-    
+
     // Handle authentication errors
     if (error.response?.status === 401) {
       console.log('🔐 Authentication failed, clearing storage...');
@@ -76,12 +76,12 @@ const safeApiCall = async (apiCall, errorMessage) => {
       window.location.href = '/login';
       throw new Error('Session expired. Please log in again.');
     }
-    
+
     // Handle authorization errors
     if (error.response?.status === 403) {
       throw new Error('Access denied. You do not have permission to perform this action.');
     }
-    
+
     throw error;
   }
 };
@@ -94,7 +94,7 @@ export const createForumPost = (postData) => async (dispatch, getState) => {
     const {
       userLogin: { userInfo },
     } = getState();
-    
+
     const config = getAuthConfig(userInfo);
 
     const { data } = await safeApiCall(
@@ -126,7 +126,7 @@ export const getForumPosts = (page = 1, limit = 50, category = '', search = '', 
     const {
       userLogin: { userInfo },
     } = getState();
-    
+
     const config = userInfo?.token ? getAuthConfig(userInfo) : {};
 
     const params = { page, limit, ...filters };
@@ -134,7 +134,7 @@ export const getForumPosts = (page = 1, limit = 50, category = '', search = '', 
     if (search) params.search = search;
 
     console.log('🔄 Fetching forum posts with params:', params);
-    
+
     const { data } = await safeApiCall(
       () => axiosInstance.get('/api/forum', { params, ...config }),
       'Fetch forum posts failed'
@@ -205,11 +205,11 @@ export const getPendingPosts = (page = 1, limit = 10) => async (dispatch, getSta
         total: data.total || 0,
       },
     });
-    
+
     return Promise.resolve(data);
   } catch (error) {
     console.error('❌ Error in getPendingPosts:', error);
-    
+
     let message = 'Failed to fetch pending posts';
     if (error.response?.status === 401) {
       message = 'Authentication failed. Please log in again.';
@@ -223,7 +223,7 @@ export const getPendingPosts = (page = 1, limit = 10) => async (dispatch, getSta
       type: FORUM_POST_LIST_FAIL,
       payload: message,
     });
-    
+
     return Promise.reject(message);
   }
 };
@@ -279,6 +279,9 @@ export const likePost = (postId) => async (dispatch, getState) => {
       payload: data,
     });
 
+    // Refresh post details to show updated like count
+    dispatch(getPostById(postId));
+
     return Promise.resolve(data);
   } catch (error) {
     const message = handleApiError(error);
@@ -313,6 +316,9 @@ export const addComment = (postId, content) => async (dispatch, getState) => {
       type: FORUM_POST_REPLY_SUCCESS,
       payload: data,
     });
+
+    // Refresh post details to show new comment
+    dispatch(getPostById(postId));
 
     return Promise.resolve(data);
   } catch (error) {
@@ -528,11 +534,11 @@ export const getFlaggedForumComments = (page = 1, limit = 20) => async (dispatch
     const {
       userLogin: { userInfo },
     } = getState();
-    
+
     if (!userInfo || userInfo.role !== 'admin') {
       throw new Error('Access denied. Admin role required.');
     }
-    
+
     const config = getAuthConfig(userInfo);
 
     const { data } = await safeApiCall(
@@ -577,12 +583,12 @@ export const getForumPostsLive = (page = 1, limit = 50, category = '', search = 
       () => axiosInstance.get('/api/forum', { params, ...config }),
       'Fetch live forum posts failed'
     );
-    
+
     dispatch({
       type: FORUM_POST_LIST_LIVE_SUCCESS,
       payload: { posts: data.posts || [], page: data.page, pages: data.pages, total: data.total }
     });
-    
+
     return Promise.resolve(data);
   } catch (error) {
     const message = handleApiError(error);

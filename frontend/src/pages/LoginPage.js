@@ -17,12 +17,19 @@ const LoginPage = () => {
     }
   }, [message, loading, setMessage]);
 
-   // Redirect if already logged in
-   useEffect(() => {
+  // Redirect based on role if already logged in
+  useEffect(() => {
     if (isAuthenticated) {
+      const user = JSON.parse(localStorage.getItem('userInfo'));
+      if (user?.role === 'seller') {
+        navigate('/seller/dashboard');
+      } else if (user?.role === 'admin') {
+        navigate('/admin/dashboard');
+      } else {
         navigate('/customer/dashboard');
+      }
     }
-   }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -55,7 +62,7 @@ const LoginPage = () => {
               </Link>
             </Grid>
           </Grid>
-           {message && <Alert severity={message.includes('success') || message.includes('Welcome') ? 'success' : 'error'} sx={{ mt: 2, width: '100%' }}>{message}</Alert>}
+          {message && <Alert severity={message.includes('success') || message.includes('Welcome') ? 'success' : 'error'} sx={{ mt: 2, width: '100%' }}>{message}</Alert>}
         </Box>
       </Paper>
     </Container>

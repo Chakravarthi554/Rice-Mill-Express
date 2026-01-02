@@ -65,13 +65,13 @@ export const listProducts = (keyword = '', pageNumber = '') => async (dispatch) 
 
   } catch (error) {
     console.error('❌ List products error:', error);
-    
+
     const message = handleApiError(error);
     dispatch({
       type: PRODUCT_LIST_FAIL,
       payload: message
     });
-    
+
     return { success: false, error: message };
   }
 };
@@ -103,7 +103,7 @@ export const listFilteredProducts = (filters = {}) => async (dispatch) => {
     const { data } = await api.get(`/api/products/filter?${queryParams.toString()}`);
 
     dispatch({
-      type: PRODUCT_FILTER_SUCCESS,
+      type: PRODUCT_LIST_SUCCESS,
       payload: {
         products: data.products || [],   // ← Always array
         total: data.total || 0,
@@ -142,13 +142,13 @@ export const listProductDetails = (id) => async (dispatch) => {
 
   } catch (error) {
     console.error('❌ Product details error:', error);
-    
+
     const message = handleApiError(error);
     dispatch({
       type: PRODUCT_DETAILS_FAIL,
       payload: message
     });
-    
+
     return { success: false, error: message };
   }
 };

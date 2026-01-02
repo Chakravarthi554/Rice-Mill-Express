@@ -29,13 +29,11 @@ import {
   DialogActions
 } from '@mui/material';
 import {
-  Cancel,
-  Chat as ChatIcon,
-  Support as SupportIcon,
-  Download as DownloadIcon
+  LocalShipping, CheckCircle, Cancel, Inventory, Person, Map,
+  Phone, LocationOn, Star, Download as DownloadIcon, Visibility
 } from '@mui/icons-material';
 import Message from '../../components/common/Message';
-import ChatWindow from '../../components/common/ChatWindow';
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -85,8 +83,7 @@ const OrderDetailPage = () => {
   const { order, loading, error } = useSelector(s => s.orderDetails || {});
   const { loading: cancelLoading, error: cancelError, success: cancelSuccess } = useSelector(s => s.orderCancel || {});
 
-  const [chatSeller, setChatSeller] = useState(false);
-  const [chatAdmin, setChatAdmin] = useState(false);
+
   const [cancelOpen, setCancelOpen] = useState(false);
 
   /* ------------------------------------------------------------------ */
@@ -221,21 +218,7 @@ const OrderDetailPage = () => {
         <Chip label={(order.orderStatus || '').toUpperCase()} color={statusColor(order.orderStatus)} size="large" />
       </Box>
 
-      {/* Support */}
-      <Card sx={{ mb: 3, bgcolor: 'primary.light', color: 'white' }}>
-        <CardContent>
-          <Box display="flex" alignItems="center" justifyContent="space-between">
-            <Box>
-              <Typography variant="h6" gutterBottom>Need Help?</Typography>
-              <Typography variant="body2">Message seller or admin.</Typography>
-            </Box>
-            <Box display="flex" gap={2}>
-              <Button variant="contained" sx={{ bgcolor: 'white', color: 'primary.main' }} onClick={() => setChatSeller(true)} disabled={!order.seller} startIcon={<ChatIcon />}>Seller</Button>
-              <Button variant="outlined" sx={{ borderColor: 'white', color: 'white' }} onClick={() => setChatAdmin(true)} startIcon={<SupportIcon />}>Admin</Button>
-            </Box>
-          </Box>
-        </CardContent>
-      </Card>
+
 
       <Grid container spacing={3}>
         {/* Progress */}
@@ -295,8 +278,7 @@ const OrderDetailPage = () => {
                   {cancelLoading ? <CircularProgress size={24} /> : 'Cancel Order'}
                 </Button>
               )}
-              <Button variant="outlined" startIcon={<ChatIcon />} onClick={() => setChatSeller(true)} disabled={!order.seller} fullWidth>Message Seller</Button>
-              <Button variant="outlined" startIcon={<SupportIcon />} onClick={() => setChatAdmin(true)} fullWidth>Message Admin</Button>
+
             </Box>
 
             <Divider sx={{ my: 2 }} />
@@ -333,13 +315,7 @@ const OrderDetailPage = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Chat windows */}
-      {chatSeller && order.seller && (
-        <ChatWindow receiverId={order.seller._id} receiverName={order.seller.name || 'Seller'} orderId={id} onClose={() => setChatSeller(false)} />
-      )}
-      {chatAdmin && (
-        <ChatWindow receiverId={process.env.REACT_APP_ADMIN_USER_ID || 'admin'} receiverName="Admin" orderId={id} onClose={() => setChatAdmin(false)} />
-      )}
+
     </Box>
   );
 };

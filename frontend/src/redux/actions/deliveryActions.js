@@ -26,14 +26,27 @@ export const listDeliveryPartners = () => async (dispatch, getState) => {
     const {
       userLogin: { userInfo },
     } = getState();
+
+    console.log('🔄 Fetching delivery partners...', {
+      userId: userInfo.user?._id,
+      token: userInfo.token ? 'Present' : 'Missing'
+    });
+
     const config = {
       headers: {
         Authorization: `Bearer ${userInfo.token}`,
       },
     };
     const { data } = await axios.get('/api/delivery-partners/partners', config);
+
+    console.log('✅ Delivery partners fetched:', {
+      count: data.length,
+      data: data
+    });
+
     dispatch({ type: DELIVERY_PARTNER_LIST_SUCCESS, payload: data });
   } catch (error) {
+    console.error('❌ Failed to fetch delivery partners:', error.response?.data || error.message);
     dispatch({
       type: DELIVERY_PARTNER_LIST_FAIL,
       payload: error.response?.data?.message || error.message
@@ -108,6 +121,12 @@ export const deleteDeliveryPartner = (id) => async (dispatch, getState) => {
 
 export const assignDeliveryPartner = (orderId, deliveryData) => async (dispatch, getState) => {
   try {
+    console.log('🚀 Redux Action: Assigning delivery partner', {
+      orderId,
+      deliveryData,
+      endpoint: `/api/delivery-partners/orders/${orderId}`
+    });
+
     dispatch({ type: DELIVERY_ASSIGN_REQUEST });
     const {
       userLogin: { userInfo },
@@ -118,12 +137,28 @@ export const assignDeliveryPartner = (orderId, deliveryData) => async (dispatch,
         Authorization: `Bearer ${userInfo.token}`,
       },
     };
+
+    console.log('📡 Making API call to assign partner...');
     const { data } = await axios.put(`/api/delivery-partners/orders/${orderId}`, deliveryData, config);
+    console.log('✅ Partner assigned successfully:', data);
+
     dispatch({ type: DELIVERY_ASSIGN_SUCCESS, payload: data });
 
-    // Refresh the orders list after assignment
+    // CRITICAL: Refresh both delivery orders AND seller orders to show the update
+    console.log('🔄 Refreshing orders after partner assignment...');
     dispatch(listOrdersForDelivery());
+
+    // Import and call listSellerOrders from orderActions
+    const { listSellerOrders } = require('./orderActions');
+    await dispatch(listSellerOrders());
+
   } catch (error) {
+    console.error('❌ Partner assignment failed:', {
+      message: error.response?.data?.message || error.message,
+      status: error.response?.status,
+      data: error.response?.data
+    });
+
     dispatch({
       type: DELIVERY_ASSIGN_FAIL,
       payload: error.response?.data?.message || error.message

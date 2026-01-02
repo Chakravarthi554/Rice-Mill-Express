@@ -1,12 +1,15 @@
 import React from 'react';
 import { Typography, Box, Paper, Grid, Button } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import Loader from '../common/Loader';
 import OrderTracker from '../customer/OrderTracker';
+import { addToCart } from '../../redux/actions/cartActions';
+import { addToWishlist } from '../../redux/actions/userActions';
 
-const MyOrders = ({ setSelectedSeller, setChatOpen }) => {
+const MyOrders = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const { loading: ordersLoading, error: ordersError, orders = [] } = useSelector((state) => state.orderListMy || {});
 
   return (
@@ -30,8 +33,8 @@ const MyOrders = ({ setSelectedSeller, setChatOpen }) => {
                   style={{
                     backgroundColor:
                       order.orderStatus === 'delivered' ? '#4CAF50' :
-                      order.orderStatus === 'cancelled' ? '#F44336' :
-                      '#2196F3',
+                        order.orderStatus === 'cancelled' ? '#F44336' :
+                          '#2196F3',
                     color: '#FFFFFF',
                     fontWeight: 'bold',
                     padding: '2px 8px',
@@ -65,7 +68,7 @@ const MyOrders = ({ setSelectedSeller, setChatOpen }) => {
                           {item.product.name}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          Price: ₹{item.price}
+                          Price: <Price amount={item.price} />
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
                           Quantity: {item.qty}
@@ -74,6 +77,35 @@ const MyOrders = ({ setSelectedSeller, setChatOpen }) => {
                           Order Date: {new Date(order.createdAt).toLocaleDateString()}
                         </Typography>
                       </div>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, ml: 2 }}>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={() => {
+                            dispatch(addToCart(item.product._id, 1));
+                            navigate('/cart');
+                          }}
+                        >
+                          Buy Again
+                        </Button>
+                        <Button
+                          variant="text"
+                          size="small"
+                          onClick={() => {
+                            dispatch(addToWishlist(item.product._id));
+                            alert('Added to wishlist');
+                          }}
+                        >
+                          Wishlist
+                        </Button>
+                        <Button
+                          variant="text"
+                          size="small"
+                          onClick={() => navigate(`/products/${item.product._id}`)}
+                        >
+                          Review
+                        </Button>
+                      </Box>
                     </div>
                   </Grid>
                 ))}
@@ -86,18 +118,7 @@ const MyOrders = ({ setSelectedSeller, setChatOpen }) => {
               >
                 View Full Details
               </Button>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => {
-                  setSelectedSeller(order.seller?._id || null);
-                  setChatOpen(true);
-                }}
-                sx={{ mt: 2, ml: 2, color: '#4CAF50', borderColor: '#4CAF50', '&:hover': { borderColor: '#45A049', color: '#45A049' } }}
-                disabled={!order.seller?._id}
-              >
-                Chat Seller
-              </Button>
+
             </Paper>
           ))}
         </Box>

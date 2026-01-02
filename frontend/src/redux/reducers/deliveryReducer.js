@@ -57,6 +57,8 @@ export const deliveryPartnerActionReducer = (state = {}, action) => {
     case DELIVERY_PARTNER_DELETE_FAIL:
     case DELIVERY_ASSIGN_FAIL:
       return { ...state, loading: false, error: action.payload };
+    case 'DELIVERY_ASSIGN_RESET':
+      return {};
     default:
       return state;
   }

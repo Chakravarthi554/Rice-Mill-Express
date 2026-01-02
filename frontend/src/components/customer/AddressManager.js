@@ -35,6 +35,8 @@ const AddressManager = ({ onSelectAddress, elevation = 2 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const [newAddress, setNewAddress] = useState({
+    name: '',
+    phone: '',
     type: 'home',
     street: '',
     city: '',
@@ -65,6 +67,8 @@ const AddressManager = ({ onSelectAddress, elevation = 2 }) => {
     setIsEditing(false);
     setCurrentAddress(null);
     setNewAddress({
+      name: '',
+      phone: '',
       type: 'home',
       street: '',
       city: '',
@@ -218,6 +222,24 @@ const AddressManager = ({ onSelectAddress, elevation = 2 }) => {
             </FormControl>
             <TextField
               fullWidth
+              label="Recipient Name"
+              name="name"
+              value={newAddress.name}
+              onChange={handleInputChange}
+              sx={{ mb: 2 }}
+              required
+            />
+            <TextField
+              fullWidth
+              label="Phone Number"
+              name="phone"
+              value={newAddress.phone}
+              onChange={handleInputChange}
+              sx={{ mb: 2 }}
+              required
+            />
+            <TextField
+              fullWidth
               label="Street Address"
               name="street"
               value={newAddress.street}
@@ -263,6 +285,8 @@ const AddressManager = ({ onSelectAddress, elevation = 2 }) => {
             variant="contained"
             disabled={
               loading ||
+              !newAddress.name ||
+              !newAddress.phone ||
               !newAddress.street ||
               !newAddress.city ||
               !newAddress.state ||

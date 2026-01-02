@@ -2,6 +2,8 @@ const mongoose = require('mongoose');
 
 const addressSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  name: { type: String, required: true },  // ✅ FIXED: Added for order shipping address
+  phone: { type: String, required: true }, // ✅ FIXED: Added for order shipping address
   type: { type: String, enum: ['home', 'work', 'other'], default: 'home' },
   street: { type: String, required: true },
   city: { type: String, required: true },

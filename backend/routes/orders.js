@@ -71,7 +71,7 @@ const {
 const validateController = (controller, functionName) => {
   if (typeof controller[functionName] !== 'function') {
     console.error(`❌ Controller function ${functionName} is not a function`);
-    return (req, res) => res.status(501).json({ 
+    return (req, res) => res.status(501).json({
       message: `Function ${functionName} not available`,
       code: 'FUNCTION_NOT_AVAILABLE'
     });
@@ -98,6 +98,10 @@ router.route("/seller/analytics")
 
 // ✅ FIXED: Webhook (no protect middleware)
 router.post("/webhook/shiprocket", validateController(orderController, 'shiprocketWebhook'));
+
+// ✅ FIXED: Invoice generation
+const { generateInvoice } = require('../controllers/invoiceController');
+router.get("/:id/invoice", protect, generateInvoice);
 
 // ✅ FIXED: Single order actions
 router

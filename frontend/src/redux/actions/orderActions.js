@@ -35,23 +35,23 @@ import { handleApiError } from '../../utils/handleApiError';
 export const listMyOrders = () => async (dispatch, getState) => {
   try {
     dispatch({ type: ORDER_LIST_MY_REQUEST });
-    
+
     console.log('🔄 Fetching my orders...');
-    
+
     const { data } = await api.get('/api/orders/myorders');
-    
+
     console.log(`✅ Found ${data.length} orders`);
-    
+
     dispatch({
       type: ORDER_LIST_MY_SUCCESS,
       payload: data || []
     });
-    
+
     return { success: true, data };
-    
+
   } catch (error) {
     console.error('❌ Get my orders error:', error);
-    
+
     // Handle 404 gracefully - return empty array
     if (error.isEndpointNotFound) {
       console.log('⚠️ Orders endpoint not found, returning empty list');
@@ -61,13 +61,13 @@ export const listMyOrders = () => async (dispatch, getState) => {
       });
       return { success: true, data: [] };
     }
-    
+
     const message = handleApiError(error);
     dispatch({
       type: ORDER_LIST_MY_FAIL,
       payload: message
     });
-    
+
     return { success: false, error: message };
   }
 };
@@ -101,13 +101,13 @@ export const createOrder = (order) => async (dispatch, getState) => {
 
   } catch (error) {
     console.error('❌ Create order error:', error);
-    
+
     const message = handleApiError(error);
     dispatch({
       type: ORDER_CREATE_FAIL,
       payload: message
     });
-    
+
     throw new Error(message);
   }
 };
@@ -132,13 +132,13 @@ export const getOrderDetails = (id) => async (dispatch, getState) => {
 
   } catch (error) {
     console.error('❌ Get order details error:', error);
-    
+
     const message = handleApiError(error);
     dispatch({
       type: ORDER_DETAILS_FAIL,
       payload: message
     });
-    
+
     return { success: false, error: message };
   }
 };
@@ -154,7 +154,7 @@ export const listOrders = (filters = {}) => async (dispatch, getState) => {
     });
 
     const url = `/api/orders${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-    
+
     console.log(`🔄 Fetching orders: ${url}`);
 
     const { data } = await api.get(url);
@@ -170,13 +170,13 @@ export const listOrders = (filters = {}) => async (dispatch, getState) => {
 
   } catch (error) {
     console.error('❌ List orders error:', error);
-    
+
     const message = handleApiError(error);
     dispatch({
       type: ORDER_LIST_FAIL,
       payload: message
     });
-    
+
     return { success: false, error: message };
   }
 };
@@ -192,7 +192,7 @@ export const listSellerOrders = (filters = {}) => async (dispatch, getState) => 
     });
 
     const url = `/api/orders/sellerorders${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-    
+
     console.log(`🔄 Fetching seller orders: ${url}`);
 
     const { data } = await api.get(url);
@@ -208,7 +208,7 @@ export const listSellerOrders = (filters = {}) => async (dispatch, getState) => 
 
   } catch (error) {
     console.error('❌ List seller orders error:', error);
-    
+
     // Handle 404 gracefully
     if (error.isEndpointNotFound) {
       console.log('⚠️ Seller orders endpoint not found, returning empty list');
@@ -218,13 +218,13 @@ export const listSellerOrders = (filters = {}) => async (dispatch, getState) => 
       });
       return { success: true, data: { orders: [], total: 0 } };
     }
-    
+
     const message = handleApiError(error);
     dispatch({
       type: ORDER_LIST_SELLER_FAIL,
       payload: message
     });
-    
+
     return { success: false, error: message };
   }
 };
@@ -254,13 +254,13 @@ export const cancelOrder = (orderId, cancellationReason) => async (dispatch, get
 
   } catch (error) {
     console.error('❌ Cancel order error:', error);
-    
+
     const message = handleApiError(error);
     dispatch({
       type: ORDER_CANCEL_FAIL,
       payload: message
     });
-    
+
     return { success: false, error: message };
   }
 };
@@ -285,13 +285,13 @@ export const deliverOrder = (orderId) => async (dispatch, getState) => {
 
   } catch (error) {
     console.error('❌ Deliver order error:', error);
-    
+
     const message = handleApiError(error);
     dispatch({
       type: ORDER_DELIVER_FAIL,
       payload: message
     });
-    
+
     return { success: false, error: message };
   }
 };
@@ -308,7 +308,7 @@ export const updateOrderStatus = (orderId, status, note = '') => async (dispatch
       note
     });
 
-    console.log('✅ Order status updated successfully');
+    console.log('✅ Order status updated successfully:', data);
 
     dispatch({
       type: ORDER_UPDATE_SUCCESS,
@@ -319,13 +319,13 @@ export const updateOrderStatus = (orderId, status, note = '') => async (dispatch
 
   } catch (error) {
     console.error('❌ Update order status error:', error);
-    
+
     const message = handleApiError(error);
     dispatch({
       type: ORDER_UPDATE_FAIL,
       payload: message
     });
-    
+
     return { success: false, error: message };
   }
 };
@@ -350,13 +350,13 @@ export const payOrder = (orderId, paymentResult) => async (dispatch, getState) =
 
   } catch (error) {
     console.error('❌ Pay order error:', error);
-    
+
     const message = handleApiError(error);
     dispatch({
       type: ORDER_PAY_FAIL,
       payload: message
     });
-    
+
     return { success: false, error: message };
   }
 };

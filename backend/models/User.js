@@ -75,6 +75,33 @@ const userSchema = mongoose.Schema(
       referredUsers: { type: Number, default: 0 },
       earnedCredits: { type: Number, default: 0 },
     },
+    paymentMethods: [{
+      _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
+      cardNumber: { type: String, required: true },
+      cardType: { type: String, default: 'Credit Card' },
+      last4: { type: String },
+      expiry: { type: String, required: true },
+      isDefault: { type: Boolean, default: false },
+      createdAt: { type: Date, default: Date.now }
+    }],
+    linkedAccounts: [{ type: String, enum: ['google', 'facebook', 'twitter'] }],
+    subscription: {
+      plan: { type: String, enum: ['free', 'premium', 'enterprise'], default: 'free' },
+      active: { type: Boolean, default: false },
+      startDate: { type: Date },
+      endDate: { type: Date },
+      autoRenew: { type: Boolean, default: false },
+      paymentMethodId: { type: String }
+    },
+    rewardsBalance: { type: Number, default: 0 },
+    rewardsHistory: [{
+      amount: { type: Number, required: true },
+      type: { type: String, enum: ['earned', 'redeemed'], required: true },
+      description: { type: String },
+      date: { type: Date, default: Date.now }
+    }],
+    defaultAddress: { type: mongoose.Schema.Types.ObjectId, ref: 'Address' },
+    defaultPayment: { type: String }
   },
   { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );

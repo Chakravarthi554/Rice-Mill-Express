@@ -77,7 +77,7 @@ import {
 } from './reducers/addressReducers';
 
 import {
-  deliveryPartnerActionReducer, orderListForDeliveryReducer,
+  deliveryPartnerListReducer, deliveryPartnerActionReducer, orderListForDeliveryReducer,
 } from './reducers/deliveryReducer';
 
 import {
@@ -131,18 +131,18 @@ const shippingAddressFromStorage = getParsedItem('shippingAddress', {});
 
 // ✅ FIXED: Enhanced initial state with proper defaults
 const initialState = {
-  cart: { 
-    cartItems: cartItemsFromStorage, 
+  cart: {
+    cartItems: cartItemsFromStorage,
     shippingAddress: shippingAddressFromStorage,
     loading: false,
     error: null
   },
-  userLogin: { 
-    userInfo: userInfoFromStorage, 
-    loading: false, 
-    error: null 
+  userLogin: {
+    userInfo: userInfoFromStorage,
+    loading: false,
+    error: null
   },
-  userWishlist: { 
+  userWishlist: {
     wishlistItems: wishlistItemsFromStorage,
     loading: false,
     error: null
@@ -154,12 +154,12 @@ const initialState = {
   adminDashboardStats: { stats: {}, recentActivities: {}, loading: false, error: null },
   adminCommentsModeration: { comments: [], loading: false, error: null, page: 1, pages: 1, total: 0 },
   sellerPayments: { payments: [], balance: {}, payoutHistory: [], loading: false, error: null },
-  
+
   // ✅ ADD BULK ORDER INITIAL STATE
   bulkOrderCreate: { loading: false, success: false, error: null, bulkOrder: null },
   bulkOrderList: { loading: false, bulkOrders: [], error: null },
   bulkOrderUpdate: { loading: false, success: false, error: null, bulkOrder: null },
-  
+
   // 🔥 NEW: Admin Payment Initial State
   adminPaymentStats: { stats: {}, loading: false, error: null },
   adminTransactions: { transactions: [], loading: false, error: null, page: 1, pages: 1, total: 0 },
@@ -209,7 +209,7 @@ const rootReducer = combineReducers({
   bulkOrderUpdate: bulkOrderUpdateReducer,
 
   adminMessages: adminMessagesReducer,
-  
+
   // Orders
   orderCreate: orderCreateReducer,
   orderDetails: orderDetailsReducer,
@@ -234,7 +234,7 @@ const rootReducer = combineReducers({
 
   adminSettings: adminSettingsReducer,
   moderation: moderationReducer,
-  
+
   // Recipes
   recipeSubmit: recipeSubmitReducer,
   recipeList: recipeListReducer,
@@ -286,6 +286,7 @@ const rootReducer = combineReducers({
   notification: notificationReducer,
 
   // Delivery
+  deliveryPartnerList: deliveryPartnerListReducer,
   deliveryPartnerAction: deliveryPartnerActionReducer,
   orderListForDelivery: orderListForDeliveryReducer,
 

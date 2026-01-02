@@ -26,9 +26,10 @@ import {
   USER_UPDATE_SUCCESS,
   USER_UPDATE_FAIL,
   USER_WISHLIST_ADD_ITEM,
-  USER_WISHLIST_REMOVE_ITEM,
-  USER_WISHLIST_SUCCESS,
   USER_WISHLIST_REQUEST,
+  USER_WISHLIST_SUCCESS,
+  USER_WISHLIST_FAIL,
+  USER_WISHLIST_REMOVE_ITEM,
   CREATE_DELIVERY_PARTNER_REQUEST,
   CREATE_DELIVERY_PARTNER_SUCCESS,
   CREATE_DELIVERY_PARTNER_FAIL,
@@ -57,33 +58,33 @@ import {
   USER_RESET_PREFERENCES_SUCCESS,
   USER_RESET_PREFERENCES_FAIL,
   USER_EXPORT_DATA_FAIL,
-USER_EXPORT_DATA_SUCCESS,
-USER_GET_REWARDS_FAIL,
-USER_EXPORT_DATA_REQUEST,
-USER_GET_REWARDS_REQUEST,
-USER_GET_REWARDS_SUCCESS,
-USER_SUBSCRIBE_FAIL,
-USER_SUBSCRIBE_REQUEST,
-USER_SUBSCRIBE_SUCCESS,
-USER_ADD_PAYMENT_FAIL,
-USER_ADD_PAYMENT_REQUEST,
-USER_ADD_PAYMENT_SUCCESS,
-USER_DELETE_PAYMENT_FAIL,
-USER_DELETE_PAYMENT_REQUEST,
-USER_DELETE_PAYMENT_SUCCESS,
-USER_LINK_ACCOUNT_FAIL,
-USER_LINK_ACCOUNT_REQUEST,
-USER_LINK_ACCOUNT_SUCCESS,
-USER_REPORT_PROBLEM_FAIL,
-USER_UNLINK_ACCOUNT_FAIL,
-USER_UNLINK_ACCOUNT_REQUEST,
-USER_UNLINK_ACCOUNT_SUCCESS,
-USER_REPORT_PROBLEM_REQUEST,
-USER_REPORT_PROBLEM_SUCCESS,
-USER_UNSUBSCRIBE_FAIL,
-USER_UNSUBSCRIBE_REQUEST,
-USER_UNSUBSCRIBE_SUCCESS,
- 
+  USER_EXPORT_DATA_SUCCESS,
+  USER_GET_REWARDS_FAIL,
+  USER_EXPORT_DATA_REQUEST,
+  USER_GET_REWARDS_REQUEST,
+  USER_GET_REWARDS_SUCCESS,
+  USER_SUBSCRIBE_FAIL,
+  USER_SUBSCRIBE_REQUEST,
+  USER_SUBSCRIBE_SUCCESS,
+  USER_ADD_PAYMENT_FAIL,
+  USER_ADD_PAYMENT_REQUEST,
+  USER_ADD_PAYMENT_SUCCESS,
+  USER_DELETE_PAYMENT_FAIL,
+  USER_DELETE_PAYMENT_REQUEST,
+  USER_DELETE_PAYMENT_SUCCESS,
+  USER_LINK_ACCOUNT_FAIL,
+  USER_LINK_ACCOUNT_REQUEST,
+  USER_LINK_ACCOUNT_SUCCESS,
+  USER_REPORT_PROBLEM_FAIL,
+  USER_UNLINK_ACCOUNT_FAIL,
+  USER_UNLINK_ACCOUNT_REQUEST,
+  USER_UNLINK_ACCOUNT_SUCCESS,
+  USER_REPORT_PROBLEM_REQUEST,
+  USER_REPORT_PROBLEM_SUCCESS,
+  USER_UNSUBSCRIBE_FAIL,
+  USER_UNSUBSCRIBE_REQUEST,
+  USER_UNSUBSCRIBE_SUCCESS,
+
   USER_GET_SUBSCRIPTION_FAIL,
   USER_GET_SUBSCRIPTION_REQUEST,
   USER_GET_SUBSCRIPTION_SUCCESS,
@@ -97,31 +98,31 @@ export const loginUser = (email, password) => async (dispatch) => {
     dispatch({ type: USER_LOGIN_REQUEST });
 
     console.log('🔄 Attempting login...');
-    
-    const loginConfig = { 
-      headers: { 'Content-Type': 'application/json' }, 
+
+    const loginConfig = {
+      headers: { 'Content-Type': 'application/json' },
       withCredentials: true,
-      timeout: 30000 
+      timeout: 30000
     };
-    
+
     const { data: loginData } = await axios.post('/api/auth/login', { email, password }, loginConfig);
 
     if (!loginData.accessToken) {
       throw new Error('No access token received from server');
     }
 
-    const profileConfig = { 
+    const profileConfig = {
       headers: { Authorization: `Bearer ${loginData.accessToken}` },
       timeout: 30000
     };
-    
+
     console.log('✅ Login successful, fetching full profile...');
     const { data: profileData } = await axios.get('/api/users/profile', profileConfig);
 
     const fullUserData = { ...profileData, token: loginData.accessToken };
 
     dispatch({ type: USER_LOGIN_SUCCESS, payload: fullUserData });
-    
+
     // Save to localStorage
     localStorage.setItem('userInfo', JSON.stringify(fullUserData));
     localStorage.setItem('token', loginData.accessToken);
@@ -134,12 +135,12 @@ export const loginUser = (email, password) => async (dispatch) => {
     getSocket(fullUserData._id, fullUserData.role, loginData.accessToken);
 
     console.log('✅ Login process completed successfully');
-    
+
   } catch (error) {
     console.error('❌ Login Action Error:', error.response?.data || error.message);
-    
+
     let errorMessage = 'Login failed. Please try again.';
-    
+
     if (error.response?.data?.message) {
       errorMessage = error.response.data.message;
     } else if (error.code === 'ECONNABORTED') {
@@ -147,14 +148,14 @@ export const loginUser = (email, password) => async (dispatch) => {
     } else if (error.message) {
       errorMessage = error.message;
     }
-    
+
     dispatch({ type: USER_LOGIN_FAIL, payload: errorMessage });
-    
+
     // Clear any partial storage
     localStorage.removeItem('userInfo');
     localStorage.removeItem('token');
     delete axiosInstance.defaults.headers.common['Authorization'];
-    
+
     throw new Error(errorMessage);
   }
 };
@@ -162,20 +163,20 @@ export const loginUser = (email, password) => async (dispatch) => {
 // 🔥 CRITICAL FIX: Enhanced logout with socket cleanup
 export const logoutUser = () => (dispatch) => {
   console.log('🚪 Logging out user...');
-  
+
   // Clear localStorage
   localStorage.removeItem('userInfo');
   localStorage.removeItem('token');
-  
+
   // Clear axios headers
   delete axiosInstance.defaults.headers.common['Authorization'];
-  
+
   // Disconnect socket
   disconnectSocket();
-  
+
   // Dispatch logout action
   dispatch({ type: USER_LOGOUT });
-  
+
   console.log('✅ Logout completed');
 };
 
@@ -186,36 +187,36 @@ export const getUserDetails = (id = 'profile') => async (dispatch, getState) => 
   try {
     dispatch({ type: USER_DETAILS_REQUEST });
     const { userLogin: { userInfo } } = getState();
-    
+
     if (!userInfo?.token) {
       throw new Error('No authentication token available');
     }
-    
-    const config = { 
+
+    const config = {
       headers: { Authorization: `Bearer ${userInfo.token}` },
       timeout: 30000
     };
-    
+
     const url = id === 'profile' ? '/api/users/profile' : `/api/users/${id}`;
     const { data } = await axiosInstance.get(url, config);
-    
+
     dispatch({ type: USER_DETAILS_SUCCESS, payload: data });
-    
+
     return data;
   } catch (error) {
     const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch user details';
     console.error('❌ Get user details error:', errorMessage);
-    
+
     dispatch({
       type: USER_DETAILS_FAIL,
       payload: errorMessage,
     });
-    
+
     // If it's an auth error, logout
     if (error.response?.status === 401) {
       dispatch(logoutUser());
     }
-    
+
     throw new Error(errorMessage);
   }
 };
@@ -290,13 +291,13 @@ export const updateUserProfile = (userData) => async (dispatch, getState) => {
   try {
     dispatch({ type: USER_UPDATE_PROFILE_REQUEST });
     const { userLogin: { userInfo } } = getState();
-   
+
     if (!userInfo?.token) {
       throw new Error('No authentication token available');
     }
-   
+
     console.log('🔄 Updating profile with data:', userData);
-   
+
     const formData = new FormData();
     Object.keys(userData).forEach((key) => {
       const value = userData[key];
@@ -313,7 +314,7 @@ export const updateUserProfile = (userData) => async (dispatch, getState) => {
         console.log(`✅ Added ${key}:`, value);
       }
     });
-    
+
     const config = {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -321,26 +322,26 @@ export const updateUserProfile = (userData) => async (dispatch, getState) => {
       },
       timeout: 30000
     };
-    
+
     console.log('🔄 Sending profile update request...');
     const { data } = await axiosInstance.put('/api/users/profile', formData, config);
     console.log('✅ Profile update response:', data);
-    
+
     if (data.success) {
       dispatch({ type: USER_UPDATE_PROFILE_SUCCESS, payload: data.user });
-      
+
       // Update login state and localStorage
       const newUserInfoState = { ...userInfo, ...data.user };
       dispatch({ type: USER_LOGIN_SUCCESS, payload: newUserInfoState });
       localStorage.setItem('userInfo', JSON.stringify(newUserInfoState));
-     
+
       return data.user;
     } else {
       throw new Error(data.message || 'Profile update failed');
     }
   } catch (error) {
     console.error('❌ Update profile error:', error);
-   
+
     let errorMessage = 'Failed to update profile';
     if (error.response?.data?.message) {
       errorMessage = error.response.data.message;
@@ -349,12 +350,12 @@ export const updateUserProfile = (userData) => async (dispatch, getState) => {
     } else if (error.message) {
       errorMessage = error.message;
     }
-    
+
     dispatch({
       type: USER_UPDATE_PROFILE_FAIL,
       payload: errorMessage,
     });
-   
+
     throw new Error(errorMessage);
   }
 };
@@ -363,6 +364,7 @@ export const updateUserProfile = (userData) => async (dispatch, getState) => {
 // --- WISHLIST ACTIONS ---
 export const getWishlistAction = () => async (dispatch, getState) => { // Renamed for clarity
   try {
+    dispatch({ type: USER_WISHLIST_REQUEST }); // ✅ FIXED: Dispatch REQUEST for loading state
     const { userLogin: { userInfo } } = getState();
     if (!userInfo?.token) return;
     const config = {
@@ -374,6 +376,7 @@ export const getWishlistAction = () => async (dispatch, getState) => { // Rename
     dispatch({ type: USER_WISHLIST_SUCCESS, payload: data }); // FIXED: Dispatch SUCCESS with full populated data
   } catch (error) {
     console.error('Get Wishlist Error:', error);
+    dispatch({ type: USER_WISHLIST_FAIL, payload: error.response?.data?.message || error.message }); // ✅ FIXED: Dispatch FAIL
   }
 };
 
@@ -588,7 +591,7 @@ export const linkAccount = (provider) => async (dispatch, getState) => {
     dispatch({ type: USER_LINK_ACCOUNT_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await axios.post('/api/users/link-account', { provider }, config);
+    const { data } = await axios.post('/api/users/linked-accounts', { provider }, config);
     dispatch({ type: USER_LINK_ACCOUNT_SUCCESS, payload: data });
     dispatch(getUserDetails('profile'));
   } catch (error) {
@@ -601,7 +604,7 @@ export const unlinkAccount = (provider) => async (dispatch, getState) => {
     dispatch({ type: USER_UNLINK_ACCOUNT_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await axios.post('/api/users/unlink-account', { provider }, config);
+    const { data } = await axios.delete('/api/users/linked-accounts', { ...config, data: { provider } });
     dispatch({ type: USER_UNLINK_ACCOUNT_SUCCESS, payload: data });
     dispatch(getUserDetails('profile'));
   } catch (error) {
@@ -711,5 +714,43 @@ export const getSubscription = () => async (dispatch, getState) => {
       type: USER_GET_SUBSCRIPTION_FAIL,
       payload: error.response?.data?.message || error.message,
     });
+  }
+};
+
+export const getReferrals = () => async (dispatch, getState) => {
+  try {
+    const { userLogin: { userInfo } } = getState();
+    const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
+    const { data } = await axios.get('/api/users/referrals', config);
+    // Dispatch success or update user info if needed
+    // For now we just return data or dispatch a generic success? 
+    // Maybe better to update a specific reducer. Let's assume we update details.
+    // Or just let the component handle local state?
+    // Let's dispatch USER_DETAILS_SUCCESS with merged data if possible, or a new type.
+    return data;
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+export const getPrivacySettings = () => async (dispatch, getState) => {
+  try {
+    const { userLogin: { userInfo } } = getState();
+    const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
+    const { data } = await axios.get('/api/users/privacy', config);
+    return data;
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+export const updatePrivacySettings = (settings) => async (dispatch, getState) => {
+  try {
+    const { userLogin: { userInfo } } = getState();
+    const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
+    const { data } = await axios.put('/api/users/privacy', settings, config);
+    return data;
+  } catch (error) {
+    throw error;
   }
 };

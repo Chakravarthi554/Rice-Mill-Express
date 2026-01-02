@@ -40,6 +40,8 @@ import {
   UPLOAD_COD_PROOF_FAIL,
 } from '../constants/orderConstants';
 
+import { DELIVERY_ASSIGN_SUCCESS } from '../constants/deliveryConstants';
+
 export const orderListReducer = (state = { orders: [] }, action) => {
   switch (action.type) {
     case ORDER_LIST_REQUEST:
@@ -140,6 +142,36 @@ export const orderListSellerReducer = (state = { orders: [] }, action) => {
       return { loading: false, orders: action.payload };
     case ORDER_LIST_SELLER_FAIL:
       return { loading: false, error: action.payload };
+    case ORDER_UPDATE_SUCCESS:
+    case DELIVERY_ASSIGN_SUCCESS:
+      // The payload from backend is the updated order object
+      const updatedOrder = action.payload;
+
+      // state.orders can be either:
+      // 1. An array of orders (direct from backend)
+      // 2. An object with { orders: [...], page, pages, total }
+
+      if (Array.isArray(state.orders)) {
+        // Case 1: Direct array
+        return {
+          ...state,
+          orders: state.orders.map(order =>
+            order._id === updatedOrder._id ? { ...order, ...updatedOrder } : order
+          )
+        };
+      } else if (state.orders && Array.isArray(state.orders.orders)) {
+        // Case 2: Paginated object
+        return {
+          ...state,
+          orders: {
+            ...state.orders,
+            orders: state.orders.orders.map(order =>
+              order._id === updatedOrder._id ? { ...order, ...updatedOrder } : order
+            )
+          }
+        };
+      }
+      return state;
     default:
       return state;
   }
@@ -153,6 +185,8 @@ export const orderUpdateReducer = (state = {}, action) => {
       return { loading: false, success: true, order: action.payload };
     case ORDER_UPDATE_FAIL:
       return { loading: false, error: action.payload };
+    case 'ORDER_UPDATE_RESET':
+      return {};
     default:
       return state;
   }

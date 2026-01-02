@@ -13,13 +13,13 @@ import {
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
-  PersonOutline, LocationOnOutlined, LockOutlined, LinkOutlined,
+  PersonOutline, LocationOnOutlined, LockOutlined,
   LanguageOutlined, Brightness4Outlined, AccessibilityNewOutlined,
-  HistoryOutlined, PaymentOutlined, HomeOutlined, CachedOutlined,
+  HistoryOutlined, CachedOutlined,
   GetAppOutlined, CardGiftcardOutlined, StarOutline, NotificationsOutlined,
-  DoNotDisturbOnOutlined, RecommendOutlined, PrivacyTipOutlined,
-  HelpOutlineOutlined, ChatOutlined, FeedbackOutlined, GavelOutlined,
-  InfoOutlined, DeleteSweepOutlined, RefreshOutlined,
+  RecommendOutlined, PrivacyTipOutlined,
+  HelpOutlineOutlined, GavelOutlined,
+  DeleteSweepOutlined,
   LogoutOutlined, DeleteForeverOutlined,
 } from '@mui/icons-material';
 
@@ -30,7 +30,6 @@ const settingsGroups = [
       { text: 'Edit Profile', icon: <PersonOutline />, path: 'profile' },
       { text: 'Manage Addresses', icon: <LocationOnOutlined />, path: 'addresses' },
       { text: 'Login & Security', icon: <LockOutlined />, path: 'security' },
-      { text: 'Linked Accounts', icon: <LinkOutlined />, path: 'linked-accounts' },
       { text: 'Language & Region', icon: <LanguageOutlined />, path: 'language' },
       { text: 'Theme Mode', icon: <Brightness4Outlined />, path: 'theme' },
       { text: 'Accessibility', icon: <AccessibilityNewOutlined />, path: 'accessibility' },
@@ -40,8 +39,6 @@ const settingsGroups = [
     subheader: 'Orders & Payments',
     items: [
       { text: 'Order History', icon: <HistoryOutlined />, path: 'order-history' },
-      { text: 'Payment Methods', icon: <PaymentOutlined />, path: 'payment-methods' },
-      { text: 'Default Options', icon: <HomeOutlined />, path: 'defaults' },
       { text: 'Refunds & Returns', icon: <CachedOutlined />, path: 'refunds' },
       { text: 'Download Invoices', icon: <GetAppOutlined />, path: 'invoices' },
       { text: 'Rewards Wallet', icon: <CardGiftcardOutlined />, path: 'rewards' },
@@ -52,27 +49,21 @@ const settingsGroups = [
     subheader: 'Notifications & Privacy',
     items: [
       { text: 'Notifications', icon: <NotificationsOutlined />, path: 'notifications' },
-      { text: 'Do Not Disturb', icon: <DoNotDisturbOnOutlined />, path: 'dnd' },
       { text: 'Recommendations', icon: <RecommendOutlined />, path: 'recommendations' },
       { text: 'Privacy Settings', icon: <PrivacyTipOutlined />, path: 'privacy' },
-      { text: 'Export Data', icon: <GetAppOutlined />, path: 'export-data' },
     ],
   },
   {
     subheader: 'Support & Legal',
     items: [
       { text: 'Help Center', icon: <HelpOutlineOutlined />, path: 'help-center' },
-      { text: 'Chat with Support', icon: <ChatOutlined />, path: 'support' },
-      { text: 'Report a Problem', icon: <FeedbackOutlined />, path: 'feedback' },
       { text: 'Legal Policies', icon: <GavelOutlined />, path: 'legal' },
-      { text: 'App Info', icon: <InfoOutlined />, path: 'app-info' },
     ],
   },
   {
     subheader: 'Account Management',
     items: [
       { text: 'Clear Cache', icon: <DeleteSweepOutlined />, path: 'clear-cache' },
-      { text: 'Reset Preferences', icon: <RefreshOutlined />, path: 'reset-prefs' },
       { text: 'Logout', icon: <LogoutOutlined />, path: 'logout' },
       { text: 'Delete Account', icon: <DeleteForeverOutlined />, path: 'delete-account' },
     ],

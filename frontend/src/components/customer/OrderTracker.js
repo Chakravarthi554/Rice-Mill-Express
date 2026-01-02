@@ -113,21 +113,44 @@ const OrderTracker = ({ order }) => {
 
       {order.orderStatus === 'out_for_delivery' && order.deliveryPartner && (
         <Box sx={{ mt: 3, p: 2, bgcolor: '#f5f5f5', borderRadius: 2 }}>
-          <Typography variant="subtitle1" fontWeight="bold">Delivery Partner</Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+            <Typography variant="subtitle1" fontWeight="bold">Delivery Partner</Typography>
+            {order.deliveryPartner.kycStatus === 'approved' && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, bgcolor: 'success.light', px: 1, py: 0.5, borderRadius: 1 }}>
+                <CheckCircle sx={{ fontSize: 16, color: 'success.dark' }} />
+                <Typography variant="caption" fontWeight="bold" color="success.dark">Verified</Typography>
+              </Box>
+            )}
+          </Box>
           <List dense>
             <ListItem><ListItemText primary="Name" secondary={order.deliveryPartner.name} /></ListItem>
             <ListItem>
               <ListItemText primary="Phone" secondary={order.deliveryPartner.phone} />
               <IconButton href={`tel:${order.deliveryPartner.phone}`}><Phone /></IconButton>
             </ListItem>
+            {order.deliveryPartner.vehicle_number && (
+              <ListItem>
+                <ListItemText
+                  primary="Vehicle"
+                  secondary={`${order.deliveryPartner.vehicle_type || 'Vehicle'} - ${order.deliveryPartner.vehicle_number}`}
+                />
+              </ListItem>
+            )}
+            {order.deliveryPartner.license_number && (
+              <ListItem>
+                <ListItemText primary="License" secondary={order.deliveryPartner.license_number} />
+              </ListItem>
+            )}
           </List>
-          <Button
-            variant="contained"
-            size="small"
-            onClick={() => window.open(`https://track.shiprocket.in/${order.trackingId}`, '_blank')}
-          >
-            Track
-          </Button>
+          {order.trackingId && (
+            <Button
+              variant="contained"
+              size="small"
+              onClick={() => window.open(`https://track.shiprocket.in/${order.trackingId}`, '_blank')}
+            >
+              Track
+            </Button>
+          )}
         </Box>
       )}
 

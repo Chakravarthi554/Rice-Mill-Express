@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import {
-  Container, Typography, Button, Grid, Paper, Box, Alert, IconButton, Divider, CircularProgress
+  Container, Typography, Button, Grid, Paper, Box, Alert, IconButton, Divider, CircularProgress, Checkbox, FormControlLabel
 } from '@mui/material';
 import { Remove, Add } from '@mui/icons-material';
 import AddressManager from '../../components/customer/AddressManager';
@@ -34,6 +34,9 @@ const CheckoutPage = () => {
   const [selectedAddress, setSelectedAddress] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('cod');
   const [rzpInitiating, setRzpInitiating] = useState(false);
+  const [selectedItems, setSelectedItems] = useState([]); // ✅ Track selected cart items
+  const [deliveryCharge, setDeliveryCharge] = useState(0);
+  const [freeDelivery, setFreeDelivery] = useState(false);
   const razorpayRef = useRef(null);
 
   // -----------------------------------------------------------------
@@ -44,6 +47,13 @@ const CheckoutPage = () => {
     dispatch({ type: ORDER_CREATE_RESET });
     dispatch({ type: RAZORPAY_ORDER_CREATE_RESET });
   }, [dispatch]);
+
+  // ✅ Select all items by default when cart loads
+  useEffect(() => {
+    if (cartItems.length > 0 && selectedItems.length === 0) {
+      setSelectedItems(cartItems.map(item => item.product._id));
+    }
+  }, [cartItems]);
 
   // -----------------------------------------------------------------
   // Redirect when cart becomes empty
@@ -64,14 +74,31 @@ const CheckoutPage = () => {
   }, [orderSuccess, createdOrder, navigate, dispatch]);
 
   // -----------------------------------------------------------------
-  // Total calculation (uses product.price from populated product)
+  // Total calculation - ✅ FIXED: Calculate for SELECTED items only
   // -----------------------------------------------------------------
-  const totalAmount = cartItems.reduce((sum, i) => {
-    const price = i.product?.price ?? 0;
-    const qty   = i.quantity ?? 1;          // <-- note: quantity field name
-    return sum + price * qty;
-  }, 0);
+  const totalAmount = cartItems
+    .filter(i => selectedItems.includes(i.product?._id))
+    .reduce((sum, i) => {
+      const price = i.product?.price ?? 0;
+      const qty = i.quantity ?? 1;
+      return sum + price * qty;
+    }, 0);
 
+  // Calculate delivery charge
+  useEffect(() => {
+    if (totalAmount >= 1000) {
+      setDeliveryCharge(0);
+      setFreeDelivery(true);
+    } else {
+      // Base charge: ₹50
+      // For demo, using fixed charge. In production, calculate based on distance
+      const baseCharge = 50;
+      setDeliveryCharge(baseCharge);
+      setFreeDelivery(false);
+    }
+  }, [totalAmount]);
+
+  const grandTotal = totalAmount + deliveryCharge;
   const isMinOrderMet = totalAmount >= 1500;
 
   // -----------------------------------------------------------------
@@ -89,14 +116,24 @@ const CheckoutPage = () => {
     dispatch({ type: RAZORPAY_ORDER_CREATE_RESET });
   };
 
+  // \u2705 Handle item selection toggle
+  const handleItemToggle = (productId) => {
+    setSelectedItems(prev =>
+      prev.includes(productId)
+        ? prev.filter(id => id !== productId)
+        : [...prev, productId]
+    );
+  };
+
   // -----------------------------------------------------------------
-  // COD order payload
+  // COD order payload - ✅ UPDATED: Use only selected items
   // -----------------------------------------------------------------
   const placeCODOrder = async () => {
+    const selectedCartItems = cartItems.filter(i => selectedItems.includes(i.product._id));
     const payload = {
-      orderItems: cartItems.map(i => ({
+      orderItems: selectedCartItems.map(i => ({
         product: i.product._id,
-        qty: i.quantity                     // <-- quantity field name
+        qty: i.quantity
       })),
       shippingAddressId: selectedAddress._id,
       paymentMethod: 'cod',
@@ -125,8 +162,9 @@ const CheckoutPage = () => {
       description: 'Order Payment',
       order_id: rzpOrder.id,
       handler: async (response) => {
+        const selectedCartItems = cartItems.filter(i => selectedItems.includes(i.product._id));
         const finalPayload = {
-          orderItems: cartItems.map(i => ({
+          orderItems: selectedCartItems.map(i => ({
             product: i.product._id,
             qty: i.quantity
           })),
@@ -153,9 +191,10 @@ const CheckoutPage = () => {
 
   const placeOrderHandler = async () => {
     if (!selectedAddress) return alert('Select a delivery address');
+    if (selectedItems.length === 0) return alert('Please select at least one item to order'); // \u2705 Validate selection
     if (paymentMethod === 'cod' && !isMinOrderMet) return alert('Minimum ₹1500 for COD');
 
-    if (paymentMethod === 'cod') await placeCODOrder();
+    if (paymentMethod === 'cod') await placeCODOrder();
     else await initiateRazorpay();
   };
 
@@ -211,6 +250,12 @@ const CheckoutPage = () => {
 
             {cartItems.map((item, idx) => (
               <Box key={item.product._id} sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                {/* \u2705 Checkbox for item selection */}
+                <Checkbox
+                  checked={selectedItems.includes(item.product._id)}
+                  onChange={() => handleItemToggle(item.product._id)}
+                  sx={{ mr: 1 }}
+                />
                 <Box sx={{ flexGrow: 1 }}>
                   <Typography variant="body2">{item.product.name}</Typography>
                   <Typography variant="caption">
@@ -244,7 +289,27 @@ const CheckoutPage = () => {
             ))}
 
             <Divider sx={{ my: 2 }} />
-            <Typography variant="h6">Total: ₹{totalAmount.toFixed(2)}</Typography>
+
+            {/* Delivery Charge */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+              <Typography>Subtotal:</Typography>
+              <Typography>₹{totalAmount.toFixed(2)}</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+              <Typography>Delivery Charge:</Typography>
+              {freeDelivery ? (
+                <Typography color="success.main" fontWeight="bold">FREE</Typography>
+              ) : (
+                <Typography>₹{deliveryCharge.toFixed(2)}</Typography>
+              )}
+            </Box>
+            {freeDelivery && (
+              <Typography variant="caption" color="success.main" sx={{ mb: 1, display: 'block' }}>
+                🎉 Free delivery on orders ≥ ₹1000
+              </Typography>
+            )}
+            <Divider sx={{ my: 1 }} />
+            <Typography variant="h6">Grand Total: ₹{grandTotal.toFixed(2)}</Typography>
 
             <Button
               fullWidth

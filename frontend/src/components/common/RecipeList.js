@@ -6,7 +6,7 @@ import {
   CircularProgress, Alert, Pagination, TextField, Select, MenuItem, FormControl, InputLabel
 } from '@mui/material';
 import { listRecipes } from '../../redux/actions/recipeActions'; // Correct import
-import ChatWindow from '../common/ChatWindow'; // Assuming path is correct
+
 import Loader from './Loader'; // Use your Loader component
 
 const RecipeList = () => {
@@ -27,9 +27,7 @@ const RecipeList = () => {
   );
   const { userInfo } = useSelector((state) => state.userLogin); // Get user info for chat
 
-  // State for chat
-  const [chatOpen, setChatOpen] = useState(false);
-  const [selectedSeller, setSelectedSeller] = useState(null);
+
 
   useEffect(() => {
     // Fetch recipes based on current URL params
@@ -50,16 +48,6 @@ const RecipeList = () => {
     setSearchParams({ pageNumber: value, search: searchTerm, riceType: riceTypeFilter });
   };
 
-  const openChat = (sellerId) => {
-    if (!userInfo) {
-        alert('Please log in to chat with the seller.');
-        // Optionally redirect to login: navigate('/login');
-        return;
-    }
-    setSelectedSeller(sellerId);
-    setChatOpen(true);
-  };
-
   // Define Rice Types for Filter (adjust as needed)
   const riceTypes = ['Basmati', 'Jasmine', 'Brown Rice', 'Arborio', 'Sushi Rice', 'Wild Rice', 'Other'];
 
@@ -71,25 +59,25 @@ const RecipeList = () => {
 
       {/* Filter and Search Bar */}
       <Box component="form" onSubmit={handleSearch} sx={{ display: 'flex', gap: 2, mb: 4, alignItems: 'center', flexWrap: 'wrap' }}>
-         <TextField
-           label="Search Recipes"
-           variant="outlined"
-           value={currentSearch}
-           onChange={(e) => setCurrentSearch(e.target.value)}
-           sx={{ flexGrow: 1, minWidth: '200px' }}
-         />
-         <FormControl sx={{ minWidth: 150 }}>
-           <InputLabel>Rice Type</InputLabel>
-           <Select
-             value={currentRiceType}
-             label="Rice Type"
-             onChange={handleFilterChange}
-           >
-             <MenuItem value=""><em>All Types</em></MenuItem>
-             {riceTypes.map(type => <MenuItem key={type} value={type}>{type}</MenuItem>)}
-           </Select>
-         </FormControl>
-         <Button type="submit" variant="contained">Search</Button>
+        <TextField
+          label="Search Recipes"
+          variant="outlined"
+          value={currentSearch}
+          onChange={(e) => setCurrentSearch(e.target.value)}
+          sx={{ flexGrow: 1, minWidth: '200px' }}
+        />
+        <FormControl sx={{ minWidth: 150 }}>
+          <InputLabel>Rice Type</InputLabel>
+          <Select
+            value={currentRiceType}
+            label="Rice Type"
+            onChange={handleFilterChange}
+          >
+            <MenuItem value=""><em>All Types</em></MenuItem>
+            {riceTypes.map(type => <MenuItem key={type} value={type}>{type}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <Button type="submit" variant="contained">Search</Button>
       </Box>
 
       {loading && page === 1 ? ( // Show loader only on initial load
@@ -97,7 +85,7 @@ const RecipeList = () => {
       ) : error ? (
         <Alert severity="error">{error}</Alert>
       ) : recipes.length === 0 ? (
-          <Typography>No recipes found matching your criteria.</Typography>
+        <Typography>No recipes found matching your criteria.</Typography>
       ) : (
         <>
           <Grid container spacing={3}>
@@ -118,26 +106,20 @@ const RecipeList = () => {
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                       Rice Type: {recipe.riceType}
                     </Typography>
-                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                       By: {recipe.sellerId?.name || 'Unknown Seller'}
                     </Typography>
-                     {/* Display linked products concisely */}
-                     {recipe.linkedProducts && recipe.linkedProducts.length > 0 && (
-                         <Typography variant="caption" display="block" color="text.secondary">
-                           Uses: {recipe.linkedProducts.map(p => p.name).join(', ')}
-                         </Typography>
-                     )}
+                    {/* Display linked products concisely */}
+                    {recipe.linkedProducts && recipe.linkedProducts.length > 0 && (
+                      <Typography variant="caption" display="block" color="text.secondary">
+                        Uses: {recipe.linkedProducts.map(p => p.name).join(', ')}
+                      </Typography>
+                    )}
                   </CardContent>
                   <Box sx={{ p: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #eee' }}>
-                     <Button component={RouterLink} to={`/recipes/${recipe._id}`} size="small">
-                       View Recipe
-                     </Button>
-                     {/* Only show chat button if sellerId exists and user is logged in */}
-                     {recipe.sellerId?._id && userInfo && (
-                         <Button onClick={() => openChat(recipe.sellerId._id)} size="small">
-                           Chat Seller
-                         </Button>
-                     )}
+                    <Button component={RouterLink} to={`/recipes/${recipe._id}`} size="small">
+                      View Recipe
+                    </Button>
                   </Box>
                 </Card>
               </Grid>
@@ -156,17 +138,11 @@ const RecipeList = () => {
               />
             </Box>
           )}
-          {loading && page > 1 && <Loader sx={{ mt: 2 }}/>} {/* Show loader during page changes */}
+          {loading && page > 1 && <Loader sx={{ mt: 2 }} />} {/* Show loader during page changes */}
         </>
       )}
 
-      {/* Chat Window Modal */}
-      {chatOpen && userInfo && ( // Ensure user is logged in to open chat
-        <ChatWindow
-          receiverId={selectedSeller}
-          onClose={() => setChatOpen(false)}
-        />
-      )}
+
     </Box>
   );
 };

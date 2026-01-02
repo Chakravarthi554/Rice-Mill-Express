@@ -105,7 +105,7 @@ const {
 const validateController = (controller, functionName) => {
   if (typeof controller[functionName] !== 'function') {
     console.error(`❌ User controller function ${functionName} is not a function`);
-    return (req, res) => res.status(501).json({ 
+    return (req, res) => res.status(501).json({
       message: `Function ${functionName} not available`,
       code: 'FUNCTION_NOT_AVAILABLE'
     });
@@ -161,15 +161,29 @@ router.route('/wishlist')
   .get(validateController(userController, 'getWishlist'))
   .post(validateController(userController, 'addToWishlist'));
 
-router.delete('/wishlist/:productId', validateController(userController, 'removeFromWishlist'));
+router.delete('/wishlist/:id', validateController(userController, 'removeFromWishlist')); // ✅ FIXED: Changed :productId to :id
 
 // ✅ FIXED: Upload profile image
 router.post('/upload-profile', upload.single('profileImage'), validateController(userController, 'uploadProfileImage'));
 
 // ✅ FIXED: Account management
 router.delete('/me', validateController(userController, 'deleteAccount'));
-router.get('/export-data', validateController(userController, 'exportUserData'));
+
 router.get('/dashboard/stats', validateController(userController, 'getDashboardStats'));
+router.get('/referrals', validateController(userController, 'getReferrals'));
+router.get('/rewards', validateController(userController, 'getRewards')); // Added rewards
+router.get('/subscription', validateController(userController, 'getSubscription')); // Added subscription
+router.post('/subscription', validateController(userController, 'subscribe')); // Subscribe
+router.delete('/subscription', validateController(userController, 'unsubscribe')); // Unsubscribe
+router.route('/privacy').get(validateController(userController, 'getPrivacySettings')).put(validateController(userController, 'updatePrivacySettings'));
+router.route('/linked-accounts').get(validateController(userController, 'getLinkedAccounts')).post(validateController(userController, 'linkAccount')).delete(validateController(userController, 'unlinkAccount'));
+
+// ✅ FIXED: Missing Payment and Review Routes
+router.route('/payment-methods')
+  .get(validateController(userController, 'getPaymentMethods'))
+  .post(validateController(userController, 'addPaymentMethod')); // Frontend calls this
+router.route('/payment-methods/:id').delete(validateController(userController, 'deletePaymentMethod'));
+router.route('/reviews').get(validateController(userController, 'getReviews'));
 
 // ✅ FIXED: Admin only routes
 router.use(authorize('admin'));

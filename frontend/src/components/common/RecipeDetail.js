@@ -25,7 +25,7 @@ import SendIcon from '@mui/icons-material/Send';
 import { getRecipeDetails, rateRecipe } from '../../redux/actions/recipeActions';
 import { addToCart } from '../../redux/actions/cartActions';
 import { likeItem, addComment, getComments, trackShare } from '../../redux/actions/socialActions';
-import ChatWindow from './ChatWindow';
+
 import Loader from './Loader';
 import Message from './Message';
 
@@ -51,7 +51,7 @@ const RecipeDetail = () => {
 
   const [rating, setRating] = useState(0);
   const [commentText, setCommentText] = useState('');
-  const [chatOpen, setChatOpen] = useState(false);
+
   const [showComments, setShowComments] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
 
@@ -131,13 +131,7 @@ const RecipeDetail = () => {
     }
   };
 
-  const openChat = () => {
-    if (!userInfo) {
-      alert('Please log in to chat.');
-      return;
-    }
-    setChatOpen(true);
-  };
+
 
   const hasLiked = recipe.likes?.includes(userInfo?._id);
 
@@ -211,7 +205,6 @@ const RecipeDetail = () => {
             {recipe.sellerId && (
               <Typography variant="subtitle1" color="text.secondary" gutterBottom>
                 Recipe By: {recipe.sellerId.name || 'Unknown'}
-                <Button size="small" sx={{ ml: 1 }} onClick={openChat}>Chat Seller</Button>
               </Typography>
             )}
           </Grid>
@@ -416,9 +409,7 @@ const RecipeDetail = () => {
       </Dialog>
 
       {/* Chat Window */}
-      {chatOpen && userInfo && recipe?.sellerId?._id && (
-        <ChatWindow receiverId={recipe.sellerId._id} onClose={() => setChatOpen(false)} />
-      )}
+
     </Box>
   );
 };

@@ -8,8 +8,11 @@ import {
 } from '@mui/material';
 import { useSelector } from 'react-redux';
 import { AuthProvider } from './context/AuthContext';
+import { ThemeProvider as CustomThemeProvider } from './context/ThemeContext';
+import { I18nProvider } from './context/i18nContext';
 import ProtectedRoute from './components/common/RoleRoute';
 import SocketInitializer from './components/common/SocketInitializer';
+import './theme.css';
 
 // --- Pages ---
 import LoginPage from './pages/LoginPage';
@@ -28,6 +31,7 @@ import BulkOrderPage from './pages/customer/BulkOrderPage';
 import CartPage from './pages/customer/CartPage';
 import WishlistPage from './pages/customer/WishlistPage';
 import NotificationsPage from './pages/customer/NotificationsPage';
+import DeliveryKYCApproval from './components/admin/DeliveryKYCApproval';
 import OrderSuccessPage from './pages/customer/OrderSuccessPage';
 
 import AccountManagement from './components/customer/AccountManagement';
@@ -51,26 +55,18 @@ import PersonalizationSettings from './components/customer/PersonalizationSettin
 import ReferralKycSettings from './components/customer/ReferralKycSettings';
 
 // REAL Components (NOT placeholders)
-import LinkedAccounts from './components/customer/LinkedAccounts';
-import LanguageRegion from './components/customer/LanguageRegion';
+import LanguageSettings from './components/customer/LanguageSettings';
 import ThemeMode from './components/customer/ThemeMode';
-import Accessibility from './components/customer/Accessibility';
+import AccessibilitySettings from './components/customer/AccessibilitySettings';
 import OrderHistory from './components/customer/OrderHistory';
-import PaymentMethods from './components/customer/PaymentMethods';
-import DefaultOptions from './components/customer/DefaultOptions';
 import RefundsReturns from './components/customer/RefundsReturns';
 import DownloadInvoices from './components/customer/DownloadInvoices';
 import RewardsWallet from './components/customer/RewardsWallet';
 import Subscription from './components/customer/Subscription';
-import DoNotDisturb from './components/customer/DoNotDisturb';
 import Recommendations from './components/customer/Recommendations';
 import PrivacySettings from './components/customer/PrivacySettings';
-import ExportData from './components/customer/ExportData';
 import HelpCenter from './components/customer/HelpCenter';
-import ChatSupport from './components/customer/ChatSupport';
-import ReportProblem from './components/customer/ReportProblem';
 import LegalPolicies from './components/customer/LegalPolicies';
-import AppInfo from './components/customer/AppInfo';
 
 // Placeholder for future
 import SettingsPlaceholder from './components/customer/SettingsPlaceholder';
@@ -110,117 +106,117 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <AuthProvider>
-        <SocketInitializer />
-        <Routes>
+      <CustomThemeProvider>
+        <I18nProvider>
+          <AuthProvider>
+            <SocketInitializer />
+            <Routes>
 
-          {/* --- AUTH --- */}
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/forgotpassword" element={<ForgotPasswordPage />} />
-          <Route path="/resetpassword/:token" element={<ResetPasswordPage />} />
+              {/* --- AUTH --- */}
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/forgotpassword" element={<ForgotPasswordPage />} />
+              <Route path="/resetpassword/:token" element={<ResetPasswordPage />} />
 
-          {/* --- CUSTOMER DASHBOARD --- */}
-          <Route
-            path="/customer/dashboard"
-            element={
-              <ProtectedRoute roles={['customer']}>
-                <CustomerDashboard />
-              </ProtectedRoute>
-            }
-          />
+              {/* --- CUSTOMER DASHBOARD --- */}
+              <Route
+                path="/customer/dashboard"
+                element={
+                  <ProtectedRoute roles={['customer']}>
+                    <CustomerDashboard />
+                  </ProtectedRoute>
+                }
+              />
 
-          {/* --- CUSTOMER PAGES --- */}
-          <Route path="/products/:id" element={<ProtectedRoute><ProductPage /></ProtectedRoute>} />
-          <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
-          <Route path="/wishlist" element={<ProtectedRoute><WishlistPage /></ProtectedRoute>} />
-          <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
-          <Route path="/orders/:id" element={<ProtectedRoute><OrderDetailPage /></ProtectedRoute>} />
-          <Route path="/orders/success" element={<ProtectedRoute><OrderSuccessPage /></ProtectedRoute>} />
-          <Route path="/bulk-order" element={<ProtectedRoute><BulkOrderPage /></ProtectedRoute>} />
+              {/* --- CUSTOMER PAGES --- */}
+              <Route path="/products/:id" element={<ProtectedRoute><ProductPage /></ProtectedRoute>} />
+              <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
+              <Route path="/wishlist" element={<ProtectedRoute><WishlistPage /></ProtectedRoute>} />
+              <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
+              <Route path="/orders/:id" element={<ProtectedRoute><OrderDetailPage /></ProtectedRoute>} />
+              <Route path="/orders/success" element={<ProtectedRoute><OrderSuccessPage /></ProtectedRoute>} />
+              <Route path="/bulk-order" element={<ProtectedRoute><BulkOrderPage /></ProtectedRoute>} />
+              <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
 
-          {/* --- SELLER --- */}
-          <Route
-            path="/seller/dashboard"
-            element={<ProtectedRoute roles={['seller']}><SellerDashboard /></ProtectedRoute>}
-          />
-          <Route
-            path="/seller/kyc"
-            element={<ProtectedRoute roles={['seller']}><SellerKycPage /></ProtectedRoute>}
-          />
+              {/* --- SELLER --- */}
+              <Route
+                path="/seller/dashboard"
+                element={<ProtectedRoute roles={['seller']}><SellerDashboard /></ProtectedRoute>}
+              />
+              <Route
+                path="/seller/kyc"
+                element={<ProtectedRoute roles={['seller']}><SellerKycPage /></ProtectedRoute>}
+              />
 
-          {/* --- ADMIN --- */}
-          <Route
-            path="/admin/dashboard"
-            element={<ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>}
-          />
-          <Route
-            path="/admin/forum"
-            element={<ProtectedRoute roles={['admin']}><AdminForumPanel /></ProtectedRoute>}
-          />
+              {/* --- ADMIN --- */}
+              <Route
+                path="/admin/dashboard"
+                element={<ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>}
+              />
+              <Route
+                path="/admin/forum"
+                element={<ProtectedRoute roles={['admin']}><AdminForumPanel /></ProtectedRoute>}
+              />
+              <Route
+                path="/admin/delivery-kyc"
+                element={<ProtectedRoute roles={['admin']}><DeliveryKYCApproval /></ProtectedRoute>}
+              />
 
-          {/* --- COMMUNITY --- */}
-          {/* 🔥 CRITICAL FIX: Forum routes allow all authenticated roles */}
-          <Route path="/forum" element={<ProtectedRoute><ForumList /></ProtectedRoute>} />
-          <Route path="/forum/:id" element={<ProtectedRoute><ForumComments /></ProtectedRoute>} />
-          <Route path="/forum/create" element={<ProtectedRoute><CreatePostForm /></ProtectedRoute>} />
-          <Route path="/recipes" element={<ProtectedRoute><RecipeList /></ProtectedRoute>} />
-          <Route path="/recipes/:id" element={<ProtectedRoute><RecipeDetail /></ProtectedRoute>} />
+              {/* --- COMMUNITY --- */}
+              {/* 🔥 CRITICAL FIX: Forum routes allow all authenticated roles */}
+              <Route path="/forum" element={<ProtectedRoute><ForumList /></ProtectedRoute>} />
+              <Route path="/forum/:id" element={<ProtectedRoute><ForumComments /></ProtectedRoute>} />
+              <Route path="/forum/create" element={<ProtectedRoute><CreatePostForm /></ProtectedRoute>} />
+              <Route path="/recipes" element={<ProtectedRoute><RecipeList /></ProtectedRoute>} />
+              <Route path="/recipes/:id" element={<ProtectedRoute><RecipeDetail /></ProtectedRoute>} />
 
-          {/* --- CUSTOMER SETTINGS (NESTED) --- */}
-          <Route
-            path="/settings"
-            element={<ProtectedRoute roles={['customer']}><Settings /></ProtectedRoute>}
-          >
-            <Route index element={<Navigate to="profile" replace />} />
+              {/* --- CUSTOMER SETTINGS (NESTED) --- */}
+              <Route
+                path="/settings"
+                element={<ProtectedRoute roles={['customer']}><Settings /></ProtectedRoute>}
+              >
+                <Route index element={<Navigate to="profile" replace />} />
 
-            {/* --- REAL COMPONENTS --- */}
-            <Route path="profile" element={<Profile />} />
-            <Route path="addresses" element={<AddressManager />} />
-            <Route path="security" element={<SecuritySettings />} />
-            <Route path="preferences" element={<PreferencesSettings />} />
-            <Route path="personalization" element={<PersonalizationSettings />} />
-            <Route path="referrals-kyc" element={<ReferralKycSettings />} />
-            <Route path="notifications" element={<NotificationsPage />} />
+                {/* --- REAL COMPONENTS --- */}
+                <Route path="profile" element={<Profile />} />
+                <Route path="addresses" element={<AddressManager />} />
+                <Route path="security" element={<SecuritySettings />} />
+                <Route path="preferences" element={<PreferencesSettings />} />
+                <Route path="personalization" element={<PersonalizationSettings />} />
+                <Route path="referrals-kyc" element={<ReferralKycSettings />} />
+                <Route path="notifications" element={<NotificationsPage />} />
 
-            <Route path="linked-accounts" element={<LinkedAccounts />} />
-            <Route path="language" element={<LanguageRegion />} />
-            <Route path="theme" element={<ThemeMode />} />
-            <Route path="accessibility" element={<Accessibility />} />
-            <Route path="order-history" element={<OrderHistory />} />
-            <Route path="payment-methods" element={<PaymentMethods />} />
-            <Route path="defaults" element={<DefaultOptions />} />
-            <Route path="refunds" element={<RefundsReturns />} />
-            <Route path="invoices" element={<DownloadInvoices />} />
-            <Route path="rewards" element={<RewardsWallet />} />
-            <Route path="subscription" element={<Subscription />} />
-            <Route path="dnd" element={<DoNotDisturb />} />
-            <Route path="recommendations" element={<Recommendations />} />
-            <Route path="privacy" element={<PrivacySettings />} />
-            <Route path="export-data" element={<ExportData />} />
-            <Route path="help-center" element={<HelpCenter />} />
-            <Route path="support" element={<ChatSupport />} />
-            <Route path="feedback" element={<ReportProblem />} />
-            <Route path="legal" element={<LegalPolicies />} />
-            <Route path="app-info" element={<AppInfo />} />
+                <Route path="language" element={<LanguageSettings />} />
+                <Route path="theme" element={<ThemeMode />} />
+                <Route path="accessibility" element={<AccessibilitySettings />} />
+                <Route path="order-history" element={<OrderHistory />} />
+                <Route path="refunds" element={<RefundsReturns />} />
+                <Route path="invoices" element={<DownloadInvoices />} />
+                <Route path="rewards" element={<RewardsWallet />} />
+                <Route path="subscription" element={<Subscription />} />
+                <Route path="recommendations" element={<Recommendations />} />
+                <Route path="privacy" element={<PrivacySettings />} />
+                <Route path="help-center" element={<HelpCenter />} />
+                <Route path="legal" element={<LegalPolicies />} />
 
-            {/* --- Account Management (Clear Cache + Reset Prefs) --- */}
-            <Route path="clear-cache" element={<AccountManagement />} />
-            <Route path="reset-prefs" element={<AccountManagement />} />
+                {/* --- Account Management --- */}
+                <Route path="clear-cache" element={<AccountManagement />} />
 
-            {/* --- Auth Actions --- */}
-            <Route path="logout" element={<LogoutPage />} />
-            <Route path="delete-account" element={<DeleteAccountPage />} />
+                {/* --- Auth Actions --- */}
+                <Route path="logout" element={<LogoutPage />} />
+                <Route path="delete-account" element={<DeleteAccountPage />} />
 
-            {/* --- PLACEHOLDERS (Future) --- */}
-            <Route path="*" element={<SettingsPlaceholder title="Coming Soon" />} />
-          </Route>
+                {/* --- PLACEHOLDERS (Future) --- */}
+                <Route path="*" element={<SettingsPlaceholder title="Coming Soon" />} />
+              </Route>
 
-          {/* --- DEFAULT --- */}
-          <Route path="/" element={<LoginPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </AuthProvider>
+              {/* --- DEFAULT --- */}
+              <Route path="/" element={<LoginPage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </AuthProvider>
+        </I18nProvider>
+      </CustomThemeProvider>
     </ThemeProvider>
   );
 }

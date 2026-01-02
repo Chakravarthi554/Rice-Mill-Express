@@ -11,22 +11,27 @@ import {
   Button,
   Card,
   CardContent,
+  CardMedia,
   Divider,
   IconButton,
   Stack,
-  Rating as MuiRating
+  Rating as MuiRating,
+  Snackbar,
+  Alert,
+  Avatar
 } from "@mui/material";
 import {
   AddShoppingCart,
   FlashOn,
-  Favorite,
-  Chat,
-  Login,
   Remove,
   Add,
   LocalOffer,
   Star,
-  Visibility
+  Visibility,
+  Favorite,
+  Chat,
+  ShoppingCart,
+  LocalShipping
 } from "@mui/icons-material";
 import { styled } from "@mui/material/styles";
 import Loader from "../../components/common/Loader";
@@ -35,10 +40,9 @@ import { listProductDetails } from "../../redux/actions/productActions";
 import { addToCart } from "../../redux/actions/cartActions";
 import { addToWishlist } from "../../redux/actions/userActions";
 import { listRecipes } from "../../redux/actions/recipeActions";
-import ChatWindow from "../../components/common/ChatWindow";
-import SocialInteraction from "../../components/common/SocialInteraction";
-import { getComments } from "../../redux/actions/socialActions";
-import { socket } from "../../utils/socket";
+import { listProducts } from "../../redux/actions/productActions"; // ✅ For recommendations
+import Price from "../../components/common/Price";
+
 
 const ProductImage = styled('img')({
   width: '100%',
@@ -102,7 +106,8 @@ const ActionButton = styled(Button)(({ theme, varianttype }) => ({
 const ProductPage = () => {
   const { id } = useParams();
   const [qty, setQty] = useState(1);
-  const [chatOpen, setChatOpen] = useState(false);
+  const [cartSnackbar, setCartSnackbar] = useState(false); // ✅ Cart confirmation
+
   const [selectedImage, setSelectedImage] = useState(0);
   const [socialStats, setSocialStats] = useState({ likes: 0, comments: 0 });
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -115,6 +120,7 @@ const ProductPage = () => {
   const { recipes = [] } = useSelector((state) => state.recipeSuggestion || {});
   const socialCommentsList = useSelector((state) => state.socialCommentsList || {});
   const { userInfo } = useSelector((state) => state.userLogin);
+  const { products = [] } = useSelector(s => s.productList); // ✅ For recommendations
 
   const getImageUrl = (imagePath) => {
     if (!imagePath) return "https://via.placeholder.com/600x400/4CAF50/ffffff?text=Product+Image";
@@ -125,25 +131,16 @@ const ProductPage = () => {
 
   useEffect(() => {
     dispatch(listProductDetails(id));
-    dispatch(getComments('products', id));
+    dispatch(listProducts()); // ✅ Fetch all products for recommendations
+  }, [dispatch, id]); // Only depend on id to reload when navigating to different product
+
+  useEffect(() => {
     if (product && product.riceType) {
       dispatch(listRecipes({ riceType: product.riceType }));
     }
-  }, [dispatch, id, product.riceType]);
+  }, [dispatch, product?.riceType]); // Separate effect for recipes
 
-  useEffect(() => {
-    if (!socket || !product._id) return;
-    socket.on(`SOCIAL_UPDATE_PRODUCTS_${product._id}`, (data) => {
-      if (data.type === 'LIKE') {
-        setSocialStats(prev => ({ ...prev, likes: data.likes || prev.likes }));
-      }
-      if (data.type === 'COMMENT') {
-        setSocialStats(prev => ({ ...prev, comments: prev.comments + 1 }));
-        dispatch(getComments('products', id));
-      }
-    });
-    return () => socket.off(`SOCIAL_UPDATE_PRODUCTS_${product._id}`);
-  }, [product._id, id, dispatch]);
+
 
   useEffect(() => {
     if (product) {
@@ -157,7 +154,7 @@ const ProductPage = () => {
   const addToCartHandler = async () => {
     try {
       await dispatch(addToCart(id, qty));
-      navigate('/cart');
+      setCartSnackbar(true); // ✅ Show confirmation instead of navigating
     } catch (err) {
       alert(err.message || 'Failed to add to cart');
     }
@@ -284,14 +281,27 @@ const ProductPage = () => {
                   {hasOffer ? (
                     <>
                       <Typography variant="h3" sx={{ fontWeight: 'bold', color: 'success.main', background: 'linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)', backgroundClip: 'text', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                        ₹{product.offerPrice}
+                        <Price amount={product.offerPrice} />
                       </Typography>
-                      <Typography variant="h5" sx={{ color: 'text.secondary', textDecoration: 'line-through' }}>₹{product.price}</Typography>
-                      <Chip label={`Save ₹${product.price - product.offerPrice}`} color="success" variant="filled" sx={{ fontWeight: 'bold' }} />
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                        <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#2e7d32' }}>
+                          <Price amount={product.price} />
+                        </Typography>
+                        {product.price >= 1000 && (
+                          <Chip
+                            label="Free Delivery"
+                            color="success"
+                            size="small"
+                            icon={<LocalShipping />}
+                            sx={{ fontWeight: 'bold' }}
+                          />
+                        )}
+                      </Box>
+                      <Chip label={`Save`} color="success" variant="filled" sx={{ fontWeight: 'bold' }} />
                     </>
                   ) : (
                     <Typography variant="h3" sx={{ fontWeight: 'bold', color: 'success.main', background: 'linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)', backgroundClip: 'text', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                      ₹{product.price || 0}
+                      <Price amount={product.price || 0} />
                     </Typography>
                   )}
                 </Stack>
@@ -333,16 +343,12 @@ const ProductPage = () => {
                     <Button variant="outlined" color="error" onClick={addToWishlistHandler} startIcon={<Favorite />} sx={{ flex: 1, py: 1.5, borderRadius: '12px', fontWeight: 'bold' }}>
                       Wishlist
                     </Button>
-                    <Button variant="outlined" color="primary" onClick={() => setChatOpen(true)} disabled={!userInfo} startIcon={userInfo ? <Chat /> : <Login />} sx={{ flex: 1, py: 1.5, borderRadius: '12px', fontWeight: 'bold' }}>
-                      {userInfo ? 'Chat Seller' : 'Login to Chat'}
-                    </Button>
+
                   </Stack>
                 </Stack>
               </StyledPaper>
 
-              <StyledPaper>
-                <SocialInteraction itemType="products" itemId={product._id} itemUserId={product.seller?._id} />
-              </StyledPaper>
+
             </Stack>
           </Grid>
         </Grid>
@@ -391,9 +397,134 @@ const ProductPage = () => {
         </Grid>
       </Box>
 
-      {chatOpen && userInfo && (
-        <ChatWindow receiverId={product.seller?._id} productId={product._id} onClose={() => setChatOpen(false)} receiverName={product.seller?.name || "Seller"} />
+      {/* ✅ Reviews Section */}
+      {product.reviews && product.reviews.length > 0 && (
+        <Box sx={{ mt: 6 }}>
+          <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
+            Customer Reviews
+          </Typography>
+          <Grid container spacing={2}>
+            {product.reviews.map((review, idx) => (
+              <Grid item xs={12} key={idx}>
+                <Card sx={{ p: 3 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                    <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>
+                      {review.name?.charAt(0).toUpperCase()}
+                    </Avatar>
+                    <Box sx={{ flexGrow: 1 }}>
+                      <Typography variant="subtitle1" fontWeight="bold">
+                        {review.name}
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <MuiRating value={review.rating} readOnly size="small" />
+                        <Typography variant="caption" color="text.secondary">
+                          {new Date(review.createdAt).toLocaleDateString()}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Box>
+                  <Typography variant="body2" color="text.secondary">
+                    {review.comment}
+                  </Typography>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
       )}
+
+      {/* ✅ Recommended Products Section */}
+      {products.length > 0 && (
+        <Box sx={{ mt: 6 }}>
+          <Divider sx={{ mb: 4 }} />
+          <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
+            You May Also Like
+          </Typography>
+          <Grid container spacing={3}>
+            {products
+              .filter(p => p._id !== id)
+              .map(recommendedProduct => (
+                <Grid item xs={12} sm={6} md={3} key={recommendedProduct._id}>
+                  <Card
+                    sx={{
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      cursor: 'pointer',
+                      transition: 'transform 0.2s',
+                      '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 }
+                    }}
+                    onClick={() => navigate(`/products/${recommendedProduct._id}`)}
+                  >
+                    <CardMedia
+                      component="img"
+                      image={getImageUrl(recommendedProduct.images?.[0] || recommendedProduct.image)}
+                      alt={recommendedProduct.name}
+                      sx={{ height: 180, objectFit: 'contain', backgroundColor: '#f5f5f5', p: 1 }}
+                    />
+                    <CardContent sx={{ flexGrow: 1 }}>
+                      <Typography variant="subtitle1" noWrap fontWeight="bold">
+                        {recommendedProduct.name}
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, my: 1 }}>
+                        <MuiRating value={recommendedProduct.rating} readOnly size="small" />
+                        <Typography variant="caption" color="text.secondary">
+                          ({recommendedProduct.numReviews})
+                        </Typography>
+                      </Box>
+                      <Typography variant="h6" color="primary" fontWeight="bold">
+                        <Price amount={recommendedProduct.price} />
+                      </Typography>
+                    </CardContent>
+                    <Box sx={{ p: 2, pt: 0 }}>
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                        startIcon={<AddShoppingCart />}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          dispatch(addToCart(recommendedProduct._id, 1));
+                          setCartSnackbar(true);
+                        }}
+                        disabled={recommendedProduct.countInStock === 0}
+                      >
+                        Add to Cart
+                      </Button>
+                    </Box>
+                  </Card>
+                </Grid>
+              ))}
+          </Grid>
+        </Box>
+      )}
+
+      {/* ✅ Cart Confirmation Snackbar */}
+      <Snackbar
+        open={cartSnackbar}
+        autoHideDuration={6000}
+        onClose={() => setCartSnackbar(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setCartSnackbar(false)}
+          severity="success"
+          sx={{ width: '100%', alignItems: 'center' }}
+          action={
+            <Button
+              color="inherit"
+              size="small"
+              startIcon={<ShoppingCart />}
+              onClick={() => navigate('/cart')}
+              sx={{ fontWeight: 'bold' }}
+            >
+              Go to Cart
+            </Button>
+          }
+        >
+          Product added to cart!
+        </Alert>
+      </Snackbar>
+
     </Container>
   );
 };
