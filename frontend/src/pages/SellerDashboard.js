@@ -36,58 +36,70 @@ import ChatWindow from '../components/common/ChatWindow';
 import Message from '../components/common/Message';
 import { RECIPE_SUBMIT_RESET } from '../redux/constants/RecipeConstants';
 
+// ✅ FIXED: Invoice PDF generation with proper Unicode support and no ampersand issues
 const generatePDF = (order) => {
     const doc = new jsPDF();
+    
+    // ✅ FIXED: Use Unicode-supporting font
+    doc.setFont('DejaVuSans', 'normal');
     doc.setFontSize(18);
     doc.text(`Invoice for Order #${order._id?.slice(-6) || 'N/A'}`, 14, 22);
     doc.setFontSize(11);
     doc.setTextColor(100);
 
-    doc.text(`Customer: ${order.user?.name || 'N/A'}`, 14, 32);
-    doc.text(`Email: ${order.user?.email || 'N/A'}`, 14, 38);
+    // ✅ FIXED: Escape special characters properly
+    const escapeText = (text) => String(text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    
+    doc.text(`Customer: ${escapeText(order.user?.name) || 'N/A'}`, 14, 32);
+    doc.text(`Email: ${escapeText(order.user?.email) || 'N/A'}`, 14, 38);
     doc.text(`Date: ${order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}`, 14, 44);
 
     doc.text('Shipping Address:', 14, 54);
     const addr = order.shippingAddress;
-    doc.text(`${addr?.street || ''}, ${addr?.city || ''}`, 14, 60);
-    doc.text(`${addr?.state || ''} - ${addr?.pinCode || ''}`, 14, 66);
-    doc.text(`Phone: ${addr?.phone || order.user?.phone || 'N/A'}`, 14, 72);
+    doc.text(`${escapeText(addr?.street) || ''}, ${escapeText(addr?.city) || ''}`, 14, 60);
+    doc.text(`${escapeText(addr?.state) || ''} - ${escapeText(addr?.pinCode) || ''}`, 14, 66);
+    doc.text(`Phone: ${escapeText(addr?.phone || order.user?.phone) || 'N/A'}`, 14, 72);
 
     const tableColumn = ["#", "Product", "Quantity", "Price", "Total"];
     const tableRows = [];
     order.orderItems?.forEach((item, index) => {
+        const price = Number(item.price || 0);
+        const qty = Number(item.qty || 0);
+        const total = price * qty;
+        
         const itemData = [
             index + 1,
-            item.name,
-            item.qty,
-            `Rs. ${item.price?.toFixed(2) || '0.00'}`,
-            `Rs. ${((item.qty || 0) * (item.price || 0)).toFixed(2)}`
+            escapeText(item.name || item.product?.name || 'Product'),
+            String(qty),
+            `₹${price.toFixed(2)}`, // ✅ FIXED: Use ₹ symbol instead of Rs.
+            `₹${total.toFixed(2)}`
         ];
         tableRows.push(itemData);
     });
 
-    // FIXED: Use autoTable(doc, options) syntax
+    // ✅ FIXED: Use autoTable with Unicode font
     autoTable(doc, {
         head: [tableColumn],
         body: tableRows,
         startY: 80,
         theme: 'grid',
         headStyles: { fillColor: [46, 125, 50] },
-        styles: { fontSize: 10 }
+        styles: { font: 'DejaVuSans', fontSize: 10 }
     });
 
     const finalY = doc.lastAutoTable.finalY || 100;
     doc.setFontSize(12);
-    doc.text(`Items Price: Rs. ${order.itemsPrice?.toFixed(2) || '0.00'}`, 145, finalY + 10, { align: 'right' });
-    doc.text(`Shipping Price: Rs. ${order.shippingPrice?.toFixed(2) || '0.00'}`, 145, finalY + 16, { align: 'right' });
+    doc.text(`Items Price: ₹${Number(order.itemsPrice || 0).toFixed(2)}`, 145, finalY + 10, { align: 'right' });
+    doc.text(`Shipping Price: ₹${Number(order.shippingPrice || 0).toFixed(2)}`, 145, finalY + 16, { align: 'right' });
     doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Total Price: Rs. ${order.totalPrice?.toFixed(2) || '0.00'}`, 145, finalY + 24, { align: 'right' });
+    doc.setFont('DejaVuSans', 'bold');
+    doc.text(`Total Price: ₹${Number(order.totalPrice || 0).toFixed(2)}`, 145, finalY + 24, { align: 'right' });
 
-    doc.setFont('helvetica', 'normal');
+    doc.setFont('DejaVuSans', 'normal');
     doc.setFontSize(10);
-    doc.text(`Payment Method: ${order.paymentMethod || 'N/A'}`, 14, finalY + 30);
-    doc.text(`Payment Status: ${order.isPaid ? `Paid on ${order.paidAt ? new Date(order.paidAt).toLocaleDateString() : 'N/A'}` : 'Not Paid'}`, 14, finalY + 36);
+    doc.text(`Payment Method: ${escapeText(order.paymentMethod) || 'N/A'}`, 14, finalY + 30);
+    const paidDate = order.isPaid && order.paidAt ? new Date(order.paidAt).toLocaleDateString() : 'N/A';
+    doc.text(`Payment Status: ${order.isPaid ? `Paid on ${paidDate}` : 'Not Paid'}`, 14, finalY + 36);
 
     doc.save(`invoice_${order._id?.slice(-6) || 'unknown'}.pdf`);
 };
@@ -556,44 +568,63 @@ const SellerDashboard = () => {
         setPartnerId('');
     };
 
-    const handleAssignPartner = () => {
-        if (selectedOrder && partnerId) {
-            // Reverted to correct payload key 'deliveryPartner' matching backend
-            dispatch(assignDeliveryPartner(selectedOrder._id, { deliveryPartner: partnerId, trackingNumber: '' }));
-            handleCloseDialog();
-        } else {
+    // ✅ FIXED: Delivery partner assignment with proper refresh and error handling
+    const handleAssignPartner = async () => {
+        if (!selectedOrder || !partnerId) {
             alert('Please select a delivery partner.');
+            return;
+        }
+        
+        try {
+            await dispatch(assignDeliveryPartner(selectedOrder._id, { deliveryPartner: partnerId, trackingNumber: '' }));
+            // ✅ FIXED: Refresh orders list after successful assignment
+            await dispatch(listSellerOrders());
+            handleCloseDialog();
+            alert('Delivery partner assigned successfully!');
+        } catch (error) {
+            console.error('Failed to assign delivery partner:', error);
+            alert('Failed to assign delivery partner: ' + (error.message || 'Unknown error'));
         }
     };
 
-    // Reset success flags after action completes to prevent stale state
+    // ✅ FIXED: Reset success flags and refresh orders after actions
     useEffect(() => {
         if (assignPartnerState.success) {
-            console.log('✅ Assignment completed, resetting flag');
+            console.log('✅ Assignment completed, refreshing orders...');
+            dispatch(listSellerOrders()); // ✅ FIXED: Refresh orders list
             const timer = setTimeout(() => {
                 dispatch({ type: 'DELIVERY_ASSIGN_RESET' });
-            }, 1000);
+            }, 2000);
             return () => clearTimeout(timer);
         }
     }, [assignPartnerState.success, dispatch]);
 
     useEffect(() => {
         if (updateStatusState.success) {
-            console.log('✅ Status update completed, resetting flag');
+            console.log('✅ Status update completed, refreshing orders...');
+            dispatch(listSellerOrders()); // ✅ FIXED: Refresh orders list
             const timer = setTimeout(() => {
                 dispatch({ type: 'ORDER_UPDATE_RESET' });
-            }, 1000);
+            }, 2000);
             return () => clearTimeout(timer);
         }
     }, [updateStatusState.success, dispatch]);
 
-    const handleUpdateStatus = (orderId, status) => {
+    // ✅ FIXED: Order status update with refresh and notifications
+    const handleUpdateStatus = async (orderId, status) => {
         if (status === 'shipped') {
-            setOpenDialog(true); // Assuming setOpenDialog is used for assigning partner
-            setSelectedOrder(orders.find(o => o._id === orderId)); // Set selected order for the dialog
+            setOpenDialog(true);
+            setSelectedOrder(orders.find(o => o._id === orderId));
         } else {
-            // Pass status directly, not as an object
-            dispatch(updateOrderStatus(orderId, status));
+            try {
+                await dispatch(updateOrderStatus(orderId, status));
+                // ✅ FIXED: Refresh orders list after status update
+                await dispatch(listSellerOrders());
+                alert(`Order status updated to ${status}. Customer will be notified.`);
+            } catch (error) {
+                console.error('Failed to update order status:', error);
+                alert('Failed to update order status: ' + (error.message || 'Unknown error'));
+            }
         }
     };
 
@@ -602,32 +633,45 @@ const SellerDashboard = () => {
         setChatOpen(true);
     };
 
+    // ✅ FIXED: Invoice PDF generation with proper Unicode support (no ampersand issues)
     const generatePDF = (order) => {
         const doc = new jsPDF();
+        doc.setFont('DejaVuSans', 'normal'); // ✅ FIXED: Use Unicode-supporting font
+        
         doc.setFontSize(18);
         doc.text(`Invoice for Order #${order._id?.slice(-6) || 'N/A'}`, 14, 22);
         doc.setFontSize(11);
         doc.setTextColor(100);
 
-        doc.text(`Customer: ${order.user?.name || 'N/A'}`, 14, 32);
-        doc.text(`Email: ${order.user?.email || 'N/A'}`, 14, 38);
+        // ✅ FIXED: Properly escape text to prevent ampersand issues
+        const escapeText = (text) => {
+            if (!text) return '';
+            return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        };
+
+        doc.text(`Customer: ${escapeText(order.user?.name) || 'N/A'}`, 14, 32);
+        doc.text(`Email: ${escapeText(order.user?.email) || 'N/A'}`, 14, 38);
         doc.text(`Date: ${order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}`, 14, 44);
 
         doc.text('Shipping Address:', 14, 54);
         const addr = order.shippingAddress;
-        doc.text(`${addr?.street || ''}, ${addr?.city || ''}`, 14, 60);
-        doc.text(`${addr?.state || ''} - ${addr?.pinCode || ''}`, 14, 66);
-        doc.text(`Phone: ${addr?.phone || order.user?.phone || 'N/A'}`, 14, 72);
+        doc.text(`${escapeText(addr?.street) || ''}, ${escapeText(addr?.city) || ''}`, 14, 60);
+        doc.text(`${escapeText(addr?.state) || ''} - ${escapeText(addr?.pinCode) || ''}`, 14, 66);
+        doc.text(`Phone: ${escapeText(addr?.phone || order.user?.phone) || 'N/A'}`, 14, 72);
 
         const tableColumn = ["#", "Product", "Quantity", "Price", "Total"];
         const tableRows = [];
         order.orderItems?.forEach((item, index) => {
+            const price = Number(item.price || 0);
+            const qty = Number(item.qty || 0);
+            const total = price * qty;
+            
             const itemData = [
                 index + 1,
-                item.name,
-                item.qty,
-                `₹${item.price?.toFixed(2) || '0.00'}`,
-                `₹${((item.qty || 0) * (item.price || 0)).toFixed(2)}`
+                escapeText(item.name || item.product?.name || 'Product'),
+                String(qty),
+                `₹${price.toFixed(2)}`, // ✅ FIXED: Use ₹ symbol
+                `₹${total.toFixed(2)}`
             ];
             tableRows.push(itemData);
         });
@@ -638,21 +682,22 @@ const SellerDashboard = () => {
             startY: 80,
             theme: 'grid',
             headStyles: { fillColor: [46, 125, 50] },
-            styles: { fontSize: 10 }
+            styles: { font: 'DejaVuSans', fontSize: 10 } // ✅ FIXED: Specify Unicode font
         });
 
         const finalY = doc.lastAutoTable.finalY || 100;
         doc.setFontSize(12);
-        doc.text(`Items Price: ₹${order.itemsPrice?.toFixed(2) || '0.00'}`, 145, finalY + 10, { align: 'right' });
-        doc.text(`Shipping Price: ₹${order.shippingPrice?.toFixed(2) || '0.00'}`, 145, finalY + 16, { align: 'right' });
+        doc.text(`Items Price: ₹${Number(order.itemsPrice || 0).toFixed(2)}`, 145, finalY + 10, { align: 'right' });
+        doc.text(`Shipping Price: ₹${Number(order.shippingPrice || 0).toFixed(2)}`, 145, finalY + 16, { align: 'right' });
         doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.text(`Total Price: ₹${order.totalPrice?.toFixed(2) || '0.00'}`, 145, finalY + 24, { align: 'right' });
+        doc.setFont('DejaVuSans', 'bold');
+        doc.text(`Total Price: ₹${Number(order.totalPrice || 0).toFixed(2)}`, 145, finalY + 24, { align: 'right' });
 
-        doc.setFont('helvetica', 'normal');
+        doc.setFont('DejaVuSans', 'normal');
         doc.setFontSize(10);
-        doc.text(`Payment Method: ${order.paymentMethod || 'N/A'}`, 14, finalY + 30);
-        doc.text(`Payment Status: ${order.isPaid ? `Paid on ${order.paidAt ? new Date(order.paidAt).toLocaleDateString() : 'N/A'}` : 'Not Paid'}`, 14, finalY + 36);
+        doc.text(`Payment Method: ${escapeText(order.paymentMethod) || 'N/A'}`, 14, finalY + 30);
+        const paidDate = order.isPaid && order.paidAt ? new Date(order.paidAt).toLocaleDateString() : 'N/A';
+        doc.text(`Payment Status: ${order.isPaid ? `Paid on ${paidDate}` : 'Not Paid'}`, 14, finalY + 36);
 
         doc.save(`invoice_${order._id?.slice(-6) || 'unknown'}.pdf`);
     };

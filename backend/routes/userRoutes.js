@@ -185,6 +185,11 @@ router.route('/payment-methods')
 router.route('/payment-methods/:id').delete(validateController(userController, 'deletePaymentMethod'));
 router.route('/reviews').get(validateController(userController, 'getReviews'));
 
+// ✅ NEW: Forum bookmark routes
+router.post('/bookmarks', validateController(userController, 'bookmarkPost'));
+router.delete('/bookmarks/:postId', validateController(userController, 'unbookmarkPost'));
+router.get('/bookmarks', validateController(userController, 'getBookmarks'));
+
 // ✅ FIXED: Admin only routes
 router.use(authorize('admin'));
 

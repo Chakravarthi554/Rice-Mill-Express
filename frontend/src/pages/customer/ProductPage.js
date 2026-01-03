@@ -19,7 +19,9 @@ import {
   Snackbar,
   Alert,
   Avatar,
-  Pagination
+  Pagination,
+  TextField,
+  CircularProgress
 } from "@mui/material";
 import {
   AddShoppingCart,
@@ -37,7 +39,7 @@ import {
 import { styled } from "@mui/material/styles";
 import Loader from "../../components/common/Loader";
 import Message from "../../components/common/Message";
-import { listProductDetails } from "../../redux/actions/productActions";
+import { listProductDetails, createProductReview } from "../../redux/actions/productActions";
 import { addToCart } from "../../redux/actions/cartActions";
 import { addToWishlist } from "../../redux/actions/userActions";
 import { listRecipes } from "../../redux/actions/recipeActions";
@@ -105,6 +107,80 @@ const ActionButton = styled(Button)(({ theme, varianttype }) => ({
   })
 }));
 
+// ✅ NEW: Review Form Component
+const ReviewFormComponent = ({ productId, onReviewSubmitted }) => {
+  const dispatch = useDispatch();
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
+  const { userInfo } = useSelector((state) => state.userLogin);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!rating || !comment.trim()) {
+      setError('Please provide both rating and comment');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      await dispatch(createProductReview(productId, { rating, comment }));
+      setSuccess(true);
+      setRating(0);
+      setComment('');
+      setTimeout(() => {
+        setSuccess(false);
+        onReviewSubmitted();
+      }, 2000);
+    } catch (err) {
+      setError(err.message || 'Failed to submit review');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Box component="form" onSubmit={handleSubmit}>
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {success && <Alert severity="success" sx={{ mb: 2 }}>Review submitted successfully!</Alert>}
+      
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="body1" gutterBottom>Rating *</Typography>
+        <MuiRating
+          value={rating}
+          onChange={(event, newValue) => setRating(newValue)}
+          size="large"
+          sx={{ mb: 1 }}
+        />
+      </Box>
+
+      <TextField
+        fullWidth
+        multiline
+        rows={4}
+        label="Your Review *"
+        placeholder="Share your experience with this product..."
+        value={comment}
+        onChange={(e) => setComment(e.target.value)}
+        required
+        sx={{ mb: 2 }}
+      />
+
+      <Button
+        type="submit"
+        variant="contained"
+        disabled={loading || !rating || !comment.trim()}
+        sx={{ borderRadius: '12px', fontWeight: 'bold' }}
+      >
+        {loading ? <CircularProgress size={24} /> : 'Submit Review'}
+      </Button>
+    </Box>
+  );
+};
+
 const ProductPage = () => {
   const { id } = useParams();
   const [qty, setQty] = useState(1);
@@ -119,6 +195,7 @@ const ProductPage = () => {
   const [reviewFilter, setReviewFilter] = useState('all');
   const [reviewPage, setReviewPage] = useState(1);
   const reviewsPerPage = 5;
+  const [reviewFormOpen, setReviewFormOpen] = useState(false);
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -433,6 +510,38 @@ const ProductPage = () => {
           )}
         </Grid>
       </Box>
+
+      {/* ✅ NEW: Add Review Form */}
+      {userInfo && (
+        <Box sx={{ mt: 6 }}>
+          <StyledPaper>
+            <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
+              Write a Review
+            </Typography>
+            <ReviewForm productId={id} onReviewSubmitted={() => {
+              dispatch(listProductDetails(id)); // Refresh product details
+              setReviewFormOpen(false);
+            }} />
+          </StyledPaper>
+        </Box>
+      )}
+
+      {/* ✅ NEW: Add Review Form */}
+      {userInfo && !product.reviews?.some(r => r.user?._id === userInfo._id || r.user === userInfo._id) && (
+        <Box sx={{ mt: 6 }}>
+          <StyledPaper>
+            <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
+              Write a Review
+            </Typography>
+            <ReviewFormComponent 
+              productId={id} 
+              onReviewSubmitted={() => {
+                dispatch(listProductDetails(id)); // Refresh product details
+              }} 
+            />
+          </StyledPaper>
+        </Box>
+      )}
 
       {/* ✅ FIXED: Reviews Section with Filtering, Pagination, and Verified Purchase */}
       {product.reviews && product.reviews.length > 0 && (

@@ -754,3 +754,53 @@ export const updatePrivacySettings = (settings) => async (dispatch, getState) =>
     throw error;
   }
 };
+
+// ✅ NEW: Forum bookmark actions
+export const bookmarkPost = (postId) => async (dispatch, getState) => {
+  try {
+    const { userLogin: { userInfo } } = getState();
+    const config = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${userInfo.token}`,
+      },
+    };
+    await axios.post('/api/users/bookmarks', { postId }, config);
+    // You could dispatch a success action here if needed
+  } catch (error) {
+    console.error('Bookmark error:', error.response?.data || error.message);
+    throw new Error(error.response?.data?.message || 'Failed to bookmark post');
+  }
+};
+
+export const unbookmarkPost = (postId) => async (dispatch, getState) => {
+  try {
+    const { userLogin: { userInfo } } = getState();
+    const config = {
+      headers: {
+        Authorization: `Bearer ${userInfo.token}`,
+      },
+    };
+    await axios.delete(`/api/users/bookmarks/${postId}`, config);
+    // You could dispatch a success action here if needed
+  } catch (error) {
+    console.error('Unbookmark error:', error.response?.data || error.message);
+    throw new Error(error.response?.data?.message || 'Failed to unbookmark post');
+  }
+};
+
+export const getBookmarks = () => async (dispatch, getState) => {
+  try {
+    const { userLogin: { userInfo } } = getState();
+    const config = {
+      headers: {
+        Authorization: `Bearer ${userInfo.token}`,
+      },
+    };
+    const { data } = await axios.get('/api/users/bookmarks', config);
+    return data.bookmarks || [];
+  } catch (error) {
+    console.error('Get bookmarks error:', error.response?.data || error.message);
+    throw new Error(error.response?.data?.message || 'Failed to fetch bookmarks');
+  }
+};

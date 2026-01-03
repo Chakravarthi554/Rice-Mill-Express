@@ -312,8 +312,8 @@ const createProduct = asyncHandler(async (req, res) => {
       certifications: parsedCertifications,
       type,
       quality,
-      dietPreference: dietPreference ? (Array.isArray(dietPreference) ? dietPreference : [dietPreference]) : [],
-      cookingPurpose: cookingPurpose ? (Array.isArray(cookingPurpose) ? cookingPurpose : [cookingPurpose]) : [],
+      dietPreference: Array.isArray(dietPreference) ? dietPreference : (dietPreference ? [dietPreference] : []),
+      cookingPurpose: Array.isArray(cookingPurpose) ? cookingPurpose : (cookingPurpose ? [cookingPurpose] : []),
       minBulkQuantity: Number(minBulkQuantity)
     });
 

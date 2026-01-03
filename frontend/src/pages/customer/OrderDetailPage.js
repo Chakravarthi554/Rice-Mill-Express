@@ -123,24 +123,30 @@ const OrderDetailPage = () => {
     doc.setFontSize(11);
     doc.setTextColor(100);
 
+    // ✅ FIXED: Escape text to prevent ampersand issues
+    const escapeText = (text) => {
+      if (!text) return '';
+      return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    };
+
     // ---- Customer info ----
-    doc.text(`Customer: ${order.user?.name || 'N/A'}`, 14, 32);
-    doc.text(`Email: ${order.user?.email || 'N/A'}`, 14, 38);
-    doc.text(`Phone: ${order.shippingAddress?.phone || 'N/A'}`, 14, 44);
+    doc.text(`Customer: ${escapeText(order.user?.name) || 'N/A'}`, 14, 32);
+    doc.text(`Email: ${escapeText(order.user?.email) || 'N/A'}`, 14, 38);
+    doc.text(`Phone: ${escapeText(order.shippingAddress?.phone) || 'N/A'}`, 14, 44);
     doc.text(`Date: ${order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}`, 14, 50);
 
     // ---- Shipping address ----
     doc.text('Shipping Address:', 14, 60);
     const a = order.shippingAddress;
     if (a) {
-      doc.text(`${a.street || ''}`, 14, 66);
-      doc.text(`${a.city || ''}, ${a.state || ''} - ${a.pinCode || ''}`, 14, 72);
+      doc.text(`${escapeText(a.street) || ''}`, 14, 66);
+      doc.text(`${escapeText(a.city) || ''}, ${escapeText(a.state) || ''} - ${escapeText(a.pinCode) || ''}`, 14, 72);
     }
 
     // ---- Table ----
     const cols = ['Product', 'Qty', 'Price', 'Total'];
     const rows = (order.orderItems || []).map(i => [
-      i.name,
+      escapeText(i.name || i.product?.name || 'Product'),
       String(i.qty),
       `₹${Number(i.price || 0).toFixed(2)}`,
       `₹${(Number(i.qty || 0) * Number(i.price || 0)).toFixed(2)}`
@@ -169,9 +175,10 @@ const OrderDetailPage = () => {
     // ---- Payment info ----
     doc.setFont('DejaVuSans', 'normal');
     doc.setFontSize(10);
-    doc.text(`Method: ${order.paymentMethod || 'N/A'}`, 14, y + 40);
-    doc.text(`Status: ${order.isPaid ? `Paid ${order.paidAt ? new Date(order.paidAt).toLocaleDateString() : ''}` : 'Not Paid'}`, 14, y + 46);
-    doc.text(`Order: ${order.orderStatus || 'N/A'}`, 14, y + 52);
+    doc.text(`Method: ${escapeText(order.paymentMethod) || 'N/A'}`, 14, y + 40);
+    const paidDate = order.isPaid && order.paidAt ? new Date(order.paidAt).toLocaleDateString() : '';
+    doc.text(`Status: ${order.isPaid ? `Paid ${paidDate}` : 'Not Paid'}`, 14, y + 46);
+    doc.text(`Order: ${escapeText(order.orderStatus) || 'N/A'}`, 14, y + 52);
 
     // ---- QR code (tiny SVG) ----
     try {

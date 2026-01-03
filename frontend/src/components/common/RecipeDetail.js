@@ -72,6 +72,40 @@ const RecipeDetail = () => {
     }
   }, [dispatch, recipeId]);
 
+  // ✅ FIXED: Listen for comment approval events to refresh comments
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleCommentApproved = (data) => {
+      if (data.recipeId === recipeId || data.itemId === recipeId) {
+        // Refresh comments when one is approved
+        dispatch(getComments('recipes', recipeId));
+      }
+    };
+
+    const handleCommentAdded = (data) => {
+      if (data.recipeId === recipeId || data.itemId === recipeId) {
+        // Refresh comments when new comment is added
+        dispatch(getComments('recipes', recipeId));
+      }
+    };
+
+    socket.on('RECIPE_COMMENTED', handleCommentAdded);
+    socket.on('COMMENT_APPROVED', handleCommentApproved);
+    socket.on('SOCIAL_UPDATE', (data) => {
+      if (data.itemType === 'recipe' && data.itemId === recipeId && data.type === 'COMMENT') {
+        dispatch(getComments('recipes', recipeId));
+      }
+    });
+
+    return () => {
+      socket.off('RECIPE_COMMENTED', handleCommentAdded);
+      socket.off('COMMENT_APPROVED', handleCommentApproved);
+      socket.off('SOCIAL_UPDATE');
+    };
+  }, [recipeId, dispatch]);
+
   const handleLike = () => {
     if (!userInfo) {
       alert('Please log in to like this recipe.');

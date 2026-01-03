@@ -44,6 +44,7 @@ import RecipeList from './components/common/RecipeList';
 import ForumList from './components/common/ForumList';
 import CreatePostForm from './components/common/CreatePostForm';
 import ForumComments from './components/common/ForumComments';
+import BookmarksPage from './pages/customer/BookmarksPage';
 
 // --- Settings Components ---
 import Settings from './components/customer/Settings';
@@ -167,6 +168,7 @@ function App() {
               <Route path="/forum" element={<ProtectedRoute><ForumList /></ProtectedRoute>} />
               <Route path="/forum/:id" element={<ProtectedRoute><ForumComments /></ProtectedRoute>} />
               <Route path="/forum/create" element={<ProtectedRoute><CreatePostForm /></ProtectedRoute>} />
+              <Route path="/bookmarks" element={<ProtectedRoute><BookmarksPage /></ProtectedRoute>} />
               <Route path="/recipes" element={<ProtectedRoute><RecipeList /></ProtectedRoute>} />
               <Route path="/recipes/:id" element={<ProtectedRoute><RecipeDetail /></ProtectedRoute>} />
 

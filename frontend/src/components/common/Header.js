@@ -78,21 +78,26 @@ const Header = ({ onSearch }) => {
   const handleProfileMenuOpen = (event) => setAnchorEl(event.currentTarget);
   const handleMenuClose = () => setAnchorEl(null);
 
-  // ✅ FIXED: Debounced search
+  // ✅ FIXED: Real-time debounced search - shows products as user types/deletes
   useEffect(() => {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
     
-    if (keyword.trim()) {
-      searchTimeoutRef.current = setTimeout(() => {
-        if (onSearch) {
-          onSearch(keyword);
-        } else {
+    // ✅ FIXED: Trigger search even when keyword is empty (to show all products)
+    searchTimeoutRef.current = setTimeout(() => {
+      if (onSearch) {
+        onSearch(keyword);
+      } else {
+        // If keyword is empty, show all products; otherwise filter
+        if (keyword.trim()) {
           dispatch(listFilteredProducts({ search: keyword }));
+        } else {
+          // ✅ FIXED: When search is cleared, show all products
+          dispatch(listProducts());
         }
-      }, 500); // 500ms debounce
-    }
+      }
+    }, 300); // ✅ FIXED: Reduced to 300ms for better responsiveness
 
     return () => {
       if (searchTimeoutRef.current) {

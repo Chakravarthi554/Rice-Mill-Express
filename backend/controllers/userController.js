@@ -887,6 +887,67 @@ const getRewards = asyncHandler(async (req, res) => {
   res.json({ balance: user.rewardsBalance || 0, history: user.rewardsHistory || [] });
 });
 
+// ✅ NEW: Forum bookmark functions
+const bookmarkPost = asyncHandler(async (req, res) => {
+  const { postId } = req.body;
+
+  if (!mongoose.Types.ObjectId.isValid(postId)) {
+    return res.status(400).json({ message: 'Invalid post ID' });
+  }
+
+  const user = await User.findById(req.user._id);
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
+  // Check if already bookmarked
+  const existingBookmark = user.bookmarks.find(b => b.postId.toString() === postId);
+  if (existingBookmark) {
+    return res.status(400).json({ message: 'Post already bookmarked' });
+  }
+
+  user.bookmarks.push({ postId, bookmarkedAt: new Date() });
+  await user.save();
+
+  res.json({ success: true, message: 'Post bookmarked successfully' });
+});
+
+const unbookmarkPost = asyncHandler(async (req, res) => {
+  const { postId } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(postId)) {
+    return res.status(400).json({ message: 'Invalid post ID' });
+  }
+
+  const user = await User.findById(req.user._id);
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
+  user.bookmarks = user.bookmarks.filter(b => b.postId.toString() !== postId);
+  await user.save();
+
+  res.json({ success: true, message: 'Post unbookmarked successfully' });
+});
+
+const getBookmarks = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id)
+    .populate({
+      path: 'bookmarks.postId',
+      populate: { path: 'userId', select: 'name profilePic' }
+    })
+    .select('bookmarks');
+
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
+  // Filter out null postIds (deleted posts)
+  const validBookmarks = user.bookmarks.filter(b => b.postId);
+
+  res.json({ bookmarks: validBookmarks });
+});
+
 // Alias functions for backward compatibility
 const updateProfile = updateUserProfile;
 
@@ -937,5 +998,8 @@ module.exports = {
   getDashboardStats,
   getUserById,
   updateUser,
-  deleteUser
+  deleteUser,
+  bookmarkPost,
+  unbookmarkPost,
+  getBookmarks
 };

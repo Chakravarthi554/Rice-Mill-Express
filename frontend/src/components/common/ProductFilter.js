@@ -69,8 +69,14 @@ const ProductFilter = () => {
     dispatch(listProducts());
   }, [dispatch]);
 
+  // ✅ FIXED: Real-time search - shows products as user types/deletes
   useEffect(() => {
-    dispatch(listFilteredProducts({ ...filters, search: searchQuery }));
+    if (searchQuery.trim()) {
+      dispatch(listFilteredProducts({ ...filters, search: searchQuery }));
+    } else {
+      // ✅ FIXED: When search is cleared, show all products (or filtered products without search)
+      dispatch(listFilteredProducts({ ...filters, search: '' }));
+    }
   }, [dispatch, filters, searchQuery]);
 
   const handleSearch = () => {

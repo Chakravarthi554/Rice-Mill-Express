@@ -159,6 +159,30 @@ const assignDeliveryToOrder = asyncHandler(async (req, res) => {
 
     console.log(`✅ Order ${order._id} assigned to partner ${deliveryPartner} and set to shipped`);
 
+    // ✅ FIXED: Send notification to delivery partner
+    const DeliveryPartner = require('../models/deliveryPartner');
+    const Notification = require('../models/Notification');
+    const partner = await DeliveryPartner.findById(deliveryPartner);
+    if (partner && partner.user) {
+      await Notification.create({
+        user: partner.user,
+        type: 'ORDER_ASSIGNED',
+        message: `New order #${order._id.toString().slice(-6)} assigned to you for delivery`,
+        relatedEntity: order._id,
+        entityModel: 'Order'
+      });
+      console.log(`✅ Notification sent to delivery partner ${partner.user}`);
+    }
+
+    // ✅ FIXED: Send notification to customer
+    await Notification.create({
+      user: order.user,
+      type: 'ORDER_STATUS_UPDATE',
+      message: `Your order #${order._id.toString().slice(-6)} has been shipped and assigned to delivery partner`,
+      relatedEntity: order._id,
+      entityModel: 'Order'
+    });
+
     // Broadcast order update for real-time refresh
     const broadcastOrderUpdate = req.app.get('broadcastOrderUpdate');
     if (broadcastOrderUpdate) {
@@ -168,8 +192,19 @@ const assignDeliveryToOrder = asyncHandler(async (req, res) => {
       console.error('❌ broadcastOrderUpdate function not found in app settings');
     }
 
-    // Refresh the orders list to reflect the updated status
-    req.app.get('io').to(`seller_${req.user._id}`).emit('orderUpdated', updatedOrder);
+    // ✅ FIXED: Emit socket events for real-time updates
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`seller_${req.user._id}`).emit('orderUpdated', updatedOrder);
+      io.to(`user_${order.user.toString()}`).emit('ORDER_UPDATE', {
+        orderId: order._id,
+        status: updatedOrder.orderStatus,
+        deliveryPartner: updatedOrder.deliveryPartner
+      });
+      if (partner && partner.user) {
+        io.to(`delivery_${partner.user.toString()}`).emit('ORDER_ASSIGNED', updatedOrder);
+      }
+    }
 
     res.json(updatedOrder);
   } catch (error) {

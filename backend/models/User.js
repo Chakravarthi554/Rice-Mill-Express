@@ -100,6 +100,12 @@ const userSchema = mongoose.Schema(
       description: { type: String },
       date: { type: Date, default: Date.now }
     }],
+
+    // ✅ ADDED: Forum bookmarks
+    bookmarks: [{
+      postId: { type: mongoose.Schema.Types.ObjectId, ref: 'ForumPost', required: true },
+      bookmarkedAt: { type: Date, default: Date.now }
+    }],
     defaultAddress: { type: mongoose.Schema.Types.ObjectId, ref: 'Address' },
     defaultPayment: { type: String }
   },

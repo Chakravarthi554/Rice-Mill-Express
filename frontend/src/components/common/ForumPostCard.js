@@ -13,6 +13,7 @@ import {
 import {
   likePost, deleteForumPost, reportPost, addComment, reportForumComment
 } from '../../redux/actions/forumActions';
+import { bookmarkPost, unbookmarkPost } from '../../redux/actions/userActions';
 import { emitSocialAction } from '../../utils/socket';
 
 const ForumPostCard = ({ post, onUpdate }) => {
@@ -27,7 +28,7 @@ const ForumPostCard = ({ post, onUpdate }) => {
   const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState('');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
-  const [isBookmarked, setIsBookmarked] = useState(false);
+  // Remove local state for bookmark - we'll get this from user profile or check server-side
 
   useEffect(() => setCurrentPost(post), [post]);
 
@@ -140,6 +141,24 @@ const ForumPostCard = ({ post, onUpdate }) => {
     }
   };
 
+  const handleBookmark = async () => {
+    try {
+      await dispatch(bookmarkPost(currentPost._id));
+      showSnackbar('Post bookmarked', 'success');
+    } catch (error) {
+      showSnackbar(error.message || 'Failed to bookmark', 'error');
+    }
+  };
+
+  const handleUnbookmark = async () => {
+    try {
+      await dispatch(unbookmarkPost(currentPost._id));
+      showSnackbar('Bookmark removed', 'success');
+    } catch (error) {
+      showSnackbar(error.message || 'Failed to remove bookmark', 'error');
+    }
+  };
+
   const showSnackbar = (msg, sev) => setSnackbar({ open: true, message: msg, severity: sev });
   const closeSnackbar = () => setSnackbar({ ...snackbar, open: false });
 
@@ -235,7 +254,8 @@ const ForumPostCard = ({ post, onUpdate }) => {
 
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
         <MenuItem onClick={() => { setAnchorEl(null); navigate(`/forum/post/${currentPost._id}`); }}>View</MenuItem>
-        <MenuItem onClick={() => { setAnchorEl(null); setIsBookmarked(!isBookmarked); }}>Bookmark</MenuItem>
+        <MenuItem onClick={() => { setAnchorEl(null); handleBookmark(); }}>Bookmark</MenuItem>
+        <MenuItem onClick={() => { setAnchorEl(null); navigate('/bookmarks'); }}>View Bookmarks</MenuItem>
         <MenuItem onClick={() => { setAnchorEl(null); setReportOpen(true); }}>Report</MenuItem>
         {(isOwner || isAdmin) && <MenuItem onClick={() => { setAnchorEl(null); handleDelete(); }} sx={{ color: 'error.main' }}>Delete</MenuItem>}
       </Menu>
