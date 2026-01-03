@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import Loader from '../common/Loader';
 import OrderTracker from '../customer/OrderTracker';
+import Price from '../common/Price';
 import { addToCart } from '../../redux/actions/cartActions';
 import { addToWishlist } from '../../redux/actions/userActions';
 
@@ -91,9 +92,13 @@ const MyOrders = () => {
                         <Button
                           variant="text"
                           size="small"
-                          onClick={() => {
-                            dispatch(addToWishlist(item.product._id));
-                            alert('Added to wishlist');
+                          onClick={async () => {
+                            try {
+                              await dispatch(addToWishlist(item.product._id));
+                              alert('Added to wishlist');
+                            } catch (error) {
+                              alert('Failed to add to wishlist: ' + (error.message || 'Unknown error'));
+                            }
                           }}
                         >
                           Wishlist
@@ -101,7 +106,7 @@ const MyOrders = () => {
                         <Button
                           variant="text"
                           size="small"
-                          onClick={() => navigate(`/products/${item.product._id}`)}
+                          onClick={() => navigate(`/products/${item.product._id}#reviews`)}
                         >
                           Review
                         </Button>

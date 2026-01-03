@@ -18,7 +18,8 @@ import {
   Rating as MuiRating,
   Snackbar,
   Alert,
-  Avatar
+  Avatar,
+  Pagination
 } from "@mui/material";
 import {
   AddShoppingCart,
@@ -41,6 +42,7 @@ import { addToCart } from "../../redux/actions/cartActions";
 import { addToWishlist } from "../../redux/actions/userActions";
 import { listRecipes } from "../../redux/actions/recipeActions";
 import { listProducts } from "../../redux/actions/productActions"; // ✅ For recommendations
+import { listMyOrders } from "../../redux/actions/orderActions"; // ✅ For verified purchase check
 import Price from "../../components/common/Price";
 
 
@@ -112,6 +114,11 @@ const ProductPage = () => {
   const [socialStats, setSocialStats] = useState({ likes: 0, comments: 0 });
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
+  
+  // ✅ FIXED: Review filtering and pagination state
+  const [reviewFilter, setReviewFilter] = useState('all');
+  const [reviewPage, setReviewPage] = useState(1);
+  const reviewsPerPage = 5;
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -121,6 +128,7 @@ const ProductPage = () => {
   const socialCommentsList = useSelector((state) => state.socialCommentsList || {});
   const { userInfo } = useSelector((state) => state.userLogin);
   const { products = [] } = useSelector(s => s.productList); // ✅ For recommendations
+  const { orders: userOrders = [] } = useSelector((state) => state.orderListMy || {}); // ✅ For verified purchase check
 
   const getImageUrl = (imagePath) => {
     if (!imagePath) return "https://via.placeholder.com/600x400/4CAF50/ffffff?text=Product+Image";
@@ -132,7 +140,11 @@ const ProductPage = () => {
   useEffect(() => {
     dispatch(listProductDetails(id));
     dispatch(listProducts()); // ✅ Fetch all products for recommendations
-  }, [dispatch, id]); // Only depend on id to reload when navigating to different product
+    // ✅ FIXED: Fetch user orders for verified purchase check
+    if (userInfo) {
+      dispatch(listMyOrders());
+    }
+  }, [dispatch, id, userInfo]); // Only depend on id to reload when navigating to different product
 
   useEffect(() => {
     if (product && product.riceType) {
@@ -150,6 +162,31 @@ const ProductPage = () => {
       });
     }
   }, [product, socialCommentsList]);
+
+  // ✅ FIXED: Filter reviews based on selected filter
+  const filteredReviews = React.useMemo(() => {
+    if (!product.reviews || product.reviews.length === 0) return [];
+    
+    let filtered = product.reviews.filter(review => review.approved !== false);
+    
+    if (reviewFilter === 'all') {
+      return filtered;
+    } else if (reviewFilter === 'verified') {
+      // Filter verified purchases (users who have purchased this product)
+      return filtered.filter(review => {
+        if (!userInfo || !userOrders) return false;
+        return userOrders.some(order => 
+          order.orderItems?.some(item => 
+            item.product?._id === product._id && order.isPaid
+          ) && order.user?._id === review.user?._id
+        );
+      });
+    } else if (typeof reviewFilter === 'number') {
+      return filtered.filter(review => review.rating === reviewFilter);
+    }
+    
+    return filtered;
+  }, [product.reviews, reviewFilter, userInfo, userOrders, product._id]);
 
   const addToCartHandler = async () => {
     try {
@@ -397,39 +434,108 @@ const ProductPage = () => {
         </Grid>
       </Box>
 
-      {/* ✅ Reviews Section */}
+      {/* ✅ FIXED: Reviews Section with Filtering, Pagination, and Verified Purchase */}
       {product.reviews && product.reviews.length > 0 && (
         <Box sx={{ mt: 6 }}>
           <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
-            Customer Reviews
+            Customer Reviews ({product.numReviews || product.reviews.length})
           </Typography>
+          
+          {/* ✅ FIXED: Review Filters */}
+          <Box sx={{ mb: 3, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            <Chip 
+              label="All" 
+              onClick={() => setReviewFilter('all')} 
+              color={reviewFilter === 'all' ? 'primary' : 'default'}
+              clickable
+            />
+            <Chip 
+              label="5 Stars" 
+              onClick={() => setReviewFilter(5)} 
+              color={reviewFilter === 5 ? 'primary' : 'default'}
+              clickable
+            />
+            <Chip 
+              label="4 Stars" 
+              onClick={() => setReviewFilter(4)} 
+              color={reviewFilter === 4 ? 'primary' : 'default'}
+              clickable
+            />
+            <Chip 
+              label="3 Stars" 
+              onClick={() => setReviewFilter(3)} 
+              color={reviewFilter === 3 ? 'primary' : 'default'}
+              clickable
+            />
+            <Chip 
+              label="Verified Purchase" 
+              onClick={() => setReviewFilter('verified')} 
+              color={reviewFilter === 'verified' ? 'primary' : 'default'}
+              clickable
+            />
+          </Box>
+
+          {/* ✅ FIXED: Filtered Reviews */}
           <Grid container spacing={2}>
-            {product.reviews.map((review, idx) => (
-              <Grid item xs={12} key={idx}>
-                <Card sx={{ p: 3 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                    <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>
-                      {review.name?.charAt(0).toUpperCase()}
-                    </Avatar>
-                    <Box sx={{ flexGrow: 1 }}>
-                      <Typography variant="subtitle1" fontWeight="bold">
-                        {review.name}
-                      </Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <MuiRating value={review.rating} readOnly size="small" />
-                        <Typography variant="caption" color="text.secondary">
-                          {new Date(review.createdAt).toLocaleDateString()}
-                        </Typography>
+            {filteredReviews
+              .slice((reviewPage - 1) * reviewsPerPage, reviewPage * reviewsPerPage)
+              .map((review, idx) => {
+                // Check if user has purchased this product (verified purchase)
+                const isVerified = userInfo && userOrders?.some(order => 
+                  order.orderItems?.some(item => 
+                    item.product?._id === product._id && order.isPaid
+                  )
+                );
+                
+                return (
+                  <Grid item xs={12} key={review._id || idx}>
+                    <Card sx={{ p: 3 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                        <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>
+                          {review.name?.charAt(0).toUpperCase() || review.user?.name?.charAt(0).toUpperCase()}
+                        </Avatar>
+                        <Box sx={{ flexGrow: 1 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Typography variant="subtitle1" fontWeight="bold">
+                              {review.name || review.user?.name || 'Anonymous'}
+                            </Typography>
+                            {isVerified && (
+                              <Chip 
+                                label="Verified Purchase" 
+                                size="small" 
+                                color="success" 
+                                sx={{ height: 20, fontSize: '0.7rem' }}
+                              />
+                            )}
+                          </Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                            <MuiRating value={review.rating} readOnly size="small" />
+                            <Typography variant="caption" color="text.secondary">
+                              {new Date(review.createdAt || Date.now()).toLocaleDateString()}
+                            </Typography>
+                          </Box>
+                        </Box>
                       </Box>
-                    </Box>
-                  </Box>
-                  <Typography variant="body2" color="text.secondary">
-                    {review.comment}
-                  </Typography>
-                </Card>
-              </Grid>
-            ))}
+                      <Typography variant="body2" color="text.secondary">
+                        {review.comment}
+                      </Typography>
+                    </Card>
+                  </Grid>
+                );
+              })}
           </Grid>
+
+          {/* ✅ FIXED: Pagination */}
+          {filteredReviews.length > reviewsPerPage && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+              <Pagination 
+                count={Math.ceil(filteredReviews.length / reviewsPerPage)} 
+                page={reviewPage} 
+                onChange={(e, value) => setReviewPage(value)}
+                color="primary"
+              />
+            </Box>
+          )}
         </Box>
       )}
 

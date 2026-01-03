@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   AppBar, Toolbar, Typography, IconButton, Badge, Menu, MenuItem,
   InputBase, Box, Avatar, useTheme, useMediaQuery
@@ -7,9 +7,7 @@ import {
   Search as SearchIcon,
   ShoppingCart,
   Favorite,
-  Notifications,
   AccountCircle,
-  Menu as MenuIcon,
   Logout,
   Settings,
   Person,
@@ -23,6 +21,7 @@ import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { logoutUser } from '../../redux/actions/userActions';
 import { listFilteredProducts } from '../../redux/actions/productActions';
+import NotificationBadge from './NotificationBadge';
 
 const Search = styled('div')(({ theme }) => ({
   position: 'relative',
@@ -68,6 +67,7 @@ const Header = ({ onSearch }) => {
   const dispatch = useDispatch();
   const [anchorEl, setAnchorEl] = useState(null);
   const [keyword, setKeyword] = useState('');
+  const searchTimeoutRef = useRef(null);
 
   const { cartItems } = useSelector(state => state.cart || {});
   const { wishlistItems } = useSelector(state => state.userWishlist || {});
@@ -78,13 +78,38 @@ const Header = ({ onSearch }) => {
   const handleProfileMenuOpen = (event) => setAnchorEl(event.currentTarget);
   const handleMenuClose = () => setAnchorEl(null);
 
+  // ✅ FIXED: Debounced search
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    if (keyword.trim()) {
+      searchTimeoutRef.current = setTimeout(() => {
+        if (onSearch) {
+          onSearch(keyword);
+        } else {
+          dispatch(listFilteredProducts({ search: keyword }));
+        }
+      }, 500); // 500ms debounce
+    }
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [keyword, dispatch, onSearch]);
+
   const handleSearch = (e) => {
     e.preventDefault();
-    if (onSearch) {
-      onSearch(keyword);
-    } else {
-      dispatch(listFilteredProducts({ search: keyword }));
-      navigate('/customer/dashboard'); // Ensure we are on dashboard
+    if (keyword.trim()) {
+      if (onSearch) {
+        onSearch(keyword);
+      } else {
+        dispatch(listFilteredProducts({ search: keyword }));
+        navigate('/customer/dashboard');
+      }
     }
   };
 
@@ -147,11 +172,8 @@ const Header = ({ onSearch }) => {
               <Favorite />
             </Badge>
           </IconButton>
-          <IconButton color="inherit" onClick={() => navigate('/notifications')}>
-            <Badge badgeContent={0} color="error"> {/* Connect to notification count later */}
-              <Notifications />
-            </Badge>
-          </IconButton>
+          {/* ✅ FIXED: Use NotificationBadge component */}
+          <NotificationBadge />
 
           <IconButton
             edge="end"

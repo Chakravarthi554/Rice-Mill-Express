@@ -408,8 +408,6 @@ const RecipeDetail = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Chat Window */}
-
     </Box>
   );
 };
