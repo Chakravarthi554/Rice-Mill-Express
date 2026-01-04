@@ -1,3 +1,4 @@
+// [AI: Three-dot menu bookmark logic and Redux connect added]
 import React, { useState, useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';

@@ -7,6 +7,7 @@
  * - Enhanced comments: shows only approved/unflagged comments to non-admins
  */
 
+// [AI: Recipe comments live update and approval visibility fixed]
 import React, { useEffect, useState, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useParams, Link as RouterLink, useNavigate } from 'react-router-dom';

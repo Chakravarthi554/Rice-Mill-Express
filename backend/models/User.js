@@ -1,3 +1,4 @@
+// [AI: Updated bookmarks field – forum bookmarking enabled]
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');

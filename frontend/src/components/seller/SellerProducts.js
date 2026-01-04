@@ -1,3 +1,4 @@
+// [AI: Product dropdowns and image validation overhaul]
 import React, { useState, useEffect } from "react";
 import {
   Container,

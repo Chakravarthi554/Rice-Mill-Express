@@ -1,3 +1,4 @@
+// [AI: Product reviews form & logic fixed]
 import React, { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useParams, useNavigate, Link } from "react-router-dom";

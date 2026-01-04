@@ -1,3 +1,4 @@
+// [AI: Added forum bookmarks API routes]
 const express = require('express');
 const router = express.Router();
 

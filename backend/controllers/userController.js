@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Address = require('../models/Address');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+// [AI: Added forum bookmarking endpoints: bookmarkPost, unbookmarkPost, getBookmarks]
 const asyncHandler = require('express-async-handler');
 const mongoose = require('mongoose');
 const crypto = require('crypto');

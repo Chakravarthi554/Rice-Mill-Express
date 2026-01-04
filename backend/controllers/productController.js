@@ -1,3 +1,4 @@
+// [AI: Array handling for new seller product form fields]
 const asyncHandler = require('express-async-handler');
 const Product = require('../models/Product');
 const User = require('../models/User');
