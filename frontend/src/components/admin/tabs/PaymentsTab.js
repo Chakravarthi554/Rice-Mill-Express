@@ -42,7 +42,7 @@ import {
   Flag as FlagIcon
 } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
-import { 
+import {
   getAdminPaymentStats,
   getAdminTransactions,
   processRefund,
@@ -80,7 +80,7 @@ const PaymentsTab = () => {
 
   const loadData = () => {
     dispatch(getAdminPaymentStats());
-    
+
     if (activeTab === 0) {
       dispatch(getAdminTransactions(filters));
     } else if (activeTab === 1) {
@@ -166,7 +166,7 @@ const PaymentsTab = () => {
       refunded: { color: 'info', label: 'Refunded' },
       partially_refunded: { color: 'info', label: 'Partial Refund' }
     };
-    
+
     const config = statusConfig[status] || { color: 'default', label: status };
     return <Chip label={config.label} color={config.color} size="small" />;
   };
@@ -178,7 +178,7 @@ const PaymentsTab = () => {
       processing: { color: 'info', label: 'Processing' },
       failed: { color: 'error', label: 'Failed' }
     };
-    
+
     const config = statusConfig[status] || { color: 'default', label: status };
     return <Chip label={config.label} color={config.color} size="small" />;
   };
@@ -232,6 +232,7 @@ const PaymentsTab = () => {
             <Tab label="Transactions" />
             <Tab label="Seller Payouts" />
             <Tab label="Analytics" />
+            <Tab label="COD Settlements" />
           </Tabs>
           <Box>
             <Tooltip title="Refresh">
@@ -329,10 +330,10 @@ const PaymentsTab = () => {
                     <TableCell>₹{payment.amount?.toLocaleString('en-IN') || 0}</TableCell>
                     <TableCell>₹{payment.commissionAmount?.toLocaleString('en-IN') || 0}</TableCell>
                     <TableCell>
-                      <Chip 
-                        label={payment.method?.toUpperCase() || 'N/A'} 
-                        color={payment.method === 'razorpay' ? 'primary' : 'secondary'} 
-                        size="small" 
+                      <Chip
+                        label={payment.method?.toUpperCase() || 'N/A'}
+                        color={payment.method === 'razorpay' ? 'primary' : 'secondary'}
+                        size="small"
                       />
                     </TableCell>
                     <TableCell>
@@ -345,8 +346,8 @@ const PaymentsTab = () => {
                       <Box sx={{ display: 'flex', gap: 1 }}>
                         {payment.method === 'razorpay' && payment.status === 'completed' && (
                           <Tooltip title="Refund">
-                            <IconButton 
-                              size="small" 
+                            <IconButton
+                              size="small"
                               color="warning"
                               onClick={() => handleRefund(payment)}
                             >
@@ -355,8 +356,8 @@ const PaymentsTab = () => {
                           </Tooltip>
                         )}
                         <Tooltip title={payment.isFlagged ? "Unflag" : "Flag"}>
-                          <IconButton 
-                            size="small" 
+                          <IconButton
+                            size="small"
                             color={payment.isFlagged ? "error" : "default"}
                             onClick={() => handleFlag(payment)}
                           >
@@ -439,8 +440,8 @@ const PaymentsTab = () => {
                     <TableCell>
                       {payout.status === 'pending' && (
                         <Tooltip title="Release Payout">
-                          <IconButton 
-                            size="small" 
+                          <IconButton
+                            size="small"
                             color="success"
                             onClick={() => handlePayoutRelease(payout)}
                           >
@@ -463,7 +464,7 @@ const PaymentsTab = () => {
           <Alert severity="info" sx={{ mb: 3 }}>
             Advanced analytics and charts coming soon. Currently showing basic statistics.
           </Alert>
-          
+
           <Grid container spacing={3}>
             <Grid item xs={12} md={6}>
               <Card>
@@ -501,7 +502,7 @@ const PaymentsTab = () => {
                 </CardContent>
               </Card>
             </Grid>
-            
+
             <Grid item xs={12} md={6}>
               <Card>
                 <CardContent>
@@ -530,6 +531,35 @@ const PaymentsTab = () => {
               </Card>
             </Grid>
           </Grid>
+        </Box>
+      )}
+
+      {/* COD Settlements Tab */}
+      {activeTab === 3 && (
+        <Box>
+          <Alert severity="info" sx={{ mb: 3 }}>
+            Review and settle cash collected by delivery partners.
+          </Alert>
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Order ID</TableCell>
+                  <TableCell>Delivery Partner</TableCell>
+                  <TableCell>Amount</TableCell>
+                  <TableCell>Collected At</TableCell>
+                  <TableCell>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                <TableRow>
+                  <TableCell colSpan={5} align="center">
+                    <Typography color="textSecondary">COD Settlement feature requires backend integration. Please use the API for now.</Typography>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </TableContainer>
         </Box>
       )}
 
@@ -572,7 +602,7 @@ const PaymentsTab = () => {
             Release ₹{payoutDialog.payout?.amount} to {payoutDialog.payout?.seller?.name}?
           </Typography>
           <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-            Bank: {payoutDialog.payout?.bankDetailsSnapshot?.accountHolderName} • 
+            Bank: {payoutDialog.payout?.bankDetailsSnapshot?.accountHolderName} •
             {payoutDialog.payout?.bankDetailsSnapshot?.accountNumber?.slice(-4)}
           </Typography>
         </DialogContent>
@@ -591,8 +621,8 @@ const PaymentsTab = () => {
         </DialogTitle>
         <DialogContent>
           <Typography>
-            {flagDialog.payment?.isFlagged 
-              ? 'Remove flag from this payment?' 
+            {flagDialog.payment?.isFlagged
+              ? 'Remove flag from this payment?'
               : 'Flag this payment for review?'}
           </Typography>
           <TextField
@@ -610,9 +640,9 @@ const PaymentsTab = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setFlagDialog({ open: false, payment: null })}>Cancel</Button>
-          <Button 
-            onClick={confirmFlag} 
-            color={flagDialog.payment?.isFlagged ? "primary" : "warning"} 
+          <Button
+            onClick={confirmFlag}
+            color={flagDialog.payment?.isFlagged ? "primary" : "warning"}
             variant="contained"
           >
             {flagDialog.payment?.isFlagged ? 'Unflag' : 'Flag'}

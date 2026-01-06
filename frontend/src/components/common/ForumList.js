@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { 
+import {
   Box, Typography, Button, CircularProgress, Alert, Container,
   Grid, Card, CardContent
 } from '@mui/material';
@@ -50,10 +50,10 @@ const ForumList = () => {
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
       {/* Header Section */}
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
+      <Box sx={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
         mb: 4,
         p: 3,
         backgroundColor: 'white',
@@ -62,7 +62,7 @@ const ForumList = () => {
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
       }}>
         <Box sx={{ color: 'white' }}>
-          <Typography variant="h3" sx={{ 
+          <Typography variant="h3" sx={{
             fontWeight: 'bold',
             mb: 1
           }}>
@@ -72,14 +72,14 @@ const ForumList = () => {
             Share your rice stories, recipes, and experiences with our community
           </Typography>
         </Box>
-        
+
         <Box sx={{ display: 'flex', gap: 2 }}>
           <Button
             variant="contained"
             startIcon={<AddIcon />}
             onClick={handleCreatePost}
             disabled={!userInfo}
-            sx={{ 
+            sx={{
               borderRadius: 3,
               px: 3,
               py: 1,
@@ -104,7 +104,7 @@ const ForumList = () => {
             startIcon={<RefreshIcon />}
             onClick={handleRefresh}
             disabled={loading}
-            sx={{ 
+            sx={{
               borderRadius: 3,
               px: 3,
               py: 1,
@@ -122,15 +122,28 @@ const ForumList = () => {
         </Box>
       </Box>
 
+      {/* Search Bar */}
+      <Box component="form" onSubmit={handleSearch} sx={{ mb: 4, display: 'flex', gap: 2 }}>
+        <TextField
+          fullWidth
+          variant="outlined"
+          placeholder="Search forum posts..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          sx={{ bgcolor: 'white', borderRadius: 1 }}
+        />
+        <Button type="submit" variant="contained" size="large">Search</Button>
+      </Box>
+
       {/* Error Alert */}
       {error && (
-        <Alert 
-          severity="error" 
-          sx={{ 
+        <Alert
+          severity="error"
+          sx={{
             mb: 3,
             borderRadius: 2
           }}
-          onClose={() => {}}
+          onClose={() => { }}
         >
           {error}
         </Alert>
@@ -154,8 +167,8 @@ const ForumList = () => {
         ) : (
           !loading && (
             <Grid item xs={12}>
-              <Card sx={{ 
-                textAlign: 'center', 
+              <Card sx={{
+                textAlign: 'center',
                 py: 8,
                 backgroundColor: 'white',
                 borderRadius: 3,

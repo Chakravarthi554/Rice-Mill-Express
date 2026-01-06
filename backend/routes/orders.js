@@ -117,6 +117,14 @@ router.put("/:id/pay", protect, role("admin"), validateController(orderControlle
 router.put("/:id/deliver", protect, role("admin", "seller", "deliveryPartner"), sellerOrOrderOwner, validateController(orderController, 'updateOrderToDelivered'));
 router.put("/:id/cod-proof", protect, role("seller"), sellerOrOrderOwner, validateController(orderController, 'uploadCodProof'));
 
+// ✅ NEW: Complete Delivery (OTP + Photo)
+const upload = require('../middleware/uploadMiddleware'); // Assuming this exists or use multer directly
+router.put("/:id/complete-delivery", protect, role("admin", "seller", "deliveryPartner"), upload.single('image'), validateController(orderController, 'completeDelivery'));
+
+// ✅ NEW: Complete Delivery (OTP + Photo)
+const upload = require('../middleware/uploadMiddleware'); // Assuming this exists or use multer directly
+router.put("/:id/complete-delivery", protect, role("admin", "seller", "deliveryPartner"), upload.single('image'), validateController(orderController, 'completeDelivery'));
+
 // ✅ FIXED: Health check endpoint for orders API
 router.get("/health", (req, res) => {
   res.json({

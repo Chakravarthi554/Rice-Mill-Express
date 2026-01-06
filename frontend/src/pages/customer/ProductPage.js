@@ -109,7 +109,7 @@ const ActionButton = styled(Button)(({ theme, varianttype }) => ({
 }));
 
 // ✅ NEW: Review Form Component
-const ReviewFormComponent = ({ productId, onReviewSubmitted }) => {
+const ReviewFormComponent = ({ productId, onReviewSubmitted, existingReview }) => {
   const dispatch = useDispatch();
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
@@ -117,6 +117,13 @@ const ReviewFormComponent = ({ productId, onReviewSubmitted }) => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const { userInfo } = useSelector((state) => state.userLogin);
+
+  useEffect(() => {
+    if (existingReview) {
+      setRating(existingReview.rating);
+      setComment(existingReview.comment);
+    }
+  }, [existingReview]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -130,8 +137,10 @@ const ReviewFormComponent = ({ productId, onReviewSubmitted }) => {
       setError(null);
       await dispatch(createProductReview(productId, { rating, comment }));
       setSuccess(true);
-      setRating(0);
-      setComment('');
+      if (!existingReview) {
+        setRating(0);
+        setComment('');
+      }
       setTimeout(() => {
         setSuccess(false);
         onReviewSubmitted();
@@ -513,14 +522,17 @@ const ProductPage = () => {
       </Box>
 
       {/* ✅ NEW: Add Review Form */}
-      {userInfo && !product.reviews?.some(r => r.user?._id === userInfo._id || r.user === userInfo._id) && (
+      {userInfo && (
         <Box sx={{ mt: 6 }}>
           <StyledPaper>
             <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
-              Write a Review
+              {product.reviews?.some(r => r.user?._id === userInfo._id || r.user === userInfo._id)
+                ? "Update Your Review"
+                : "Write a Review"}
             </Typography>
             <ReviewFormComponent
               productId={id}
+              existingReview={product.reviews?.find(r => r.user?._id === userInfo._id || r.user === userInfo._id)}
               onReviewSubmitted={() => {
                 dispatch(listProductDetails(id)); // Refresh product details
               }}

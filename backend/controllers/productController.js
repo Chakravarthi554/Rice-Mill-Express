@@ -2,6 +2,7 @@
 const asyncHandler = require('express-async-handler');
 const Product = require('../models/Product');
 const User = require('../models/User');
+const Notification = require('../models/Notification'); // ✅ ADDED
 
 // ✅ FIXED: Enhanced getProducts with better error handling
 const getProducts = asyncHandler(async (req, res) => {
@@ -11,11 +12,11 @@ const getProducts = asyncHandler(async (req, res) => {
 
     const keyword = req.query.keyword
       ? {
-          name: {
-            $regex: req.query.keyword,
-            $options: 'i',
-          },
-        }
+        name: {
+          $regex: req.query.keyword,
+          $options: 'i',
+        },
+      }
       : {};
 
     const count = await Product.countDocuments({ ...keyword });
@@ -181,10 +182,10 @@ const filterProducts = asyncHandler(async (req, res) => {
 
   } catch (error) {
     console.error('❌ Product filter error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: 'Error filtering products', 
-      error: error.message 
+      message: 'Error filtering products',
+      error: error.message
     });
   }
 });
@@ -215,7 +216,7 @@ const getProductById = asyncHandler(async (req, res) => {
 
   } catch (error) {
     console.error('❌ Get product by ID error:', error);
-    
+
     if (error.name === 'CastError') {
       return res.status(400).json({
         success: false,
@@ -276,8 +277,8 @@ const createProduct = asyncHandler(async (req, res) => {
     let parsedNutritionalInfo = {};
     if (nutritionalInfo) {
       try {
-        parsedNutritionalInfo = typeof nutritionalInfo === 'string' 
-          ? JSON.parse(nutritionalInfo) 
+        parsedNutritionalInfo = typeof nutritionalInfo === 'string'
+          ? JSON.parse(nutritionalInfo)
           : nutritionalInfo;
       } catch (e) {
         console.warn('⚠️ Could not parse nutritional info:', e.message);
@@ -319,7 +320,7 @@ const createProduct = asyncHandler(async (req, res) => {
     });
 
     const createdProduct = await product.save();
-    
+
     // Populate seller info for response
     await createdProduct.populate('seller', 'name businessName');
 
@@ -333,7 +334,7 @@ const createProduct = asyncHandler(async (req, res) => {
 
   } catch (error) {
     console.error('❌ Create product error:', error);
-    
+
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map(err => err.message);
       return res.status(400).json({
@@ -403,7 +404,7 @@ const updateProduct = asyncHandler(async (req, res) => {
 
   } catch (error) {
     console.error('❌ Update product error:', error);
-    
+
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map(err => err.message);
       return res.status(400).json({
@@ -479,21 +480,20 @@ const createProductReview = asyncHandler(async (req, res) => {
     );
 
     if (alreadyReviewed) {
-      return res.status(400).json({
-        success: false,
-        message: 'Product already reviewed'
-      });
+      alreadyReviewed.rating = Number(rating);
+      alreadyReviewed.comment = comment;
+      alreadyReviewed.name = req.user.name; // Update name in case it changed
+    } else {
+      const review = {
+        name: req.user.name,
+        rating: Number(rating),
+        comment,
+        user: req.user._id,
+      };
+
+      product.reviews.push(review);
+      product.numReviews = product.reviews.length;
     }
-
-    const review = {
-      name: req.user.name,
-      rating: Number(rating),
-      comment,
-      user: req.user._id,
-    };
-
-    product.reviews.push(review);
-    product.numReviews = product.reviews.length;
 
     // Calculate average rating
     product.rating =
@@ -502,9 +502,21 @@ const createProductReview = asyncHandler(async (req, res) => {
 
     await product.save();
 
+    // Notify Seller
+    if (product.seller && product.seller.toString() !== req.user._id.toString()) {
+      await Notification.create({
+        user: product.seller,
+        type: 'SYSTEM',
+        title: 'New Product Review',
+        message: `${req.user.name} reviewed your product "${product.name}"`,
+        relatedEntity: product._id,
+        entityModel: 'Product'
+      });
+    }
+
     res.status(201).json({
       success: true,
-      message: 'Review added successfully'
+      message: alreadyReviewed ? 'Review updated successfully' : 'Review added successfully'
     });
 
   } catch (error) {
@@ -521,7 +533,7 @@ const createProductReview = asyncHandler(async (req, res) => {
 const getSellerProducts = asyncHandler(async (req, res) => {
   try {
     console.log('🔄 Fetching seller products for:', req.user._id);
-    
+
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 10;
     const skip = (page - 1) * limit;

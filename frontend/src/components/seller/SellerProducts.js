@@ -20,6 +20,10 @@ import {
   Box,
   Alert,
 } from "@mui/material";
+import Slider from "react-slick";
+import "slick-carousel/slick/slick.css";
+import "slick-carousel/slick/slick-theme.css";
+import { Visibility as VisibilityIcon } from "@mui/icons-material";
 import { useDispatch, useSelector } from "react-redux";
 import {
   listProducts,
@@ -90,6 +94,13 @@ const SellerProducts = () => {
   const [editingProduct, setEditingProduct] = useState(null);
   const [selectedImages, setSelectedImages] = useState([]);
   const [imageError, setImageError] = useState('');
+  const [imageDialogOpen, setImageDialogOpen] = useState(false);
+  const [viewImages, setViewImages] = useState([]);
+
+  const handleViewImages = (images) => {
+    setViewImages(images || []);
+    setImageDialogOpen(true);
+  };
   const [formData, setFormData] = useState({
     name: "",
     brand: "",
@@ -193,7 +204,7 @@ const SellerProducts = () => {
   const handleSave = () => {
     // Validate required fields
     if (!formData.name || !formData.brand || !formData.category || !formData.description ||
-        !formData.price || !formData.countInStock || !formData.weight) {
+      !formData.price || !formData.countInStock || !formData.weight) {
       alert('Please fill in all required fields');
       return;
     }
@@ -278,6 +289,15 @@ const SellerProducts = () => {
                 <TableCell>₹{product.price}</TableCell>
                 <TableCell>{product.countInStock}</TableCell>
                 <TableCell>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<VisibilityIcon />}
+                    onClick={() => handleViewImages(product.images)}
+                    sx={{ mr: 1 }}
+                  >
+                    Images
+                  </Button>
                   <Button
                     variant="outlined"
                     size="small"
@@ -518,6 +538,33 @@ const SellerProducts = () => {
           <Button onClick={handleSave} variant="contained" color="primary">
             {editingProduct ? "Update" : "Create"}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Image View Dialog */}
+      <Dialog open={imageDialogOpen} onClose={() => setImageDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Product Images</DialogTitle>
+        <DialogContent>
+          {viewImages.length > 0 ? (
+            <Box sx={{ p: 2 }}>
+              <Slider dots infinite speed={500} slidesToShow={1} slidesToScroll={1}>
+                {viewImages.map((img, index) => (
+                  <Box key={index} sx={{ display: 'flex !important', justifyContent: 'center', alignItems: 'center', height: '400px', outline: 'none' }}>
+                    <img
+                      src={img}
+                      alt={`Product ${index + 1}`}
+                      style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }}
+                    />
+                  </Box>
+                ))}
+              </Slider>
+            </Box>
+          ) : (
+            <Typography align="center" sx={{ py: 4 }}>No images available for this product.</Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setImageDialogOpen(false)}>Close</Button>
         </DialogActions>
       </Dialog>
     </Container>

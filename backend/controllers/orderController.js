@@ -300,6 +300,24 @@ exports.updateOrderStatus = asyncHandler(async (req, res) => {
   }
 
   order.orderStatus = status;
+
+  // ✅ NEW: Generate OTP when Out for Delivery
+  if (status === 'out_for_delivery') {
+    const otp = Math.floor(1000 + Math.random() * 9000).toString();
+    order.deliveryOtp = otp;
+
+    // Notify Customer with OTP
+    await Notification.create({
+      user: order.user,
+      type: 'ORDER_OTP',
+      message: `Your Order #${order._id.toString().slice(-6)} is out for delivery! Share OTP ${otp} with the delivery partner.`,
+      relatedEntity: order._id,
+      entityModel: 'Order'
+    });
+
+    // Also send SMS if possible (Placeholder)
+    console.log(`🔐 Generated OTP for Order ${order._id}: ${otp}`);
+  }
   order.statusHistory.push({ status, timestamp: new Date(), reason: reason || undefined });
 
   if (status === 'shipped' && partnerId) order.deliveryPartner = partnerId;
@@ -468,13 +486,15 @@ exports.getMyOrders = asyncHandler(async (req, res) => {
 exports.getOrders = asyncHandler(async (req, res) => {
   const pageSize = Number(req.query.limit) || 10;
   const page = Number(req.query.pageNumber) || 1;
-  const { status, sellerId, userId, sort = '-createdAt' } = req.query;
+  const { status, sellerId, userId, codCollected, codSettled, sort = '-createdAt' } = req.query;
 
   // Build query object
   const query = {};
   if (status) query.orderStatus = status;
   if (sellerId && mongoose.Types.ObjectId.isValid(sellerId)) query.seller = sellerId;
   if (userId && mongoose.Types.ObjectId.isValid(userId)) query.user = userId;
+  if (codCollected) query.codCollected = codCollected === 'true';
+  if (codSettled) query.codSettled = codSettled === 'true';
 
   try {
     const count = await Order.countDocuments(query);
@@ -617,6 +637,18 @@ exports.assignDeliveryPartner = asyncHandler(async (req, res) => {
     order.orderStatus = 'shipped'; order.statusHistory.push({ status: 'shipped', timestamp: new Date() });
   }
   const updatedOrder = await order.save();
+
+  // Notify Delivery Partner
+  if (partnerId) {
+    await Notification.create({
+      user: partnerId,
+      type: 'SYSTEM',
+      title: 'New Delivery Assigned',
+      message: `You have been assigned to order #${order._id.toString().slice(-6)}`,
+      relatedEntity: order._id,
+      entityModel: 'Order'
+    });
+  }
   // Emit socket events
   const io = req.app.get('io');
   if (io) {
@@ -759,4 +791,68 @@ exports.getOrderInvoice = asyncHandler(async (req, res) => {
     </html>
   `;
   res.send(invoiceHtml);
+
+});
+
+// ✅ NEW: Complete Delivery with OTP & Photo Proof
+exports.completeDelivery = asyncHandler(async (req, res) => {
+  const { otp } = req.body;
+  const orderId = req.params.id;
+
+  if (!mongoose.Types.ObjectId.isValid(orderId)) { res.status(400); throw new Error('Invalid order ID'); }
+  if (!otp) { res.status(400); throw new Error('OTP is required'); }
+
+  const order = await Order.findById(orderId);
+  if (!order) { res.status(404); throw new Error('Order not found'); }
+
+  // Verify OTP
+  if (order.deliveryOtp !== otp) {
+    res.status(400);
+    throw new Error('Invalid OTP. Please ask customer for the correct code.');
+  }
+
+  // Handle Photo Proof
+  if (req.file) {
+    order.deliveryProofImage = `/uploads/${req.file.filename}`;
+    if (order.paymentMethod === 'cod') {
+      order.codProofPhoto = `/uploads/${req.file.filename}`;
+    }
+  }
+
+  // Update Status
+  order.orderStatus = 'delivered';
+  order.isDelivered = true;
+  order.deliveredAt = Date.now();
+  order.statusHistory.push({ status: 'delivered', timestamp: new Date(), reason: 'Verified Delivery with OTP' });
+
+  // Handle COD Collection
+  if (order.paymentMethod === 'cod') {
+    order.codCollected = true;
+    order.codCollectedAt = Date.now();
+    order.paymentStatus = 'completed'; // Assuming partner collected cash
+  }
+
+  const updatedOrder = await order.save();
+
+  // Notify
+  await Notification.create([
+    { user: order.user, type: 'ORDER_DELIVERED', message: `Order #${order._id.toString().slice(-6)} delivered successfully!` },
+    { user: order.seller, type: 'ORDER_DELIVERED', message: `Order #${order._id.toString().slice(-6)} delivered & verified.` }
+  ]);
+
+  // Emit Socket
+  const io = req.app.get('io');
+  if (io) {
+    const updateData = {
+      status: 'delivered',
+      isDelivered: true,
+      deliveredAt: order.deliveredAt,
+      codCollected: order.codCollected
+    };
+    emitOrderUpdate(io, order.user.toString(), order._id, updateData);
+    emitOrderUpdate(io, order.seller.toString(), order._id, updateData);
+    io.to('admin').emit('ORDER_UPDATE', { type: 'ORDER_UPDATE', data: { orderId: order._id, ...updateData } });
+  }
+
+  res.json({ message: 'Delivery verified & completed', order: updatedOrder });
 });
