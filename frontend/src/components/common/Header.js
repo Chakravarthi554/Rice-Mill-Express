@@ -20,7 +20,7 @@ import { styled, alpha } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { logoutUser } from '../../redux/actions/userActions';
-import { listFilteredProducts } from '../../redux/actions/productActions';
+import { listFilteredProducts, listProducts } from '../../redux/actions/productActions';
 import NotificationBadge from './NotificationBadge';
 
 const Search = styled('div')(({ theme }) => ({
@@ -83,7 +83,7 @@ const Header = ({ onSearch }) => {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
-    
+
     // ✅ FIXED: Trigger search even when keyword is empty (to show all products)
     searchTimeoutRef.current = setTimeout(() => {
       if (onSearch) {

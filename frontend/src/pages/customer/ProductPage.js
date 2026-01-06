@@ -147,7 +147,7 @@ const ReviewFormComponent = ({ productId, onReviewSubmitted }) => {
     <Box component="form" onSubmit={handleSubmit}>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       {success && <Alert severity="success" sx={{ mb: 2 }}>Review submitted successfully!</Alert>}
-      
+
       <Box sx={{ mb: 2 }}>
         <Typography variant="body1" gutterBottom>Rating *</Typography>
         <MuiRating
@@ -191,7 +191,7 @@ const ProductPage = () => {
   const [socialStats, setSocialStats] = useState({ likes: 0, comments: 0 });
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
-  
+
   // ✅ FIXED: Review filtering and pagination state
   const [reviewFilter, setReviewFilter] = useState('all');
   const [reviewPage, setReviewPage] = useState(1);
@@ -244,17 +244,17 @@ const ProductPage = () => {
   // ✅ FIXED: Filter reviews based on selected filter
   const filteredReviews = React.useMemo(() => {
     if (!product.reviews || product.reviews.length === 0) return [];
-    
+
     let filtered = product.reviews.filter(review => review.approved !== false);
-    
+
     if (reviewFilter === 'all') {
       return filtered;
     } else if (reviewFilter === 'verified') {
       // Filter verified purchases (users who have purchased this product)
       return filtered.filter(review => {
         if (!userInfo || !userOrders) return false;
-        return userOrders.some(order => 
-          order.orderItems?.some(item => 
+        return userOrders.some(order =>
+          order.orderItems?.some(item =>
             item.product?._id === product._id && order.isPaid
           ) && order.user?._id === review.user?._id
         );
@@ -262,7 +262,7 @@ const ProductPage = () => {
     } else if (typeof reviewFilter === 'number') {
       return filtered.filter(review => review.rating === reviewFilter);
     }
-    
+
     return filtered;
   }, [product.reviews, reviewFilter, userInfo, userOrders, product._id]);
 
@@ -513,32 +513,17 @@ const ProductPage = () => {
       </Box>
 
       {/* ✅ NEW: Add Review Form */}
-      {userInfo && (
-        <Box sx={{ mt: 6 }}>
-          <StyledPaper>
-            <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
-              Write a Review
-            </Typography>
-            <ReviewForm productId={id} onReviewSubmitted={() => {
-              dispatch(listProductDetails(id)); // Refresh product details
-              setReviewFormOpen(false);
-            }} />
-          </StyledPaper>
-        </Box>
-      )}
-
-      {/* ✅ NEW: Add Review Form */}
       {userInfo && !product.reviews?.some(r => r.user?._id === userInfo._id || r.user === userInfo._id) && (
         <Box sx={{ mt: 6 }}>
           <StyledPaper>
             <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
               Write a Review
             </Typography>
-            <ReviewFormComponent 
-              productId={id} 
+            <ReviewFormComponent
+              productId={id}
               onReviewSubmitted={() => {
                 dispatch(listProductDetails(id)); // Refresh product details
-              }} 
+              }}
             />
           </StyledPaper>
         </Box>
@@ -550,36 +535,36 @@ const ProductPage = () => {
           <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
             Customer Reviews ({product.numReviews || product.reviews.length})
           </Typography>
-          
+
           {/* ✅ FIXED: Review Filters */}
           <Box sx={{ mb: 3, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-            <Chip 
-              label="All" 
-              onClick={() => setReviewFilter('all')} 
+            <Chip
+              label="All"
+              onClick={() => setReviewFilter('all')}
               color={reviewFilter === 'all' ? 'primary' : 'default'}
               clickable
             />
-            <Chip 
-              label="5 Stars" 
-              onClick={() => setReviewFilter(5)} 
+            <Chip
+              label="5 Stars"
+              onClick={() => setReviewFilter(5)}
               color={reviewFilter === 5 ? 'primary' : 'default'}
               clickable
             />
-            <Chip 
-              label="4 Stars" 
-              onClick={() => setReviewFilter(4)} 
+            <Chip
+              label="4 Stars"
+              onClick={() => setReviewFilter(4)}
               color={reviewFilter === 4 ? 'primary' : 'default'}
               clickable
             />
-            <Chip 
-              label="3 Stars" 
-              onClick={() => setReviewFilter(3)} 
+            <Chip
+              label="3 Stars"
+              onClick={() => setReviewFilter(3)}
               color={reviewFilter === 3 ? 'primary' : 'default'}
               clickable
             />
-            <Chip 
-              label="Verified Purchase" 
-              onClick={() => setReviewFilter('verified')} 
+            <Chip
+              label="Verified Purchase"
+              onClick={() => setReviewFilter('verified')}
               color={reviewFilter === 'verified' ? 'primary' : 'default'}
               clickable
             />
@@ -591,12 +576,12 @@ const ProductPage = () => {
               .slice((reviewPage - 1) * reviewsPerPage, reviewPage * reviewsPerPage)
               .map((review, idx) => {
                 // Check if user has purchased this product (verified purchase)
-                const isVerified = userInfo && userOrders?.some(order => 
-                  order.orderItems?.some(item => 
+                const isVerified = userInfo && userOrders?.some(order =>
+                  order.orderItems?.some(item =>
                     item.product?._id === product._id && order.isPaid
                   )
                 );
-                
+
                 return (
                   <Grid item xs={12} key={review._id || idx}>
                     <Card sx={{ p: 3 }}>
@@ -610,10 +595,10 @@ const ProductPage = () => {
                               {review.name || review.user?.name || 'Anonymous'}
                             </Typography>
                             {isVerified && (
-                              <Chip 
-                                label="Verified Purchase" 
-                                size="small" 
-                                color="success" 
+                              <Chip
+                                label="Verified Purchase"
+                                size="small"
+                                color="success"
                                 sx={{ height: 20, fontSize: '0.7rem' }}
                               />
                             )}
@@ -638,9 +623,9 @@ const ProductPage = () => {
           {/* ✅ FIXED: Pagination */}
           {filteredReviews.length > reviewsPerPage && (
             <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-              <Pagination 
-                count={Math.ceil(filteredReviews.length / reviewsPerPage)} 
-                page={reviewPage} 
+              <Pagination
+                count={Math.ceil(filteredReviews.length / reviewsPerPage)}
+                page={reviewPage}
                 onChange={(e, value) => setReviewPage(value)}
                 color="primary"
               />

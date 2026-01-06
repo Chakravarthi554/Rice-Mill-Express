@@ -29,7 +29,7 @@ const ForumPostCard = ({ post, onUpdate }) => {
   const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState('');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
-  // Remove local state for bookmark - we'll get this from user profile or check server-side
+  const [isBookmarked, setIsBookmarked] = useState(false);
 
   useEffect(() => setCurrentPost(post), [post]);
 

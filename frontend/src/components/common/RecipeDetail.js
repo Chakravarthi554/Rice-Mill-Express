@@ -26,6 +26,7 @@ import SendIcon from '@mui/icons-material/Send';
 import { getRecipeDetails, rateRecipe } from '../../redux/actions/recipeActions';
 import { addToCart } from '../../redux/actions/cartActions';
 import { likeItem, addComment, getComments, trackShare } from '../../redux/actions/socialActions';
+import { getCurrentSocket } from '../../utils/socket';
 
 import Loader from './Loader';
 import Message from './Message';
@@ -75,7 +76,7 @@ const RecipeDetail = () => {
 
   // ✅ FIXED: Listen for comment approval events to refresh comments
   useEffect(() => {
-    const socket = getSocket();
+    const socket = getCurrentSocket();
     if (!socket) return;
 
     const handleCommentApproved = (data) => {
