@@ -19,6 +19,15 @@ import {
   SOCIAL_SHARE_REQUEST,
   SOCIAL_SHARE_SUCCESS,
   SOCIAL_SHARE_FAIL,
+  SOCIAL_COMMENT_LIKE_REQUEST,
+  SOCIAL_COMMENT_LIKE_SUCCESS,
+  SOCIAL_COMMENT_LIKE_FAIL,
+  SOCIAL_COMMENT_REPLY_REQUEST,
+  SOCIAL_COMMENT_REPLY_SUCCESS,
+  SOCIAL_COMMENT_REPLY_FAIL,
+  SOCIAL_RATING_DIST_REQUEST,
+  SOCIAL_RATING_DIST_SUCCESS,
+  SOCIAL_RATING_DIST_FAIL
 } from '../constants/socialConstants';
 
 export const socialLikeReducer = (state = {}, action) => {
@@ -56,8 +65,8 @@ export const socialCommentsListReducer = (state = { comments: [] }, action) => {
     case SOCIAL_GET_COMMENTS_REQUEST:
       return { loading: true, comments: [] };
     case SOCIAL_GET_COMMENTS_SUCCESS:
-      return { 
-        loading: false, 
+      return {
+        loading: false,
         comments: action.payload.comments,
         pages: action.payload.pages,
         page: action.payload.page,
@@ -103,6 +112,45 @@ export const socialShareReducer = (state = {}, action) => {
     case SOCIAL_SHARE_SUCCESS:
       return { loading: false, success: true, data: action.payload };
     case SOCIAL_SHARE_FAIL:
+      return { loading: false, error: action.payload };
+    default:
+      return state;
+  }
+}
+
+export const socialCommentLikeReducer = (state = {}, action) => {
+  switch (action.type) {
+    case SOCIAL_COMMENT_LIKE_REQUEST:
+      return { loading: true };
+    case SOCIAL_COMMENT_LIKE_SUCCESS:
+      return { loading: false, success: true, data: action.payload };
+    case SOCIAL_COMMENT_LIKE_FAIL:
+      return { loading: false, error: action.payload };
+    default:
+      return state;
+  }
+};
+
+export const socialCommentReplyReducer = (state = {}, action) => {
+  switch (action.type) {
+    case SOCIAL_COMMENT_REPLY_REQUEST:
+      return { loading: true };
+    case SOCIAL_COMMENT_REPLY_SUCCESS:
+      return { loading: false, success: true, data: action.payload };
+    case SOCIAL_COMMENT_REPLY_FAIL:
+      return { loading: false, error: action.payload };
+    default:
+      return state;
+  }
+};
+
+export const socialRatingDistReducer = (state = { distribution: {}, percentages: {} }, action) => {
+  switch (action.type) {
+    case SOCIAL_RATING_DIST_REQUEST:
+      return { loading: true, ...state };
+    case SOCIAL_RATING_DIST_SUCCESS:
+      return { loading: false, success: true, ...action.payload };
+    case SOCIAL_RATING_DIST_FAIL:
       return { loading: false, error: action.payload };
     default:
       return state;

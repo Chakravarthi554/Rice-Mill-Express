@@ -1,35 +1,40 @@
-// frontend/src/components/customer/RecipeDetail.js
+// frontend/src/components/common/RecipeDetail.js
 /**
- * FILE: frontend/src/components/customer/RecipeDetail.js
+ * FILE: frontend/src/components/common/RecipeDetail.js
  * PURPOSE:
- * - Full recipe details page with like, comment, share, and rating features
- * - Integrated chat, linked products, and admin-level comment filtering
- * - Enhanced comments: shows only approved/unflagged comments to non-admins
+ * - Full recipe details page with robust social engagement features
+ * - Instagram-like comments, nested replies, mentions, and real-time updates
+ * - Rating histogram and advanced sorting
  */
 
-// [AI: Recipe comments live update and approval visibility fixed]
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useParams, Link as RouterLink, useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Button, TextField, Rating, CircularProgress, Paper, Grid,
   List, ListItem, ListItemText, Divider, Avatar, Card, CardHeader, CardContent, Chip,
-  IconButton, Dialog, DialogTitle, DialogContent, DialogActions, ListItemAvatar, Alert
+  IconButton, Dialog, DialogTitle, DialogContent, DialogActions, ListItemAvatar, Alert,
+  Stack, LinearProgress, Menu, MenuItem, Tooltip, Badge, Collapse
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
-import FavoriteIcon from '@mui/icons-material/Favorite';
-import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
-import CommentIcon from '@mui/icons-material/Comment';
-import ShareIcon from '@mui/icons-material/Share';
-import SendIcon from '@mui/icons-material/Send';
+import {
+  Favorite, FavoriteBorder, Comment as CommentIcon, Share as ShareIcon,
+  Send as SendIcon, Sort as SortIcon, Star as StarIcon,
+  MoreVert as MoreVertIcon, Flag as FlagIcon, Reply as ReplyIcon
+} from '@mui/icons-material';
+import { motion, AnimatePresence } from 'framer-motion';
 
 import { getRecipeDetails, rateRecipe } from '../../redux/actions/recipeActions';
 import { addToCart } from '../../redux/actions/cartActions';
-import { likeItem, addComment, getComments, trackShare } from '../../redux/actions/socialActions';
+import {
+  likeItem, addComment, trackShare,
+  getSortedComments, getRatingDistribution
+} from '../../redux/actions/socialActions';
 import { getCurrentSocket } from '../../utils/socket';
 
 import Loader from './Loader';
 import Message from './Message';
+import CommentItem from '../customer/CommentItem';
 
 const StyledPaper = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(3),
@@ -50,12 +55,13 @@ const RecipeDetail = () => {
   const { id: recipeId } = useParams();
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const commentInputRef = useRef(null);
 
   const [rating, setRating] = useState(0);
   const [commentText, setCommentText] = useState('');
-
-  const [showComments, setShowComments] = useState(false);
+  const [sortBy, setSortBy] = useState('recent');
   const [showShareDialog, setShowShareDialog] = useState(false);
+  const [anchorElSort, setAnchorElSort] = useState(null);
 
   const recipeDetails = useSelector((state) => state.recipeDetails);
   const { loading, error, recipe } = recipeDetails || { recipe: {} };
@@ -66,78 +72,49 @@ const RecipeDetail = () => {
   const socialLike = useSelector((state) => state.socialLike);
   const socialComment = useSelector((state) => state.socialComment);
   const socialCommentsList = useSelector((state) => state.socialCommentsList);
+  const socialRatingDist = useSelector((state) => state.socialRatingDist);
 
   useEffect(() => {
     if (recipeId) {
       dispatch(getRecipeDetails(recipeId));
-      dispatch(getComments('recipes', recipeId));
+      dispatch(getSortedComments('recipes', recipeId, sortBy));
+      dispatch(getRatingDistribution(recipeId));
     }
-  }, [dispatch, recipeId]);
+  }, [dispatch, recipeId, sortBy]);
 
-  // ✅ FIXED: Listen for comment approval events to refresh comments
+  // Real-time updates
   useEffect(() => {
     const socket = getCurrentSocket();
     if (!socket) return;
 
-    const handleCommentApproved = (data) => {
-      if (data.recipeId === recipeId || data.itemId === recipeId) {
-        // Refresh comments when one is approved
-        dispatch(getComments('recipes', recipeId));
-      }
-    };
-
-    const handleCommentAdded = (data) => {
-      if (data.recipeId === recipeId || data.itemId === recipeId) {
-        // Refresh comments when new comment is added
-        dispatch(getComments('recipes', recipeId));
-      }
-    };
-
-    socket.on('RECIPE_COMMENTED', handleCommentAdded);
-    socket.on('COMMENT_APPROVED', handleCommentApproved);
-    socket.on('SOCIAL_UPDATE', (data) => {
-      if (data.itemId === recipeId) {
-        // Handle recipe-level updates
-        if (data.itemType === 'recipe') {
-          switch (data.type) {
-            case 'LIKE':
-            case 'RATING':
-            case 'SHARE':
-            case 'COMMENT':
-            case 'COMMENT_APPROVED':
-              // For all these, refetching details is the most robust way to sync all counts/states
-              dispatch(getRecipeDetails(recipeId));
-              if (data.type === 'COMMENT' || data.type === 'COMMENT_APPROVED') {
-                dispatch(getComments('recipes', recipeId));
-              }
-              break;
-            default:
-              break;
-          }
+    const handleSocialUpdate = (data) => {
+      if (data.itemId === recipeId || data.recipeId === recipeId) {
+        if (['COMMENT', 'COMMENT_REPLY', 'COMMENT_APPROVED', 'COMMENT_LIKE'].includes(data.type)) {
+          dispatch(getSortedComments('recipes', recipeId, sortBy));
+        }
+        if (['LIKE', 'RATING'].includes(data.type)) {
+          dispatch(getRecipeDetails(recipeId));
+          if (data.type === 'RATING') dispatch(getRatingDistribution(recipeId));
         }
       }
-    });
+    };
+
+    socket.on('SOCIAL_UPDATE', handleSocialUpdate);
+    socket.on('RECIPE_LIKED', handleSocialUpdate); // Legacy support
 
     return () => {
-      socket.off('RECIPE_COMMENTED', handleCommentAdded);
-      socket.off('COMMENT_APPROVED', handleCommentApproved);
-      socket.off('SOCIAL_UPDATE');
+      socket.off('SOCIAL_UPDATE', handleSocialUpdate);
+      socket.off('RECIPE_LIKED', handleSocialUpdate);
     };
-  }, [recipeId, dispatch]);
+  }, [recipeId, dispatch, sortBy]);
 
   const handleLike = () => {
-    if (!userInfo) {
-      alert('Please log in to like this recipe.');
-      return;
-    }
+    if (!userInfo) return alert('Please log in to like this recipe.');
     dispatch(likeItem('recipes', recipeId));
   };
 
   const handleAddComment = () => {
-    if (!userInfo) {
-      alert('Please log in to comment.');
-      return;
-    }
+    if (!userInfo) return alert('Please log in to comment.');
     if (commentText.trim()) {
       dispatch(addComment('recipes', recipeId, commentText));
       setCommentText('');
@@ -145,332 +122,277 @@ const RecipeDetail = () => {
   };
 
   const handleShare = (platform) => {
-    if (!userInfo) {
-      alert('Please log in to share.');
-      return;
-    }
+    if (!userInfo) return alert('Please log in to share.');
     dispatch(trackShare('recipes', recipeId, platform));
 
     const shareUrl = `${window.location.origin}/recipes/${recipeId}`;
     const shareText = `Check out this amazing recipe: ${recipe.title}`;
-
     let shareLink = '';
-    switch (platform) {
-      case 'whatsapp':
-        shareLink = `https://wa.me/?text=${encodeURIComponent(shareText + ' ' + shareUrl)}`;
-        break;
-      case 'twitter':
-        shareLink = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
-        break;
-      case 'facebook':
-        shareLink = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
-        break;
-      default:
-        break;
-    }
 
-    if (shareLink) {
-      window.open(shareLink, '_blank', 'width=600,height=400');
+    switch (platform) {
+      case 'whatsapp': shareLink = `https://wa.me/?text=${encodeURIComponent(shareText + ' ' + shareUrl)}`; break;
+      case 'twitter': shareLink = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`; break;
+      case 'facebook': shareLink = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`; break;
+      default: break;
     }
+    if (shareLink) window.open(shareLink, '_blank', 'width=600,height=400');
     setShowShareDialog(false);
   };
 
   const handleAddToCart = (productId) => {
-    if (productId && userInfo) {
-      dispatch(addToCart(productId, 1));
-      navigate('/cart');
-    } else if (!userInfo) {
-      alert('Please log in to add items to cart.');
-    }
+    if (!userInfo) return alert('Please log in to add items to cart.');
+    dispatch(addToCart(productId, 1));
+    navigate('/cart');
   };
 
+  // Organize comments into tree
+  const commentTree = useMemo(() => {
+    const comments = socialCommentsList.comments || [];
+    const commentMap = {};
+    const roots = [];
 
+    // First pass: create map
+    comments.forEach(c => {
+      commentMap[c._id] = { ...c, replies: [] };
+    });
+
+    // Second pass: link children to parents
+    comments.forEach(c => {
+      if (c.parentComment) {
+        if (commentMap[c.parentComment]) {
+          commentMap[c.parentComment].replies.push(commentMap[c._id]);
+        }
+      } else {
+        roots.push(commentMap[c._id]);
+      }
+    });
+
+    return roots;
+  }, [socialCommentsList.comments]);
 
   const hasLiked = recipe.likes?.includes(userInfo?._id);
-
-  // --- FIX: Filter comments for admin vs non-admin ---
-  const displayComments = useMemo(() => {
-    const comments = socialCommentsList.comments || [];
-    if (userInfo?.role !== 'admin') {
-      return comments.filter((c) => c.approved && !c.isFlagged);
-    }
-    return comments;
-  }, [socialCommentsList.comments, userInfo?.role]);
+  const displayRating = recipe.averageRating || 0;
 
   if (loading) return <Loader />;
   if (error) return <Message severity="error">{error}</Message>;
   if (!recipe || !recipe.title) return <Typography>Recipe not found.</Typography>;
 
-  const displayRating =
-    recipe.ratings && recipe.ratings.length > 0
-      ? recipe.ratings.reduce((acc, item) => item.rating + acc, 0) / recipe.ratings.length
-      : 0;
-
   return (
-    <Box sx={{ p: { xs: 2, md: 4 } }}>
-      <StyledPaper>
-        {/* Social Stats Bar */}
-        <SocialStatsBar>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <IconButton onClick={handleLike} color={hasLiked ? 'error' : 'default'} disabled={socialLike.loading}>
-              {hasLiked ? <FavoriteIcon /> : <FavoriteBorderIcon />}
-            </IconButton>
-            <Typography variant="body2">{recipe.likes?.length || 0} likes</Typography>
-          </Box>
-
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <IconButton onClick={() => setShowComments(true)}>
-              <CommentIcon />
-            </IconButton>
-            <Typography variant="body2">{displayComments.length || 0} comments</Typography>
-          </Box>
-
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <IconButton onClick={() => setShowShareDialog(true)}>
-              <ShareIcon />
-            </IconButton>
-            <Typography variant="body2">{recipe.shares || 0} shares</Typography>
-          </Box>
-
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 'auto' }}>
-            <Rating value={displayRating} precision={0.5} readOnly />
-            <Typography>({recipe.numReviews || 0} reviews)</Typography>
-          </Box>
-        </SocialStatsBar>
-
-        <Typography variant="h3" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.dark', mt: 2 }}>
-          {recipe.title}
-        </Typography>
-
-        <Grid container spacing={4}>
-          <Grid item xs={12} md={6}>
-            <Box sx={{ mb: 2, borderRadius: 2, overflow: 'hidden', boxShadow: 1 }}>
+    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1200, mx: 'auto' }}>
+      <Grid container spacing={4}>
+        {/* Left Column: Media & Details */}
+        <Grid item xs={12} md={7}>
+          <StyledPaper sx={{ overflow: 'hidden', p: 0 }}>
+            <Box sx={{ position: 'relative' }}>
               <img
                 src={recipe.image || '/images/default-image.jpg'}
                 alt={recipe.title}
-                style={{ width: '100%', display: 'block', maxHeight: '400px', objectFit: 'cover' }}
+                style={{ width: '100%', display: 'block', maxHeight: '500px', objectFit: 'cover' }}
                 onError={(e) => { e.target.onerror = null; e.target.src = '/images/default-image.jpg'; }}
               />
+              <Box sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)', p: 3, pt: 8 }}>
+                <Typography variant="h4" sx={{ color: 'white', fontWeight: 'bold' }}>{recipe.title}</Typography>
+                <Stack direction="row" spacing={2} sx={{ mt: 1 }}>
+                  <Chip label={recipe.riceType} color="primary" size="small" />
+                  <Typography variant="subtitle2" sx={{ color: 'white' }}>By {recipe.sellerId?.name || 'Unknown'}</Typography>
+                </Stack>
+              </Box>
             </Box>
-            <Typography variant="subtitle1" color="text.secondary" gutterBottom>
-              Rice Type: <Chip label={recipe.riceType} size="small" color="primary" />
-            </Typography>
-            {recipe.sellerId && (
-              <Typography variant="subtitle1" color="text.secondary" gutterBottom>
-                Recipe By: {recipe.sellerId.name || 'Unknown'}
-              </Typography>
-            )}
-          </Grid>
 
-          <Grid item xs={12} md={6}>
-            <Typography variant="h5" gutterBottom sx={{ color: 'secondary.main' }}>Ingredients</Typography>
-            <List dense sx={{ mb: 3 }}>
-              {recipe.ingredients?.map((item, idx) => (
-                <ListItem key={idx} disablePadding>
-                  <ListItemText primary={`- ${item}`} />
-                </ListItem>
-              ))}
-            </List>
-            <Typography variant="h5" gutterBottom sx={{ color: 'secondary.main' }}>Steps</Typography>
-            <List dense>
-              {recipe.steps?.map((step, idx) => (
-                <ListItem key={idx} disablePadding sx={{ mb: 1 }}>
-                  <ListItemText primary={`${idx + 1}. ${step}`} />
-                </ListItem>
-              ))}
-            </List>
-          </Grid>
+            <SocialStatsBar>
+              <Tooltip title={hasLiked ? "Unlike" : "Like"}>
+                <IconButton onClick={handleLike} color={hasLiked ? 'error' : 'default'}>
+                  <AnimatePresence mode='wait'>
+                    {hasLiked ? (
+                      <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} key="filled">
+                        <Favorite />
+                      </motion.div>
+                    ) : (
+                      <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} key="outlined">
+                        <FavoriteBorder />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </IconButton>
+              </Tooltip>
+              <Typography variant="body2" fontWeight="bold">{recipe.likes?.length || 0} Likes</Typography>
+
+              <Tooltip title="Comment">
+                <IconButton onClick={() => commentInputRef.current?.focus()}>
+                  <CommentIcon />
+                </IconButton>
+              </Tooltip>
+              <Typography variant="body2" fontWeight="bold">{socialCommentsList.total || 0} Comments</Typography>
+
+              <Tooltip title="Share">
+                <IconButton onClick={() => setShowShareDialog(true)}>
+                  <ShareIcon />
+                </IconButton>
+              </Tooltip>
+              <Typography variant="body2" fontWeight="bold">{recipe.shares || 0} Shares</Typography>
+            </SocialStatsBar>
+
+            <Box sx={{ p: 3 }}>
+              <Typography variant="h6" gutterBottom color="secondary.main">Ingredients</Typography>
+              <List dense sx={{ mb: 3 }}>
+                {recipe.ingredients?.map((item, idx) => (
+                  <ListItem key={idx} disablePadding>
+                    <ListItemText primary={`• ${item}`} />
+                  </ListItem>
+                ))}
+              </List>
+
+              <Typography variant="h6" gutterBottom color="secondary.main">Steps</Typography>
+              <List dense>
+                {recipe.steps?.map((step, idx) => (
+                  <ListItem key={idx} disablePadding sx={{ mb: 1 }}>
+                    <ListItemText primary={`${idx + 1}. ${step}`} />
+                  </ListItem>
+                ))}
+              </List>
+            </Box>
+          </StyledPaper>
+
+          {/* Linked Products */}
+          {recipe.linkedProducts?.length > 0 && (
+            <Box mt={4}>
+              <Typography variant="h5" gutterBottom fontWeight="bold">Shop Ingredients</Typography>
+              <Grid container spacing={2}>
+                {recipe.linkedProducts.map(product => (
+                  <Grid item xs={12} sm={6} key={product._id}>
+                    <Card variant="outlined" sx={{ display: 'flex', p: 1 }}>
+                      <Avatar src={getImageUrl(product.image)} variant="rounded" sx={{ width: 60, height: 60 }} />
+                      <Box sx={{ ml: 2, flexGrow: 1 }}>
+                        <Typography variant="subtitle2" fontWeight="bold">{product.name}</Typography>
+                        <Typography variant="body2" color="primary">₹{product.price}</Typography>
+                        <Button size="small" onClick={() => handleAddToCart(product._id)}>Add to Cart</Button>
+                      </Box>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            </Box>
+          )}
         </Grid>
 
-        {/* Quick Comment Section */}
-        <Box sx={{ mt: 3, p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
-          <Typography variant="h6" gutterBottom>Quick Comment</Typography>
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
-            <Avatar sx={{ width: 32, height: 32, mt: 1 }}>
-              {userInfo?.name?.charAt(0) || 'U'}
-            </Avatar>
-            <TextField
-              fullWidth
-              size="small"
-              placeholder="Share your thoughts about this recipe..."
-              value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
-              multiline
-              maxRows={3}
-            />
-            <IconButton
-              color="primary"
-              onClick={handleAddComment}
-              disabled={!commentText.trim() || socialComment.loading}
-              sx={{ mt: 1 }}
-            >
-              {socialComment.loading ? <CircularProgress size={24} /> : <SendIcon />}
-            </IconButton>
-          </Box>
-        </Box>
+        {/* Right Column: Social Engagement */}
+        <Grid item xs={12} md={5}>
+          <StyledPaper sx={{ height: '100%', maxHeight: 'calc(100vh - 100px)', display: 'flex', flexDirection: 'column' }}>
+            {/* Rating Section */}
+            <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+              <Stack direction="row" justifyContent="space-between" alignItems="center">
+                <Box>
+                  <Typography variant="h4" fontWeight="bold" color="primary">{displayRating.toFixed(1)}</Typography>
+                  <Rating value={displayRating} precision={0.5} readOnly size="small" />
+                  <Typography variant="caption" display="block">{recipe.numReviews} ratings</Typography>
+                </Box>
+                <Box sx={{ flexGrow: 1, ml: 3 }}>
+                  {[5, 4, 3, 2, 1].map(star => (
+                    <Stack key={star} direction="row" alignItems="center" spacing={1}>
+                      <Typography variant="caption" sx={{ minWidth: 10 }}>{star}</Typography>
+                      <StarIcon fontSize="inherit" color="disabled" sx={{ fontSize: 12 }} />
+                      <LinearProgress
+                        variant="determinate"
+                        value={socialRatingDist.percentages?.[star] || 0}
+                        sx={{ flexGrow: 1, height: 6, borderRadius: 3 }}
+                      />
+                    </Stack>
+                  ))}
+                </Box>
+              </Stack>
+              <Button
+                variant="outlined"
+                fullWidth
+                size="small"
+                sx={{ mt: 2 }}
+                onClick={() => setRating(rating === 0 ? 5 : 0)} // Toggle rating mode
+              >
+                Rate this Recipe
+              </Button>
+              <Collapse in={rating > 0 || (recipe.ratings?.some(r => r.userId === userInfo?._id))}>
+                <Box sx={{ mt: 2, textAlign: 'center' }}>
+                  <Rating value={rating} onChange={(e, v) => setRating(v)} />
+                  <Button size="small" onClick={() => dispatch(rateRecipe(recipeId, rating))}>Submit</Button>
+                </Box>
+              </Collapse>
+            </Box>
 
-        {/* Linked Products Section */}
-        {recipe.linkedProducts && recipe.linkedProducts.length > 0 && (
-          <Box mt={4}>
-            <Typography variant="h5" gutterBottom sx={{ color: 'secondary.main' }}>
-              Recommended Rice Products
-            </Typography>
-            <Grid container spacing={2}>
-              {recipe.linkedProducts.map(product => (
-                <Grid item xs={12} sm={6} md={4} key={product._id}>
-                  <Card variant="outlined" sx={{ height: '100%' }}>
-                    <CardHeader
-                      avatar={<Avatar sx={{ bgcolor: 'primary.light' }}>{product.name ? product.name[0] : 'R'}</Avatar>}
-                      title={product.name}
-                      subheader={`₹${product.price}`}
-                    />
-                    <CardContent>
-                      <Button
-                        variant="contained"
-                        color="primary"
-                        fullWidth
-                        onClick={() => handleAddToCart(product._id)}
-                        disabled={!userInfo}
-                      >
-                        Add to Cart
-                      </Button>
-                      <Button
-                        component={RouterLink}
-                        to={`/product/${product._id}`}
-                        variant="outlined"
-                        fullWidth
-                        sx={{ mt: 1 }}
-                      >
-                        View Product
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
-          </Box>
-        )}
+            {/* Comments Header */}
+            <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: 'grey.50' }}>
+              <Typography variant="h6" fontWeight="bold">Comments ({socialCommentsList.total})</Typography>
+              <Button
+                startIcon={<SortIcon />}
+                size="small"
+                onClick={(e) => setAnchorElSort(e.currentTarget)}
+              >
+                {sortBy === 'recent' ? 'Newest' : 'Top'}
+              </Button>
+              <Menu
+                anchorEl={anchorElSort}
+                open={Boolean(anchorElSort)}
+                onClose={() => setAnchorElSort(null)}
+              >
+                <MenuItem onClick={() => { setSortBy('recent'); setAnchorElSort(null); }}>Newest First</MenuItem>
+                <MenuItem onClick={() => { setSortBy('top'); setAnchorElSort(null); }}>Top Rated</MenuItem>
+              </Menu>
+            </Box>
 
-        <Divider sx={{ my: 4 }} />
+            {/* Comments List */}
+            <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 2 }}>
+              {commentTree.length === 0 ? (
+                <Box sx={{ textAlign: 'center', py: 4, color: 'text.secondary' }}>
+                  <CommentIcon sx={{ fontSize: 48, opacity: 0.2, mb: 1 }} />
+                  <Typography>No comments yet. Be the first!</Typography>
+                </Box>
+              ) : (
+                commentTree.map(comment => (
+                  <CommentItem key={comment._id} comment={comment} recipeId={recipeId} />
+                ))
+              )}
+            </Box>
 
-        {/* Rating Section */}
-        <Box component="form" sx={{ mb: 4 }}>
-          <Typography variant="h6" gutterBottom>Rate This Recipe</Typography>
-          <Rating
-            name="recipe-rating"
-            value={rating}
-            onChange={(event, newValue) => setRating(newValue)}
-            disabled={!userInfo}
-            sx={{ mb: 1 }}
-          />
-          <Button
-            variant="contained"
-            disabled={!userInfo || rating === 0}
-            onClick={() => dispatch(rateRecipe(recipeId, rating))}
-          >
-            Submit Rating
-          </Button>
-          {!userInfo && <Typography variant="caption" display="block" color="textSecondary">Please log in to rate.</Typography>}
-        </Box>
-      </StyledPaper>
-
-      {/* Comments Dialog - UPDATED */}
-      <Dialog open={showComments} onClose={() => setShowComments(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Comments ({displayComments.length})</DialogTitle>
-        <DialogContent>
-          <List sx={{ maxHeight: 400, overflow: 'auto' }}>
-            {displayComments.map((comment) => (
-              <ListItem key={comment._id} alignItems="flex-start">
-                <ListItemAvatar>
-                  <Avatar src={getImageUrl(comment.userId?.profilePic)}>
-                    {comment.userId?.name?.charAt(0)}
-                  </Avatar>
-                </ListItemAvatar>
-                <ListItemText
-                  primary={
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography variant="subtitle2">
-                        {comment.userId?.name}
-                      </Typography>
-                      {!comment.approved && (
-                        <Chip label="Pending Approval" color="warning" size="small" />
-                      )}
-                      {comment.isFlagged && (
-                        <Chip label="Flagged" color="error" size="small" />
-                      )}
-                    </Box>
-                  }
-                  secondary={
-                    <>
-                      <Typography variant="body2" color="text.primary" sx={{ mt: 0.5 }}>
-                        {comment.text || comment.comment}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {new Date(comment.createdAt).toLocaleString()}
-                      </Typography>
-                    </>
-                  }
+            {/* Add Comment Input */}
+            <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider', bgcolor: 'background.paper' }}>
+              <Stack direction="row" spacing={1}>
+                <Avatar src={userInfo?.profilePic} sx={{ width: 32, height: 32 }} />
+                <TextField
+                  inputRef={commentInputRef}
+                  fullWidth
+                  size="small"
+                  placeholder="Add a comment..."
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  multiline
+                  maxRows={3}
+                  InputProps={{ sx: { borderRadius: 3 } }}
                 />
-              </ListItem>
-            ))}
-            {displayComments.length === 0 && (
-              <Typography color="text.secondary" align="center" sx={{ py: 4 }}>
-                No comments yet. Be the first to comment!
-              </Typography>
-            )}
-          </List>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowComments(false)}>Close</Button>
-        </DialogActions>
-      </Dialog>
+                <IconButton color="primary" onClick={handleAddComment} disabled={!commentText.trim()}>
+                  <SendIcon />
+                </IconButton>
+              </Stack>
+            </Box>
+          </StyledPaper>
+        </Grid>
+      </Grid>
 
       {/* Share Dialog */}
-      <Dialog open={showShareDialog} onClose={() => setShowShareDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Share this Recipe</DialogTitle>
+      <Dialog open={showShareDialog} onClose={() => setShowShareDialog(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Share Recipe</DialogTitle>
         <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
-            <Button
-              variant="outlined"
-              startIcon={<span style={{ color: '#25D366' }}>📱</span>}
-              onClick={() => handleShare('whatsapp')}
-              sx={{ justifyContent: 'flex-start' }}
-            >
-              Share on WhatsApp
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<span style={{ color: '#1DA1F2' }}>🐦</span>}
-              onClick={() => handleShare('twitter')}
-              sx={{ justifyContent: 'flex-start' }}
-            >
-              Share on Twitter
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<span style={{ color: '#1877F2' }}>📘</span>}
-              onClick={() => handleShare('facebook')}
-              sx={{ justifyContent: 'flex-start' }}
-            >
-              Share on Facebook
-            </Button>
-          </Box>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Button variant="outlined" startIcon={<span style={{ color: '#25D366' }}>📱</span>} onClick={() => handleShare('whatsapp')}>WhatsApp</Button>
+            <Button variant="outlined" startIcon={<span style={{ color: '#1DA1F2' }}>🐦</span>} onClick={() => handleShare('twitter')}>Twitter</Button>
+            <Button variant="outlined" startIcon={<span style={{ color: '#1877F2' }}>📘</span>} onClick={() => handleShare('facebook')}>Facebook</Button>
+          </Stack>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowShareDialog(false)}>Cancel</Button>
-        </DialogActions>
       </Dialog>
-
     </Box>
   );
 };
 
-// --- Helper Function for Profile Picture Path ---
 const getImageUrl = (imagePath) => {
   if (!imagePath) return '/default_avatar.jpg';
   if (imagePath.startsWith('http')) return imagePath;
-  if (imagePath.startsWith('/uploads/')) return `${process.env.REACT_APP_API_URL}${imagePath}`;
-  if (imagePath.startsWith('uploads/')) return `${process.env.REACT_APP_API_URL}/${imagePath}`;
   return `${process.env.REACT_APP_API_URL}/uploads/${imagePath}`;
 };
 

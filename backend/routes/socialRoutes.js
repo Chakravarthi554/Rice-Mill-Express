@@ -7,7 +7,11 @@ const {
   approveComment,
   deleteComment,
   trackShare,
-  getSocialAnalytics
+  getSocialAnalytics,
+  likeComment,
+  replyToComment,
+  getSortedComments,
+  getRatingDistribution
 } = require('../controllers/socialController');
 const { protect, role } = require('../middleware/auth');
 
@@ -18,6 +22,12 @@ router.get('/:type/:id/comments', getComments);
 router.put('/:type/:id/comments/:commentId/approve', protect, role('admin'), approveComment);
 router.delete('/:type/:id/comments/:commentId', protect, deleteComment);
 router.post('/:type/:id/share', protect, trackShare);
+
+// New Social Routes
+router.post('/:type/:id/comments/:commentId/like', protect, likeComment);
+router.post('/:type/:id/comments/:commentId/reply', protect, replyToComment);
+router.get('/:type/:id/comments/sorted', getSortedComments);
+router.get('/recipes/:id/rating-distribution', getRatingDistribution);
 
 // Admin analytics
 router.get('/admin/social-analytics', protect, role('admin'), getSocialAnalytics);

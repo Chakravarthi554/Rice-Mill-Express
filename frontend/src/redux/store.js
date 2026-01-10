@@ -49,6 +49,7 @@ import {
 import {
   socialLikeReducer, socialCommentReducer, socialCommentsListReducer,
   socialCommentApproveReducer, socialCommentDeleteReducer, socialShareReducer,
+  socialCommentLikeReducer, socialCommentReplyReducer, socialRatingDistReducer,
 } from './reducers/socialReducers';
 
 import { adminMessagesReducer } from './reducers/adminMessageReducers';
@@ -269,6 +270,9 @@ const rootReducer = combineReducers({
   socialCommentApprove: socialCommentApproveReducer,
   socialCommentDelete: socialCommentDeleteReducer,
   socialShare: socialShareReducer,
+  socialCommentLike: socialCommentLikeReducer,
+  socialCommentReply: socialCommentReplyReducer,
+  socialRatingDist: socialRatingDistReducer,
 
   // Admin - FIXED: Using only unique reducers from adminReducers
   adminDashboardStats: adminDashboardStatsReducer,

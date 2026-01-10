@@ -1235,5 +1235,6 @@ module.exports = {
   editComment,
   likeComment,
   trackShare,
-  getSocialAnalytics
+  getSocialAnalytics,
+  replyToComment
 };

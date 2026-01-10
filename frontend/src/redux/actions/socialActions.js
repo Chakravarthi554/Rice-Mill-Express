@@ -20,7 +20,16 @@ import {
   SOCIAL_SHARE_FAIL,
   SOCIAL_TYPE_PRODUCT,
   SOCIAL_TYPE_RECIPE,
-  SOCIAL_TYPE_FORUM
+  SOCIAL_TYPE_FORUM,
+  SOCIAL_COMMENT_LIKE_REQUEST,
+  SOCIAL_COMMENT_LIKE_SUCCESS,
+  SOCIAL_COMMENT_LIKE_FAIL,
+  SOCIAL_COMMENT_REPLY_REQUEST,
+  SOCIAL_COMMENT_REPLY_SUCCESS,
+  SOCIAL_COMMENT_REPLY_FAIL,
+  SOCIAL_RATING_DIST_REQUEST,
+  SOCIAL_RATING_DIST_SUCCESS,
+  SOCIAL_RATING_DIST_FAIL
 } from '../constants/socialConstants'
 
 // Like/Unlike an item
@@ -272,6 +281,142 @@ export const trackShare = (itemType, itemId, platform) => async (dispatch, getSt
   } catch (error) {
     dispatch({
       type: SOCIAL_SHARE_FAIL,
+      payload:
+        error.response && error.response.data.message
+          ? error.response.data.message
+          : error.message,
+    })
+  }
+}
+
+// Like/Unlike a comment
+export const likeComment = (itemType, itemId, commentId) => async (dispatch, getState) => {
+  try {
+    dispatch({ type: SOCIAL_COMMENT_LIKE_REQUEST })
+
+    const {
+      userLogin: { userInfo },
+    } = getState()
+
+    const config = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${userInfo.token}`,
+      },
+    }
+
+    const { data } = await axios.post(
+      `/api/${itemType}/${itemId}/comments/${commentId}/like`,
+      {},
+      config
+    )
+
+    dispatch({
+      type: SOCIAL_COMMENT_LIKE_SUCCESS,
+      payload: { commentId, ...data },
+    })
+
+  } catch (error) {
+    dispatch({
+      type: SOCIAL_COMMENT_LIKE_FAIL,
+      payload:
+        error.response && error.response.data.message
+          ? error.response.data.message
+          : error.message,
+    })
+  }
+}
+
+// Reply to a comment
+export const replyToComment = (itemType, itemId, commentId, text) => async (dispatch, getState) => {
+  try {
+    dispatch({ type: SOCIAL_COMMENT_REPLY_REQUEST })
+
+    const {
+      userLogin: { userInfo },
+    } = getState()
+
+    const config = {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${userInfo.token}`,
+      },
+    }
+
+    const { data } = await axios.post(
+      `/api/${itemType}/${itemId}/comments/${commentId}/reply`,
+      { text },
+      config
+    )
+
+    dispatch({
+      type: SOCIAL_COMMENT_REPLY_SUCCESS,
+      payload: data,
+    })
+
+    // Emit socket event
+    if (window.socket) {
+      window.socket.emit('SOCIAL_ACTION', {
+        type: 'COMMENT_REPLY',
+        itemType,
+        itemId,
+        commentId,
+        userId: userInfo._id,
+        data
+      })
+    }
+
+  } catch (error) {
+    dispatch({
+      type: SOCIAL_COMMENT_REPLY_FAIL,
+      payload:
+        error.response && error.response.data.message
+          ? error.response.data.message
+          : error.message,
+    })
+  }
+}
+
+// Get sorted comments
+export const getSortedComments = (itemType, itemId, sortBy = 'recent', page = 1) => async (dispatch) => {
+  try {
+    dispatch({ type: SOCIAL_GET_COMMENTS_REQUEST })
+
+    const { data } = await axios.get(
+      `/api/${itemType}/${itemId}/comments/sorted?sortBy=${sortBy}&page=${page}`
+    )
+
+    dispatch({
+      type: SOCIAL_GET_COMMENTS_SUCCESS,
+      payload: data,
+    })
+
+  } catch (error) {
+    dispatch({
+      type: SOCIAL_GET_COMMENTS_FAIL,
+      payload:
+        error.response && error.response.data.message
+          ? error.response.data.message
+          : error.message,
+    })
+  }
+}
+
+// Get rating distribution
+export const getRatingDistribution = (id) => async (dispatch) => {
+  try {
+    dispatch({ type: SOCIAL_RATING_DIST_REQUEST })
+
+    const { data } = await axios.get(`/api/recipes/${id}/rating-distribution`)
+
+    dispatch({
+      type: SOCIAL_RATING_DIST_SUCCESS,
+      payload: data,
+    })
+
+  } catch (error) {
+    dispatch({
+      type: SOCIAL_RATING_DIST_FAIL,
       payload:
         error.response && error.response.data.message
           ? error.response.data.message
