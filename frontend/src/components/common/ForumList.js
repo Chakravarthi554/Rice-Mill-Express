@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Button, CircularProgress, Alert, Container,
-  Grid, Card, CardContent
+  Grid, Card, CardContent, TextField
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import AddIcon from '@mui/icons-material/Add';
@@ -17,6 +17,7 @@ const ForumList = () => {
   const { userInfo } = useSelector((state) => state.userLogin);
   const { posts = [], loading, error } = useSelector((state) => state.forumPostList || {});
   const [refreshKey, setRefreshKey] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const fetchPosts = useCallback(() => {
     if (userInfo?.token) {
@@ -37,6 +38,15 @@ const ForumList = () => {
 
   const handleCreatePost = () => {
     navigate('/forum/create');
+  };
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      dispatch(getForumPosts(1, 50, searchQuery, '', { status: 'approved' }));
+    } else {
+      fetchPosts();
+    }
   };
 
   if (loading && posts.length === 0) {

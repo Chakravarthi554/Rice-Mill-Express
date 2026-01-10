@@ -41,7 +41,7 @@ const submitRecipe = asyncHandler(async (req, res) => {
       throw new Error('Ingredients, steps, and linkedProducts must be arrays.');
     }
     if (parsedLinkedProducts.some(id => !mongoose.Types.ObjectId.isValid(id))) {
-        throw new Error('Invalid product ID found in linkedProducts.');
+      throw new Error('Invalid product ID found in linkedProducts.');
     }
 
   } catch (error) {
@@ -52,8 +52,8 @@ const submitRecipe = asyncHandler(async (req, res) => {
   // Verify linked products belong to the seller
   const sellerProducts = await Product.find({ _id: { $in: parsedLinkedProducts }, seller: req.user._id });
   if (sellerProducts.length !== parsedLinkedProducts.length) {
-      res.status(400);
-      throw new Error('One or more linked products do not belong to you or do not exist.');
+    res.status(400);
+    throw new Error('One or more linked products do not belong to you or do not exist.');
   }
 
   const recipe = await Recipe.create({
@@ -69,41 +69,41 @@ const submitRecipe = asyncHandler(async (req, res) => {
 
   // 🔥 FIX: Get admin users to notify them
   const adminUsers = await mongoose.model('User').find({ role: 'admin' }).select('_id');
-  
-  if (adminUsers.length > 0) {
-  const notificationPromises = adminUsers.map(admin => 
-    Notification.create({
-      user: admin._id,
-      type: 'RECIPE_SUBMITTED',
-      title: 'New Recipe Submitted',
-      message: `New recipe "${title}" submitted by ${req.user.name}`,
-      priority: 'medium',
-      relatedEntity: recipe._id,
-      entityModel: 'Recipe',
-      actionUrl: `/admin/dashboard?tab=recipes&recipe=${recipe._id}`,
-      actionLabel: 'Review Now'
-    })
-  );
-  
-  await Promise.all(notificationPromises);
-}
 
-// Enhanced socket event
-if (req.io) {
-  req.io.emit('RECIPE_SUBMITTED', { 
-    recipe, 
-    status: recipe.status,
-    sellerName: req.user.name 
-  });
-  
-  // Emit to admin room specifically
-  req.io.to('admin').emit('NEW_RECIPE_FOR_APPROVAL', {
-    recipeId: recipe._id,
-    title: recipe.title,
-    sellerName: req.user.name,
-    timestamp: new Date()
-  });
-}
+  if (adminUsers.length > 0) {
+    const notificationPromises = adminUsers.map(admin =>
+      Notification.create({
+        user: admin._id,
+        type: 'RECIPE_SUBMITTED',
+        title: 'New Recipe Submitted',
+        message: `New recipe "${title}" submitted by ${req.user.name}`,
+        priority: 'medium',
+        relatedEntity: recipe._id,
+        entityModel: 'Recipe',
+        actionUrl: `/admin/dashboard?tab=recipes&recipe=${recipe._id}`,
+        actionLabel: 'Review Now'
+      })
+    );
+
+    await Promise.all(notificationPromises);
+  }
+
+  // Enhanced socket event
+  if (req.io) {
+    req.io.emit('RECIPE_SUBMITTED', {
+      recipe,
+      status: recipe.status,
+      sellerName: req.user.name
+    });
+
+    // Emit to admin room specifically
+    req.io.to('admin').emit('NEW_RECIPE_FOR_APPROVAL', {
+      recipeId: recipe._id,
+      title: recipe.title,
+      sellerName: req.user.name,
+      timestamp: new Date()
+    });
+  }
   res.status(201).json({
     ...recipe.toObject(),
     message: 'Recipe submitted successfully! Awaiting admin approval.'
@@ -121,7 +121,7 @@ const getRecipes = asyncHandler(async (req, res) => {
   const query = { status: 'approved' };
   if (riceType) query.riceType = riceType;
   if (search) {
-      query.$text = { $search: search };
+    query.$text = { $search: search };
   }
 
   const count = await Recipe.countDocuments(query);
@@ -139,39 +139,39 @@ const getRecipes = asyncHandler(async (req, res) => {
 // @route   GET /api/recipes/myrecipes
 // @access  Private/Seller
 const getMyRecipes = asyncHandler(async (req, res) => {
-    const pageSize = 10;
-    const page = Number(req.query.pageNumber) || 1;
+  const pageSize = 10;
+  const page = Number(req.query.pageNumber) || 1;
 
-    const query = { sellerId: req.user._id };
+  const query = { sellerId: req.user._id };
 
-    const count = await Recipe.countDocuments(query);
-    const recipes = await Recipe.find(query)
-      .populate('linkedProducts', 'name')
-      .limit(pageSize)
-      .skip(pageSize * (page - 1))
-      .sort({ createdAt: -1 });
+  const count = await Recipe.countDocuments(query);
+  const recipes = await Recipe.find(query)
+    .populate('linkedProducts', 'name')
+    .limit(pageSize)
+    .skip(pageSize * (page - 1))
+    .sort({ createdAt: -1 });
 
-    res.json({ recipes, page, pages: Math.ceil(count / pageSize), total: count });
+  res.json({ recipes, page, pages: Math.ceil(count / pageSize), total: count });
 });
 
 // @desc    Get pending recipes (Admin) with pagination
 // @route   GET /api/recipes/pending
 // @access  Private/Admin
 const getPendingRecipes = asyncHandler(async (req, res) => {
-    const pageSize = 10;
-    const page = Number(req.query.pageNumber) || 1;
+  const pageSize = 10;
+  const page = Number(req.query.pageNumber) || 1;
 
-    const query = { status: 'pending' };
+  const query = { status: 'pending' };
 
-    const count = await Recipe.countDocuments(query);
-    const recipes = await Recipe.find(query)
-      .populate('sellerId', 'name email')
-      .populate('linkedProducts', 'name')
-      .limit(pageSize)
-      .skip(pageSize * (page - 1))
-      .sort({ createdAt: -1 });
+  const count = await Recipe.countDocuments(query);
+  const recipes = await Recipe.find(query)
+    .populate('sellerId', 'name email')
+    .populate('linkedProducts', 'name')
+    .limit(pageSize)
+    .skip(pageSize * (page - 1))
+    .sort({ createdAt: -1 });
 
-    res.json({ recipes, page, pages: Math.ceil(count / pageSize), total: count });
+  res.json({ recipes, page, pages: Math.ceil(count / pageSize), total: count });
 });
 
 // @desc    Get single recipe by ID
@@ -179,10 +179,10 @@ const getPendingRecipes = asyncHandler(async (req, res) => {
 // @access  Public (or Private if login needed to view)
 const getRecipeById = asyncHandler(async (req, res) => {
   if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      res.status(400);
-      throw new Error('Invalid recipe ID');
+    res.status(400);
+    throw new Error('Invalid recipe ID');
   }
-  
+
   const recipe = await Recipe.findById(req.params.id)
     .populate('linkedProducts', 'name price images seller')
     .populate('sellerId', 'name email')
@@ -225,17 +225,17 @@ const approveRecipe = asyncHandler(async (req, res) => {
 
     // Notify seller
     await Notification.create({
-        user: recipe.sellerId,
-        message: message,
-        type: 'RECIPE_STATUS',
-        relatedEntity: recipe._id,
-        entityModel: 'Recipe'
+      user: recipe.sellerId,
+      message: message,
+      type: 'RECIPE_STATUS',
+      relatedEntity: recipe._id,
+      entityModel: 'Recipe'
     });
 
     // Emit socket event
     if (req.io) {
-      req.io.emit('RECIPE_STATUS_CHANGED', { 
-        recipeId: recipe._id, 
+      req.io.emit('RECIPE_STATUS_CHANGED', {
+        recipeId: recipe._id,
         status: status,
         recipe: updatedRecipe,
         sellerId: recipe.sellerId
@@ -276,16 +276,29 @@ const rateRecipe = asyncHandler(async (req, res) => {
     }
 
     await recipe.save();
-    
+
     // Emit socket event
     if (req.io) {
-      req.io.emit('RECIPE_RATED', { 
-        recipeId: recipe._id, 
+      req.io.emit('RECIPE_RATED', {
+        recipeId: recipe._id,
         rating: rating,
-        averageRating: recipe.averageRating 
+        averageRating: recipe.averageRating,
+        numReviews: recipe.numReviews
+      });
+
+      // Social update for general sync
+      req.io.emit('SOCIAL_UPDATE', {
+        type: 'RATING',
+        itemType: 'recipe',
+        itemId: recipe._id,
+        userId: req.user._id,
+        rating: rating,
+        averageRating: recipe.averageRating,
+        numReviews: recipe.numReviews,
+        timestamp: new Date()
       });
     }
-    
+
     res.status(201).json({ message: 'Rating added/updated', recipe });
   } else {
     res.status(404);
@@ -297,26 +310,26 @@ const rateRecipe = asyncHandler(async (req, res) => {
 // @route   DELETE /api/recipes/:id
 // @access  Private/Admin or Private/Seller
 const deleteRecipe = asyncHandler(async (req, res) => {
-    const recipe = await Recipe.findById(req.params.id);
+  const recipe = await Recipe.findById(req.params.id);
 
-    if (recipe) {
-        if (req.user.role === 'admin' || recipe.sellerId.toString() === req.user._id.toString()) {
-            await Recipe.deleteOne({ _id: req.params.id });
-            
-            // Emit socket event
-            if (req.io) {
-              req.io.emit('RECIPE_DELETED', { recipeId: req.params.id });
-            }
-            
-            res.json({ message: 'Recipe removed' });
-        } else {
-            res.status(403);
-            throw new Error('User not authorized to delete this recipe');
-        }
+  if (recipe) {
+    if (req.user.role === 'admin' || recipe.sellerId.toString() === req.user._id.toString()) {
+      await Recipe.deleteOne({ _id: req.params.id });
+
+      // Emit socket event
+      if (req.io) {
+        req.io.emit('RECIPE_DELETED', { recipeId: req.params.id });
+      }
+
+      res.json({ message: 'Recipe removed' });
     } else {
-        res.status(404);
-        throw new Error('Recipe not found');
+      res.status(403);
+      throw new Error('User not authorized to delete this recipe');
     }
+  } else {
+    res.status(404);
+    throw new Error('Recipe not found');
+  }
 });
 
 // NEW: Moderate recipe comment
@@ -324,17 +337,17 @@ const moderateRecipeComment = asyncHandler(async (req, res) => {
   try {
     const { recipeId, commentId } = req.params;
     const { action } = req.body; // 'approve', 'reject', 'delete'
-    
+
     if (!['approve', 'reject', 'delete'].includes(action)) {
       return res.status(400).json({ message: 'Invalid action' });
     }
-    
+
     const recipe = await Recipe.findById(recipeId);
     if (!recipe) return res.status(404).json({ message: 'Recipe not found' });
-    
+
     const comment = recipe.comments.id(commentId);
     if (!comment) return res.status(404).json({ message: 'Comment not found' });
-    
+
     if (action === 'approve') {
       comment.approved = true;
       comment.isFlagged = false;
@@ -343,9 +356,9 @@ const moderateRecipeComment = asyncHandler(async (req, res) => {
     } else if (action === 'delete') {
       recipe.comments.pull({ _id: commentId });
     }
-    
+
     await recipe.save();
-    
+
     // Emit socket event
     if (req.io) {
       req.io.emit('RECIPE_COMMENT_MODERATED', {
@@ -354,8 +367,8 @@ const moderateRecipeComment = asyncHandler(async (req, res) => {
         action: action
       });
     }
-    
-    res.json({ 
+
+    res.json({
       message: `Comment ${action}d successfully`,
       recipe: await Recipe.findById(recipeId).populate('comments.userId', 'name profilePic')
     });
@@ -370,31 +383,31 @@ const reportRecipeComment = asyncHandler(async (req, res) => {
   try {
     const { recipeId, commentId } = req.params;
     const { reason } = req.body;
-    
+
     const recipe = await Recipe.findById(recipeId);
     if (!recipe) return res.status(404).json({ message: 'Recipe not found' });
-    
+
     const comment = recipe.comments.id(commentId);
     if (!comment) return res.status(404).json({ message: 'Comment not found' });
-    
+
     // Check if user already reported this comment
-    const alreadyReported = comment.reports.some(report => 
+    const alreadyReported = comment.reports.some(report =>
       report.userId.toString() === req.user._id.toString()
     );
-    
+
     if (!alreadyReported) {
       comment.reports.push({
         userId: req.user._id,
         reason: reason || 'Inappropriate content',
         createdAt: new Date()
       });
-      
+
       // Flag comment if it has 3 or more reports
       comment.isFlagged = comment.reports.length >= 3;
-      
+
       await recipe.save();
     }
-    
+
     res.json({ message: 'Comment reported successfully', comment });
   } catch (error) {
     console.error('Error in reportRecipeComment:', error);
@@ -408,21 +421,21 @@ const getFlaggedRecipeComments = asyncHandler(async (req, res) => {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Access denied. Admin role required.' });
     }
-    
+
     const { page = 1, limit = 20 } = req.query;
     const skip = (page - 1) * limit;
-    
+
     // Find recipes that have flagged comments
     const recipes = await Recipe.find({
       'comments.isFlagged': true
     })
-    .populate('sellerId', 'name email')
-    .populate('comments.userId', 'name profilePic')
-    .sort({ updatedAt: -1 })
-    .skip(skip)
-    .limit(parseInt(limit))
-    .lean();
-    
+      .populate('sellerId', 'name email')
+      .populate('comments.userId', 'name profilePic')
+      .sort({ updatedAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+
     // Extract flagged comments with recipe info
     const flaggedComments = [];
     recipes.forEach(recipe => {
@@ -438,11 +451,11 @@ const getFlaggedRecipeComments = asyncHandler(async (req, res) => {
         }
       });
     });
-    
+
     const total = await Recipe.countDocuments({
       'comments.isFlagged': true
     });
-    
+
     res.json({
       comments: flaggedComments,
       total,
@@ -473,7 +486,7 @@ const commentOnRecipe = asyncHandler(async (req, res) => {
   if (recipe) {
     // Auto-approve comments for sellers and admins, require approval for customers
     const approved = req.user.role !== 'customer';
-    
+
     const newComment = {
       userId: req.user._id,
       comment: comment.trim(),
@@ -488,15 +501,15 @@ const commentOnRecipe = asyncHandler(async (req, res) => {
     // Populate the newly added comment
     const updatedRecipe = await Recipe.findById(req.params.id)
       .populate('comments.userId', 'name profilePic');
-    
+
     const addedComment = updatedRecipe.comments[updatedRecipe.comments.length - 1];
 
     // Enhanced socket event for real-time updates
     if (req.io) {
       // Notify all users in the recipe room
-      req.io.to(`recipe_${recipe._id}`).emit('RECIPE_COMMENTED', { 
-        recipeId: recipe._id, 
-        comment: addedComment 
+      req.io.to(`recipe_${recipe._id}`).emit('RECIPE_COMMENTED', {
+        recipeId: recipe._id,
+        comment: addedComment
       });
 
       // Notify admin if comment needs approval

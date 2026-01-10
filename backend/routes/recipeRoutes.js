@@ -14,7 +14,7 @@ const {
 } = require('../controllers/recipeController');
 const asyncHandler = require('../middleware/asyncHandler');
 
-const {likeItem,addComment, getComments, trackShare } = require('../controllers/socialController');
+const { likeItem, addComment, getComments, trackShare } = require('../controllers/socialController');
 
 
 const multer = require('multer');
@@ -70,13 +70,13 @@ router.get('/', getRecipes); // Get approved recipes (public or logged-in users)
 router.get('/:id', getRecipeById); // Get single recipe details
 
 // Authenticated user routes (rating/commenting)
-router.post('/:id/rate', protect, rateRecipe);
-router.post('/:id/comment', protect, commentOnRecipe);
+router.post('/:id/rate', protect, socialRateLimiter, rateRecipe);
+router.post('/:id/comment', protect, socialRateLimiter, commentOnRecipe);
 
 // Delete route (Admin or Owner Seller)
 router.delete('/:id', protect, role('admin', 'seller'), deleteRecipe); // Role middleware allows admin OR seller
 
-router.post('/:id/like', protect, (req, res, next) => {
+router.post('/:id/like', protect, socialRateLimiter, (req, res, next) => {
   req.params.type = 'recipes';
   next();
 }, likeItem);
@@ -91,36 +91,72 @@ router.get('/:id/comments', (req, res, next) => {
   next();
 }, getComments);
 
-router.post('/:id/share', protect, (req, res, next) => {
+router.post('/:id/share', protect, strictSocialLimiter, (req, res, next) => {
   req.params.type = 'recipes';
   next();
 }, trackShare);
+
+// Enhanced social features
+const { editComment, likeComment, replyToComment, getSortedComments, getCommentReplies, getRatingDistribution } = require('../controllers/socialController');
+
+// Edit comment
+router.put('/:id/comments/:commentId', protect, (req, res, next) => {
+  req.params.type = 'recipes';
+  next();
+}, editComment);
+
+// Like comment
+router.post('/:id/comments/:commentId/like', protect, (req, res, next) => {
+  req.params.type = 'recipes';
+  next();
+}, likeComment);
+
+// Reply to comment
+router.post('/:id/comments/:commentId/reply', protect, (req, res, next) => {
+  req.params.type = 'recipes';
+  next();
+}, replyToComment);
+
+// Get sorted comments
+router.get('/:id/comments/sorted', (req, res, next) => {
+  req.params.type = 'recipes';
+  next();
+}, getSortedComments);
+
+// Get comment replies
+router.get('/:id/comments/:commentId/replies', (req, res, next) => {
+  req.params.type = 'recipes';
+  next();
+}, getCommentReplies);
+
+// Get rating distribution
+router.get('/:id/rating-distribution', getRatingDistribution);
 
 router.get('/:id/comments', asyncHandler(async (req, res) => {
   try {
     const { page = 1, limit = 20 } = req.query;
     const skip = (page - 1) * limit;
-    
+
     const recipe = await Recipe.findById(req.params.id)
       .populate('comments.userId', 'name profilePic')
       .select('comments');
-    
+
     if (!recipe) {
       return res.status(404).json({ message: 'Recipe not found' });
     }
-    
+
     let comments = recipe.comments;
     // Filter for non-admin users
     if (req.user?.role !== 'admin') {
       comments = comments.filter(comment => comment.approved && !comment.isFlagged);
     }
-    
+
     // Sort by creation date (newest first)
     comments.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    
+
     // Apply pagination
     const paginatedComments = comments.slice(skip, skip + Number(limit));
-    
+
     res.json({
       comments: paginatedComments,
       total: comments.length,

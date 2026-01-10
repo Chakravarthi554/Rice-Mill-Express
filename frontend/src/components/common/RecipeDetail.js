@@ -96,8 +96,25 @@ const RecipeDetail = () => {
     socket.on('RECIPE_COMMENTED', handleCommentAdded);
     socket.on('COMMENT_APPROVED', handleCommentApproved);
     socket.on('SOCIAL_UPDATE', (data) => {
-      if (data.itemType === 'recipe' && data.itemId === recipeId && data.type === 'COMMENT') {
-        dispatch(getComments('recipes', recipeId));
+      if (data.itemId === recipeId) {
+        // Handle recipe-level updates
+        if (data.itemType === 'recipe') {
+          switch (data.type) {
+            case 'LIKE':
+            case 'RATING':
+            case 'SHARE':
+            case 'COMMENT':
+            case 'COMMENT_APPROVED':
+              // For all these, refetching details is the most robust way to sync all counts/states
+              dispatch(getRecipeDetails(recipeId));
+              if (data.type === 'COMMENT' || data.type === 'COMMENT_APPROVED') {
+                dispatch(getComments('recipes', recipeId));
+              }
+              break;
+            default:
+              break;
+          }
+        }
       }
     });
 

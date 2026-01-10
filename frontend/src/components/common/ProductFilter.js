@@ -1,5 +1,5 @@
-// [AI: Live product search result sync enhanced]
-import React, { useState, useEffect } from 'react';
+// Enhanced Product Filter System with comprehensive filtering capabilities
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   Container,
@@ -12,8 +12,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  FormControlLabel,
-  Checkbox,
+  Chip,
   Grid,
   Card,
   CardContent,
@@ -22,30 +21,43 @@ import {
   Alert,
   Skeleton,
   Slider,
+  IconButton,
+  InputAdornment,
+  Divider,
+  Stack,
+  Autocomplete,
 } from '@mui/material';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import StarIcon from '@mui/icons-material/Star';
+import CloseIcon from '@mui/icons-material/Close';
+import SearchIcon from '@mui/icons-material/Search';
+import ClearAllIcon from '@mui/icons-material/ClearAll';
+import SortIcon from '@mui/icons-material/Sort';
 import { listProducts, listFilteredProducts } from '../../redux/actions/productActions';
 import { addToCart } from '../../redux/actions/cartActions';
 import { addToWishlist } from '../../redux/actions/userActions';
 import { useNavigate } from 'react-router-dom';
+import Price from '../common/Price';
 
 const ProductFilter = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { products = [], loading: productLoading, error: productError } = 
+  const { products = [], loading: productLoading, error: productError } =
     useSelector((state) => state.productList || {});
-  const { filteredProducts = [], loading: filteredLoading, error: filteredError } = 
-    useSelector((state) => state.productFilter || {});
+
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [openDrawer, setOpenDrawer] = useState(false);
   const [imageLoading, setImageLoading] = useState({});
+  const [sortBy, setSortBy] = useState('newest');
+
   const [filters, setFilters] = useState({
     category: '',
     type: '',
     quality: '',
     weight: '',
     priceRange: [0, 5000],
+    brand: [],
     dietPreference: [],
     cookingPurpose: [],
     sellerLocation: '',
@@ -66,31 +78,96 @@ const ProductFilter = () => {
     'Organic Products',
   ];
 
+  const brands = useMemo(() => {
+    const uniqueBrands = [...new Set(products.map(p => p.brand).filter(Boolean))];
+    return uniqueBrands.sort();
+  }, [products]);
+
+  const sortOptions = [
+    { value: 'newest', label: 'Newest First' },
+    { value: 'price-low', label: 'Price: Low to High' },
+    { value: 'price-high', label: 'Price: High to Low' },
+    { value: 'rating', label: 'Highest Rated' },
+    { value: 'popular', label: 'Most Popular' },
+  ];
+
+  // Load products on mount
   useEffect(() => {
     dispatch(listProducts());
   }, [dispatch]);
 
-  // ✅ FIXED: Real-time search - shows products as user types/deletes
+  // Debounce search input
   useEffect(() => {
-    if (searchQuery.trim()) {
-      dispatch(listFilteredProducts({ ...filters, search: searchQuery }));
-    } else {
-      // ✅ FIXED: When search is cleared, show all products (or filtered products without search)
-      dispatch(listFilteredProducts({ ...filters, search: '' }));
-    }
-  }, [dispatch, filters, searchQuery]);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
 
-  const handleSearch = () => {
-    dispatch(listFilteredProducts({ ...filters, search: searchQuery }));
-  };
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Apply filters when debounced search or filters change
+  useEffect(() => {
+    if (debouncedSearch.trim() || hasActiveFilters()) {
+      dispatch(listFilteredProducts({ ...filters, search: debouncedSearch }));
+    } else {
+      dispatch(listProducts());
+    }
+  }, [debouncedSearch, filters, dispatch]);
+
+  const hasActiveFilters = useCallback(() => {
+    return (
+      filters.category ||
+      filters.type ||
+      filters.quality ||
+      filters.weight ||
+      filters.brand.length > 0 ||
+      filters.priceRange[0] !== 0 ||
+      filters.priceRange[1] !== 5000 ||
+      filters.dietPreference.length > 0 ||
+      filters.cookingPurpose.length > 0 ||
+      filters.sellerLocation ||
+      filters.deliveryOptions.length > 0 ||
+      filters.ratings > 0 ||
+      filters.discounts ||
+      filters.stockAvailability
+    );
+  }, [filters]);
 
   const handleFilterChange = (field, value) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleApplyFilters = () => {
-    dispatch(listFilteredProducts({ ...filters, search: searchQuery }));
-    setOpenDrawer(false);
+  const handleClearAllFilters = () => {
+    setFilters({
+      category: '',
+      type: '',
+      quality: '',
+      weight: '',
+      priceRange: [0, 5000],
+      brand: [],
+      dietPreference: [],
+      cookingPurpose: [],
+      sellerLocation: '',
+      deliveryOptions: [],
+      ratings: 0,
+      discounts: '',
+      stockAvailability: '',
+    });
+    setSearchQuery('');
+    setDebouncedSearch('');
+  };
+
+  const handleRemoveFilter = (filterKey, value = null) => {
+    if (filterKey === 'priceRange') {
+      setFilters(prev => ({ ...prev, priceRange: [0, 5000] }));
+    } else if (Array.isArray(filters[filterKey])) {
+      setFilters(prev => ({
+        ...prev,
+        [filterKey]: prev[filterKey].filter(item => item !== value)
+      }));
+    } else {
+      setFilters(prev => ({ ...prev, [filterKey]: filterKey === 'ratings' ? 0 : '' }));
+    }
   };
 
   const handleBuyNow = (productId) => {
@@ -116,37 +193,173 @@ const ProductFilter = () => {
   const handleImageLoad = (productId) => setImageLoading(prev => ({ ...prev, [productId]: false }));
   const handleImageError = (productId) => setImageLoading(prev => ({ ...prev, [productId]: false }));
 
-  const displayedProducts = searchQuery || Object.values(filters).some(val => 
-    (Array.isArray(val) && val.length > 0) || (typeof val === 'string' && val) || 
-    (Array.isArray(val) && val[0] !== 0 && val[1] !== 5000)
-  )
-    ? [...filteredProducts, ...products.filter(p => !filteredProducts.some(fp => fp._id === p._id))]
-    : products;
+  // Sort products
+  const sortedProducts = useMemo(() => {
+    const productsToSort = [...products];
+
+    switch (sortBy) {
+      case 'price-low':
+        return productsToSort.sort((a, b) => {
+          const priceA = a.offerPrice || a.price || 0;
+          const priceB = b.offerPrice || b.price || 0;
+          return priceA - priceB;
+        });
+      case 'price-high':
+        return productsToSort.sort((a, b) => {
+          const priceA = a.offerPrice || a.price || 0;
+          const priceB = b.offerPrice || b.price || 0;
+          return priceB - priceA;
+        });
+      case 'rating':
+        return productsToSort.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+      case 'popular':
+        return productsToSort.sort((a, b) => (b.numReviews || 0) - (a.numReviews || 0));
+      case 'newest':
+      default:
+        return productsToSort.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }
+  }, [products, sortBy]);
+
+  // Active filter badges
+  const activeFilterBadges = useMemo(() => {
+    const badges = [];
+
+    if (filters.category) badges.push({ label: `Category: ${filters.category}`, key: 'category' });
+    if (filters.type) badges.push({ label: `Type: ${filters.type}`, key: 'type' });
+    if (filters.quality) badges.push({ label: `Quality: ${filters.quality}`, key: 'quality' });
+    if (filters.weight) badges.push({ label: `Weight: ${filters.weight}`, key: 'weight' });
+    if (filters.brand.length > 0) {
+      filters.brand.forEach(brand =>
+        badges.push({ label: `Brand: ${brand}`, key: 'brand', value: brand })
+      );
+    }
+    if (filters.priceRange[0] !== 0 || filters.priceRange[1] !== 5000) {
+      badges.push({
+        label: `Price: ₹${filters.priceRange[0]} - ₹${filters.priceRange[1]}`,
+        key: 'priceRange'
+      });
+    }
+    if (filters.dietPreference.length > 0) {
+      filters.dietPreference.forEach(diet =>
+        badges.push({ label: `Diet: ${diet}`, key: 'dietPreference', value: diet })
+      );
+    }
+    if (filters.cookingPurpose.length > 0) {
+      filters.cookingPurpose.forEach(purpose =>
+        badges.push({ label: `Purpose: ${purpose}`, key: 'cookingPurpose', value: purpose })
+      );
+    }
+    if (filters.ratings > 0) badges.push({ label: `${filters.ratings}★ & above`, key: 'ratings' });
+    if (filters.stockAvailability) badges.push({ label: filters.stockAvailability, key: 'stockAvailability' });
+
+    return badges;
+  }, [filters]);
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4 }}>
-      <Box sx={{ display: 'flex', gap: 2, mb: 4 }}>
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      {/* Search and Filter Bar */}
+      <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap' }}>
         <TextField
           fullWidth
-          label="Search by Product, City, or Pincode"
+          label="Search by Product, Brand, or Description"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon />
+              </InputAdornment>
+            ),
+            endAdornment: searchQuery && (
+              <InputAdornment position="end">
+                <IconButton size="small" onClick={() => setSearchQuery('')}>
+                  <CloseIcon />
+                </IconButton>
+              </InputAdornment>
+            ),
+          }}
+          sx={{ flex: 1, minWidth: '250px' }}
         />
         <Button
           variant="outlined"
           startIcon={<FilterListIcon />}
           onClick={() => setOpenDrawer(true)}
+          sx={{ minWidth: '120px' }}
         >
-          Filter
+          Filters
         </Button>
+        <FormControl sx={{ minWidth: '180px' }}>
+          <InputLabel>Sort By</InputLabel>
+          <Select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            label="Sort By"
+            startAdornment={<SortIcon sx={{ mr: 1, color: 'action.active' }} />}
+          >
+            {sortOptions.map((option) => (
+              <MenuItem key={option.value} value={option.value}>
+                {option.label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
       </Box>
 
+      {/* Active Filter Badges */}
+      {(activeFilterBadges.length > 0 || searchQuery) && (
+        <Box sx={{ mb: 3 }}>
+          <Stack direction="row" spacing={1} flexWrap="wrap" alignItems="center" sx={{ gap: 1 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>
+              Active Filters:
+            </Typography>
+            {searchQuery && (
+              <Chip
+                label={`Search: "${searchQuery}"`}
+                onDelete={() => setSearchQuery('')}
+                color="primary"
+                size="small"
+              />
+            )}
+            {activeFilterBadges.map((badge, index) => (
+              <Chip
+                key={`${badge.key}-${badge.value || index}`}
+                label={badge.label}
+                onDelete={() => handleRemoveFilter(badge.key, badge.value)}
+                color="primary"
+                variant="outlined"
+                size="small"
+              />
+            ))}
+            <Button
+              size="small"
+              startIcon={<ClearAllIcon />}
+              onClick={handleClearAllFilters}
+              sx={{ ml: 1 }}
+            >
+              Clear All
+            </Button>
+          </Stack>
+        </Box>
+      )}
+
+      {/* Result Count */}
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        {productLoading ? 'Loading...' : `${sortedProducts.length} product${sortedProducts.length !== 1 ? 's' : ''} found`}
+      </Typography>
+
+      {/* Filter Drawer */}
       <Drawer anchor="right" open={openDrawer} onClose={() => setOpenDrawer(false)}>
-        <Box sx={{ width: 300, p: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            Filter Products
-          </Typography>
+        <Box sx={{ width: 320, p: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Typography variant="h6">Filter Products</Typography>
+            <IconButton onClick={() => setOpenDrawer(false)}>
+              <CloseIcon />
+            </IconButton>
+          </Box>
+
+          <Divider sx={{ mb: 3 }} />
+
+          {/* Category Filter */}
           <FormControl fullWidth sx={{ mb: 2 }}>
             <InputLabel>Category</InputLabel>
             <Select
@@ -154,6 +367,7 @@ const ProductFilter = () => {
               onChange={(e) => handleFilterChange('category', e.target.value)}
               label="Category"
             >
+              <MenuItem value="">All Categories</MenuItem>
               {categories.map((cat) => (
                 <MenuItem key={cat} value={cat}>
                   {cat}
@@ -161,6 +375,20 @@ const ProductFilter = () => {
               ))}
             </Select>
           </FormControl>
+
+          {/* Brand Filter */}
+          <Autocomplete
+            multiple
+            options={brands}
+            value={filters.brand}
+            onChange={(e, newValue) => handleFilterChange('brand', newValue)}
+            renderInput={(params) => (
+              <TextField {...params} label="Brand" placeholder="Select brands" />
+            )}
+            sx={{ mb: 2 }}
+          />
+
+          {/* Type Filter */}
           <FormControl fullWidth sx={{ mb: 2 }}>
             <InputLabel>Type</InputLabel>
             <Select
@@ -168,19 +396,18 @@ const ProductFilter = () => {
               onChange={(e) => handleFilterChange('type', e.target.value)}
               label="Type"
             >
+              <MenuItem value="">All Types</MenuItem>
               <MenuItem value="Sona Masuri">Sona Masuri</MenuItem>
               <MenuItem value="Samba Masuri (BPT 5204)">Samba Masuri (BPT 5204)</MenuItem>
               <MenuItem value="Telangana Sona (RNR 15048)">Telangana Sona (RNR 15048)</MenuItem>
               <MenuItem value="Swarna (MTU 7029)">Swarna (MTU 7029)</MenuItem>
-              <MenuItem value="Jagtial Sannalu (JGL 1798, JGL 3844)">Jagtial Sannalu (JGL 1798, JGL 3844)</MenuItem>
-              <MenuItem value="Kunaram Sannalu (KNM 118, KNM 1189)">Kunaram Sannalu (KNM 118, KNM 1189)</MenuItem>
-              <MenuItem value="Tellahamsa">Tellahamsa</MenuItem>
-              <MenuItem value="Red Rice (Erramallelu, Champa)">Red Rice (Erramallelu, Champa)</MenuItem>
-              <MenuItem value="Brown Rice">Brown Rice</MenuItem>
               <MenuItem value="Basmati">Basmati</MenuItem>
+              <MenuItem value="Brown Rice">Brown Rice</MenuItem>
               <MenuItem value="Parboiled Rice">Parboiled Rice</MenuItem>
             </Select>
           </FormControl>
+
+          {/* Quality Filter */}
           <FormControl fullWidth sx={{ mb: 2 }}>
             <InputLabel>Quality</InputLabel>
             <Select
@@ -188,11 +415,14 @@ const ProductFilter = () => {
               onChange={(e) => handleFilterChange('quality', e.target.value)}
               label="Quality"
             >
-              <MenuItem value="Premium (export grade, organic certified)">Premium (export grade, organic certified)</MenuItem>
-              <MenuItem value="Standard (fine rice for daily use)">Standard (fine rice for daily use)</MenuItem>
-              <MenuItem value="Broken rice (budget-friendly)">Broken rice (budget-friendly)</MenuItem>
+              <MenuItem value="">All Qualities</MenuItem>
+              <MenuItem value="Premium (export grade, organic certified)">Premium</MenuItem>
+              <MenuItem value="Standard (fine rice for daily use)">Standard</MenuItem>
+              <MenuItem value="Broken rice (budget-friendly)">Broken Rice</MenuItem>
             </Select>
           </FormControl>
+
+          {/* Weight Filter */}
           <FormControl fullWidth sx={{ mb: 2 }}>
             <InputLabel>Weight (kgs)</InputLabel>
             <Select
@@ -200,6 +430,7 @@ const ProductFilter = () => {
               onChange={(e) => handleFilterChange('weight', e.target.value)}
               label="Weight (kgs)"
             >
+              <MenuItem value="">All Weights</MenuItem>
               <MenuItem value="1 kg">1 kg</MenuItem>
               <MenuItem value="5 kg">5 kg</MenuItem>
               <MenuItem value="10 kg">10 kg</MenuItem>
@@ -207,7 +438,11 @@ const ProductFilter = () => {
               <MenuItem value="50 kg">50 kg</MenuItem>
             </Select>
           </FormControl>
-          <Typography variant="body1" gutterBottom>Price Range</Typography>
+
+          {/* Price Range */}
+          <Typography variant="body1" gutterBottom sx={{ mt: 3 }}>
+            Price Range: ₹{filters.priceRange[0]} - ₹{filters.priceRange[1]}
+          </Typography>
           <Slider
             value={filters.priceRange}
             onChange={(e, newValue) => handleFilterChange('priceRange', newValue)}
@@ -215,56 +450,10 @@ const ProductFilter = () => {
             min={0}
             max={5000}
             step={100}
-            sx={{ mb: 2 }}
+            sx={{ mb: 3 }}
           />
-          <FormControl fullWidth sx={{ mb: 2 }}>
-            <InputLabel>Diet Preference</InputLabel>
-            <Select
-              multiple
-              value={filters.dietPreference}
-              onChange={(e) => handleFilterChange('dietPreference', e.target.value)}
-              label="Diet Preference"
-            >
-              <MenuItem value="Diabetic-friendly (low GI rice)">Diabetic-friendly (low GI rice)</MenuItem>
-              <MenuItem value="Gluten-free">Gluten-free</MenuItem>
-              <MenuItem value="Organic certified">Organic certified</MenuItem>
-            </Select>
-          </FormControl>
-          <FormControl fullWidth sx={{ mb: 2 }}>
-            <InputLabel>Cooking Purpose</InputLabel>
-            <Select
-              multiple
-              value={filters.cookingPurpose}
-              onChange={(e) => handleFilterChange('cookingPurpose', e.target.value)}
-              label="Cooking Purpose"
-            >
-              <MenuItem value="Biryani rice">Biryani rice</MenuItem>
-              <MenuItem value="Daily use">Daily use</MenuItem>
-              <MenuItem value="Idly/Dosa rice">Idly/Dosa rice</MenuItem>
-              <MenuItem value="Sweet rice">Sweet rice</MenuItem>
-            </Select>
-          </FormControl>
-          <TextField
-            fullWidth
-            label="Seller Location"
-            value={filters.sellerLocation}
-            onChange={(e) => handleFilterChange('sellerLocation', e.target.value)}
-            variant="outlined"
-            sx={{ mb: 2 }}
-          />
-          <FormControl fullWidth sx={{ mb: 2 }}>
-            <InputLabel>Delivery Options</InputLabel>
-            <Select
-              multiple
-              value={filters.deliveryOptions}
-              onChange={(e) => handleFilterChange('deliveryOptions', e.target.value)}
-              label="Delivery Options"
-            >
-              <MenuItem value="Express delivery">Express delivery</MenuItem>
-              <MenuItem value="Standard delivery">Standard delivery</MenuItem>
-              <MenuItem value="Bulk order supply">Bulk order supply</MenuItem>
-            </Select>
-          </FormControl>
+
+          {/* Rating Filter */}
           <FormControl fullWidth sx={{ mb: 2 }}>
             <InputLabel>Ratings & Reviews</InputLabel>
             <Select
@@ -272,26 +461,15 @@ const ProductFilter = () => {
               onChange={(e) => handleFilterChange('ratings', e.target.value)}
               label="Ratings & Reviews"
             >
-              <MenuItem value={0}>All</MenuItem>
+              <MenuItem value={0}>All Ratings</MenuItem>
               <MenuItem value={4}>4★ & above</MenuItem>
               <MenuItem value={3}>3★ & above</MenuItem>
               <MenuItem value={2}>2★ & above</MenuItem>
               <MenuItem value={1}>1★ & above</MenuItem>
             </Select>
           </FormControl>
-          <FormControl fullWidth sx={{ mb: 2 }}>
-            <InputLabel>Discounts & Offers</InputLabel>
-            <Select
-              value={filters.discounts}
-              onChange={(e) => handleFilterChange('discounts', e.target.value)}
-              label="Discounts & Offers"
-            >
-              <MenuItem value="">All</MenuItem>
-              <MenuItem value="Under ₹500">Under ₹500</MenuItem>
-              <MenuItem value="Buy 1 Get 1">Buy 1 Get 1</MenuItem>
-              <MenuItem value="Festive offers">Festive offers</MenuItem>
-            </Select>
-          </FormControl>
+
+          {/* Stock Availability */}
           <FormControl fullWidth sx={{ mb: 2 }}>
             <InputLabel>Stock Availability</InputLabel>
             <Select
@@ -304,112 +482,156 @@ const ProductFilter = () => {
               <MenuItem value="Pre-order">Pre-order</MenuItem>
             </Select>
           </FormControl>
-          <Button
-            variant="contained"
-            fullWidth
-            sx={{ mt: 3 }}
-            onClick={handleApplyFilters}
-          >
-            Apply Filters
-          </Button>
+
+          <Divider sx={{ my: 3 }} />
+
+          {/* Action Buttons */}
+          <Stack spacing={2}>
+            <Button
+              variant="contained"
+              fullWidth
+              onClick={() => setOpenDrawer(false)}
+            >
+              Apply Filters
+            </Button>
+            <Button
+              variant="outlined"
+              fullWidth
+              startIcon={<ClearAllIcon />}
+              onClick={handleClearAllFilters}
+            >
+              Clear All Filters
+            </Button>
+          </Stack>
         </Box>
       </Drawer>
 
-      {productLoading || filteredLoading ? (
-        <Typography>Loading...</Typography>
-      ) : productError || filteredError ? (
-        <Alert severity="error">{productError || filteredError}</Alert>
+      {/* Products Grid */}
+      {productLoading ? (
+        <Grid container spacing={3}>
+          {[1, 2, 3, 4, 5, 6].map((item) => (
+            <Grid item xs={12} sm={6} md={4} lg={3} key={item}>
+              <Card>
+                <Skeleton variant="rectangular" height={200} />
+                <CardContent>
+                  <Skeleton variant="text" height={30} />
+                  <Skeleton variant="text" height={20} />
+                  <Skeleton variant="text" height={20} width="60%" />
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+      ) : productError ? (
+        <Alert severity="error">{productError}</Alert>
+      ) : sortedProducts.length === 0 ? (
+        <Box sx={{ textAlign: 'center', py: 8 }}>
+          <Typography variant="h6" color="text.secondary" gutterBottom>
+            No products found
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Try adjusting your filters or search query
+          </Typography>
+          <Button
+            variant="contained"
+            startIcon={<ClearAllIcon />}
+            onClick={handleClearAllFilters}
+          >
+            Clear All Filters
+          </Button>
+        </Box>
       ) : (
         <Grid container spacing={3}>
-          {displayedProducts.map((product) => {
+          {sortedProducts.map((product) => {
             const hasOffer =
               typeof product.offerPrice === 'number' &&
               product.offerPrice > 0 &&
               product.offerPrice < product.price;
             const displayPrice = hasOffer ? product.offerPrice : product.price;
-            const isImageLoading = imageLoading[product._id] || true;
+            const isImageLoading = imageLoading[product._id] !== false;
 
             return (
-              <Grid item xs={12} sm={6} md={4} key={product._id}>
+              <Grid item xs={12} sm={6} md={4} lg={3} key={product._id}>
                 <Card
                   onClick={() => navigate(`/products/${product._id}`)}
                   sx={{
                     cursor: 'pointer',
-                    transition: 'transform 0.3s',
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    transition: 'transform 0.2s, box-shadow 0.2s',
                     '&:hover': {
-                      transform: 'translateY(-5px)',
-                      boxShadow: '0 10px 20px rgba(0,0,0,0.1)',
+                      transform: 'translateY(-4px)',
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
                     },
                   }}
                 >
                   {isImageLoading ? (
-                    <Skeleton variant="rectangular" height={140} />
+                    <Skeleton variant="rectangular" height={200} />
                   ) : (
                     <CardMedia
                       component="img"
-                      height="140"
+                      height="200"
                       image={product.images?.[0] || '/default-image.jpg'}
                       alt={product.name}
                       onLoad={() => handleImageLoad(product._id)}
                       onError={() => handleImageError(product._id)}
-                      sx={{ objectFit: 'cover' }}
+                      sx={{ objectFit: 'contain', backgroundColor: '#f5f5f5', p: 2 }}
                     />
                   )}
-                  <CardContent>
-                    <Typography variant="h6" noWrap>
+                  <CardContent sx={{ flexGrow: 1 }}>
+                    <Typography variant="h6" noWrap gutterBottom>
                       {product.name}
                     </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mt: 1, gap: 1 }}>
-                      <Typography variant="body1" sx={{ fontWeight: 'bold', color: '#2E7D32' }}>
-                        ₹{(displayPrice || 0).toFixed(2)}
+                    <Typography variant="body2" color="text.secondary" noWrap sx={{ mb: 1 }}>
+                      {product.brand}
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                      <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'success.main' }}>
+                        <Price amount={displayPrice || 0} />
                       </Typography>
                       {hasOffer && (
-                        <Typography
-                          variant="body2"
-                          sx={{ textDecoration: 'line-through', color: '#757575' }}
-                        >
-                          ₹{(product.price || 0).toFixed(2)}
-                        </Typography>
+                        <>
+                          <Typography
+                            variant="body2"
+                            sx={{ textDecoration: 'line-through', color: 'text.secondary' }}
+                          >
+                            <Price amount={product.price || 0} />
+                          </Typography>
+                          <Chip label="OFFER" size="small" color="error" sx={{ height: 20 }} />
+                        </>
                       )}
                     </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-                      <StarIcon color="warning" fontSize="small" />
-                      <Typography variant="body2" sx={{ ml: 0.5 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <StarIcon sx={{ color: 'warning.main', fontSize: 18 }} />
+                      <Typography variant="body2">
                         {product.rating || 0} ({product.numReviews || 0})
                       </Typography>
                     </Box>
                   </CardContent>
-                  <CardActions>
+                  <CardActions sx={{ p: 2, pt: 0 }}>
                     <Button
                       variant="contained"
-                      color="primary"
+                      size="small"
+                      fullWidth
                       onClick={(e) => {
                         e.stopPropagation();
                         handleBuyNow(product._id);
                       }}
-                      sx={{ backgroundColor: '#8BC34A', '&:hover': { backgroundColor: '#7CB342' } }}
+                      sx={{ mb: 1 }}
                     >
                       Buy Now
                     </Button>
                     <Button
                       variant="outlined"
+                      size="small"
+                      fullWidth
                       onClick={(e) => {
                         e.stopPropagation();
                         handleAddToCart(product._id);
                       }}
-                      sx={{ color: '#4CAF50', borderColor: '#4CAF50', '&:hover': { borderColor: '#45A049', color: '#45A049' } }}
                     >
                       Add to Cart
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAddToWishlist(product._id);
-                      }}
-                      sx={{ color: '#4CAF50', borderColor: '#4CAF50', '&:hover': { borderColor: '#45A049', color: '#45A049' } }}
-                    >
-                      Add to Wishlist
                     </Button>
                   </CardActions>
                 </Card>
