@@ -254,9 +254,17 @@ const approveRecipe = asyncHandler(async (req, res) => {
 // @access  Private
 const rateRecipe = asyncHandler(async (req, res) => {
   const { rating } = req.body;
-  if (!rating || rating < 1 || rating > 5) {
+
+  // Enhanced validation to prevent crashes
+  if (!rating) {
     res.status(400);
-    throw new Error('Please provide a rating between 1 and 5');
+    throw new Error('Please select a rating before submitting');
+  }
+
+  const numRating = Number(rating);
+  if (isNaN(numRating) || numRating < 1 || numRating > 5) {
+    res.status(400);
+    throw new Error('Please provide a valid rating between 1 and 5');
   }
 
   const recipe = await Recipe.findById(req.params.id);

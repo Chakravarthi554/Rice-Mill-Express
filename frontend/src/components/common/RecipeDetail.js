@@ -62,6 +62,7 @@ const RecipeDetail = () => {
   const [sortBy, setSortBy] = useState('recent');
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [anchorElSort, setAnchorElSort] = useState(null);
+  const [copySuccess, setCopySuccess] = useState(false);
 
   const recipeDetails = useSelector((state) => state.recipeDetails);
   const { loading, error, recipe } = recipeDetails || { recipe: {} };
@@ -137,6 +138,25 @@ const RecipeDetail = () => {
     }
     if (shareLink) window.open(shareLink, '_blank', 'width=600,height=400');
     setShowShareDialog(false);
+  };
+
+  const handleCopyLink = async () => {
+    const shareUrl = `${window.location.origin}/recipes/${recipeId}`;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (err) {
+      alert('Failed to copy link');
+    }
+  };
+
+  const handleSubmitRating = () => {
+    if (!userInfo) return alert('Please log in to rate this recipe.');
+    if (!rating || rating < 1 || rating > 5) {
+      return alert('Please select a rating between 1 and 5 stars before submitting.');
+    }
+    dispatch(rateRecipe(recipeId, rating));
   };
 
   const handleAddToCart = (productId) => {
@@ -312,7 +332,7 @@ const RecipeDetail = () => {
               <Collapse in={rating > 0 || (recipe.ratings?.some(r => r.userId === userInfo?._id))}>
                 <Box sx={{ mt: 2, textAlign: 'center' }}>
                   <Rating value={rating} onChange={(e, v) => setRating(v)} />
-                  <Button size="small" onClick={() => dispatch(rateRecipe(recipeId, rating))}>Submit</Button>
+                  <Button size="small" onClick={handleSubmitRating}>Submit</Button>
                 </Box>
               </Collapse>
             </Box>
@@ -380,6 +400,14 @@ const RecipeDetail = () => {
         <DialogTitle>Share Recipe</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
+            <Button
+              variant="contained"
+              color={copySuccess ? 'success' : 'primary'}
+              onClick={handleCopyLink}
+            >
+              {copySuccess ? '✓ Link Copied!' : '🔗 Copy Link'}
+            </Button>
+            <Divider>OR</Divider>
             <Button variant="outlined" startIcon={<span style={{ color: '#25D366' }}>📱</span>} onClick={() => handleShare('whatsapp')}>WhatsApp</Button>
             <Button variant="outlined" startIcon={<span style={{ color: '#1DA1F2' }}>🐦</span>} onClick={() => handleShare('twitter')}>Twitter</Button>
             <Button variant="outlined" startIcon={<span style={{ color: '#1877F2' }}>📘</span>} onClick={() => handleShare('facebook')}>Facebook</Button>
