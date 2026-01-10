@@ -20,14 +20,14 @@ import {
   Schedule
 } from '@mui/icons-material';
 
-const ModerationItem = ({ 
-  item, 
-  onApprove, 
-  onReject, 
-  onDelete, 
+const ModerationItem = ({
+  item,
+  onApprove,
+  onReject,
+  onDelete,
   onPin,
   getTypeIcon,
-  getTypeColor 
+  getTypeColor
 }) => {
   const formatTimeAgo = (dateString) => {
     const date = new Date(dateString);
@@ -47,6 +47,7 @@ const ModerationItem = ({
   };
 
   const truncateContent = (content, maxLength = 150) => {
+    if (!content) return 'No content available';
     if (content.length <= maxLength) return content;
     return content.substring(0, maxLength) + '...';
   };
@@ -84,7 +85,7 @@ const ModerationItem = ({
               />
             )}
           </Box>
-          
+
           <Box display="flex" alignItems="center" gap={0.5}>
             <Tooltip title={formatTimeAgo(item.createdAt)}>
               <Chip
@@ -128,7 +129,7 @@ const ModerationItem = ({
                 </IconButton>
               </Tooltip>
             )}
-            
+
             <Button
               startIcon={<ThumbUp />}
               onClick={onApprove}
@@ -138,7 +139,7 @@ const ModerationItem = ({
             >
               Approve
             </Button>
-            
+
             <Button
               startIcon={<ThumbDown />}
               onClick={onReject}
@@ -148,7 +149,7 @@ const ModerationItem = ({
             >
               Reject
             </Button>
-            
+
             <Button
               startIcon={<Delete />}
               onClick={onDelete}

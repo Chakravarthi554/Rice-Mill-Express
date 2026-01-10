@@ -68,6 +68,7 @@ const notificationSchema = new mongoose.Schema(
         'Payment',
         'User',
         'ForumPost',
+        'ForumPostReport',
         'BulkOrder',
         'Recipe',
         'KycApplication',
@@ -95,7 +96,7 @@ const notificationSchema = new mongoose.Schema(
     },
     expiresAt: {
       type: Date,
-      default: function() {
+      default: function () {
         return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
       }
     },
@@ -121,10 +122,10 @@ notificationSchema.index({ type: 1, createdAt: -1 });
 notificationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 // Virtual for time ago
-notificationSchema.virtual('timeAgo').get(function() {
+notificationSchema.virtual('timeAgo').get(function () {
   const now = new Date();
   const diffInSeconds = Math.floor((now - this.createdAt) / 1000);
- 
+
   if (diffInSeconds < 60) return 'Just now';
   if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} min ago`;
   if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
@@ -132,9 +133,9 @@ notificationSchema.virtual('timeAgo').get(function() {
 });
 
 // Static method to create admin notifications
-notificationSchema.statics.createAdminNotification = async function(data) {
+notificationSchema.statics.createAdminNotification = async function (data) {
   const adminUsers = await mongoose.model('User').find({ role: 'admin' }).select('_id');
- 
+
   const notifications = adminUsers.map(admin => ({
     user: admin._id,
     type: data.type,
@@ -147,12 +148,12 @@ notificationSchema.statics.createAdminNotification = async function(data) {
     actionLabel: data.actionLabel,
     metadata: data.metadata
   }));
- 
+
   return this.insertMany(notifications);
 };
 
 // Method to mark as read
-notificationSchema.methods.markAsRead = function() {
+notificationSchema.methods.markAsRead = function () {
   this.read = true;
   this.readAt = new Date();
   return this.save();
