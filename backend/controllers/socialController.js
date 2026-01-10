@@ -1070,92 +1070,129 @@ const getRatingDistribution = asyncHandler(async (req, res) => {
 // @route   GET /api/:type/:id/comments/sorted
 // @access  Public
 const getSortedComments = asyncHandler(async (req, res) => {
-  const { type, id } = req.params;
-  const { sortBy = 'recent', page = 1, limit = 20 } = req.query;
-  const skip = (page - 1) * limit;
+  try {
+    const { type, id } = req.params;
+    const { sortBy = 'recent', page = 1, limit = 20 } = req.query;
+    const skip = (page - 1) * limit;
 
-  let Model;
-  switch (type) {
-    case 'products':
-      Model = Product;
-      break;
-    case 'recipes':
-      Model = Recipe;
-      break;
-    case 'forum':
-      Model = ForumPost;
-      break;
-    default:
-      res.status(400);
-      throw new Error('Invalid type');
-  }
+    let Model;
+    switch (type) {
+      case 'products':
+        Model = Product;
+        break;
+      case 'recipes':
+        Model = Recipe;
+        break;
+      case 'forum':
+        Model = ForumPost;
+        break;
+      default:
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid type. Must be products, recipes, or forum'
+        });
+    }
 
-  const item = await Model.findById(id)
-    .select('comments')
-    .populate('comments.user comments.userId', 'name profilePic');
+    const item = await Model.findById(id)
+      .select('comments')
+      .populate('comments.user comments.userId', 'name profilePic');
 
-  if (!item) {
-    res.status(404);
-    throw new Error(`${type.slice(0, -1)} not found`);
-  }
+    if (!item) {
+      return res.status(404).json({
+        success: false,
+        message: `${type.slice(0, -1)} not found`
+      });
+    }
 
-  // Handle case where comments don't exist or are empty
-  if (!item.comments || !Array.isArray(item.comments) || item.comments.length === 0) {
-    return res.json({
+    // Convert to plain object to avoid Mongoose issues
+    const itemObj = item.toObject ? item.toObject() : item;
+
+    // Safe access to comments array
+    const allComments = itemObj.comments || [];
+
+    // Handle case where comments don't exist or are empty
+    if (!Array.isArray(allComments) || allComments.length === 0) {
+      return res.status(200).json({
+        success: true,
+        comments: [],
+        total: 0,
+        page: Number(page),
+        pages: 0,
+        limit: Number(limit)
+      });
+    }
+
+    // Filter approved comments for non-admin users
+    // IMPORTANT: Schema uses 'approved', not 'isApproved'
+    let comments = req.user?.role === 'admin'
+      ? allComments
+      : allComments.filter(comment => comment && comment.approved === true && !comment.isFlagged);
+
+    // Filter out replies (only show top-level comments)
+    comments = comments.filter(comment => comment && !comment.parentComment);
+
+    // Handle empty comments after filtering
+    if (!comments || comments.length === 0) {
+      return res.status(200).json({
+        success: true,
+        comments: [],
+        total: 0,
+        page: Number(page),
+        pages: 0,
+        limit: Number(limit)
+      });
+    }
+
+    // Sort comments safely
+    try {
+      switch (sortBy) {
+        case 'top':
+          comments.sort((a, b) => {
+            const aLikes = (a && a.likes && Array.isArray(a.likes)) ? a.likes.length : 0;
+            const bLikes = (b && b.likes && Array.isArray(b.likes)) ? b.likes.length : 0;
+            return bLikes - aLikes;
+          });
+          break;
+        case 'oldest':
+          comments.sort((a, b) => {
+            const aDate = a && a.createdAt ? new Date(a.createdAt) : new Date(0);
+            const bDate = b && b.createdAt ? new Date(b.createdAt) : new Date(0);
+            return aDate - bDate;
+          });
+          break;
+        case 'recent':
+        default:
+          comments.sort((a, b) => {
+            const aDate = a && a.createdAt ? new Date(a.createdAt) : new Date(0);
+            const bDate = b && b.createdAt ? new Date(b.createdAt) : new Date(0);
+            return bDate - aDate;
+          });
+          break;
+      }
+    } catch (sortError) {
+      console.error('Error sorting comments:', sortError);
+      // Continue with unsorted comments rather than crashing
+    }
+
+    // Apply pagination safely
+    const paginatedComments = comments.slice(skip, Math.min(skip + Number(limit), comments.length));
+
+    return res.status(200).json({
       success: true,
-      comments: [],
-      total: 0,
+      comments: paginatedComments,
+      total: comments.length,
       page: Number(page),
-      pages: 0,
+      pages: Math.ceil(comments.length / Number(limit)),
       limit: Number(limit)
     });
-  }
-
-  // Filter approved comments for non-admin users
-  let comments = req.user?.role === 'admin'
-    ? item.comments
-    : item.comments.filter(comment => comment.approved === true && !comment.isFlagged);
-
-  // Filter out replies (only show top-level comments)
-  comments = comments.filter(comment => !comment.parentComment);
-
-  // Handle empty comments after filtering
-  if (comments.length === 0) {
-    return res.json({
-      success: true,
-      comments: [],
-      total: 0,
-      page: Number(page),
-      pages: 0,
-      limit: Number(limit)
+  } catch (error) {
+    console.error('❌ getSortedComments error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error fetching sorted comments',
+      error: error.message
     });
   }
-
-  // Sort comments
-  switch (sortBy) {
-    case 'top':
-      comments.sort((a, b) => (b.likes?.length || 0) - (a.likes?.length || 0));
-      break;
-    case 'oldest':
-      comments.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-      break;
-    case 'recent':
-    default:
-      comments.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      break;
-  }
-
-  // Apply pagination
-  const paginatedComments = comments.slice(skip, skip + Number(limit));
-
-  res.json({
-    success: true,
-    comments: paginatedComments,
-    total: comments.length,
-    page: Number(page),
-    pages: Math.ceil(comments.length / limit),
-    limit: Number(limit)
-  });
 });
 
 // @desc    Get replies for a comment
