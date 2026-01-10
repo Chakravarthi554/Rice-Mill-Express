@@ -484,6 +484,15 @@ const reportPost = asyncHandler(async (req, res) => {
       severity = 'medium'
     } = req.body;
 
+    // Debug logging
+    console.log('📝 Report submission:', { postId: req.params.id, userId: req.user?._id, reportReason, reportCategory, severity });
+
+    // Validate required fields
+    if (!reportReason || !reportCategory) {
+      console.log('❌ Validation failed:', { reportReason, reportCategory });
+      return res.status(400).json({ message: 'Report reason and category are required' });
+    }
+
     const post = await ForumPost.findById(req.params.id);
     if (!post) return res.status(404).json({ message: 'Post not found' });
 
@@ -552,6 +561,7 @@ const reportPost = asyncHandler(async (req, res) => {
       Notification.create({
         user: admin._id,
         type: 'SYSTEM',
+        title: `New ${severity.toUpperCase()} Report`,
         message: `New ${severity} severity report on post: "${post.title.substring(0, 50)}..."`,
         relatedEntity: report._id,
         entityModel: 'ForumPostReport',
