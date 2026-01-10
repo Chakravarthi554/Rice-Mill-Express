@@ -14,6 +14,7 @@ const {
   getRatingDistribution
 } = require('../controllers/socialController');
 const { protect, role } = require('../middleware/auth');
+const { customerLimiter } = require('../middleware/rateLimit');
 
 // Social routes for products, recipes, and forum
 router.post('/:type/:id/like', protect, likeItem);

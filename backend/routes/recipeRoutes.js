@@ -13,6 +13,7 @@ const {
   deleteRecipe       // New controller function
 } = require('../controllers/recipeController');
 const asyncHandler = require('../middleware/asyncHandler');
+const { socialRateLimiter, strictSocialLimiter, customerLimiter } = require('../middleware/rateLimit');
 
 const { likeItem, addComment, getComments, trackShare } = require('../controllers/socialController');
 

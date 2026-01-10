@@ -196,7 +196,7 @@ if (mongoose.models.BulkOrder) {
   bulkOrderSchema.index({ buyer: 1, createdAt: -1 });
   bulkOrderSchema.index({ seller: 1, status: 1 });
   bulkOrderSchema.index({ status: 1, createdAt: -1 });
-  bulkOrderSchema.index({ orderNumber: 1 });
+  // bulkOrderSchema.index({ orderNumber: 1 }); // Removed to prevent duplicate index warning
   bulkOrderSchema.index({ 'items.product': 1 });
   bulkOrderSchema.index({ createdAt: -1 });
   bulkOrderSchema.index({ isActive: 1 });

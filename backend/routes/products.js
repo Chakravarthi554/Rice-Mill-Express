@@ -4,6 +4,7 @@ const router = express.Router();
 const auth = require("../middleware/auth");
 const upload = require("../utils/uploadMiddleware");
 const asyncHandler = require("../middleware/asyncHandler");
+const { customerLimiter } = require("../middleware/rateLimit");
 
 const {
   getProducts,

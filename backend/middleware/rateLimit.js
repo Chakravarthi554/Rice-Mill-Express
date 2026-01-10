@@ -37,7 +37,23 @@ const strictSocialLimiter = rateLimit({
     legacyHeaders: false,
 });
 
+/**
+ * General customer API rate limiter
+ * Limits to 100 requests per 15 minutes
+ */
+const customerLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100,
+    message: {
+        success: false,
+        message: 'Too many requests from this IP, please try again after 15 minutes'
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
 module.exports = {
     socialRateLimiter,
-    strictSocialLimiter
+    strictSocialLimiter,
+    customerLimiter
 };
