@@ -189,11 +189,23 @@ const getRecipeById = asyncHandler(async (req, res) => {
     .populate('comments.userId', 'name profilePic');
 
   if (recipe) {
+    // Convert to plain object for manipulation
+    const recipeObj = recipe.toObject();
+
+    // Debug logging
+    console.log(`📝 Recipe ${req.params.id}: Total comments = ${recipeObj.comments.length}`);
+    const approvedCount = recipeObj.comments.filter(c => c.approved).length;
+    console.log(`✅ Approved comments = ${approvedCount}`);
+
     // For non-admin users, only show approved comments
     if (req.user?.role !== 'admin') {
-      recipe.comments = recipe.comments.filter(comment => comment.approved);
+      recipeObj.comments = recipeObj.comments.filter(comment => comment.approved === true);
+      console.log(`👤 Non-admin user: Showing ${recipeObj.comments.length} approved comments`);
+    } else {
+      console.log(`👨‍💼 Admin user: Showing all ${recipeObj.comments.length} comments`);
     }
-    res.json(recipe);
+
+    res.json(recipeObj);
   } else {
     res.status(404);
     throw new Error('Recipe not found');

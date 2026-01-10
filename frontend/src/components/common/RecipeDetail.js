@@ -83,6 +83,7 @@ const RecipeDetail = () => {
     }
   }, [dispatch, recipeId, sortBy]);
 
+
   // Real-time updates
   useEffect(() => {
     const socket = getCurrentSocket();
@@ -92,6 +93,8 @@ const RecipeDetail = () => {
       if (data.itemId === recipeId || data.recipeId === recipeId) {
         if (['COMMENT', 'COMMENT_REPLY', 'COMMENT_APPROVED', 'COMMENT_LIKE'].includes(data.type)) {
           dispatch(getSortedComments('recipes', recipeId, sortBy));
+          // Also refresh recipe details to get updated comments
+          dispatch(getRecipeDetails(recipeId));
         }
         if (['LIKE', 'RATING'].includes(data.type)) {
           dispatch(getRecipeDetails(recipeId));
@@ -100,12 +103,22 @@ const RecipeDetail = () => {
       }
     };
 
+    const handleCommentApproved = (data) => {
+      if (data.itemId === recipeId) {
+        console.log('✅ Comment approved event received, refreshing recipe...');
+        dispatch(getRecipeDetails(recipeId));
+        dispatch(getSortedComments('recipes', recipeId, sortBy));
+      }
+    };
+
     socket.on('SOCIAL_UPDATE', handleSocialUpdate);
     socket.on('RECIPE_LIKED', handleSocialUpdate); // Legacy support
+    socket.on('COMMENT_APPROVED', handleCommentApproved);
 
     return () => {
       socket.off('SOCIAL_UPDATE', handleSocialUpdate);
       socket.off('RECIPE_LIKED', handleSocialUpdate);
+      socket.off('COMMENT_APPROVED', handleCommentApproved);
     };
   }, [recipeId, dispatch, sortBy]);
 
