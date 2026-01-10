@@ -1,163 +1,307 @@
-// [AI: BookmarksPage.js – added for viewing forum bookmarks]
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
-  Container, Typography, Box, Card, CardHeader, CardContent, CardActions,
-  Avatar, Button, Grid, Chip, CircularProgress, Alert
+  Container,
+  Typography,
+  Box,
+  Grid,
+  Card,
+  CardContent,
+  CardActions,
+  Button,
+  IconButton,
+  Avatar,
+  Chip,
+  TextField,
+  InputAdornment,
+  CircularProgress,
+  Alert,
+  Paper,
+  Divider
 } from '@mui/material';
 import {
-  Favorite, Comment, Share, MoreVert
+  Bookmark,
+  BookmarkBorder,
+  Search,
+  Visibility,
+  Delete,
+  Share,
+  Comment,
+  Favorite
 } from '@mui/icons-material';
-import { styled } from '@mui/material/styles';
-import { getBookmarks } from '../../redux/actions/userActions';
-
-const StyledPaper = styled(Card)(({ theme }) => ({
-  borderRadius: theme.spacing(2),
-  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-  marginBottom: theme.spacing(2),
-  transition: 'transform 0.2s',
-  '&:hover': {
-    transform: 'translateY(-2px)',
-    boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
-  },
-}));
 
 const BookmarksPage = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { userInfo } = useSelector((state) => state.userLogin);
+
   const [bookmarks, setBookmarks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
-    const fetchBookmarks = async () => {
-      try {
-        setLoading(true);
-        const data = await dispatch(getBookmarks());
-        setBookmarks(data);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     if (userInfo) {
       fetchBookmarks();
     }
-  }, [dispatch, userInfo]);
+  }, [userInfo, page]);
+
+  const fetchBookmarks = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/forum/bookmarks?page=${page}&limit=20`, {
+        headers: {
+          'Authorization': `Bearer ${userInfo.token}`
+        }
+      });
+      const data = await response.json();
+      setBookmarks(data.posts || []);
+      setTotalPages(data.pages || 1);
+    } catch (error) {
+      console.error('Error fetching bookmarks:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUnbookmark = async (postId) => {
+    try {
+      const response = await fetch(`/api/forum/${postId}/bookmark`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${userInfo.token}`
+        }
+      });
+
+      if (response.ok) {
+        // Remove from local state
+        setBookmarks(bookmarks.filter(post => post._id !== postId));
+      }
+    } catch (error) {
+      console.error('Error unbookmarking:', error);
+    }
+  };
+
+  const handleViewPost = (postId) => {
+    navigate(`/forum/post/${postId}`);
+  };
+
+  const filteredBookmarks = bookmarks.filter(post =>
+    post.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    post.content?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const getImageUrl = (path) => {
-    if (!path) return '/default-avatar.jpg';
-    if (path.startsWith('http')) return path;
-    return `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}${path}`;
+    if (!path) return '/default_avatar.jpg';
+    return path.startsWith('http') ? path : `${process.env.REACT_APP_API_URL || ''}${path}`;
   };
 
   if (!userInfo) {
     return (
-      <Container maxWidth="md" sx={{ py: 4 }}>
-        <Alert severity="info">Please login to view your bookmarks.</Alert>
-      </Container>
-    );
-  }
-
-  if (loading) {
-    return (
-      <Container maxWidth="md" sx={{ py: 4, textAlign: 'center' }}>
-        <CircularProgress />
-        <Typography sx={{ mt: 2 }}>Loading bookmarks...</Typography>
-      </Container>
-    );
-  }
-
-  if (error) {
-    return (
-      <Container maxWidth="md" sx={{ py: 4 }}>
-        <Alert severity="error">{error}</Alert>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Alert severity="warning">Please login to view your bookmarks</Alert>
       </Container>
     );
   }
 
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
-      <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main', mb: 4 }}>
-        My Bookmarks ({bookmarks.length})
-      </Typography>
-
-      {bookmarks.length === 0 ? (
-        <Box sx={{ textAlign: 'center', py: 8 }}>
-          <Typography variant="h6" color="text.secondary" gutterBottom>
-            No bookmarks yet
-          </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-            Start bookmarking forum posts to see them here.
-          </Typography>
-          <Button component={Link} to="/forum" variant="contained">
-            Browse Forum
-          </Button>
+    <Container maxWidth="lg" sx={{ py: 3 }}>
+      {/* Header */}
+      <Box sx={{ mb: 4 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+          <Bookmark sx={{ fontSize: 40, color: 'primary.main' }} />
+          <Box>
+            <Typography variant="h4" fontWeight="bold">
+              My Bookmarks
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {bookmarks.length} saved post{bookmarks.length !== 1 ? 's' : ''}
+            </Typography>
+          </Box>
         </Box>
-      ) : (
-        <Grid container spacing={2}>
-          {bookmarks.map((bookmark) => {
-            const post = bookmark.postId;
-            if (!post) return null; // Skip deleted posts
 
-            return (
-              <Grid item xs={12} key={bookmark._id}>
-                <StyledPaper>
-                  <CardHeader
-                    avatar={<Avatar src={getImageUrl(post.userId?.profilePic)}>{post.userId?.name?.[0]}</Avatar>}
-                    title={
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography variant="subtitle1" fontWeight="bold">
+        {/* Search */}
+        <TextField
+          fullWidth
+          placeholder="Search bookmarked posts..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Search />
+              </InputAdornment>
+            ),
+          }}
+          sx={{ bgcolor: 'background.paper', borderRadius: 2 }}
+        />
+      </Box>
+
+      {/* Loading State */}
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+          <CircularProgress />
+        </Box>
+      ) : filteredBookmarks.length === 0 ? (
+        /* Empty State */
+        <Paper sx={{ p: 8, textAlign: 'center', bgcolor: 'grey.50' }}>
+          <BookmarkBorder sx={{ fontSize: 80, color: 'text.secondary', mb: 2 }} />
+          <Typography variant="h5" gutterBottom>
+            {searchQuery ? 'No matching bookmarks' : 'No bookmarks yet'}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            {searchQuery
+              ? 'Try a different search term'
+              : 'Start bookmarking posts to save them for later reading'
+            }
+          </Typography>
+          {!searchQuery && (
+            <Button
+              variant="contained"
+              onClick={() => navigate('/forum')}
+              sx={{ borderRadius: 3 }}
+            >
+              Browse Forum
+            </Button>
+          )}
+        </Paper>
+      ) : (
+        /* Bookmarks Grid */
+        <>
+          <Grid container spacing={3}>
+            {filteredBookmarks.map((post) => (
+              <Grid item xs={12} key={post._id}>
+                <Card sx={{
+                  borderRadius: 3,
+                  boxShadow: 2,
+                  '&:hover': { boxShadow: 6 },
+                  transition: 'box-shadow 0.3s'
+                }}>
+                  <CardContent>
+                    {/* Post Header */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                      <Avatar
+                        src={getImageUrl(post.userId?.profilePic)}
+                        sx={{ width: 40, height: 40, mr: 2 }}
+                      >
+                        {post.userId?.name?.[0]}
+                      </Avatar>
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="subtitle2" fontWeight="bold">
                           {post.userId?.name}
                         </Typography>
-                        {post.status !== 'approved' && <Chip label="Pending" size="small" color="warning" />}
+                        <Typography variant="caption" color="text.secondary">
+                          {new Date(post.createdAt).toLocaleDateString()}
+                        </Typography>
                       </Box>
-                    }
-                    subheader={new Date(bookmark.bookmarkedAt).toLocaleDateString()}
-                  />
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
+                      <IconButton
+                        onClick={() => handleUnbookmark(post._id)}
+                        color="primary"
+                        size="small"
+                      >
+                        <Bookmark />
+                      </IconButton>
+                    </Box>
+
+                    {/* Post Title */}
+                    <Typography variant="h6" fontWeight="bold" gutterBottom>
                       {post.title}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      {post.content?.substring(0, 200)}{post.content?.length > 200 && '...'}
+
+                    {/* Post Content Preview */}
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{
+                        mb: 2,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: 'vertical'
+                      }}
+                    >
+                      {post.content}
                     </Typography>
+
+                    {/* Tags */}
                     {post.tags?.length > 0 && (
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
-                        {post.tags.map(tag => (
-                          <Chip key={tag} label={`#${tag}`} size="small" />
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 2 }}>
+                        {post.tags.map((tag) => (
+                          <Chip key={tag} label={`#${tag}`} size="small" variant="outlined" />
                         ))}
                       </Box>
                     )}
+
+                    <Divider sx={{ my: 1 }} />
+
+                    {/* Engagement Stats */}
+                    <Box sx={{ display: 'flex', gap: 3, mb: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Favorite sx={{ fontSize: 18, color: 'error.main' }} />
+                        <Typography variant="caption">
+                          {post.likes?.length || 0}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Comment sx={{ fontSize: 18, color: 'primary.main' }} />
+                        <Typography variant="caption">
+                          {post.comments?.filter(c => c.approved).length || 0}
+                        </Typography>
+                      </Box>
+                    </Box>
                   </CardContent>
+
+                  {/* Actions */}
                   <CardActions sx={{ px: 2, pb: 2 }}>
                     <Button
-                      component={Link}
-                      to={`/forum/post/${post._id}`}
-                      size="small"
-                      color="primary"
+                      variant="contained"
+                      startIcon={<Visibility />}
+                      onClick={() => handleViewPost(post._id)}
+                      sx={{ borderRadius: 2 }}
                     >
                       View Post
                     </Button>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 'auto' }}>
-                      <Favorite sx={{ fontSize: 16, color: 'error.main' }} />
-                      <Typography variant="body2" color="text.secondary">
-                        {post.likes?.length || 0}
-                      </Typography>
-                      <Comment sx={{ fontSize: 16, ml: 1 }} />
-                      <Typography variant="body2" color="text.secondary">
-                        {post.comments?.length || 0}
-                      </Typography>
-                    </Box>
+                    <Button
+                      variant="outlined"
+                      startIcon={<Delete />}
+                      onClick={() => handleUnbookmark(post._id)}
+                      color="error"
+                      sx={{ borderRadius: 2 }}
+                    >
+                      Remove
+                    </Button>
                   </CardActions>
-                </StyledPaper>
+                </Card>
               </Grid>
-            );
-          })}
-        </Grid>
+            ))}
+          </Grid>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4, gap: 2 }}>
+              <Button
+                variant="outlined"
+                disabled={page === 1}
+                onClick={() => setPage(page - 1)}
+              >
+                Previous
+              </Button>
+              <Typography sx={{ display: 'flex', alignItems: 'center', px: 2 }}>
+                Page {page} of {totalPages}
+              </Typography>
+              <Button
+                variant="outlined"
+                disabled={page === totalPages}
+                onClick={() => setPage(page + 1)}
+              >
+                Next
+              </Button>
+            </Box>
+          )}
+        </>
       )}
     </Container>
   );

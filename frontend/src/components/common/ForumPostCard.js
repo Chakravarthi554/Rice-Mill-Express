@@ -16,6 +16,7 @@ import {
 } from '../../redux/actions/forumActions';
 import { bookmarkPost, unbookmarkPost } from '../../redux/actions/userActions';
 import { emitSocialAction } from '../../utils/socket';
+import ReportModal from './ReportModal';
 
 const ForumPostCard = ({ post, onUpdate }) => {
   const dispatch = useDispatch();
@@ -27,7 +28,6 @@ const ForumPostCard = ({ post, onUpdate }) => {
   const [commentOpen, setCommentOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
-  const [reportReason, setReportReason] = useState('');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [isBookmarked, setIsBookmarked] = useState(false);
 
@@ -120,14 +120,14 @@ const ForumPostCard = ({ post, onUpdate }) => {
     showSnackbar('Shared!', 'success');
   };
 
-  const handleReport = async () => {
+  const handleReport = async (reportData) => {
     try {
-      await dispatch(reportPost(currentPost._id, reportReason));
+      await dispatch(reportPost(currentPost._id, reportData));
       setReportOpen(false);
-      setReportReason('');
-      showSnackbar('Post reported', 'success');
-    } catch {
-      showSnackbar('Failed to report', 'error');
+      showSnackbar('Report submitted successfully. Thank you for keeping our community safe.', 'success');
+    } catch (error) {
+      showSnackbar(error.message || 'Failed to submit report', 'error');
+      throw error; // Re-throw to let ReportModal handle it
     }
   };
 
@@ -240,18 +240,13 @@ const ForumPostCard = ({ post, onUpdate }) => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={reportOpen} onClose={() => setReportOpen(false)}>
-        <DialogTitle>Report Post</DialogTitle>
-        <DialogContent>
-          {['Spam', 'Harassment', 'Inappropriate', 'Other'].map(r => (
-            <Button key={r} fullWidth variant={reportReason === r ? 'contained' : 'outlined'} onClick={() => setReportReason(r)}>{r}</Button>
-          ))}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setReportOpen(false)}>Cancel</Button>
-          <Button onClick={handleReport} variant="contained" color="error" disabled={!reportReason}>Report</Button>
-        </DialogActions>
-      </Dialog>
+      {/* Enhanced Report Modal */}
+      <ReportModal
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        post={currentPost}
+        onSubmit={handleReport}
+      />
 
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
         <MenuItem onClick={() => { setAnchorEl(null); navigate(`/forum/post/${currentPost._id}`); }}>View</MenuItem>

@@ -42,6 +42,25 @@ import {
   FORUM_POST_LIST_LIVE_REQUEST,
   FORUM_POST_LIST_LIVE_SUCCESS,
   FORUM_POST_LIST_LIVE_FAIL,
+  // New report and bookmark constants
+  FORUM_REPORTS_LIST_REQUEST,
+  FORUM_REPORTS_LIST_SUCCESS,
+  FORUM_REPORTS_LIST_FAIL,
+  FORUM_REPORT_DETAILS_REQUEST,
+  FORUM_REPORT_DETAILS_SUCCESS,
+  FORUM_REPORT_DETAILS_FAIL,
+  FORUM_REPORT_ACTION_REQUEST,
+  FORUM_REPORT_ACTION_SUCCESS,
+  FORUM_REPORT_ACTION_FAIL,
+  FORUM_REPORT_STATS_REQUEST,
+  FORUM_REPORT_STATS_SUCCESS,
+  FORUM_REPORT_STATS_FAIL,
+  FORUM_BOOKMARK_REQUEST,
+  FORUM_BOOKMARK_SUCCESS,
+  FORUM_BOOKMARK_FAIL,
+  FORUM_BOOKMARKS_LIST_REQUEST,
+  FORUM_BOOKMARKS_LIST_SUCCESS,
+  FORUM_BOOKMARKS_LIST_FAIL,
 } from '../constants/ForumConstants';
 import { handleApiError } from '../../utils/handleApiError';
 import axiosInstance from '../../utils/axiosInstance';
@@ -363,8 +382,8 @@ export const approvePost = (postId, status) => async (dispatch, getState) => {
   }
 };
 
-// Report Post
-export const reportPost = (postId, reason = '') => async (dispatch, getState) => {
+// Report Post - Enhanced with comprehensive data
+export const reportPost = (postId, reportData) => async (dispatch, getState) => {
   try {
     dispatch({ type: FORUM_POST_REPORT_REQUEST });
 
@@ -374,7 +393,7 @@ export const reportPost = (postId, reason = '') => async (dispatch, getState) =>
     const config = getAuthConfig(userInfo);
 
     const { data } = await safeApiCall(
-      () => axiosInstance.post(`/api/forum/${postId}/report`, { reason }, config),
+      () => axiosInstance.post(`/api/forum/${postId}/report`, reportData, config),
       'Report post failed'
     );
 
@@ -593,6 +612,104 @@ export const getForumPostsLive = (page = 1, limit = 50, category = '', search = 
   } catch (error) {
     const message = handleApiError(error);
     dispatch({ type: FORUM_POST_LIST_LIVE_FAIL, payload: message });
+    return Promise.reject(message);
+  }
+};
+//  NEW: Get all reports (Admin only)
+export const getReports = (filters = {}) => async (dispatch, getState) => {
+  try {
+    dispatch({ type: FORUM_REPORTS_LIST_REQUEST });
+
+    const {
+      userLogin: { userInfo },
+    } = getState();
+
+    if (!userInfo || userInfo.role !== 'admin') {
+      throw new Error('Admin access required');
+    }
+
+    const config = getAuthConfig(userInfo);
+    const params = new URLSearchParams(filters).toString();
+
+    const { data } = await safeApiCall(
+      () => axiosInstance.get(/api/admin/forum/reports?+params, config),
+      'Fetch reports failed'
+    );
+
+    dispatch({
+      type: FORUM_REPORTS_LIST_SUCCESS,
+      payload: data,
+    });
+
+    return Promise.resolve(data);
+  } catch (error) {
+    const message = handleApiError(error);
+    dispatch({
+      type: FORUM_REPORTS_LIST_FAIL,
+      payload: message,
+    });
+    return Promise.reject(message);
+  }
+};
+
+//  NEW: Toggle bookmark on post
+export const toggleBookmark = (postId) => async (dispatch, getState) => {
+  try {
+    dispatch({ type: FORUM_BOOKMARK_REQUEST });
+
+    const {
+      userLogin: { userInfo },
+    } = getState();
+    const config = getAuthConfig(userInfo);
+
+    const { data } = await safeApiCall(
+      () => axiosInstance.post(/api/forum/+postId+/bookmark, {}, config),
+      'Bookmark action failed'
+    );
+
+    dispatch({
+      type: FORUM_BOOKMARK_SUCCESS,
+      payload: data,
+    });
+
+    return Promise.resolve(data);
+  } catch (error) {
+    const message = handleApiError(error);
+    dispatch({
+      type: FORUM_BOOKMARK_FAIL,
+      payload: message,
+    });
+    return Promise.reject(message);
+  }
+};
+
+//  NEW: Get user's bookmarked posts
+export const getUserBookmarks = (page = 1, limit = 20) => async (dispatch, getState) => {
+  try {
+    dispatch({ type: FORUM_BOOKMARKS_LIST_REQUEST });
+
+    const {
+      userLogin: { userInfo },
+    } = getState();
+    const config = getAuthConfig(userInfo);
+
+    const { data } = await safeApiCall(
+      () => axiosInstance.get(/api/forum/bookmarks?page=+page+&limit=+limit, config),
+      'Fetch bookmarks failed'
+    );
+
+    dispatch({
+      type: FORUM_BOOKMARKS_LIST_SUCCESS,
+      payload: data,
+    });
+
+    return Promise.resolve(data);
+  } catch (error) {
+    const message = handleApiError(error);
+    dispatch({
+      type: FORUM_BOOKMARKS_LIST_FAIL,
+      payload: message,
+    });
     return Promise.reject(message);
   }
 };

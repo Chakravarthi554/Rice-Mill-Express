@@ -15,6 +15,12 @@ const {
   reportComment,
   getFlaggedComments,
   getAdminStats,
+  getReports,
+  getReportById,
+  takeReportAction,
+  getReportStats,
+  bookmarkPost,
+  getUserBookmarks,
   customerLimiter,
   sellerLimiter
 } = require('../controllers/forumController');
@@ -50,5 +56,15 @@ router.get('/admin/stats', protect, admin, getAdminStats);
 
 // 🔥 NEW: Mixed role routes - protect first, then specific roles
 router.post('/:postId/comments/:commentId/report', protect, reportComment);
+
+// 🔥 NEW: Report management routes (Admin only)
+router.get('/admin/reports', protect, admin, getReports);
+router.get('/admin/reports/stats', protect, admin, getReportStats);
+router.get('/admin/reports/:reportId', protect, admin, getReportById);
+router.post('/admin/reports/:reportId/action', protect, admin, takeReportAction);
+
+// 🔥 NEW: Bookmark routes (Protected)
+router.post('/:id/bookmark', protect, bookmarkPost);
+router.get('/bookmarks', protect, getUserBookmarks);
 
 module.exports = router;
