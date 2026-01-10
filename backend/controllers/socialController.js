@@ -1222,6 +1222,9 @@ const getSocialStats = asyncHandler(async (req, res) => {
 module.exports = {
   likeItem,
   addComment,
+  getComments,
+  approveComment,
+  deleteComment,
   getSocialStats,
   getCommentReplies,
   getSortedComments,
@@ -1230,8 +1233,6 @@ module.exports = {
   getFlaggedComments,
   moderateComment,
   getEngagementAnalytics,
-  customerLimiter,
-  sellerLimiter,
   editComment,
   likeComment,
   trackShare,
