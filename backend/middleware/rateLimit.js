@@ -17,6 +17,7 @@ const socialRateLimiter = rateLimit({
     },
     standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
     legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+    validate: { defaultKeys: false } // Fix for IPv6 key generator error
 });
 
 /**
@@ -35,6 +36,7 @@ const strictSocialLimiter = rateLimit({
     },
     standardHeaders: true,
     legacyHeaders: false,
+    validate: { defaultKeys: false } // Fix for IPv6 key generator error
 });
 
 /**
@@ -50,6 +52,7 @@ const customerLimiter = rateLimit({
     },
     standardHeaders: true,
     legacyHeaders: false,
+    validate: { defaultKeys: false } // Fix for IPv6 key generator error
 });
 
 module.exports = {
