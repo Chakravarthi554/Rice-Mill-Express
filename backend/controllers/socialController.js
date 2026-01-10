@@ -1099,13 +1099,37 @@ const getSortedComments = asyncHandler(async (req, res) => {
     throw new Error(`${type.slice(0, -1)} not found`);
   }
 
+  // Handle case where comments don't exist or are empty
+  if (!item.comments || !Array.isArray(item.comments) || item.comments.length === 0) {
+    return res.json({
+      success: true,
+      comments: [],
+      total: 0,
+      page: Number(page),
+      pages: 0,
+      limit: Number(limit)
+    });
+  }
+
   // Filter approved comments for non-admin users
   let comments = req.user?.role === 'admin'
     ? item.comments
-    : item.comments.filter(comment => comment.approved && !comment.isFlagged);
+    : item.comments.filter(comment => comment.approved === true && !comment.isFlagged);
 
   // Filter out replies (only show top-level comments)
   comments = comments.filter(comment => !comment.parentComment);
+
+  // Handle empty comments after filtering
+  if (comments.length === 0) {
+    return res.json({
+      success: true,
+      comments: [],
+      total: 0,
+      page: Number(page),
+      pages: 0,
+      limit: Number(limit)
+    });
+  }
 
   // Sort comments
   switch (sortBy) {
