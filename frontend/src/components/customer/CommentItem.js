@@ -59,11 +59,17 @@ const CommentItem = ({ comment, recipeId, depth = 0 }) => {
     // For this implementation, I'll assume the parent component (RecipeDetail) organizes the comments into a tree structure
     // and passes the `replies` array in the `comment` object.
 
+    const getImageUrl = (imagePath) => {
+        if (!imagePath) return '/default_avatar.jpg';
+        if (imagePath.startsWith('http')) return imagePath;
+        return `${process.env.REACT_APP_API_URL}/uploads/${imagePath}`;
+    };
+
     return (
         <Box sx={{ mb: 2, ml: depth * 4 }}>
             <Stack direction="row" spacing={2} alignItems="flex-start">
                 <Avatar
-                    src={comment.user?.profilePic || comment.userId?.profilePic}
+                    src={getImageUrl(comment.user?.profilePic || comment.userId?.profilePic)}
                     alt={comment.user?.name || comment.userId?.name}
                     sx={{ width: 32, height: 32 }}
                 />

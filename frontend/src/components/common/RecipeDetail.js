@@ -14,7 +14,7 @@ import {
   Box, Typography, Button, TextField, Rating, CircularProgress, Paper, Grid,
   List, ListItem, ListItemText, Divider, Avatar, Card, CardHeader, CardContent, Chip,
   IconButton, Dialog, DialogTitle, DialogContent, DialogActions, ListItemAvatar, Alert,
-  Stack, LinearProgress, Menu, MenuItem, Tooltip, Badge, Collapse
+  Stack, LinearProgress, Menu, MenuItem, Tooltip, Badge, Collapse, Snackbar
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import {
@@ -64,6 +64,13 @@ const RecipeDetail = () => {
   const [anchorElSort, setAnchorElSort] = useState(null);
   const [copySuccess, setCopySuccess] = useState(false);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMoreComments, setHasMoreComments] = useState(true);
+
+  // Toast notification state
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+
   const recipeDetails = useSelector((state) => state.recipeDetails);
   const { loading, error, recipe } = recipeDetails || { recipe: {} };
 
@@ -80,8 +87,17 @@ const RecipeDetail = () => {
       dispatch(getRecipeDetails(recipeId));
       dispatch(getSortedComments('recipes', recipeId, sortBy));
       dispatch(getRatingDistribution(recipeId));
+      setCurrentPage(1); // Reset pagination when recipe or sort changes
     }
   }, [dispatch, recipeId, sortBy]);
+
+  // Update pagination state based on comments response
+  useEffect(() => {
+    if (socialCommentsList.comments) {
+      const { page, pages } = socialCommentsList;
+      setHasMoreComments(page < pages);
+    }
+  }, [socialCommentsList]);
 
 
   // Real-time updates
@@ -128,10 +144,18 @@ const RecipeDetail = () => {
   };
 
   const handleAddComment = () => {
-    if (!userInfo) return alert('Please log in to comment.');
+    if (!userInfo) {
+      setSnackbar({ open: true, message: 'Please log in to comment.', severity: 'warning' });
+      return;
+    }
     if (commentText.trim()) {
       dispatch(addComment('recipes', recipeId, commentText));
       setCommentText('');
+      setSnackbar({
+        open: true,
+        message: 'Comment submitted! Awaiting admin approval.',
+        severity: 'success'
+      });
     }
   };
 
@@ -165,11 +189,16 @@ const RecipeDetail = () => {
   };
 
   const handleSubmitRating = () => {
-    if (!userInfo) return alert('Please log in to rate this recipe.');
+    if (!userInfo) {
+      setSnackbar({ open: true, message: 'Please log in to rate this recipe.', severity: 'warning' });
+      return;
+    }
     if (!rating || rating < 1 || rating > 5) {
-      return alert('Please select a rating between 1 and 5 stars before submitting.');
+      setSnackbar({ open: true, message: 'Please select a rating between 1 and 5 stars.', severity: 'error' });
+      return;
     }
     dispatch(rateRecipe(recipeId, rating));
+    setSnackbar({ open: true, message: 'Rating submitted successfully!', severity: 'success' });
   };
 
   const handleAddToCart = (productId) => {
@@ -378,16 +407,35 @@ const RecipeDetail = () => {
                   <Typography>No comments yet. Be the first!</Typography>
                 </Box>
               ) : (
-                commentTree.map(comment => (
-                  <CommentItem key={comment._id} comment={comment} recipeId={recipeId} />
-                ))
+                <>
+                  {commentTree.map(comment => (
+                    <CommentItem key={comment._id} comment={comment} recipeId={recipeId} />
+                  ))}
+
+                  {/* Load More Button */}
+                  {hasMoreComments && commentTree.length >= 20 && (
+                    <Box sx={{ textAlign: 'center', mt: 2 }}>
+                      <Button
+                        variant="outlined"
+                        onClick={() => {
+                          const nextPage = currentPage + 1;
+                          setCurrentPage(nextPage);
+                          dispatch(getSortedComments('recipes', recipeId, sortBy, nextPage));
+                        }}
+                        disabled={socialCommentsList.loading}
+                      >
+                        {socialCommentsList.loading ? <CircularProgress size={24} /> : 'Load More Comments'}
+                      </Button>
+                    </Box>
+                  )}
+                </>
               )}
             </Box>
 
             {/* Add Comment Input */}
             <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider', bgcolor: 'background.paper' }}>
               <Stack direction="row" spacing={1}>
-                <Avatar src={userInfo?.profilePic} sx={{ width: 32, height: 32 }} />
+                <Avatar src={getImageUrl(userInfo?.profilePic)} sx={{ width: 32, height: 32 }} />
                 <TextField
                   inputRef={commentInputRef}
                   fullWidth
@@ -427,6 +475,22 @@ const RecipeDetail = () => {
           </Stack>
         </DialogContent>
       </Dialog>
+
+      {/* Toast Notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

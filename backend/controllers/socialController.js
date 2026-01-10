@@ -1095,7 +1095,7 @@ const getSortedComments = asyncHandler(async (req, res) => {
 
     const item = await Model.findById(id)
       .select('comments')
-      .populate('comments.user comments.userId', 'name profilePic');
+      .populate('comments.userId', 'name profilePic');
 
     if (!item) {
       return res.status(404).json({

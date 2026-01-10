@@ -33,7 +33,7 @@ import { socket, emitSocialAction } from '../../utils/socket';
 const SocialInteraction = ({ itemType, itemId, itemUserId, showComments = true }) => {
   const dispatch = useDispatch();
   const { userInfo } = useSelector((state) => state.userLogin);
-  
+
   const [likes, setLikes] = useState(0);
   const [hasLiked, setHasLiked] = useState(false);
   const [comments, setComments] = useState([]);
@@ -55,7 +55,7 @@ const SocialInteraction = ({ itemType, itemId, itemUserId, showComments = true }
     if (socialCommentsList.comments) {
       setComments(socialCommentsList.comments);
       // Calculate total likes from comments (for demo - in real app, get from item)
-      const totalLikes = socialCommentsList.comments.reduce((sum, comment) => 
+      const totalLikes = socialCommentsList.comments.reduce((sum, comment) =>
         sum + (comment.likes ? comment.likes.length : 0), 0
       );
       setLikes(totalLikes);
@@ -71,7 +71,7 @@ const SocialInteraction = ({ itemType, itemId, itemUserId, showComments = true }
         setLikes(data.likes || likes);
         setHasLiked(data.hasLiked || false);
       }
-      
+
       if (data.type === 'COMMENT') {
         setComments(prev => [...prev, data.comment]);
         dispatch(getComments(itemType, itemId)); // Refresh comments
@@ -122,7 +122,7 @@ const SocialInteraction = ({ itemType, itemId, itemUserId, showComments = true }
 
     if (commentText.trim()) {
       dispatch(addComment(itemType, itemId, commentText));
-      
+
       // Emit socket event
       emitSocialAction({
         type: 'COMMENT',
@@ -133,7 +133,7 @@ const SocialInteraction = ({ itemType, itemId, itemUserId, showComments = true }
         userRole: userInfo.role,
         comment: { text: commentText, user: userInfo }
       });
-      
+
       setCommentText('');
       setShowCommentDialog(false);
     }
@@ -223,6 +223,12 @@ const SocialInteraction = ({ itemType, itemId, itemUserId, showComments = true }
     </Dialog>
   );
 
+  const getImageUrl = (imagePath) => {
+    if (!imagePath) return '/default_avatar.jpg';
+    if (imagePath.startsWith('http')) return imagePath;
+    return `${process.env.REACT_APP_API_URL}/uploads/${imagePath}`;
+  };
+
   const CommentDialog = () => (
     <Dialog open={showCommentDialog} onClose={() => setShowCommentDialog(false)} maxWidth="sm" fullWidth>
       <DialogTitle>Comments ({comments.length})</DialogTitle>
@@ -231,7 +237,7 @@ const SocialInteraction = ({ itemType, itemId, itemUserId, showComments = true }
           {comments.map((comment) => (
             <ListItem key={comment._id} alignItems="flex-start">
               <ListItemAvatar>
-                <Avatar src={comment.user?.profilePic}>
+                <Avatar src={getImageUrl(comment.user?.profilePic)}>
                   {comment.user?.name?.charAt(0)}
                 </Avatar>
               </ListItemAvatar>
@@ -265,7 +271,7 @@ const SocialInteraction = ({ itemType, itemId, itemUserId, showComments = true }
             </Typography>
           )}
         </List>
-        
+
         {userInfo && (
           <Box sx={{ display: 'flex', gap: 1 }}>
             <TextField
@@ -276,8 +282,8 @@ const SocialInteraction = ({ itemType, itemId, itemUserId, showComments = true }
               onChange={(e) => setCommentText(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}
             />
-            <IconButton 
-              color="primary" 
+            <IconButton
+              color="primary"
               onClick={handleAddComment}
               disabled={!commentText.trim() || socialComment.loading}
             >
@@ -295,7 +301,7 @@ const SocialInteraction = ({ itemType, itemId, itemUserId, showComments = true }
   return (
     <>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2 }}>
-        <IconButton 
+        <IconButton
           onClick={handleLike}
           color={hasLiked ? 'error' : 'default'}
           disabled={socialLike.loading}
