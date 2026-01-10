@@ -632,7 +632,7 @@ export const getReports = (filters = {}) => async (dispatch, getState) => {
     const params = new URLSearchParams(filters).toString();
 
     const { data } = await safeApiCall(
-      () => axiosInstance.get(/api/admin/forum/reports?+params, config),
+      () => axiosInstance.get(`/api/admin/forum/reports?${params}`, config),
       'Fetch reports failed'
     );
 
@@ -663,7 +663,7 @@ export const toggleBookmark = (postId) => async (dispatch, getState) => {
     const config = getAuthConfig(userInfo);
 
     const { data } = await safeApiCall(
-      () => axiosInstance.post(/api/forum/+postId+/bookmark, {}, config),
+      () => axiosInstance.post(`/api/forum/${postId}/bookmark`, {}, config),
       'Bookmark action failed'
     );
 
@@ -694,7 +694,7 @@ export const getUserBookmarks = (page = 1, limit = 20) => async (dispatch, getSt
     const config = getAuthConfig(userInfo);
 
     const { data } = await safeApiCall(
-      () => axiosInstance.get(/api/forum/bookmarks?page=+page+&limit=+limit, config),
+      () => axiosInstance.get(`/api/forum/bookmarks?page=${page}&limit=${limit}`, config),
       'Fetch bookmarks failed'
     );
 
