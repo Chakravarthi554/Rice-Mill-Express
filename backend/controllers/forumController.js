@@ -484,30 +484,53 @@ const reportPost = asyncHandler(async (req, res) => {
       severity = 'medium'
     } = req.body;
 
-    // Debug logging
-    console.log('📝 Report submission:', { postId: req.params.id, userId: req.user?._id, reportReason, reportCategory, severity });
+    // 🔥 Enhanced debug logging
+    console.log('📝 Report submission - Full request body:', req.body);
+    console.log('📝 Report details:', {
+      postId: req.params.id,
+      userId: req.user?._id,
+      reportReason,
+      reportCategory,
+      severity,
+      additionalDetails: additionalDetails?.substring(0, 50)
+    });
 
     // Validate required fields
     if (!reportReason || !reportCategory) {
-      console.log('❌ Validation failed:', { reportReason, reportCategory });
-      return res.status(400).json({ message: 'Report reason and category are required' });
+      console.log('❌ Validation failed - Missing fields:', {
+        hasReason: !!reportReason,
+        hasCategory: !!reportCategory,
+        receivedReason: reportReason,
+        receivedCategory: reportCategory
+      });
+      return res.status(400).json({
+        message: 'Report reason and category are required',
+        missingFields: {
+          reportReason: !reportReason,
+          reportCategory: !reportCategory
+        }
+      });
     }
 
     const post = await ForumPost.findById(req.params.id);
     if (!post) return res.status(404).json({ message: 'Post not found' });
 
     // Check for duplicate report
+    console.log('🔍 Checking for duplicate report...');
     const existingReport = await ForumPostReport.findOne({
       postId: req.params.id,
       reportedBy: req.user._id
     });
 
     if (existingReport) {
+      console.log('⚠️ Duplicate report detected:', existingReport._id);
       return res.status(400).json({
         message: 'You have already reported this post',
-        reportId: existingReport._id
+        reportId: existingReport._id,
+        isDuplicate: true
       });
     }
+    console.log('✅ No duplicate found, proceeding with report creation');
 
     // Rate limiting check - max 5 reports per day per user
     const today = new Date();

@@ -150,12 +150,11 @@ const ReportModal = ({ open, onClose, post, onSubmit }) => {
                 alignItems: 'center',
                 gap: 1,
                 bgcolor: 'error.light',
-                color: 'error.contrastText'
+                color: 'error.contrastText',
+                fontWeight: 'bold'
             }}>
                 <Report />
-                <Typography variant="h6" fontWeight="bold">
-                    Report Post
-                </Typography>
+                Report Post
             </DialogTitle>
 
             <DialogContent sx={{ mt: 2 }}>

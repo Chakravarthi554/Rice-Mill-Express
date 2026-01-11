@@ -163,7 +163,13 @@ const ForumPostCard = ({ post, onUpdate }) => {
   const showSnackbar = (msg, sev) => setSnackbar({ open: true, message: msg, severity: sev });
   const closeSnackbar = () => setSnackbar({ ...snackbar, open: false });
 
-  const getImageUrl = (path) => path?.startsWith('http') ? path : `${process.env.REACT_APP_API_URL || ''}${path || '/default_avatar.jpg'}`;
+  const getImageUrl = (path) => {
+    if (!path) return `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/uploads/default_avatar.jpg`;
+    if (path.startsWith('http')) return path;
+    // Ensure path starts with /
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    return `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}${cleanPath}`;
+  };
 
   return (
     <>
