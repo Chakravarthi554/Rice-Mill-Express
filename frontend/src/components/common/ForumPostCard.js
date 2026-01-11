@@ -103,8 +103,9 @@ const ForumPostCard = ({ post, onUpdate }) => {
     try {
       await dispatch(reportForumComment(currentPost._id, commentId, 'Inappropriate'));
       showSnackbar('Comment reported', 'success');
-    } catch {
-      showSnackbar('Failed to report', 'error');
+    } catch (error) {
+      const errorMsg = typeof error === 'string' ? error : (error.message || 'Failed to report');
+      showSnackbar(errorMsg, 'error');
     }
   };
 
@@ -126,7 +127,8 @@ const ForumPostCard = ({ post, onUpdate }) => {
       setReportOpen(false);
       showSnackbar('Report submitted successfully. Thank you for keeping our community safe.', 'success');
     } catch (error) {
-      showSnackbar(error.message || 'Failed to submit report', 'error');
+      const errorMsg = typeof error === 'string' ? error : (error.message || 'Failed to submit report');
+      showSnackbar(errorMsg, 'error');
       throw error; // Re-throw to let ReportModal handle it
     }
   };

@@ -35,17 +35,7 @@ const applyPostLimiter = (req, res, next) => {
   }
 };
 
-// 🔥 CRITICAL FIX: PUBLIC ROUTES - No authentication required for public forum access
-router.get('/', getPosts);
-router.get('/:id', getPostById);
-
-// 🔥 CRITICAL FIX: PROTECTED ROUTES - Authentication required but all roles allowed
-router.post('/', protect, applyPostLimiter, createPost);
-router.post('/:id/reply', protect, replyToPost);
-router.post('/:id/like', protect, likePost);
-router.post('/:id/report', protect, reportPost);
-
-// 🔥 CRITICAL FIX: ADMIN ROUTES - protect FIRST, admin SECOND with proper error handling
+// 🔥 CRITICAL FIX: ADMIN ROUTES - Move above param routes to prevent shadowing
 router.get('/admin/pending', protect, admin, getPendingPosts);
 router.put('/admin/:id/approve', protect, admin, approvePost);
 router.delete('/admin/:id', protect, admin, deletePost);
@@ -54,16 +44,26 @@ router.post('/admin/:postId/comments/:commentId/moderate', protect, admin, moder
 router.get('/admin/moderation/flagged-comments', protect, admin, getFlaggedComments);
 router.get('/admin/stats', protect, admin, getAdminStats);
 
-// 🔥 NEW: Mixed role routes - protect first, then specific roles
-router.post('/:postId/comments/:commentId/report', protect, reportComment);
-
 // 🔥 NEW: Report management routes (Admin only)
 router.get('/admin/reports', protect, admin, getReports);
 router.get('/admin/reports/stats', protect, admin, getReportStats);
 router.get('/admin/reports/:reportId', protect, admin, getReportById);
 router.post('/admin/reports/:reportId/action', protect, admin, takeReportAction);
 
-// 🔥 NEW: Bookmark routes (Protected)
+// 🔥 PUBLIC ROUTES
+router.get('/', getPosts);
+router.get('/:id', getPostById);
+
+// 🔥 PROTECTED ROUTES
+router.post('/', protect, applyPostLimiter, createPost);
+router.post('/:id/reply', protect, replyToPost);
+router.post('/:id/like', protect, likePost);
+router.post('/:id/report', protect, reportPost);
+
+// 🔥 Mixed role routes
+router.post('/:postId/comments/:commentId/report', protect, reportComment);
+
+// 🔥 Bookmark routes (Protected)
 router.post('/:id/bookmark', protect, bookmarkPost);
 router.get('/bookmarks', protect, getUserBookmarks);
 

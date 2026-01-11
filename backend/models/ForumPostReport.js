@@ -29,6 +29,17 @@ const forumPostReportSchema = new mongoose.Schema({
             'Trademark Violation',
             'Misinformation',
             'Impersonation',
+            'Spam or scam',
+            'Misleading content',
+            'Repetitive content',
+            'Harassment or hate speech',
+            'Violence or dangerous content',
+            'Adult content',
+            'Graphic content',
+            'Copyright infringement',
+            'Trademark violation',
+            'Misinformation',
+            'Impersonation',
             'Other'
         ]
     },

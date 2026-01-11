@@ -65,7 +65,7 @@ const AdminReportsPanel = () => {
     const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
-        if (userInfo?.role === 'admin') {
+        if (['admin', 'super_admin'].includes(userInfo?.role)) {
             fetchReports();
             fetchStats();
         }
@@ -75,7 +75,7 @@ const AdminReportsPanel = () => {
         setLoading(true);
         try {
             const queryParams = new URLSearchParams(filters).toString();
-            const response = await fetch(`/api/admin/forum/reports?${queryParams}`, {
+            const response = await fetch(`/api/forum/admin/reports?${queryParams}`, {
                 headers: {
                     'Authorization': `Bearer ${userInfo.token}`
                 }
@@ -91,7 +91,7 @@ const AdminReportsPanel = () => {
 
     const fetchStats = async () => {
         try {
-            const response = await fetch('/api/admin/forum/reports/stats', {
+            const response = await fetch('/api/forum/admin/reports/stats', {
                 headers: {
                     'Authorization': `Bearer ${userInfo.token}`
                 }
@@ -105,7 +105,7 @@ const AdminReportsPanel = () => {
 
     const handleViewReport = async (reportId) => {
         try {
-            const response = await fetch(`/api/admin/forum/reports/${reportId}`, {
+            const response = await fetch(`/api/forum/admin/reports/${reportId}`, {
                 headers: {
                     'Authorization': `Bearer ${userInfo.token}`
                 }
@@ -122,7 +122,7 @@ const AdminReportsPanel = () => {
 
         setSubmitting(true);
         try {
-            const response = await fetch(`/api/admin/forum/reports/${selectedReport.report._id}/action`, {
+            const response = await fetch(`/api/forum/admin/reports/${selectedReport.report._id}/action`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -173,7 +173,7 @@ const AdminReportsPanel = () => {
         }
     };
 
-    if (userInfo?.role !== 'admin') {
+    if (!['admin', 'super_admin'].includes(userInfo?.role)) {
         return (
             <Container maxWidth="lg" sx={{ py: 4 }}>
                 <Alert severity="error">Access denied. Admin privileges required.</Alert>
@@ -408,44 +408,64 @@ const AdminReportsPanel = () => {
                             </Box>
                         </DialogTitle>
                         <DialogContent sx={{ mt: 2 }}>
-                            {/* Report Info */}
-                            <Paper sx={{ p: 2, mb: 2, bgcolor: 'grey.50' }}>
-                                <Typography variant="subtitle2" gutterBottom>Report Information</Typography>
-                                <Grid container spacing={1}>
-                                    <Grid item xs={6}>
-                                        <Typography variant="caption" color="text.secondary">Severity:</Typography>
-                                        <Chip label={selectedReport.report.severity} color={getSeverityColor(selectedReport.report.severity)} size="small" sx={{ ml: 1 }} />
-                                    </Grid>
-                                    <Grid item xs={6}>
-                                        <Typography variant="caption" color="text.secondary">Status:</Typography>
-                                        <Chip label={selectedReport.report.status} color={getStatusColor(selectedReport.report.status)} size="small" sx={{ ml: 1 }} />
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <Typography variant="caption" color="text.secondary">Reason:</Typography>
-                                        <Typography variant="body2">{selectedReport.report.reportReason}</Typography>
-                                    </Grid>
-                                    {selectedReport.report.additionalDetails && (
-                                        <Grid item xs={12}>
-                                            <Typography variant="caption" color="text.secondary">Details:</Typography>
-                                            <Typography variant="body2">{selectedReport.report.additionalDetails}</Typography>
+                            {!selectedReport.report ? (
+                                <Alert severity="error" sx={{ mt: 2 }}>
+                                    {selectedReport.message || 'Error: Could not load report details.'}
+                                </Alert>
+                            ) : (
+                                <>
+                                    {/* Report Info */}
+                                    <Paper sx={{ p: 2, mb: 2, bgcolor: 'grey.50' }}>
+                                        <Typography variant="subtitle2" gutterBottom>Report Information</Typography>
+                                        <Grid container spacing={1}>
+                                            <Grid item xs={6}>
+                                                <Typography variant="caption" color="text.secondary">Severity:</Typography>
+                                                <Chip
+                                                    label={selectedReport.report.severity || 'N/A'}
+                                                    color={getSeverityColor(selectedReport.report.severity)}
+                                                    size="small"
+                                                    sx={{ ml: 1 }}
+                                                />
+                                            </Grid>
+                                            <Grid item xs={6}>
+                                                <Typography variant="caption" color="text.secondary">Status:</Typography>
+                                                <Chip
+                                                    label={selectedReport.report.status || 'N/A'}
+                                                    color={getStatusColor(selectedReport.report.status)}
+                                                    size="small"
+                                                    sx={{ ml: 1 }}
+                                                />
+                                            </Grid>
+                                            <Grid item xs={12}>
+                                                <Typography variant="caption" color="text.secondary">Reason:</Typography>
+                                                <Typography variant="body2">{selectedReport.report.reportReason || 'No reason provided'}</Typography>
+                                            </Grid>
+                                            {selectedReport.report.additionalDetails && (
+                                                <Grid item xs={12}>
+                                                    <Typography variant="caption" color="text.secondary">Details:</Typography>
+                                                    <Typography variant="body2">{selectedReport.report.additionalDetails}</Typography>
+                                                </Grid>
+                                            )}
                                         </Grid>
-                                    )}
-                                </Grid>
-                            </Paper>
+                                    </Paper>
 
-                            {/* Post Info */}
-                            <Paper sx={{ p: 2, mb: 2 }}>
-                                <Typography variant="subtitle2" gutterBottom>Reported Post</Typography>
-                                <Typography variant="h6">{selectedReport.report.postId?.title}</Typography>
-                                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                    {selectedReport.report.postId?.content?.substring(0, 200)}...
-                                </Typography>
-                                <Box sx={{ mt: 1 }}>
-                                    <Typography variant="caption" color="text.secondary">
-                                        Author: {selectedReport.report.postId?.userId?.name}
-                                    </Typography>
-                                </Box>
-                            </Paper>
+                                    {/* Post Info */}
+                                    <Paper sx={{ p: 2, mb: 2 }}>
+                                        <Typography variant="subtitle2" gutterBottom>Reported Post</Typography>
+                                        <Typography variant="h6">{selectedReport.report.postId?.title || 'Post Deleted'}</Typography>
+                                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                            {selectedReport.report.postId?.content ? (
+                                                selectedReport.report.postId.content.substring(0, 200) + (selectedReport.report.postId.content.length > 200 ? '...' : '')
+                                            ) : 'No content available'}
+                                        </Typography>
+                                        <Box sx={{ mt: 1 }}>
+                                            <Typography variant="caption" color="text.secondary">
+                                                Author: {selectedReport.report.postId?.userId?.name || 'Unknown'}
+                                            </Typography>
+                                        </Box>
+                                    </Paper>
+                                </>
+                            )}
 
                             {/* Other Reports */}
                             {selectedReport.otherReportsOnPost?.length > 0 && (

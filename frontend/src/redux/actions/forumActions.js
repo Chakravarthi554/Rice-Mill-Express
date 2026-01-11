@@ -632,7 +632,7 @@ export const getReports = (filters = {}) => async (dispatch, getState) => {
     const params = new URLSearchParams(filters).toString();
 
     const { data } = await safeApiCall(
-      () => axiosInstance.get(`/api/admin/forum/reports?${params}`, config),
+      () => axiosInstance.get(`/api/forum/admin/reports?${params}`, config),
       'Fetch reports failed'
     );
 

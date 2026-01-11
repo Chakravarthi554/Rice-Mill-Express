@@ -116,7 +116,15 @@ const ReportModal = ({ open, onClose, post, onSubmit }) => {
             await onSubmit(formData);
             handleClose();
         } catch (error) {
-            setErrors({ submit: error.message || 'Failed to submit report' });
+            // Check for duplicate report message from backend or Redux action string
+            const errorMsg = typeof error === 'string' ? error : (error.message || '');
+            const isDuplicate = errorMsg.toLowerCase().includes('already reported') || error.isDuplicate;
+
+            setErrors({
+                submit: isDuplicate
+                    ? 'You have already reported this post. Our team is already reviewing it.'
+                    : (errorMsg || 'Failed to submit report')
+            });
         } finally {
             setSubmitting(false);
         }

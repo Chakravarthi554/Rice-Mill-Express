@@ -9,7 +9,7 @@ import {
   LocalShipping as LocalShippingIcon, Forum as ForumIcon,
   Payments as PaymentsIcon, RestaurantMenu as RestaurantMenuIcon,
   Settings as SettingsIcon, Message as MessageIcon,
-  Security as SecurityIcon
+  Security as SecurityIcon, Report as ReportIcon
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../../context/AuthContext';
@@ -26,6 +26,7 @@ const iconMap = {
   Settings: SettingsIcon,
   Message: MessageIcon,
   Security: SecurityIcon,
+  Report: ReportIcon,
 };
 
 const AdminLayout = ({ tabs, title }) => {
@@ -54,11 +55,11 @@ const AdminLayout = ({ tabs, title }) => {
             <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#333' }}>{title}</Typography>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-  <NotificationBadge />
-  <IconButton color="inherit" onClick={() => window.confirm('Logout?') && logout()}>
-    <LogoutIcon />
-  </IconButton>
-</Box>
+            <NotificationBadge />
+            <IconButton color="inherit" onClick={() => window.confirm('Logout?') && logout()}>
+              <LogoutIcon />
+            </IconButton>
+          </Box>
         </Toolbar>
       </AppBar>
 

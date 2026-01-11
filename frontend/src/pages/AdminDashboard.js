@@ -10,6 +10,8 @@ import PaymentsTab from '../components/admin/tabs/PaymentsTab';
 import AnalyticsTab from '../components/admin/tabs/AnalyticsTab'; // NEW IMPORT
 import DeliveryKYCApproval from '../components/admin/DeliveryKYCApproval';
 
+import AdminReportsPanel from '../components/admin/AdminReportsPanel';
+
 const tabs = [
   { label: 'Overview', icon: 'Dashboard', component: <OverviewTab /> },
   { label: 'Analytics', icon: 'Assessment', component: <AnalyticsTab /> }, // UPDATED: Added AnalyticsTab
@@ -18,6 +20,7 @@ const tabs = [
   { label: 'Delivery KYC', icon: 'DeliveryDining', component: <DeliveryKYCApproval /> },
   { label: 'Recipes', icon: 'RestaurantMenu', component: <RecipesTab /> },
   { label: 'Forum', icon: 'Forum', component: <ForumTab /> },
+  { label: 'Post Reports', icon: 'Report', component: <AdminReportsPanel /> },
   { label: 'Settings', icon: 'Settings', component: <SettingsTab /> },
   { label: 'Messages', icon: 'Message', component: <MessagesTab /> },
   { label: 'Moderation', icon: 'Security', component: <ModerationTab /> },

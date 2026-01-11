@@ -525,7 +525,8 @@ const reportPost = asyncHandler(async (req, res) => {
     if (existingReport) {
       console.log('⚠️ Duplicate report detected:', existingReport._id);
       return res.status(400).json({
-        message: 'You have already reported this post',
+        success: false,
+        message: 'You have already reported this post. Our team is already reviewing it.',
         reportId: existingReport._id,
         isDuplicate: true
       });
@@ -962,7 +963,7 @@ const getAdminStats = asyncHandler(async (req, res) => {
 // ✅ NEW: Get all reports (Admin only)
 const getReports = asyncHandler(async (req, res) => {
   try {
-    if (!req.user || req.user.role !== 'admin') {
+    if (!req.user || !['admin', 'super_admin'].includes(req.user.role)) {
       return res.status(403).json({ message: 'Admin access required' });
     }
 
@@ -980,6 +981,8 @@ const getReports = asyncHandler(async (req, res) => {
     if (status && status !== 'all') query.status = status;
     if (severity && severity !== 'all') query.severity = severity;
     if (category && category !== 'all') query.reportCategory = category;
+
+    console.log('🔍 Executing report query:', JSON.stringify(query, null, 2));
 
     const skip = (page - 1) * limit;
     const sort = { [sortBy]: sortOrder === 'desc' ? -1 : 1 };
@@ -1011,7 +1014,7 @@ const getReports = asyncHandler(async (req, res) => {
 // ✅ NEW: Get single report details (Admin only)
 const getReportById = asyncHandler(async (req, res) => {
   try {
-    if (!req.user || req.user.role !== 'admin') {
+    if (!req.user || !['admin', 'super_admin'].includes(req.user.role)) {
       return res.status(403).json({ message: 'Admin access required' });
     }
 
@@ -1028,10 +1031,15 @@ const getReportById = asyncHandler(async (req, res) => {
       return res.status(404).json({ message: 'Report not found' });
     }
 
-    // Get post author's report history
-    const authorReports = await ForumPostReport.find({
-      'postId.userId': report.postId?.userId?._id
-    }).countDocuments();
+    // Get post author's report history across all their posts
+    let authorReportsCount = 0;
+    if (report.postId?.userId?._id) {
+      const authorPosts = await ForumPost.find({ userId: report.postId.userId._id }).select('_id');
+      const authorPostIds = authorPosts.map(p => p._id);
+      authorReportsCount = await ForumPostReport.countDocuments({
+        postId: { $in: authorPostIds }
+      });
+    }
 
     // Get other reports on this post
     const postReports = await ForumPostReport.find({
@@ -1044,7 +1052,7 @@ const getReportById = asyncHandler(async (req, res) => {
 
     res.json({
       report,
-      authorReportHistory: authorReports,
+      authorReportHistory: authorReportsCount,
       otherReportsOnPost: postReports
     });
   } catch (error) {
@@ -1056,7 +1064,7 @@ const getReportById = asyncHandler(async (req, res) => {
 // ✅ NEW: Take action on report (Admin only)
 const takeReportAction = asyncHandler(async (req, res) => {
   try {
-    if (!req.user || req.user.role !== 'admin') {
+    if (!req.user || !['admin', 'super_admin'].includes(req.user.role)) {
       return res.status(403).json({ message: 'Admin access required' });
     }
 
@@ -1179,7 +1187,7 @@ const takeReportAction = asyncHandler(async (req, res) => {
 // ✅ NEW: Get report statistics (Admin only)
 const getReportStats = asyncHandler(async (req, res) => {
   try {
-    if (!req.user || req.user.role !== 'admin') {
+    if (!req.user || !['admin', 'super_admin'].includes(req.user.role)) {
       return res.status(403).json({ message: 'Admin access required' });
     }
 
