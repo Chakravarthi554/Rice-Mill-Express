@@ -910,6 +910,12 @@ const bookmarkPost = asyncHandler(async (req, res) => {
   user.bookmarks.push({ postId, bookmarkedAt: new Date() });
   await user.save();
 
+  // Sync with ForumPost
+  const ForumPost = require('../models/ForumPost');
+  await ForumPost.findByIdAndUpdate(postId, {
+    $addToSet: { bookmarkedBy: user._id }
+  });
+
   res.json({ success: true, message: 'Post bookmarked successfully' });
 });
 
@@ -927,6 +933,12 @@ const unbookmarkPost = asyncHandler(async (req, res) => {
 
   user.bookmarks = user.bookmarks.filter(b => b.postId.toString() !== postId);
   await user.save();
+
+  // Sync with ForumPost
+  const ForumPost = require('../models/ForumPost');
+  await ForumPost.findByIdAndUpdate(postId, {
+    $pull: { bookmarkedBy: user._id }
+  });
 
   res.json({ success: true, message: 'Post unbookmarked successfully' });
 });

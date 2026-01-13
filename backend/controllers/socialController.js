@@ -2,9 +2,28 @@ const asyncHandler = require('express-async-handler');
 const Product = require('../models/Product');
 const Recipe = require('../models/Recipe');
 const ForumPost = require('../models/ForumPost');
-const User = require('../models/User'); // Added missing import
+const User = require('../models/User');
 const Notification = require('../models/Notification');
+const Comment = require('../models/Comment');
+const Like = require('../models/Like');
+const Rating = require('../models/Rating');
+const Share = require('../models/Share');
+const Order = require('../models/Order');
 const mongoose = require('mongoose');
+const { getAsync, setAsync, client: redisClient } = require('../utils/redis');
+
+// Helper for atomic counter updates and Redis cache invalidation
+const updateEngagementCount = async (Model, targetId, field, amount) => {
+  const update = { $inc: { [field]: amount } };
+  const updatedItem = await Model.findByIdAndUpdate(targetId, update, { new: true });
+
+  // Invalidate Redis cache for this item's engagement stats
+  const cacheKey = `engagement:${targetId}`;
+  await setAsync(cacheKey, JSON.stringify(updatedItem), 'EX', 3600); // 1 hour cache
+
+  return updatedItem;
+};
+
 
 // @desc    Like/Unlike an item
 // @route   POST /api/:type/:id/like
@@ -14,78 +33,66 @@ const likeItem = asyncHandler(async (req, res) => {
   const userId = req.user._id;
 
   let Model;
+  let targetType;
   switch (type) {
-    case 'products':
-      Model = Product;
-      break;
-    case 'recipes':
-      Model = Recipe;
-      break;
-    case 'forum':
-      Model = ForumPost;
-      break;
+    case 'products': Model = Product; targetType = 'Product'; break;
+    case 'recipes': Model = Recipe; targetType = 'Recipe'; break;
+    case 'forum': Model = ForumPost; targetType = 'ForumPost'; break;
     default:
       res.status(400);
       throw new Error('Invalid type');
   }
 
-  const item = await Model.findById(id);
-  if (!item) {
-    res.status(404);
-    throw new Error(`${type.slice(0, -1)} not found`);
-  }
+  const existingLike = await Like.findOne({ targetId: id, userId });
 
-  const hasLiked = item.likes.includes(userId);
-
-  if (hasLiked) {
+  if (existingLike) {
     // Unlike
-    item.likes = item.likes.filter(like => like.toString() !== userId.toString());
-  } else {
-    // Like
-    item.likes.push(userId);
-  }
+    await Like.findByIdAndDelete(existingLike._id);
+    const updatedItem = await updateEngagementCount(Model, id, 'likesCount', -1);
 
-  await item.save();
-
-  // Create notification for item owner (except when user likes their own item)
-  if (item.userId && item.userId.toString() !== userId.toString() && !hasLiked) {
-    await Notification.create({
-      user: item.userId,
-      type: 'SOCIAL_LIKE',
-      message: `${req.user.name} liked your ${type.slice(0, -1)}`,
-      relatedEntity: item._id,
-      entityModel: type.slice(0, -1).charAt(0).toUpperCase() + type.slice(0, -1).slice(1)
-    });
-  }
-
-  // 🔥 ENHANCED: Real-time socket events
-  if (req.io) {
-    req.io.emit('SOCIAL_UPDATE', {
-      type: 'LIKE',
-      itemType: type.slice(0, -1),
-      itemId: id,
-      userId: userId,
-      likes: item.likes.length,
-      hasLiked: !hasLiked,
-      timestamp: new Date()
-    });
-
-    // Specifically for recipes if needed
-    if (type === 'recipes') {
-      req.io.emit('RECIPE_LIKED', {
-        recipeId: id,
-        likes: item.likes.length,
-        userId: userId,
-        action: hasLiked ? 'unliked' : 'liked'
+    // 🔥 Real-time socket events
+    if (req.io) {
+      req.io.to(`${type.slice(0, -1)}_${id}`).emit('SOCIAL_UPDATE', {
+        type: 'LIKE_UPDATED',
+        itemType: targetType,
+        itemId: id,
+        likesCount: updatedItem.likesCount,
+        hasLiked: false,
+        userId
       });
     }
-  }
 
-  res.json({
-    success: true,
-    likes: item.likes.length,
-    hasLiked: !hasLiked
-  });
+    return res.json({ success: true, likes: updatedItem.likesCount, hasLiked: false });
+  } else {
+    // Like
+    await Like.create({ targetId: id, targetType, userId });
+    const updatedItem = await updateEngagementCount(Model, id, 'likesCount', 1);
+
+    // Create notification
+    if (updatedItem.userId && updatedItem.userId.toString() !== userId.toString()) {
+      await Notification.create({
+        user: updatedItem.userId,
+        type: 'SOCIAL_LIKE',
+        message: `${req.user.name} liked your ${targetType.toLowerCase()}`,
+        relatedEntity: id,
+        entityModel: targetType
+      });
+    }
+
+    // 🔥 Real-time socket events
+    if (req.io) {
+      req.io.to(`${type.slice(0, -1)}_${id}`).emit('SOCIAL_UPDATE', {
+        type: 'LIKE_UPDATED',
+        itemType: targetType,
+        itemId: id,
+        likesCount: updatedItem.likesCount,
+        hasLiked: true,
+        userId
+      });
+    }
+
+    return res.json({ success: true, likes: updatedItem.likesCount, hasLiked: true });
+  }
 });
 
 // @desc    Add comment to an item
@@ -93,7 +100,7 @@ const likeItem = asyncHandler(async (req, res) => {
 // @access  Private
 const addComment = asyncHandler(async (req, res) => {
   const { type, id } = req.params;
-  const { text } = req.body;
+  const { text, parentCommentId } = req.body;
   const userId = req.user._id;
 
   if (!text || text.trim() === '') {
@@ -102,104 +109,119 @@ const addComment = asyncHandler(async (req, res) => {
   }
 
   let Model;
+  let targetType;
   switch (type) {
-    case 'products':
-      Model = Product;
-      break;
-    case 'recipes':
-      Model = Recipe;
-      break;
-    case 'forum':
-      Model = ForumPost;
-      break;
+    case 'products': Model = Product; targetType = 'Product'; break;
+    case 'recipes': Model = Recipe; targetType = 'Recipe'; break;
+    case 'forum': Model = ForumPost; targetType = 'ForumPost'; break;
     default:
       res.status(400);
       throw new Error('Invalid type');
   }
 
-  const item = await Model.findById(id);
-  if (!item) {
-    res.status(404);
-    throw new Error(`${type.slice(0, -1)} not found`);
-  }
-
-  const comment = {
-    user: userId,
-    text: text.trim(),
-    approved: req.user.role === 'admin' // Auto-approve admin comments
-  };
-
-  item.comments.push(comment);
-  await item.save();
-
-  const newComment = item.comments[item.comments.length - 1];
-
-  // Create notification for item owner
-  if (item.userId && item.userId.toString() !== userId.toString()) {
-    await Notification.create({
-      user: item.userId,
-      type: 'SOCIAL_COMMENT',
-      message: `${req.user.name} commented on your ${type.slice(0, -1)}`,
-      relatedEntity: item._id,
-      entityModel: type.slice(0, -1).charAt(0).toUpperCase() + type.slice(0, -1).slice(1)
+  // Check for verified purchase if it's a product
+  let isVerified = false;
+  if (type === 'products') {
+    const hasOrdered = await Order.findOne({
+      user: userId,
+      'orderItems.product': id,
+      isPaid: true
     });
+    if (hasOrdered) isVerified = true;
   }
 
-  // Notify admin for approval if user is not admin
-  if (req.user.role !== 'admin') {
-    const adminUsers = await User.find({ role: 'admin' });
-    for (const admin of adminUsers) {
+  // Create the comment first
+  const comment = await Comment.create({
+    targetId: id,
+    targetType,
+    userId,
+    content: text.trim(),
+    parentCommentId: parentCommentId || null,
+    approved: true, // Auto-approve for real-time interaction
+    isVerified
+  });
+
+  try {
+    const updatedItem = await updateEngagementCount(Model, id, 'commentsCount', 1);
+
+    if (!updatedItem) {
+      // If item creation failed or item doesn't exist, allow the comment but warn
+      // Or rollback? Better to rollback if item doesn't exist.
+      await Comment.findByIdAndDelete(comment._id);
+      res.status(404);
+      throw new Error('Target item not found');
+    }
+
+    // Populate user for the response and socket
+    const populatedComment = await Comment.findById(comment._id).populate('userId', 'name profilePic');
+
+    // Create notification for item owner
+    if (updatedItem.userId && updatedItem.userId.toString() !== userId.toString()) {
       await Notification.create({
-        user: admin._id,
-        type: 'COMMENT_APPROVAL',
-        message: `New comment from ${req.user.name} requires approval`,
-        relatedEntity: item._id,
-        entityModel: 'Comment'
+        user: updatedItem.userId,
+        type: parentCommentId ? 'SOCIAL_REPLY' : 'SOCIAL_COMMENT',
+        message: `${req.user.name} ${parentCommentId ? 'replied' : 'commented'} on your ${targetType.toLowerCase()}`,
+        relatedEntity: id,
+        entityModel: targetType
       });
     }
-  }
 
-  // 🔥 ENHANCED: Real-time socket events
-  if (req.io) {
-    // Notify all users in the item room
-    req.io.to(`${type.slice(0, -1)}_${id}`).emit('SOCIAL_COMMENTED', {
-      itemType: type.slice(0, -1),
-      itemId: id,
-      comment: {
-        _id: newComment._id,
-        user: { _id: req.user._id, name: req.user.name, profilePic: req.user.profilePic },
-        text: newComment.text,
-        approved: newComment.approved,
-        createdAt: newComment.createdAt
+    // Notify admin for approval if not admin (still notify for moderation purposes)
+    if (req.user.role !== 'admin') {
+      const adminUsers = await User.find({ role: 'admin' });
+      for (const admin of adminUsers) {
+        await Notification.create({
+          user: admin._id,
+          type: 'COMMENT_APPROVAL',
+          message: `New comment from ${req.user.name} posted`,
+          relatedEntity: id,
+          entityModel: 'Comment'
+        });
       }
-    });
-
-    // Emit social update for real-time sync
-    req.io.emit('SOCIAL_UPDATE', {
-      type: 'COMMENT',
-      itemType: type.slice(0, -1),
-      itemId: id,
-      userId: userId,
-      comment: newComment,
-      needsApproval: !newComment.approved,
-      timestamp: new Date()
-    });
-  }
-
-  res.status(201).json({
-    success: true,
-    comment: {
-      _id: newComment._id,
-      user: {
-        _id: req.user._id,
-        name: req.user.name,
-        profilePic: req.user.profilePic
-      },
-      text: newComment.text,
-      approved: newComment.approved,
-      createdAt: newComment.createdAt
     }
-  });
+
+    // 🔥 Real-time socket events
+    if (req.io) {
+      const prefix = type.endsWith('s') ? type.slice(0, -1) : type;
+      const room = `${prefix.toLowerCase()}_${id}`;
+
+      req.io.to(room).emit('SOCIAL_UPDATE', {
+        type: 'COMMENT_ADDED',
+        itemType: targetType,
+        itemId: id,
+        comment: populatedComment,
+        commentsCount: updatedItem.commentsCount
+      });
+
+      // Global emission for dashboard sync
+      req.io.emit('SOCIAL_UPDATE', {
+        type: 'COMMENT_ADDED',
+        itemType: targetType,
+        itemId: id,
+        comment: populatedComment,
+        commentsCount: updatedItem.commentsCount
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      comment: populatedComment,
+      commentsCount: updatedItem.commentsCount
+    });
+
+  } catch (error) {
+    // If we crash after creating comment but before response, try to cleanup
+    console.error('Error in addComment post-creation:', error);
+    if (!res.headersSent) {
+      // If it was our own 404 throw
+      if (error.message === 'Target item not found') {
+        res.status(404);
+        throw error;
+      }
+      res.status(500);
+      throw new Error('Server error adding comment');
+    }
+  }
 });
 
 // @desc    Get comments for an item
@@ -211,39 +233,28 @@ const getComments = asyncHandler(async (req, res) => {
   const limit = parseInt(req.query.limit) || 10;
   const skip = (page - 1) * limit;
 
-  let Model;
+  let targetType;
   switch (type) {
-    case 'products':
-      Model = Product;
-      break;
-    case 'recipes':
-      Model = Recipe;
-      break;
-    case 'forum':
-      Model = ForumPost;
-      break;
+    case 'products': targetType = 'Product'; break;
+    case 'recipes': targetType = 'Recipe'; break;
+    case 'forum': targetType = 'ForumPost'; break;
     default:
       res.status(400);
       throw new Error('Invalid type');
   }
 
-  const item = await Model.findById(id)
-    .select('comments')
-    .populate('comments.user', 'name profilePic')
-    .slice('comments', [skip, limit]);
-
-  if (!item) {
-    res.status(404);
-    throw new Error(`${type.slice(0, -1)} not found`);
+  const query = { targetId: id, targetType, parentCommentId: null };
+  if (req.user?.role !== 'admin') {
+    query.approved = true;
   }
 
-  // Filter approved comments for non-admin users
-  const comments = req.user?.role === 'admin'
-    ? item.comments
-    : item.comments.filter(comment => comment.approved);
+  const comments = await Comment.find(query)
+    .populate('userId', 'name profilePic')
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit);
 
-  const total = await Model.findById(id).select('comments');
-  const totalComments = total ? total.comments.length : 0;
+  const totalComments = await Comment.countDocuments(query);
 
   res.json({
     comments,
@@ -257,88 +268,36 @@ const getComments = asyncHandler(async (req, res) => {
 // @route   PUT /api/:type/:id/comments/:commentId/approve
 // @access  Private/Admin
 const approveComment = asyncHandler(async (req, res) => {
-  const { type, id, commentId } = req.params;
+  const { commentId } = req.params;
 
-  let Model;
-  switch (type) {
-    case 'products':
-      Model = Product;
-      break;
-    case 'recipes':
-      Model = Recipe;
-      break;
-    case 'forum':
-      Model = ForumPost;
-      break;
-    default:
-      res.status(400);
-      throw new Error('Invalid type');
-  }
-
-  const item = await Model.findById(id);
-  if (!item) {
-    res.status(404);
-    throw new Error(`${type.slice(0, -1)} not found`);
-  }
-
-  const comment = item.comments.id(commentId);
+  const comment = await Comment.findById(commentId);
   if (!comment) {
     res.status(404);
     throw new Error('Comment not found');
   }
 
   comment.approved = true;
-  await item.save();
+  await comment.save();
 
   // Notify the comment author
   await Notification.create({
-    user: comment.user || comment.userId,
+    user: comment.userId,
     type: 'COMMENT_APPROVED',
     message: `Your comment has been approved and is now visible to everyone`,
-    relatedEntity: item._id,
-    entityModel: type.slice(0, -1).charAt(0).toUpperCase() + type.slice(0, -1).slice(1)
+    relatedEntity: comment.targetId,
+    entityModel: comment.targetType
   });
 
-  // 🔥 ENHANCED: Real-time socket events for comment approval
+  // 🔥 Real-time socket events
   if (req.io) {
-    // Broadcast to all users viewing this item
-    req.io.emit('COMMENT_APPROVED', {
-      itemType: type,
-      itemId: id,
-      commentId: commentId,
-      comment: comment,
-      timestamp: new Date()
-    });
-
-    // Notify the comment author specifically
-    const commentOwnerId = comment.user || comment.userId;
-    if (commentOwnerId) {
-      req.io.to(`user_${commentOwnerId}`).emit('YOUR_COMMENT_APPROVED', {
-        itemType: type,
-        itemId: id,
-        commentId: commentId,
-        message: 'Your comment has been approved and is now visible to everyone'
-      });
-    }
-
-    // Emit social update for real-time sync
-    req.io.emit('SOCIAL_UPDATE', {
+    req.io.to(`${comment.targetType.toLowerCase()}_${comment.targetId}`).emit('SOCIAL_UPDATE', {
       type: 'COMMENT_APPROVED',
-      itemType: type.slice(0, -1),
-      itemId: id,
-      commentId: commentId,
-      comment: comment,
-      timestamp: new Date()
+      commentId: comment._id,
+      itemId: comment.targetId
     });
-
-    console.log(`✅ Comment approved and broadcasted via socket: ${commentId} for ${type} ${id}`);
   }
 
-  res.json({
-    success: true,
-    message: 'Comment approved successfully',
-    comment: comment
-  });
+  res.json({ success: true, message: 'Comment approved successfully', comment });
 });
 
 // @desc    Delete comment
@@ -348,47 +307,56 @@ const deleteComment = asyncHandler(async (req, res) => {
   const { type, id, commentId } = req.params;
   const userId = req.user._id;
 
-  let Model;
-  switch (type) {
-    case 'products':
-      Model = Product;
-      break;
-    case 'recipes':
-      Model = Recipe;
-      break;
-    case 'forum':
-      Model = ForumPost;
-      break;
-    default:
-      res.status(400);
-      throw new Error('Invalid type');
-  }
-
-  const item = await Model.findById(id);
-  if (!item) {
-    res.status(404);
-    throw new Error(`${type.slice(0, -1)} not found`);
-  }
-
-  const comment = item.comments.id(commentId);
+  const comment = await Comment.findById(commentId);
   if (!comment) {
     res.status(404);
     throw new Error('Comment not found');
   }
 
-  // Check if user is admin or comment owner
-  if (req.user.role !== 'admin' && comment.user.toString() !== userId.toString()) {
+  // Author or admin check
+  if (comment.userId.toString() !== userId.toString() && req.user.role !== 'admin') {
     res.status(403);
     throw new Error('Not authorized to delete this comment');
   }
 
-  comment.remove();
-  await item.save();
+  await Comment.findByIdAndDelete(commentId);
+  await Comment.deleteMany({ parentCommentId: commentId }); // Remove replies
 
-  res.json({
-    success: true,
-    message: 'Comment deleted successfully'
-  });
+  let Model;
+  switch (type) {
+    case 'products': Model = Product; break;
+    case 'recipes': Model = Recipe; break;
+    case 'forum': Model = ForumPost; break;
+    default:
+      res.status(400);
+      throw new Error('Invalid type');
+  }
+
+  const updatedItem = await updateEngagementCount(Model, id, 'commentsCount', -1);
+
+  // 🔥 Real-time socket events
+  if (req.io) {
+    const prefix = type.endsWith('s') ? type.slice(0, -1) : type;
+    const room = `${prefix.toLowerCase()}_${id}`;
+
+    req.io.to(room).emit('SOCIAL_UPDATE', {
+      type: 'COMMENT_DELETED',
+      itemId: id,
+      commentId,
+      commentsCount: updatedItem.commentsCount
+    });
+
+    // Global update
+    req.io.emit('SOCIAL_UPDATE', {
+      type: 'COMMENT_DELETED',
+      itemId: id,
+      itemType: type,
+      commentId,
+      commentsCount: updatedItem.commentsCount
+    });
+  }
+
+  res.json({ success: true, message: 'Comment deleted successfully', commentsCount: updatedItem.commentsCount });
 });
 
 // @desc    Track share action
@@ -397,48 +365,147 @@ const deleteComment = asyncHandler(async (req, res) => {
 const trackShare = asyncHandler(async (req, res) => {
   const { type, id } = req.params;
   const { platform } = req.body;
+  const userId = req.user._id;
 
   let Model;
+  let targetType;
   switch (type) {
-    case 'products':
-      Model = Product;
-      break;
-    case 'recipes':
-      Model = Recipe;
-      break;
-    case 'forum':
-      Model = ForumPost;
-      break;
+    case 'products': Model = Product; targetType = 'Product'; break;
+    case 'recipes': Model = Recipe; targetType = 'Recipe'; break;
+    case 'forum': Model = ForumPost; targetType = 'ForumPost'; break;
     default:
       res.status(400);
       throw new Error('Invalid type');
   }
 
-  const item = await Model.findById(id);
-  if (!item) {
-    res.status(404);
-    throw new Error(`${type.slice(0, -1)} not found`);
-  }
+  await Share.create({
+    targetId: id,
+    targetType,
+    userId,
+    platform: platform || 'unknown'
+  });
 
-  item.shares = (item.shares || 0) + 1;
-  await item.save();
+  const updatedItem = await updateEngagementCount(Model, id, 'sharesCount', 1);
 
-  // Create notification for item owner
-  if (item.userId && item.userId.toString() !== req.user._id.toString()) {
-    await Notification.create({
-      user: item.userId,
-      type: 'SOCIAL_SHARE',
-      message: `${req.user.name} shared your ${type.slice(0, -1)} on ${platform}`,
-      relatedEntity: item._id,
-      entityModel: type.slice(0, -1).charAt(0).toUpperCase() + type.slice(0, -1).slice(1)
+  // 🔥 Real-time socket events
+  if (req.io) {
+    const prefix = type.endsWith('s') ? type.slice(0, -1) : type;
+    const room = `${prefix.toLowerCase()}_${id}`;
+
+    req.io.to(room).emit('SOCIAL_UPDATE', {
+      type: 'SHARE_UPDATED',
+      itemId: id,
+      sharesCount: updatedItem.sharesCount
+    });
+
+    // Global update
+    req.io.emit('SOCIAL_UPDATE', {
+      type: 'SHARE_UPDATED',
+      itemId: id,
+      itemType: type,
+      sharesCount: updatedItem.sharesCount
     });
   }
 
-  res.json({
-    success: true,
-    shares: item.shares,
-    message: `Shared on ${platform} successfully`
-  });
+  res.json({ success: true, sharesCount: updatedItem.sharesCount });
+});
+
+const rateItem = asyncHandler(async (req, res) => {
+  const { type, id } = req.params;
+  const { rating, comment } = req.body;
+  const userId = req.user._id;
+
+  if (!rating || rating < 1 || rating > 5) {
+    res.status(400);
+    throw new Error('Please provide a rating between 1 and 5');
+  }
+
+  let Model;
+  let targetType;
+  switch (type) {
+    case 'products': Model = Product; targetType = 'Product'; break;
+    case 'recipes': Model = Recipe; targetType = 'Recipe'; break;
+    default:
+      res.status(400);
+      throw new Error('Invalid type for rating');
+  }
+
+  let existingRating = await Rating.findOne({ targetId: id, userId });
+  if (existingRating) {
+    existingRating.rating = Number(rating);
+    existingRating.comment = comment;
+    await existingRating.save();
+  } else {
+    await Rating.create({
+      targetId: id,
+      targetType,
+      userId,
+      rating: Number(rating),
+      comment,
+      approved: true
+    });
+  }
+
+  try {
+    // Recalculate average and distribution
+    const stats = await Rating.aggregate([
+      { $match: { targetId: new mongoose.Types.ObjectId(id), approved: true } },
+      {
+        $group: {
+          _id: '$rating',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    let totalCount = 0;
+    let totalSum = 0;
+
+    stats.forEach(stat => {
+      distribution[stat._id] = stat.count;
+      totalCount += stat.count;
+      totalSum += stat._id * stat.count;
+    });
+
+    const averageRating = totalCount > 0 ? totalSum / totalCount : 0;
+
+    const item = await Model.findByIdAndUpdate(id, {
+      rating: averageRating,
+      numReviews: totalCount,
+      ratingDistribution: distribution
+    }, { new: true });
+
+    if (!item) {
+      res.status(404);
+      throw new Error('Item not found for rating update');
+    }
+
+    // Invalidate cache
+    await setAsync(`engagement:${id}`, JSON.stringify(item), 'EX', 3600);
+
+    // 🔥 Real-time socket events
+    if (req.io) {
+      req.io.to(`${type.slice(0, -1)}_${id}`).emit('SOCIAL_UPDATE', {
+        type: 'RATING_UPDATED',
+        itemId: id,
+        rating: item.rating,
+        numReviews: item.numReviews,
+        distribution: item.ratingDistribution
+      });
+    }
+
+    res.json({
+      success: true,
+      rating: item.rating,
+      numReviews: item.numReviews,
+      distribution: item.ratingDistribution
+    });
+  } catch (error) {
+    console.error('Error in rateItem:', error);
+    res.status(500);
+    throw new Error('Server error updating rating');
+  }
 });
 
 // @desc    Get social analytics for admin
@@ -449,9 +516,9 @@ const getSocialAnalytics = asyncHandler(async (req, res) => {
     Product.aggregate([
       {
         $project: {
-          likesCount: { $size: '$likes' },
-          commentsCount: { $size: '$comments' },
-          sharesCount: '$shares'
+          likesCount: 1,
+          commentsCount: 1,
+          sharesCount: 1
         }
       },
       {
@@ -469,9 +536,9 @@ const getSocialAnalytics = asyncHandler(async (req, res) => {
     Recipe.aggregate([
       {
         $project: {
-          likesCount: { $size: '$likes' },
-          commentsCount: { $size: '$comments' },
-          sharesCount: '$shares'
+          likesCount: 1,
+          commentsCount: 1,
+          sharesCount: 1
         }
       },
       {
@@ -489,9 +556,9 @@ const getSocialAnalytics = asyncHandler(async (req, res) => {
     ForumPost.aggregate([
       {
         $project: {
-          likesCount: { $size: '$likes' },
-          commentsCount: { $size: '$comments' },
-          sharesCount: '$shares'
+          likesCount: 1,
+          commentsCount: 1,
+          sharesCount: 1
         }
       },
       {
@@ -509,9 +576,9 @@ const getSocialAnalytics = asyncHandler(async (req, res) => {
   ]);
 
   const pendingComments = await Promise.all([
-    Product.countDocuments({ 'comments.approved': false }),
-    Recipe.countDocuments({ 'comments.approved': false }),
-    ForumPost.countDocuments({ 'comments.approved': false })
+    Comment.countDocuments({ targetType: 'Product', approved: false }),
+    Comment.countDocuments({ targetType: 'Recipe', approved: false }),
+    Comment.countDocuments({ targetType: 'ForumPost', approved: false })
   ]);
 
   const totalPendingComments = pendingComments.reduce((sum, count) => sum + count, 0);
@@ -533,7 +600,7 @@ const getSocialAnalytics = asyncHandler(async (req, res) => {
 // @route   POST /api/:type/:id/comments/:commentId/report
 // @access  Private
 const reportComment = asyncHandler(async (req, res) => {
-  const { type, id, commentId } = req.params;
+  const { commentId } = req.params;
   const { reason } = req.body;
   const userId = req.user._id;
 
@@ -542,23 +609,7 @@ const reportComment = asyncHandler(async (req, res) => {
     throw new Error('Reporting reason is required');
   }
 
-  let Model;
-  switch (type) {
-    case 'products': Model = Product; break;
-    case 'recipes': Model = Recipe; break;
-    case 'forum': Model = ForumPost; break;
-    default:
-      res.status(400);
-      throw new Error('Invalid type');
-  }
-
-  const item = await Model.findById(id);
-  if (!item) {
-    res.status(404);
-    throw new Error(`${type.slice(0, -1)} not found`);
-  }
-
-  const comment = item.comments.id(commentId);
+  const comment = await Comment.findById(commentId);
   if (!comment) {
     res.status(404);
     throw new Error('Comment not found');
@@ -579,13 +630,13 @@ const reportComment = asyncHandler(async (req, res) => {
     comment.isFlagged = true;
   }
 
-  await item.save();
+  await comment.save();
 
   // Notify socket if flagged
   if (comment.isFlagged && req.io) {
     req.io.to('admin_room').emit('COMMENT_FLAGGED', {
-      itemType: type,
-      itemId: id,
+      itemType: comment.targetType,
+      itemId: comment.targetId,
       commentId,
       reportsCount: comment.reports.length
     });
@@ -598,30 +649,9 @@ const reportComment = asyncHandler(async (req, res) => {
 // @route   GET /api/social/flagged
 // @access  Private/Admin
 const getFlaggedComments = asyncHandler(async (req, res) => {
-  const products = await Product.find({ 'comments.isFlagged': true }).select('name comments');
-  const recipes = await Recipe.find({ 'comments.isFlagged': true }).select('title comments');
-  const forum = await ForumPost.find({ 'comments.isFlagged': true }).select('title comments');
-
-  const flagged = [];
-
-  const extractFlagged = (items, type) => {
-    items.forEach(item => {
-      item.comments.forEach(c => {
-        if (c.isFlagged) {
-          flagged.push({
-            itemId: item._id,
-            itemName: item.name || item.title,
-            itemType: type,
-            comment: c
-          });
-        }
-      });
-    });
-  };
-
-  extractFlagged(products, 'product');
-  extractFlagged(recipes, 'recipe');
-  extractFlagged(forum, 'forum');
+  const flagged = await Comment.find({ isFlagged: true })
+    .populate('userId', 'name profilePic')
+    .sort({ createdAt: -1 });
 
   res.json({ success: true, count: flagged.length, comments: flagged });
 });
@@ -633,23 +663,7 @@ const moderateComment = asyncHandler(async (req, res) => {
   const { type, id, commentId } = req.params;
   const { action, notes } = req.body; // action: approve, reject, delete
 
-  let Model;
-  switch (type) {
-    case 'products': Model = Product; break;
-    case 'recipes': Model = Recipe; break;
-    case 'forum': Model = ForumPost; break;
-    default:
-      res.status(400);
-      throw new Error('Invalid type');
-  }
-
-  const item = await Model.findById(id);
-  if (!item) {
-    res.status(404);
-    throw new Error('Item not found');
-  }
-
-  const comment = item.comments.id(commentId);
+  const comment = await Comment.findById(commentId);
   if (!comment) {
     res.status(404);
     throw new Error('Comment not found');
@@ -662,7 +676,31 @@ const moderateComment = asyncHandler(async (req, res) => {
     comment.approved = false;
     comment.isFlagged = false;
   } else if (action === 'delete') {
-    item.comments.pull(commentId);
+    await Comment.findByIdAndDelete(commentId);
+    await Comment.deleteMany({ parentCommentId: commentId }); // Remove replies
+
+    let Model;
+    switch (type) {
+      case 'products': Model = Product; break;
+      case 'recipes': Model = Recipe; break;
+      case 'forum': Model = ForumPost; break;
+      default:
+        res.status(400);
+        throw new Error('Invalid type');
+    }
+
+    const updatedItem = await updateEngagementCount(Model, id, 'commentsCount', -1);
+
+    if (req.io) {
+      req.io.to(`${type.slice(0, -1)}_${id}`).emit('SOCIAL_UPDATE', {
+        type: 'COMMENT_DELETED',
+        itemId: id,
+        commentId,
+        commentsCount: updatedItem?.commentsCount || 0
+      });
+    }
+
+    return res.json({ success: true, message: 'Comment deleted successfully' });
   } else {
     res.status(400);
     throw new Error('Invalid action');
@@ -672,12 +710,12 @@ const moderateComment = asyncHandler(async (req, res) => {
   comment.moderatedBy = req.user._id;
   comment.moderatedAt = new Date();
 
-  await item.save();
+  await comment.save();
 
   // Socket notification
   if (req.io) {
-    req.io.emit('SOCIAL_UPDATE', {
-      type: action === 'delete' ? 'COMMENT_DELETED' : 'COMMENT_MODERATED',
+    req.io.to(`${type.slice(0, -1)}_${id}`).emit('SOCIAL_UPDATE', {
+      type: 'COMMENT_MODERATED',
       itemType: type.slice(0, -1),
       itemId: id,
       commentId,
@@ -686,7 +724,7 @@ const moderateComment = asyncHandler(async (req, res) => {
     });
   }
 
-  res.json({ success: true, message: `Comment ${action}d successfully` });
+  res.json({ success: true, message: `Comment ${action}d successfully`, comment });
 });
 
 // @desc    Get engagement analytics for a specific item
@@ -711,23 +749,31 @@ const getEngagementAnalytics = asyncHandler(async (req, res) => {
     throw new Error('Item not found');
   }
 
-  const ratingsCount = item.ratings?.length || 0;
-  const commentsCount = item.comments?.length || 0;
-  const likesCount = item.likes?.length || 0;
-  const sharesCount = item.shares || 0;
+  // Fetch counts from standalone collections for accuracy
+  const [likesCount, commentsCount, ratingsCount, sharesCount] = await Promise.all([
+    Like.countDocuments({ targetId: id }),
+    Comment.countDocuments({ targetId: id }),
+    Rating.countDocuments({ targetId: id }),
+    Share.countDocuments({ targetId: id })
+  ]);
+
+  // Use cached values if they exist, otherwise use live counts
+  const stats = {
+    likes: likesCount || item.likesCount || 0,
+    comments: commentsCount || item.commentsCount || 0,
+    ratings: ratingsCount || item.numReviews || 0,
+    shares: sharesCount || item.sharesCount || 0,
+    averageRating: item.rating || 0
+  };
 
   // Simple engagement score
-  const engagementScore = (likesCount * 1) + (commentsCount * 2) + (ratingsCount * 1.5) + (sharesCount * 3);
+  const engagementScore = (stats.likes * 1) + (stats.comments * 2) + (stats.ratings * 1.5) + (stats.shares * 3);
 
   res.json({
     success: true,
     stats: {
-      likes: likesCount,
-      comments: commentsCount,
-      ratings: ratingsCount,
-      shares: sharesCount,
-      engagementScore: engagementScore.toFixed(2),
-      averageRating: item.averageRating || 0
+      ...stats,
+      engagementScore: engagementScore.toFixed(2)
     }
   });
 });
@@ -736,7 +782,7 @@ const getEngagementAnalytics = asyncHandler(async (req, res) => {
 // @route   PUT /api/:type/:id/comments/:commentId
 // @access  Private (Comment owner only)
 const editComment = asyncHandler(async (req, res) => {
-  const { type, id, commentId } = req.params;
+  const { commentId } = req.params;
   const { text } = req.body;
   const userId = req.user._id;
 
@@ -745,214 +791,15 @@ const editComment = asyncHandler(async (req, res) => {
     throw new Error('Comment text is required');
   }
 
-  if (text.length > 1000) {
-    res.status(400);
-    throw new Error('Comment must be 1000 characters or less');
-  }
-
-  let Model;
-  switch (type) {
-    case 'products':
-      Model = Product;
-      break;
-    case 'recipes':
-      Model = Recipe;
-      break;
-    case 'forum':
-      Model = ForumPost;
-      break;
-    default:
-      res.status(400);
-      throw new Error('Invalid type');
-  }
-
-  const item = await Model.findById(id);
-  if (!item) {
-    res.status(404);
-    throw new Error(`${type.slice(0, -1)} not found`);
-  }
-
-  const comment = item.comments.id(commentId);
+  const comment = await Comment.findById(commentId);
   if (!comment) {
     res.status(404);
     throw new Error('Comment not found');
   }
 
-  // Check if user owns the comment
-  if (comment.user?.toString() !== userId.toString() && comment.userId?.toString() !== userId.toString()) {
-    res.status(403);
+  if (comment.userId.toString() !== userId.toString()) {
+    res.status(401);
     throw new Error('Not authorized to edit this comment');
-  }
-
-  // Detect mentions (@username)
-  const mentionRegex = /@(\w+)/g;
-  const mentions = [];
-  let match;
-  while ((match = mentionRegex.exec(text)) !== null) {
-    const username = match[1];
-    const mentionedUser = await User.findOne({ name: new RegExp(`^${username}$`, 'i') });
-    if (mentionedUser) {
-      mentions.push(mentionedUser._id);
-    }
-  }
-
-  comment.text = text.trim();
-  comment.isEdited = true;
-  comment.editedAt = new Date();
-  comment.mentions = mentions;
-  await item.save();
-
-  // Notify mentioned users
-  for (const mentionedUserId of mentions) {
-    if (mentionedUserId.toString() !== userId.toString()) {
-      await Notification.create({
-        user: mentionedUserId,
-        type: 'MENTION',
-        message: `${req.user.name} mentioned you in a comment`,
-        relatedEntity: item._id,
-        entityModel: type.slice(0, -1).charAt(0).toUpperCase() + type.slice(0, -1).slice(1)
-      });
-    }
-  }
-
-  res.json({
-    success: true,
-    comment: {
-      _id: comment._id,
-      text: comment.text,
-      isEdited: comment.isEdited,
-      editedAt: comment.editedAt,
-      mentions: comment.mentions
-    },
-    message: 'Comment updated successfully'
-  });
-});
-
-// @desc    Like/Unlike a comment
-// @route   POST /api/:type/:id/comments/:commentId/like
-// @access  Private
-const likeComment = asyncHandler(async (req, res) => {
-  const { type, id, commentId } = req.params;
-  const userId = req.user._id;
-
-  let Model;
-  switch (type) {
-    case 'products':
-      Model = Product;
-      break;
-    case 'recipes':
-      Model = Recipe;
-      break;
-    case 'forum':
-      Model = ForumPost;
-      break;
-    default:
-      res.status(400);
-      throw new Error('Invalid type');
-  }
-
-  const item = await Model.findById(id);
-  if (!item) {
-    res.status(404);
-    throw new Error(`${type.slice(0, -1)} not found`);
-  }
-
-  const comment = item.comments.id(commentId);
-  if (!comment) {
-    res.status(404);
-    throw new Error('Comment not found');
-  }
-
-  const hasLiked = comment.likes?.includes(userId) || false;
-
-  if (hasLiked) {
-    // Unlike
-    comment.likes = comment.likes.filter(like => like.toString() !== userId.toString());
-  } else {
-    // Like
-    if (!comment.likes) comment.likes = [];
-    comment.likes.push(userId);
-  }
-
-  await item.save();
-
-  // Notify comment owner (except when user likes their own comment)
-  const commentOwnerId = comment.user || comment.userId;
-  if (commentOwnerId && commentOwnerId.toString() !== userId.toString() && !hasLiked) {
-    await Notification.create({
-      user: commentOwnerId,
-      type: 'COMMENT_LIKE',
-      message: `${req.user.name} liked your comment`,
-      relatedEntity: item._id,
-      entityModel: type.slice(0, -1).charAt(0).toUpperCase() + type.slice(0, -1).slice(1)
-    });
-  }
-
-  // 🔥 ENHANCED: Real-time socket events
-  if (req.io) {
-    req.io.emit('SOCIAL_UPDATE', {
-      type: 'COMMENT_LIKE',
-      itemType: type.slice(0, -1),
-      itemId: id,
-      commentId: commentId,
-      userId: userId,
-      likes: comment.likes?.length || 0,
-      hasLiked: !hasLiked,
-      timestamp: new Date()
-    });
-  }
-
-  res.json({
-    success: true,
-    likes: comment.likes?.length || 0,
-    hasLiked: !hasLiked
-  });
-});
-
-// @desc    Reply to a comment (nested comment)
-// @route   POST /api/:type/:id/comments/:commentId/reply
-// @access  Private
-const replyToComment = asyncHandler(async (req, res) => {
-  const { type, id, commentId } = req.params;
-  const { text } = req.body;
-  const userId = req.user._id;
-
-  if (!text || text.trim() === '') {
-    res.status(400);
-    throw new Error('Reply text is required');
-  }
-
-  if (text.length > 1000) {
-    res.status(400);
-    throw new Error('Reply must be 1000 characters or less');
-  }
-
-  let Model;
-  switch (type) {
-    case 'products':
-      Model = Product;
-      break;
-    case 'recipes':
-      Model = Recipe;
-      break;
-    case 'forum':
-      Model = ForumPost;
-      break;
-    default:
-      res.status(400);
-      throw new Error('Invalid type');
-  }
-
-  const item = await Model.findById(id);
-  if (!item) {
-    res.status(404);
-    throw new Error(`${type.slice(0, -1)} not found`);
-  }
-
-  const parentComment = item.comments.id(commentId);
-  if (!parentComment) {
-    res.status(404);
-    throw new Error('Parent comment not found');
   }
 
   // Detect mentions
@@ -967,61 +814,83 @@ const replyToComment = asyncHandler(async (req, res) => {
     }
   }
 
-  const reply = {
-    user: userId,
-    userId: userId,
-    text: text.trim(),
-    parentComment: commentId,
-    mentions: mentions,
-    approved: req.user.role === 'admin' // Auto-approve admin replies
-  };
+  comment.content = text.trim();
+  comment.mentions = mentions;
+  comment.isEdited = true;
+  comment.editedAt = Date.now();
 
-  item.comments.push(reply);
-  await item.save();
+  await comment.save();
 
-  const newReply = item.comments[item.comments.length - 1];
-
-  // Notify parent comment owner
-  const parentCommentOwnerId = parentComment.user || parentComment.userId;
-  if (parentCommentOwnerId && parentCommentOwnerId.toString() !== userId.toString()) {
-    await Notification.create({
-      user: parentCommentOwnerId,
-      type: 'COMMENT_REPLY',
-      message: `${req.user.name} replied to your comment`,
-      relatedEntity: item._id,
-      entityModel: type.slice(0, -1).charAt(0).toUpperCase() + type.slice(0, -1).slice(1)
+  // 🔥 Real-time socket events
+  if (req.io) {
+    req.io.to(`${comment.targetType.toLowerCase()}_${comment.targetId}`).emit('SOCIAL_UPDATE', {
+      type: 'COMMENT_EDITED',
+      itemId: comment.targetId,
+      commentId: comment._id,
+      content: comment.content
     });
   }
 
-  // Notify mentioned users
-  for (const mentionedUserId of mentions) {
-    if (mentionedUserId.toString() !== userId.toString()) {
+  res.json({ success: true, comment });
+});
+
+// @desc    Like/Unlike a comment
+// @route   POST /api/:type/:id/comments/:commentId/like
+// @access  Private
+const likeComment = asyncHandler(async (req, res) => {
+  const { type, id, commentId } = req.params;
+  const userId = req.user._id;
+
+  const comment = await Comment.findById(commentId);
+  if (!comment) {
+    res.status(404);
+    throw new Error('Comment not found');
+  }
+
+  const hasLiked = comment.likes.includes(userId);
+
+  if (hasLiked) {
+    comment.likes = comment.likes.filter(id => id.toString() !== userId.toString());
+  } else {
+    comment.likes.push(userId);
+
+    // Notify comment owner
+    if (comment.userId.toString() !== userId.toString()) {
       await Notification.create({
-        user: mentionedUserId,
-        type: 'MENTION',
-        message: `${req.user.name} mentioned you in a reply`,
-        relatedEntity: item._id,
-        entityModel: type.slice(0, -1).charAt(0).toUpperCase() + type.slice(0, -1).slice(1)
+        user: comment.userId,
+        type: 'COMMENT_LIKE',
+        message: `${req.user.name} liked your comment`,
+        relatedEntity: comment.targetId,
+        entityModel: comment.targetType
       });
     }
   }
 
-  res.status(201).json({
-    success: true,
-    reply: {
-      _id: newReply._id,
-      user: {
-        _id: req.user._id,
-        name: req.user.name,
-        profilePic: req.user.profilePic
-      },
-      text: newReply.text,
-      parentComment: newReply.parentComment,
-      mentions: newReply.mentions,
-      approved: newReply.approved,
-      createdAt: newReply.createdAt
-    }
-  });
+  await comment.save();
+
+  // 🔥 Real-time socket events
+  if (req.io) {
+    req.io.to(`${comment.targetType.toLowerCase()}_${comment.targetId}`).emit('SOCIAL_UPDATE', {
+      type: 'COMMENT_LIKE_UPDATED',
+      itemId: comment.targetId,
+      commentId: comment._id,
+      likesCount: comment.likes.length,
+      hasLiked: !hasLiked,
+      userId
+    });
+  }
+
+  res.json({ success: true, likes: comment.likes.length, hasLiked: !hasLiked });
+});
+
+// @desc    Reply to a comment (nested comment)
+// @route   POST /api/:type/:id/comments/:commentId/reply
+// @access  Private
+const replyToComment = asyncHandler(async (req, res) => {
+  // replyToComment is now a wrapper around addComment logic or vice versa.
+  // We'll redirect to addComment with parentCommentId.
+  req.body.parentCommentId = req.params.commentId;
+  return addComment(req, res);
 });
 
 // @desc    Get rating distribution for a recipe
@@ -1029,40 +898,46 @@ const replyToComment = asyncHandler(async (req, res) => {
 // @access  Public
 const getRatingDistribution = asyncHandler(async (req, res) => {
   const { id } = req.params;
-
-  const recipe = await Recipe.findById(id).select('ratings averageRating numReviews');
-
-  if (!recipe) {
-    res.status(404);
-    throw new Error('Recipe not found');
+  let targetType;
+  switch (req.params.type) {
+    case 'products': targetType = 'Product'; break;
+    case 'recipes': targetType = 'Recipe'; break;
+    default: targetType = 'Recipe';
   }
 
-  // Calculate distribution
-  const distribution = {
-    5: 0,
-    4: 0,
-    3: 0,
-    2: 0,
-    1: 0
-  };
+  // Aggregate ratings from the standalone collection
+  const stats = await Rating.aggregate([
+    { $match: { targetId: new mongoose.Types.ObjectId(id), targetType, approved: true } },
+    {
+      $group: {
+        _id: '$rating',
+        count: { $sum: 1 }
+      }
+    }
+  ]);
 
-  recipe.ratings.forEach(rating => {
-    distribution[rating.rating] = (distribution[rating.rating] || 0) + 1;
+  const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  let totalRatings = 0;
+  let sumRatings = 0;
+
+  stats.forEach(stat => {
+    distribution[stat._id] = stat.count;
+    totalRatings += stat.count;
+    sumRatings += stat._id * stat.count;
   });
 
-  const total = recipe.ratings.length;
+  const averageRating = totalRatings > 0 ? (sumRatings / totalRatings).toFixed(1) : 0;
   const percentages = {};
-
   for (let i = 1; i <= 5; i++) {
-    percentages[i] = total > 0 ? Math.round((distribution[i] / total) * 100) : 0;
+    percentages[i] = totalRatings > 0 ? Math.round((distribution[i] / totalRatings) * 100) : 0;
   }
 
   res.json({
     success: true,
-    averageRating: recipe.averageRating || 0,
-    totalRatings: total,
-    distribution: distribution,
-    percentages: percentages
+    averageRating: parseFloat(averageRating),
+    totalRatings,
+    distribution,
+    percentages
   });
 });
 
@@ -1070,178 +945,68 @@ const getRatingDistribution = asyncHandler(async (req, res) => {
 // @route   GET /api/:type/:id/comments/sorted
 // @access  Public
 const getSortedComments = asyncHandler(async (req, res) => {
-  try {
-    const { type, id } = req.params;
-    const { sortBy = 'recent', page = 1, limit = 20 } = req.query;
-    const skip = (page - 1) * limit;
+  const { type, id } = req.params;
+  const { sortBy = 'recent', page = 1, limit = 20 } = req.query;
+  const skip = (page - 1) * limit;
 
-    let Model;
-    switch (type) {
-      case 'products':
-        Model = Product;
-        break;
-      case 'recipes':
-        Model = Recipe;
-        break;
-      case 'forum':
-        Model = ForumPost;
-        break;
-      default:
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid type. Must be products, recipes, or forum'
-        });
-    }
-
-    const item = await Model.findById(id)
-      .select('comments')
-      .populate('comments.userId', 'name profilePic');
-
-    if (!item) {
-      return res.status(404).json({
-        success: false,
-        message: `${type.slice(0, -1)} not found`
-      });
-    }
-
-    // Convert to plain object to avoid Mongoose issues
-    const itemObj = item.toObject ? item.toObject() : item;
-
-    // Safe access to comments array
-    const allComments = itemObj.comments || [];
-
-    // Handle case where comments don't exist or are empty
-    if (!Array.isArray(allComments) || allComments.length === 0) {
-      return res.status(200).json({
-        success: true,
-        comments: [],
-        total: 0,
-        page: Number(page),
-        pages: 0,
-        limit: Number(limit)
-      });
-    }
-
-    // Filter approved comments for non-admin users
-    // IMPORTANT: Schema uses 'approved', not 'isApproved'
-    let comments = req.user?.role === 'admin'
-      ? allComments
-      : allComments.filter(comment => comment && comment.approved === true && !comment.isFlagged);
-
-    // Filter out replies (only show top-level comments)
-    comments = comments.filter(comment => comment && !comment.parentComment);
-
-    // Handle empty comments after filtering
-    if (!comments || comments.length === 0) {
-      return res.status(200).json({
-        success: true,
-        comments: [],
-        total: 0,
-        page: Number(page),
-        pages: 0,
-        limit: Number(limit)
-      });
-    }
-
-    // Sort comments safely
-    try {
-      switch (sortBy) {
-        case 'top':
-          comments.sort((a, b) => {
-            const aLikes = (a && a.likes && Array.isArray(a.likes)) ? a.likes.length : 0;
-            const bLikes = (b && b.likes && Array.isArray(b.likes)) ? b.likes.length : 0;
-            return bLikes - aLikes;
-          });
-          break;
-        case 'oldest':
-          comments.sort((a, b) => {
-            const aDate = a && a.createdAt ? new Date(a.createdAt) : new Date(0);
-            const bDate = b && b.createdAt ? new Date(b.createdAt) : new Date(0);
-            return aDate - bDate;
-          });
-          break;
-        case 'recent':
-        default:
-          comments.sort((a, b) => {
-            const aDate = a && a.createdAt ? new Date(a.createdAt) : new Date(0);
-            const bDate = b && b.createdAt ? new Date(b.createdAt) : new Date(0);
-            return bDate - aDate;
-          });
-          break;
-      }
-    } catch (sortError) {
-      console.error('Error sorting comments:', sortError);
-      // Continue with unsorted comments rather than crashing
-    }
-
-    // Apply pagination safely
-    const paginatedComments = comments.slice(skip, Math.min(skip + Number(limit), comments.length));
-
-    return res.status(200).json({
-      success: true,
-      comments: paginatedComments,
-      total: comments.length,
-      page: Number(page),
-      pages: Math.ceil(comments.length / Number(limit)),
-      limit: Number(limit)
-    });
-  } catch (error) {
-    console.error('❌ getSortedComments error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Error fetching sorted comments',
-      error: error.message
-    });
+  let targetType;
+  switch (type) {
+    case 'products': targetType = 'Product'; break;
+    case 'recipes': targetType = 'Recipe'; break;
+    case 'forum': targetType = 'ForumPost'; break;
+    default:
+      return res.status(400).json({ success: false, message: 'Invalid type' });
   }
+
+  const query = { targetId: id, targetType, parentCommentId: null };
+  // Comments are auto-approved on creation (line 140), so no need to filter
+  // if (req.user?.role !== 'admin') {
+  //   query.approved = true;
+  // }
+
+  let sortCriteria = { createdAt: -1 };
+  if (sortBy === 'top') {
+    sortCriteria = { likesCount: -1, createdAt: -1 };
+  } else if (sortBy === 'oldest') {
+    sortCriteria = { createdAt: 1 };
+  }
+
+  const comments = await Comment.find(query)
+    .populate('userId', 'name profilePic')
+    .sort(sortCriteria)
+    .skip(skip)
+    .limit(limit);
+
+  const total = await Comment.countDocuments(query);
+
+  res.json({
+    success: true,
+    comments,
+    total,
+    page: Number(page),
+    pages: Math.ceil(total / Number(limit))
+  });
 });
 
 // @desc    Get replies for a comment
 // @route   GET /api/:type/:id/comments/:commentId/replies
 // @access  Public
 const getCommentReplies = asyncHandler(async (req, res) => {
-  const { type, id, commentId } = req.params;
+  const { commentId } = req.params;
 
-  let Model;
-  switch (type) {
-    case 'products':
-      Model = Product;
-      break;
-    case 'recipes':
-      Model = Recipe;
-      break;
-    case 'forum':
-      Model = ForumPost;
-      break;
-    default:
-      res.status(400);
-      throw new Error('Invalid type');
-  }
+  const query = { parentCommentId: commentId };
+  // Comments are auto-approved on creation, no need to filter
+  // if (req.user?.role !== 'admin') {
+  //   query.approved = true;
+  // }
 
-  const item = await Model.findById(id)
-    .select('comments')
-    .populate('comments.user comments.userId', 'name profilePic');
-
-  if (!item) {
-    res.status(404);
-    throw new Error(`${type.slice(0, -1)} not found`);
-  }
-
-  // Get all replies to this comment
-  let replies = item.comments.filter(comment =>
-    comment.parentComment?.toString() === commentId
-  );
-
-  // Filter approved replies for non-admin users
-  if (req.user?.role !== 'admin') {
-    replies = replies.filter(reply => reply.approved && !reply.isFlagged);
-  }
-
-  // Sort by creation date (oldest first for replies)
-  replies.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  const replies = await Comment.find(query)
+    .populate('userId', 'name profilePic')
+    .sort({ createdAt: 1 }); // Oldest first for threads
 
   res.json({
     success: true,
-    replies: replies,
+    replies,
     total: replies.length
   });
 });
@@ -1271,11 +1036,12 @@ const getSocialStats = asyncHandler(async (req, res) => {
   res.json({
     success: true,
     stats: {
-      likes: item.likes?.length || 0,
-      comments: item.comments?.length || 0,
-      shares: item.shares || 0,
-      averageRating: item.averageRating || 0,
-      numReviews: item.numReviews || 0
+      likes: item.likesCount || 0,
+      comments: item.commentsCount || 0,
+      shares: item.sharesCount || 0,
+      averageRating: item.rating || item.averageRating || 0,
+      numReviews: item.numReviews || 0,
+      distribution: item.ratingDistribution || {}
     }
   });
 });
@@ -1298,5 +1064,6 @@ module.exports = {
   likeComment,
   trackShare,
   getSocialAnalytics,
-  replyToComment
+  replyToComment,
+  rateItem
 };

@@ -1,5 +1,6 @@
 // Enhanced Comment System with nested replies, mentions, and optimistic UI
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { formatDistanceToNow } from 'date-fns';
 import {
     Box,
     TextField,
@@ -27,9 +28,15 @@ import {
     Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
-import { getCurrentSocket } from '../../utils/socket';
+import {
+    getSocket,
+    emitSocialAction,
+    getCurrentSocket,
+    joinItemRoom,
+    leaveItemRoom
+} from '../../utils/socket';
 
-const CommentSystem = ({ recipeId, type = 'recipes' }) => {
+const CommentSystem = ({ itemId, type = 'recipes' }) => {
     const dispatch = useDispatch();
     const { userInfo } = useSelector((state) => state.userLogin);
 
@@ -53,7 +60,7 @@ const CommentSystem = ({ recipeId, type = 'recipes' }) => {
         setLoading(true);
         try {
             const response = await fetch(
-                `/api/${type}/${recipeId}/comments/sorted?sortBy=${sort}&page=${pageNum}&limit=20`,
+                `/api/social/${type}/${itemId}/comments/sorted?sortBy=${sort}&page=${pageNum}&limit=20`,
                 {
                     headers: userInfo?.token ? { Authorization: `Bearer ${userInfo.token}` } : {}
                 }
@@ -72,12 +79,12 @@ const CommentSystem = ({ recipeId, type = 'recipes' }) => {
         } finally {
             setLoading(false);
         }
-    }, [recipeId, type, sortBy, userInfo]);
+    }, [itemId, type, sortBy, userInfo]);
 
     // Fetch replies for a comment
     const fetchReplies = async (commentId) => {
         try {
-            const response = await fetch(`/api/${type}/${recipeId}/comments/${commentId}/replies`);
+            const response = await fetch(`/api/social/${type}/${itemId}/comments/${commentId}/replies`);
             const data = await response.json();
             setReplies(prev => ({ ...prev, [commentId]: data.replies || [] }));
         } catch (error) {
@@ -92,58 +99,52 @@ const CommentSystem = ({ recipeId, type = 'recipes' }) => {
     // WebSocket Listeners for Real-time Updates
     useEffect(() => {
         const socket = getCurrentSocket();
-        if (!socket) return;
 
-        const handleSocialUpdate = (data) => {
-            if (data.itemId === recipeId && data.itemType === type.slice(0, -1)) {
+        if (socket && itemId) {
+            joinItemRoom(type, itemId);
+
+            const handleSocialUpdate = (data) => {
+                console.log(`💬 CommentSystem [${type}:${itemId}] update:`, data);
+
+                // Only process updates for this specific item
+                if (data.itemId !== itemId) return;
+
                 switch (data.type) {
-                    case 'COMMENT':
-                        if (data.comment && data.comment.approved) {
-                            setComments(prev => {
-                                // Don't add if already exists (optimistic UI might have added it)
-                                if (prev.some(c => c._id === data.comment._id)) return prev;
-                                return [data.comment, ...prev];
-                            });
-                        }
+                    case 'COMMENT_ADDED':
+                    case 'COMMENT_APPROVED':
+                        // Check if we already have it to avoid duplicates
+                        setComments(prev => {
+                            const exists = prev.some(c => c._id === data.comment?._id || c._id === data.commentId);
+                            if (exists) return prev;
+                            if (data.comment) return [data.comment, ...prev];
+                            return prev;
+                        });
                         break;
-                    case 'COMMENT_LIKE':
-                        setComments(prev => prev.map(c =>
-                            c._id === data.commentId ? { ...c, likes: data.likes } : c
-                        ));
-                        break;
+
+                    case 'COMMENT_MODERATED':
                     case 'COMMENT_DELETED':
                         setComments(prev => prev.filter(c => c._id !== data.commentId));
                         break;
-                    case 'COMMENT_MODERATED':
-                        if (data.action === 'approve') {
-                            // If it was already in list but not approved, update it
-                            setComments(prev => prev.map(c =>
-                                c._id === data.commentId ? { ...c, approved: true } : c
-                            ));
-                            // If it wasn't in list (for non-admins), we might need to fetch it or just let next refresh handle it
-                            // For simplicity, let's refresh if it's an approval of a comment not in list
-                            setComments(prev => {
-                                if (!prev.some(c => c._id === data.commentId)) {
-                                    fetchComments(1, sortBy);
-                                }
-                                return prev;
-                            });
-                        } else if (data.action === 'reject') {
-                            setComments(prev => prev.filter(c => c._id !== data.commentId));
-                        }
+
+                    case 'COMMENT_EDITED':
+                        setComments(prev => (prev || []).filter(Boolean).map(c =>
+                            c._id === data.commentId ? { ...c, content: data.content, isEdited: true } : c
+                        ));
                         break;
+
                     default:
                         break;
                 }
-            }
-        };
+            };
 
-        socket.on('SOCIAL_UPDATE', handleSocialUpdate);
+            socket.on('SOCIAL_UPDATE', handleSocialUpdate);
 
-        return () => {
-            socket.off('SOCIAL_UPDATE', handleSocialUpdate);
-        };
-    }, [recipeId, type, sortBy, fetchComments]);
+            return () => {
+                socket.off('SOCIAL_UPDATE', handleSocialUpdate);
+                leaveItemRoom(type, itemId);
+            };
+        }
+    }, [itemId, type]);
 
     // Infinite scroll
     useEffect(() => {
@@ -172,10 +173,10 @@ const CommentSystem = ({ recipeId, type = 'recipes' }) => {
         const tempComment = {
             _id: `temp-${Date.now()}`,
             userId: { _id: userInfo._id, name: userInfo.name, profilePic: userInfo.profilePic },
-            text: commentText,
-            likes: [],
+            content: commentText,
+            likesCount: 0,
             createdAt: new Date().toISOString(),
-            approved: userInfo.role === 'admin',
+            approved: true, // Optimistically assume approved or handled by backend
             isTemp: true
         };
 
@@ -183,7 +184,7 @@ const CommentSystem = ({ recipeId, type = 'recipes' }) => {
         setCommentText('');
 
         try {
-            const response = await fetch(`/api/${type}/${recipeId}/comment`, {
+            const response = await fetch(`/api/social/${type}/${itemId}/comment`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -192,10 +193,11 @@ const CommentSystem = ({ recipeId, type = 'recipes' }) => {
                 body: JSON.stringify({ text: commentText })
             });
 
+            if (!response.ok) throw new Error('Failed to add comment');
             const data = await response.json();
 
             // Replace temp comment with real one
-            setComments(prev => prev.map(c => c._id === tempComment._id ? data.comment : c));
+            setComments(prev => (prev || []).map(c => c._id === tempComment._id ? data.comment : c).filter(Boolean));
         } catch (error) {
             console.error('Error adding comment:', error);
             // Remove temp comment on error
@@ -208,7 +210,7 @@ const CommentSystem = ({ recipeId, type = 'recipes' }) => {
         if (!editText.trim()) return;
 
         try {
-            const response = await fetch(`/api/${type}/${recipeId}/comments/${commentId}`, {
+            const response = await fetch(`/api/social/${type}/${itemId}/comments/${commentId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -219,9 +221,20 @@ const CommentSystem = ({ recipeId, type = 'recipes' }) => {
 
             const data = await response.json();
 
-            setComments(prev => prev.map(c =>
+            setComments(prev => (prev || []).filter(Boolean).map(c =>
                 c._id === commentId ? { ...c, ...data.comment } : c
             ));
+
+            // Also update in replies
+            setReplies(prev => {
+                const newReplies = { ...prev };
+                Object.keys(newReplies).forEach(parentId => {
+                    newReplies[parentId] = (newReplies[parentId] || []).filter(Boolean).map(r =>
+                        r._id === commentId ? { ...r, ...data.comment } : r
+                    );
+                });
+                return newReplies;
+            });
 
             setEditingComment(null);
             setEditText('');
@@ -236,9 +249,17 @@ const CommentSystem = ({ recipeId, type = 'recipes' }) => {
 
         // Optimistic UI update
         setComments(prev => prev.filter(c => c._id !== commentId));
+        setReplies(prev => {
+            const newReplies = { ...prev };
+            delete newReplies[commentId];
+            Object.keys(newReplies).forEach(parentId => {
+                newReplies[parentId] = newReplies[parentId].filter(r => r._id !== commentId);
+            });
+            return newReplies;
+        });
 
         try {
-            await fetch(`/api/${type}/${recipeId}/comments/${commentId}`, {
+            await fetch(`/api/social/${type}/${itemId}/comments/${commentId}`, {
                 method: 'DELETE',
                 headers: { Authorization: `Bearer ${userInfo.token}` }
             });
@@ -253,28 +274,46 @@ const CommentSystem = ({ recipeId, type = 'recipes' }) => {
         if (!userInfo) return;
 
         // Optimistic UI update
-        setComments(prev => prev.map(c => {
+        const updateLikes = (list) => (list || []).filter(Boolean).map(c => {
             if (c._id === commentId) {
-                const hasLiked = c.likes?.includes(userInfo._id);
+                const hasLiked = c.hasLiked; // We should probably track this in state
                 return {
                     ...c,
-                    likes: hasLiked
-                        ? c.likes.filter(id => id !== userInfo._id)
-                        : [...(c.likes || []), userInfo._id]
+                    likesCount: hasLiked ? Math.max(0, (c.likesCount || 0) - 1) : (c.likesCount || 0) + 1,
+                    hasLiked: !hasLiked
                 };
             }
             return c;
-        }));
+        });
+
+        setComments(prev => updateLikes(prev));
+        setReplies(prev => {
+            const newReplies = { ...prev };
+            Object.keys(newReplies).forEach(parentId => {
+                newReplies[parentId] = updateLikes(newReplies[parentId]);
+            });
+            return newReplies;
+        });
 
         try {
-            await fetch(`/api/${type}/${recipeId}/comments/${commentId}/like`, {
+            const response = await fetch(`/api/social/${type}/${itemId}/comments/${commentId}/like`, {
                 method: 'POST',
                 headers: { Authorization: `Bearer ${userInfo.token}` }
             });
+            const data = await response.json();
+
+            // Update with real count from server
+            const finalUpdate = (list) => list.map(c =>
+                c._id === commentId ? { ...c, likesCount: data.likes, hasLiked: data.hasLiked } : c
+            );
+            setComments(prev => finalUpdate(prev));
+            setReplies(prev => {
+                const newR = { ...prev };
+                Object.keys(newR).forEach(pid => { newR[pid] = finalUpdate(newR[pid]); });
+                return newR;
+            });
         } catch (error) {
             console.error('Error liking comment:', error);
-            // Revert on error
-            fetchComments(1, sortBy);
         }
     };
 
@@ -282,8 +321,24 @@ const CommentSystem = ({ recipeId, type = 'recipes' }) => {
     const handleReplyToComment = async (parentCommentId, replyText) => {
         if (!replyText.trim() || !userInfo) return;
 
+        // Optimistic reply
+        const tempReply = {
+            _id: `temp-reply-${Date.now()}`,
+            userId: { _id: userInfo._id, name: userInfo.name, profilePic: userInfo.profilePic },
+            content: replyText,
+            likesCount: 0,
+            parentCommentId: parentCommentId,
+            createdAt: new Date().toISOString(),
+            isTemp: true
+        };
+
+        setReplies(prev => ({
+            ...prev,
+            [parentCommentId]: [...(prev[parentCommentId] || []), tempReply]
+        }));
+
         try {
-            const response = await fetch(`/api/${type}/${recipeId}/comments/${parentCommentId}/reply`, {
+            const response = await fetch(`/api/social/${type}/${itemId}/comments/${parentCommentId}/reply`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -292,17 +347,23 @@ const CommentSystem = ({ recipeId, type = 'recipes' }) => {
                 body: JSON.stringify({ text: replyText })
             });
 
+            if (!response.ok) throw new Error('Failed to reply');
             const data = await response.json();
 
-            // Add reply to replies state
+            // Replace temp reply
             setReplies(prev => ({
                 ...prev,
-                [parentCommentId]: [...(prev[parentCommentId] || []), data.reply]
+                [parentCommentId]: (prev[parentCommentId] || []).map(r => r._id === tempReply._id ? data.comment : r).filter(Boolean)
             }));
 
             setReplyingTo(null);
         } catch (error) {
             console.error('Error replying to comment:', error);
+            // Revert
+            setReplies(prev => ({
+                ...prev,
+                [parentCommentId]: (prev[parentCommentId] || []).filter(r => r._id !== tempReply._id)
+            }));
         }
     };
 
@@ -320,8 +381,9 @@ const CommentSystem = ({ recipeId, type = 'recipes' }) => {
         const [showReplies, setShowReplies] = useState(false);
         const [replyText, setReplyText] = useState('');
         const isOwner = userInfo?._id === comment.userId?._id;
-        const hasLiked = comment.likes?.includes(userInfo?._id);
+        const hasLiked = comment.hasLiked;
         const commentReplies = replies[comment._id] || [];
+        const isVerified = comment.isVerified; // This should come from the server or be computed
 
         const handleToggleReplies = () => {
             if (!showReplies && commentReplies.length === 0) {
@@ -341,9 +403,19 @@ const CommentSystem = ({ recipeId, type = 'recipes' }) => {
                         <Box sx={{ bgcolor: 'background.paper', p: 2, borderRadius: 2, boxShadow: 1 }}>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                                 <Box>
-                                    <Typography variant="subtitle2" fontWeight="bold">
-                                        {comment.userId?.name}
-                                    </Typography>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <Typography variant="subtitle2" fontWeight="bold">
+                                            {comment.userId?.name}
+                                        </Typography>
+                                        {isVerified && (
+                                            <Chip
+                                                label="Verified Purchase"
+                                                size="small"
+                                                color="success"
+                                                sx={{ height: 20, fontSize: '0.65rem' }}
+                                            />
+                                        )}
+                                    </Box>
                                     <Typography variant="caption" color="text.secondary">
                                         {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
                                         {comment.isEdited && ' (edited)'}
@@ -379,7 +451,7 @@ const CommentSystem = ({ recipeId, type = 'recipes' }) => {
                                 </Box>
                             ) : (
                                 <Typography variant="body2" sx={{ mt: 1, whiteSpace: 'pre-wrap' }}>
-                                    {comment.text || comment.comment}
+                                    {comment.content}
                                 </Typography>
                             )}
 
@@ -396,7 +468,7 @@ const CommentSystem = ({ recipeId, type = 'recipes' }) => {
                                 onClick={() => handleLikeComment(comment._id)}
                                 sx={{ color: hasLiked ? 'error.main' : 'text.secondary' }}
                             >
-                                {comment.likes?.length || 0}
+                                {comment.likesCount || 0}
                             </Button>
 
                             {!isReply && (
@@ -458,8 +530,8 @@ const CommentSystem = ({ recipeId, type = 'recipes' }) => {
                         {/* Nested replies */}
                         <Collapse in={showReplies}>
                             <Box sx={{ mt: 2 }}>
-                                {commentReplies.map(reply => (
-                                    <CommentItem key={reply._id} comment={reply} isReply />
+                                {(commentReplies || []).filter(Boolean).map(reply => (
+                                    <CommentItem key={reply?._id} comment={reply} isReply />
                                 ))}
                             </Box>
                         </Collapse>
@@ -501,7 +573,7 @@ const CommentSystem = ({ recipeId, type = 'recipes' }) => {
                         fullWidth
                         multiline
                         maxRows={4}
-                        placeholder="Share your thoughts about this recipe..."
+                        placeholder={`Share your thoughts about this ${type.slice(0, -1)}...`}
                         value={commentText}
                         onChange={(e) => setCommentText(e.target.value)}
                         onKeyPress={(e) => {
@@ -526,41 +598,61 @@ const CommentSystem = ({ recipeId, type = 'recipes' }) => {
 
             <Divider sx={{ mb: 3 }} />
 
-            {/* Comments list */}
-            {loading && page === 1 ? (
-                [...Array(3)].map((_, i) => (
-                    <Box key={i} sx={{ display: 'flex', gap: 2, mb: 3 }}>
-                        <Skeleton variant="circular" width={40} height={40} />
-                        <Box sx={{ flex: 1 }}>
-                            <Skeleton variant="text" width="30%" />
-                            <Skeleton variant="rectangular" height={60} sx={{ mt: 1 }} />
+            {/* Comments list with independent scrolling */}
+            <Box sx={{
+                maxHeight: '600px',
+                overflowY: 'auto',
+                pr: 1,
+                '&::-webkit-scrollbar': {
+                    width: '6px',
+                },
+                '&::-webkit-scrollbar-track': {
+                    background: '#f1f1f1',
+                    borderRadius: '10px',
+                },
+                '&::-webkit-scrollbar-thumb': {
+                    background: '#888',
+                    borderRadius: '10px',
+                },
+                '&::-webkit-scrollbar-thumb:hover': {
+                    background: '#555',
+                },
+            }}>
+                {loading && page === 1 ? (
+                    [...Array(3)].map((_, i) => (
+                        <Box key={i} sx={{ display: 'flex', gap: 2, mb: 3 }}>
+                            <Skeleton variant="circular" width={40} height={40} />
+                            <Box sx={{ flex: 1 }}>
+                                <Skeleton variant="text" width="30%" />
+                                <Skeleton variant="rectangular" height={60} sx={{ mt: 1 }} />
+                            </Box>
                         </Box>
+                    ))
+                ) : comments.length === 0 ? (
+                    <Box sx={{ textAlign: 'center', py: 6 }}>
+                        <Typography variant="body1" color="text.secondary">
+                            No comments yet. Be the first to comment!
+                        </Typography>
                     </Box>
-                ))
-            ) : comments.length === 0 ? (
-                <Box sx={{ textAlign: 'center', py: 6 }}>
-                    <Typography variant="body1" color="text.secondary">
-                        No comments yet. Be the first to comment!
-                    </Typography>
-                </Box>
-            ) : (
-                <>
-                    {comments.map(comment => (
-                        <CommentItem key={comment._id} comment={comment} />
-                    ))}
+                ) : (
+                    <>
+                        {(comments || []).filter(Boolean).map(comment => (
+                            <CommentItem key={comment?._id} comment={comment} />
+                        ))}
 
-                    {/* Infinite scroll trigger */}
-                    <div ref={observerTarget} style={{ height: 20 }} />
+                        {/* Infinite scroll trigger */}
+                        <div ref={observerTarget} style={{ height: 20 }} />
 
-                    {loading && page > 1 && (
-                        <Box sx={{ textAlign: 'center', py: 2 }}>
-                            <Typography variant="body2" color="text.secondary">
-                                Loading more comments...
-                            </Typography>
-                        </Box>
-                    )}
-                </>
-            )}
+                        {loading && page > 1 && (
+                            <Box sx={{ textAlign: 'center', py: 2 }}>
+                                <Typography variant="body2" color="text.secondary">
+                                    Loading more comments...
+                                </Typography>
+                            </Box>
+                        )}
+                    </>
+                )}
+            </Box>
 
             {/* Context menu */}
             <Menu
@@ -570,7 +662,7 @@ const CommentSystem = ({ recipeId, type = 'recipes' }) => {
             >
                 <MenuItem onClick={() => {
                     setEditingComment(selectedComment._id);
-                    setEditText(selectedComment.text);
+                    setEditText(selectedComment.content);
                     handleMenuClose();
                 }}>
                     <EditIcon fontSize="small" sx={{ mr: 1 }} />

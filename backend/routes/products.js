@@ -16,11 +16,10 @@ const {
   bulkUploadProducts,
   getProductAnalytics,
   getRecipeSuggestion,
-  createProductReview,
   filterProducts, // ← Make sure this is exported!
 } = require("../controllers/productController");
 
-const { likeItem, addComment, getComments, trackShare } = require('../controllers/socialController');
+const { likeItem, addComment, getComments, trackShare, rateItem } = require('../controllers/socialController');
 
 // ===== PUBLIC ROUTES =====
 // GET /api/products/filter → MUST come BEFORE /:id !!!
@@ -39,7 +38,10 @@ router.delete("/:id", auth.protect, auth.role("seller"), auth.kycVerified, delet
 router.post("/bulk", auth.protect, auth.role("seller"), auth.kycVerified, bulkUploadProducts);
 
 // ===== USER ROUTES =====
-router.post("/:id/reviews", auth.protect, createProductReview);
+router.post("/:id/reviews", auth.protect, (req, res, next) => {
+  req.params.type = 'products';
+  next();
+}, rateItem);
 
 // ===== SOCIAL =====
 router.post('/:id/like', auth.protect, (req, res, next) => {

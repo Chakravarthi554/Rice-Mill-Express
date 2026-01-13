@@ -12,19 +12,17 @@ import {
 } from '@mui/material';
 import { Star as StarIcon } from '@mui/icons-material';
 
-const RatingSystem = ({ recipeId, currentUserRating, onRate }) => {
+import { getCurrentSocket } from '../../utils/socket';
+
+const RatingSystem = ({ type = 'recipes', itemId, currentUserRating, onRate }) => {
     const [distribution, setDistribution] = useState(null);
     const [loading, setLoading] = useState(true);
     const [userRating, setUserRating] = useState(currentUserRating || 0);
     const [hoveredRating, setHoveredRating] = useState(0);
 
-    useEffect(() => {
-        fetchRatingDistribution();
-    }, [recipeId]);
-
-    const fetchRatingDistribution = async () => {
+    const fetchRatingDistribution = React.useCallback(async () => {
         try {
-            const response = await fetch(`/api/recipes/${recipeId}/rating-distribution`);
+            const response = await fetch(`/api/social/${type}/${itemId}/rating-distribution`);
             const data = await response.json();
             setDistribution(data);
         } catch (error) {
@@ -32,9 +30,35 @@ const RatingSystem = ({ recipeId, currentUserRating, onRate }) => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [itemId, type]);
 
-    const handleRatingChange = (newValue) => {
+    useEffect(() => {
+        fetchRatingDistribution();
+    }, [fetchRatingDistribution]);
+
+    useEffect(() => {
+        const socket = getCurrentSocket();
+        if (!socket) return;
+
+        const handleRatingUpdate = (data) => {
+            if (data.itemId === itemId && data.type === 'RATING_UPDATED') {
+                setDistribution({
+                    averageRating: data.rating,
+                    totalRatings: data.numReviews,
+                    distribution: data.distribution,
+                    percentages: Object.keys(data.distribution).reduce((acc, star) => {
+                        acc[star] = Math.round((data.distribution[star] / data.numReviews) * 100) || 0;
+                        return acc;
+                    }, {})
+                });
+            }
+        };
+
+        socket.on('SOCIAL_UPDATE', handleRatingUpdate);
+        return () => socket.off('SOCIAL_UPDATE', handleRatingUpdate);
+    }, [itemId]);
+
+    const handleRatingChange = async (newValue) => {
         setUserRating(newValue);
         if (onRate) {
             onRate(newValue);
@@ -64,7 +88,7 @@ const RatingSystem = ({ recipeId, currentUserRating, onRate }) => {
                 <Grid item xs={12} md={4}>
                     <Box sx={{ textAlign: 'center', py: 2 }}>
                         <Typography variant="h2" fontWeight="bold" color="primary.main">
-                            {averageRating.toFixed(1)}
+                            {(averageRating || 0).toFixed(1)}
                         </Typography>
                         <Rating
                             value={averageRating}

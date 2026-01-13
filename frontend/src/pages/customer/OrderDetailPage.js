@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { getOrderDetails, cancelOrder } from '../../redux/actions/orderActions';
+import { getOrderDetails, cancelOrder, downloadInvoice } from '../../redux/actions/orderActions';
 import {
   Button,
   Typography,
@@ -34,48 +34,6 @@ import {
 } from '@mui/icons-material';
 import Message from '../../components/common/Message';
 
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-
-/* -------------------------------------------------------------
-   Tiny pure-JS QR generator (no external lib)
-   ------------------------------------------------------------- */
-const generateQR = (text) => {
-  const size = 128;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, size, size);
-
-  // Very small QR – just encode the order ID + total
-  const data = `Order:${text}`;
-  const cell = 4;
-  const margin = cell * 3;
-  const qrSize = size - margin * 2;
-  const cells = Math.floor(qrSize / cell);
-
-  // Simple hash → binary matrix
-  let hash = 0;
-  for (let i = 0; i < data.length; i++) hash = ((hash << 5) - hash + data.charCodeAt(i)) | 0;
-  const matrix = Array.from({ length: cells }, () => Array(cells).fill(0));
-
-  for (let y = 0; y < cells; y++) {
-    for (let x = 0; x < cells; x++) {
-      const v = (hash >>> (y * cells + x)) & 1;
-      if (v) {
-        ctx.fillStyle = '#000';
-        ctx.fillRect(margin + x * cell, margin + y * cell, cell, cell);
-      }
-    }
-  }
-  return canvas.toDataURL('image/png');
-};
-
-/* -------------------------------------------------------------
-   PDF generation (no external fonts, no extra deps)
-   ------------------------------------------------------------- */
 const OrderDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -83,8 +41,8 @@ const OrderDetailPage = () => {
   const { order, loading, error } = useSelector(s => s.orderDetails || {});
   const { loading: cancelLoading, error: cancelError, success: cancelSuccess } = useSelector(s => s.orderCancel || {});
 
-
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   /* ------------------------------------------------------------------ */
   useEffect(() => {
@@ -104,92 +62,14 @@ const OrderDetailPage = () => {
   const closeCancel = () => setCancelOpen(false);
 
   /* ------------------------------------------------------------------ */
-  const generatePDF = useCallback(() => {
-    if (!order) return;
-
-    // ---- debounce (prevents socket hiccup) ----
-    let running = false;
-    if (running) return;
-    running = true;
-    setTimeout(() => (running = false), 800);
-
-    const doc = new jsPDF();
-
-    // ---- Use built-in Unicode font (supports ₹) ----
-    doc.setFont('DejaVuSans', 'normal');   // jsPDF ships with it
-    doc.setFontSize(18);
-    doc.text(`Invoice #${(order._id || '').substring(18, 24).toUpperCase()}`, 14, 22);
-
-    doc.setFontSize(11);
-    doc.setTextColor(100);
-
-    // ✅ FIXED: Escape text to prevent ampersand issues
-    const escapeText = (text) => {
-      if (!text) return '';
-      return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    };
-
-    // ---- Customer info ----
-    doc.text(`Customer: ${escapeText(order.user?.name) || 'N/A'}`, 14, 32);
-    doc.text(`Email: ${escapeText(order.user?.email) || 'N/A'}`, 14, 38);
-    doc.text(`Phone: ${escapeText(order.shippingAddress?.phone) || 'N/A'}`, 14, 44);
-    doc.text(`Date: ${order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}`, 14, 50);
-
-    // ---- Shipping address ----
-    doc.text('Shipping Address:', 14, 60);
-    const a = order.shippingAddress;
-    if (a) {
-      doc.text(`${escapeText(a.street) || ''}`, 14, 66);
-      doc.text(`${escapeText(a.city) || ''}, ${escapeText(a.state) || ''} - ${escapeText(a.pinCode) || ''}`, 14, 72);
+  const handleDownload = async () => {
+    setDownloading(true);
+    const result = await dispatch(downloadInvoice(id));
+    setDownloading(false);
+    if (!result.success) {
+      alert(result.error || 'Failed to download invoice');
     }
-
-    // ---- Table ----
-    const cols = ['Product', 'Qty', 'Price', 'Total'];
-    const rows = (order.orderItems || []).map(i => [
-      escapeText(i.name || i.product?.name || 'Product'),
-      String(i.qty),
-      `₹${Number(i.price || 0).toFixed(2)}`,
-      `₹${(Number(i.qty || 0) * Number(i.price || 0)).toFixed(2)}`
-    ]);
-
-    autoTable(doc, {
-      head: [cols],
-      body: rows,
-      startY: 80,
-      theme: 'grid',
-      headStyles: { fillColor: [46, 125, 50] },
-      styles: { font: 'DejaVuSans', fontSize: 10 }
-    });
-
-    const y = doc.lastAutoTable.finalY || 100;
-
-    // ---- Summary ----
-    doc.setFontSize(12);
-    doc.text(`Items: ₹${Number(order.itemsPrice || 0).toFixed(2)}`, 145, y + 10, { align: 'right' });
-    doc.text(`Tax: ₹${Number(order.taxPrice || 0).toFixed(2)}`, 145, y + 16, { align: 'right' });
-    doc.text(`Shipping: ₹${Number(order.shippingPrice || 0).toFixed(2)}`, 145, y + 22, { align: 'right' });
-    doc.setFontSize(14);
-    doc.setFont('DejaVuSans', 'bold');
-    doc.text(`Total: ₹${Number(order.totalPrice || 0).toFixed(2)}`, 145, y + 30, { align: 'right' });
-
-    // ---- Payment info ----
-    doc.setFont('DejaVuSans', 'normal');
-    doc.setFontSize(10);
-    doc.text(`Method: ${escapeText(order.paymentMethod) || 'N/A'}`, 14, y + 40);
-    const paidDate = order.isPaid && order.paidAt ? new Date(order.paidAt).toLocaleDateString() : '';
-    doc.text(`Status: ${order.isPaid ? `Paid ${paidDate}` : 'Not Paid'}`, 14, y + 46);
-    doc.text(`Order: ${escapeText(order.orderStatus) || 'N/A'}`, 14, y + 52);
-
-    // ---- QR code (tiny SVG) ----
-    try {
-      const qr = generateQR(`${order._id}\n₹${Number(order.totalPrice || 0).toFixed(2)}`);
-      doc.addImage(qr, 'PNG', 160, y + 40, 30, 30);
-      doc.setFontSize(9);
-      doc.text('Scan to view', 175, y + 75, { align: 'center' });
-    } catch (e) { /* ignore */ }
-
-    doc.save(`invoice_${(order._id || '').substring(18, 24).toUpperCase()}.pdf`);
-  }, [order]);
+  };
 
   /* ------------------------------------------------------------------ */
   const steps = ['Order Placed', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered'];
@@ -279,7 +159,15 @@ const OrderDetailPage = () => {
           <Card><CardContent>
             <Typography variant="h6" gutterBottom>Actions</Typography>
             <Box display="flex" flexDirection="column" gap={2}>
-              <Button variant="contained" startIcon={<DownloadIcon />} onClick={generatePDF} fullWidth>Download Invoice</Button>
+              <Button
+                variant="contained"
+                startIcon={downloading ? <CircularProgress size={20} color="inherit" /> : <DownloadIcon />}
+                onClick={handleDownload}
+                fullWidth
+                disabled={downloading}
+              >
+                {downloading ? 'Downloading...' : 'Download Invoice'}
+              </Button>
               {canCancel() && (
                 <Button variant="outlined" color="error" startIcon={<Cancel />} onClick={openCancel} fullWidth disabled={cancelLoading}>
                   {cancelLoading ? <CircularProgress size={24} /> : 'Cancel Order'}

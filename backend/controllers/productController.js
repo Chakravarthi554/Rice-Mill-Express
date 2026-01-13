@@ -194,9 +194,7 @@ const filterProducts = asyncHandler(async (req, res) => {
 const getProductById = asyncHandler(async (req, res) => {
   try {
     const product = await Product.findById(req.params.id)
-      .populate('seller', 'name businessName businessDetails phone rating')
-      .populate('reviews.user', 'name profileImage')
-      .populate('comments.user', 'name profileImage');
+      .populate('seller', 'name businessName businessDetails phone rating');
 
     if (!product) {
       return res.status(404).json({
@@ -462,72 +460,7 @@ const deleteProduct = asyncHandler(async (req, res) => {
 });
 
 // ✅ FIXED: Enhanced createProductReview
-const createProductReview = asyncHandler(async (req, res) => {
-  try {
-    const { rating, comment } = req.body;
-    const product = await Product.findById(req.params.id);
-
-    if (!product) {
-      return res.status(404).json({
-        success: false,
-        message: 'Product not found'
-      });
-    }
-
-    // Check if already reviewed
-    const alreadyReviewed = product.reviews.find(
-      (r) => r.user.toString() === req.user._id.toString()
-    );
-
-    if (alreadyReviewed) {
-      alreadyReviewed.rating = Number(rating);
-      alreadyReviewed.comment = comment;
-      alreadyReviewed.name = req.user.name; // Update name in case it changed
-    } else {
-      const review = {
-        name: req.user.name,
-        rating: Number(rating),
-        comment,
-        user: req.user._id,
-      };
-
-      product.reviews.push(review);
-      product.numReviews = product.reviews.length;
-    }
-
-    // Calculate average rating
-    product.rating =
-      product.reviews.reduce((acc, item) => item.rating + acc, 0) /
-      product.reviews.length;
-
-    await product.save();
-
-    // Notify Seller
-    if (product.seller && product.seller.toString() !== req.user._id.toString()) {
-      await Notification.create({
-        user: product.seller,
-        type: 'SYSTEM',
-        title: 'New Product Review',
-        message: `${req.user.name} reviewed your product "${product.name}"`,
-        relatedEntity: product._id,
-        entityModel: 'Product'
-      });
-    }
-
-    res.status(201).json({
-      success: true,
-      message: alreadyReviewed ? 'Review updated successfully' : 'Review added successfully'
-    });
-
-  } catch (error) {
-    console.error('❌ Create review error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error adding review',
-      error: error.message
-    });
-  }
-});
+// createProductReview removed - consolidated into socialController.rateItem
 
 // ✅ FIXED: Enhanced getSellerProducts
 const getSellerProducts = asyncHandler(async (req, res) => {
@@ -589,7 +522,6 @@ module.exports = {
   deleteProduct,
   createProduct,
   updateProduct,
-  createProductReview,
   getSellerProducts,
   bulkUploadProducts,
   getProductAnalytics,

@@ -52,6 +52,12 @@ router.post('/admin/reports/:reportId/action', protect, admin, takeReportAction)
 
 // 🔥 PUBLIC ROUTES
 router.get('/', getPosts);
+
+// 🔥 Bookmark routes (Protected) - MUST be before /:id to prevent shadowing
+router.post('/:id/bookmark', protect, bookmarkPost);
+router.get('/bookmarks', protect, getUserBookmarks);
+
+// 🔥 Generic ID route - MUST be after specific routes
 router.get('/:id', getPostById);
 
 // 🔥 PROTECTED ROUTES
@@ -59,12 +65,9 @@ router.post('/', protect, applyPostLimiter, createPost);
 router.post('/:id/reply', protect, replyToPost);
 router.post('/:id/like', protect, likePost);
 router.post('/:id/report', protect, reportPost);
+router.delete('/:id', protect, deletePost); // Allow post owners to delete their own posts
 
 // 🔥 Mixed role routes
 router.post('/:postId/comments/:commentId/report', protect, reportComment);
-
-// 🔥 Bookmark routes (Protected)
-router.post('/:id/bookmark', protect, bookmarkPost);
-router.get('/bookmarks', protect, getUserBookmarks);
 
 module.exports = router;

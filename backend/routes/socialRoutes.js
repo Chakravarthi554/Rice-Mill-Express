@@ -11,7 +11,8 @@ const {
   likeComment,
   replyToComment,
   getSortedComments,
-  getRatingDistribution
+  getRatingDistribution,
+  rateItem
 } = require('../controllers/socialController');
 const { protect, role } = require('../middleware/auth');
 const { customerLimiter } = require('../middleware/rateLimit');
@@ -28,7 +29,8 @@ router.post('/:type/:id/share', protect, trackShare);
 router.post('/:type/:id/comments/:commentId/like', protect, likeComment);
 router.post('/:type/:id/comments/:commentId/reply', protect, replyToComment);
 router.get('/:type/:id/comments/sorted', getSortedComments);
-router.get('/recipes/:id/rating-distribution', getRatingDistribution);
+router.get('/:type/:id/rating-distribution', getRatingDistribution);
+router.post('/:type/:id/rate', protect, rateItem);
 
 // Admin analytics
 router.get('/admin/social-analytics', protect, role('admin'), getSocialAnalytics);

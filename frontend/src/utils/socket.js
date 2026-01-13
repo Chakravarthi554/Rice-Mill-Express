@@ -9,7 +9,7 @@ const MAX_RECONNECT_ATTEMPTS = 5;
 // ✅ FIXED: Enhanced socket connection with better error handling
 export const getSocket = (userId, role, token) => {
   const tokenStr = token || localStorage.getItem('token');
-  
+
   // Enhanced validation
   if (!userId || !tokenStr) {
     console.warn('❌ Socket init failed: missing userId or token');
@@ -31,10 +31,10 @@ export const getSocket = (userId, role, token) => {
   }
 
   console.log('🔄 Creating new socket connection...');
-  
+
   // ✅ FIXED: Enhanced socket configuration
   socketInstance = io(API_URL, {
-    auth: { 
+    auth: {
       token: tokenStr,
       userId: userId,
       role: role
@@ -53,24 +53,24 @@ export const getSocket = (userId, role, token) => {
   socketInstance.on('connect', () => {
     console.log('✅ Socket connected:', socketInstance.id);
     reconnectAttempts = 0;
-    
+
     // Join relevant rooms
     if (userId) {
       socketInstance.emit('joinUserRoom', userId);
       socketInstance.emit('joinNotifications', userId);
       console.log(`✅ Joined user room: user_${userId}`);
     }
-    
+
     if (role === 'admin') {
       socketInstance.emit('joinAdminRoom');
       console.log('✅ Joined admin room');
     }
-    
+
     if (role === 'seller') {
       socketInstance.emit('joinSellerRoom', userId);
       console.log(`✅ Joined seller room: seller_${userId}`);
     }
-    
+
     // Process any pending actions
     processPendingSocialActions();
     processPendingNotifications();
@@ -91,7 +91,7 @@ export const getSocket = (userId, role, token) => {
   socketInstance.on('connect_error', (error) => {
     console.error('❌ Socket connection error:', error.message);
     reconnectAttempts++;
-    
+
     if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
       console.error('🔄 Max reconnection attempts reached');
       disconnectSocket();
@@ -135,7 +135,12 @@ export const getSocket = (userId, role, token) => {
   });
 
   socketInstance.on('SOCIAL_UPDATE', (data) => {
-    console.log('🔄 Social update received:', data);
+    console.log('🔄 SOCIAL_UPDATE received:', data);
+
+    // Dispatch as a custom window event for non-react components or legacy listeners
+    const event = new CustomEvent('socialUpdate', { detail: data });
+    window.dispatchEvent(event);
+
     if (window.socialUpdateCallback) {
       window.socialUpdateCallback(data);
     }
@@ -245,10 +250,10 @@ export const initializeSocket = (userInfo) => {
     console.warn('❌ Cannot initialize socket: No user info');
     return null;
   }
-  
+
   return getSocket(
-    userInfo._id, 
-    userInfo.role, 
+    userInfo._id,
+    userInfo.role,
     userInfo.token || localStorage.getItem('token')
   );
 };
@@ -273,19 +278,19 @@ export const emitSocialAction = (actionData) => {
     console.log('📤 Emitted social action:', actionData);
     return true;
   }
-  
+
   // Queue action for when socket reconnects
   const pending = JSON.parse(localStorage.getItem('pendingSocialActions') || '[]');
-  pending.push({ 
-    ...actionData, 
+  pending.push({
+    ...actionData,
     timestamp: Date.now(),
     attempt: (actionData.attempt || 0) + 1
   });
-  
+
   // Keep only recent actions
   const recentPending = pending.slice(-10);
   localStorage.setItem('pendingSocialActions', JSON.stringify(recentPending));
-  
+
   console.log('📦 Queued social action for later delivery');
   return false;
 };
@@ -294,13 +299,13 @@ export const processPendingSocialActions = () => {
   const pending = JSON.parse(localStorage.getItem('pendingSocialActions') || '[]');
   if (pending.length && socketInstance?.connected) {
     console.log(`🔄 Processing ${pending.length} pending social actions`);
-    
+
     pending.forEach(action => {
       if (socketInstance.connected) {
         socketInstance.emit('SOCIAL_ACTION', action);
       }
     });
-    
+
     localStorage.removeItem('pendingSocialActions');
   }
 };
@@ -314,7 +319,7 @@ export const setupSocialListeners = (callbacks = {}) => {
   if (callbacks.onSocialUpdate) {
     window.socialUpdateCallback = callbacks.onSocialUpdate;
   }
-  
+
   if (callbacks.onForumUpdate) {
     window.forumUpdateCallback = callbacks.onForumUpdate;
   }
@@ -369,7 +374,7 @@ export const removeSocialListeners = () => {
     socket.off('TYPING');
     socket.off('STOP_TYPING');
   }
-  
+
   // Clear global callbacks
   window.socialUpdateCallback = null;
   window.forumUpdateCallback = null;
@@ -432,19 +437,40 @@ export const leaveRecipeRoom = (recipeId) => {
   }
 };
 
+export const joinItemRoom = (type, itemId) => {
+  const socket = getCurrentSocket();
+  if (socket?.connected && type && itemId) {
+    // Standardize type
+    const prefix = type.endsWith('s') ? type.slice(0, -1) : type;
+    const room = `${prefix.toLowerCase()}_${itemId}`;
+    socket.emit('joinRoom', room);
+    console.log(`✅ Joined item room: ${room}`);
+  }
+};
+
+export const leaveItemRoom = (type, itemId) => {
+  const socket = getCurrentSocket();
+  if (socket?.connected && type && itemId) {
+    const prefix = type.endsWith('s') ? type.slice(0, -1) : type;
+    const room = `${prefix.toLowerCase()}_${itemId}`;
+    socket.emit('leaveRoom', room);
+    console.log(`✅ Left item room: ${room}`);
+  }
+};
+
 // 🔥 ENHANCED: PROCESS PENDING NOTIFICATIONS
 export const processPendingNotifications = () => {
   const pending = JSON.parse(localStorage.getItem('pendingNotifications') || '[]');
   if (pending.length) {
     console.log(`🔄 Processing ${pending.length} pending notifications`);
-    
+
     // Re-emit any pending notification actions
     pending.forEach(action => {
       if (action.type === 'markRead' && getCurrentSocket()?.connected) {
         markNotificationRead(action.notificationId, action.userId);
       }
     });
-    
+
     localStorage.removeItem('pendingNotifications');
   }
 };

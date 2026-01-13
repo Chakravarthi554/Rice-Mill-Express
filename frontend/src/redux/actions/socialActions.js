@@ -49,7 +49,7 @@ export const likeItem = (itemType, itemId) => async (dispatch, getState) => {
     }
 
     const { data } = await axios.post(
-      `/api/${itemType}/${itemId}/like`,
+      `/api/social/${itemType}/${itemId}/like`,
       {},
       config
     )
@@ -98,8 +98,8 @@ export const addComment = (itemType, itemId, comment) => async (dispatch, getSta
     }
 
     const { data } = await axios.post(
-      `/api/${itemType}/${itemId}/comment`,
-      { comment },
+      `/api/social/${itemType}/${itemId}/comment`,
+      { content: comment },
       config
     )
 
@@ -136,7 +136,7 @@ export const getComments = (itemType, itemId, page = 1) => async (dispatch) => {
     dispatch({ type: SOCIAL_GET_COMMENTS_REQUEST })
 
     const { data } = await axios.get(
-      `/api/${itemType}/${itemId}/comments?page=${page}`
+      `/api/social/${itemType}/${itemId}/comments?page=${page}`
     )
 
     dispatch({
@@ -171,7 +171,7 @@ export const approveComment = (itemType, itemId, commentId) => async (dispatch, 
     }
 
     const { data } = await axios.put(
-      `/api/${itemType}/${itemId}/comments/${commentId}/approve`,
+      `/api/social/comments/${commentId}/approve`,
       {},
       config
     )
@@ -219,7 +219,7 @@ export const deleteComment = (itemType, itemId, commentId) => async (dispatch, g
     }
 
     await axios.delete(
-      `/api/${itemType}/${itemId}/comments/${commentId}`,
+      `/api/social/${itemType}/${itemId}/comments/${commentId}`,
       config
     )
 
@@ -256,7 +256,7 @@ export const trackShare = (itemType, itemId, platform) => async (dispatch, getSt
     }
 
     const { data } = await axios.post(
-      `/api/${itemType}/${itemId}/share`,
+      `/api/social/${itemType}/${itemId}/share`,
       { platform },
       config
     )
@@ -306,7 +306,7 @@ export const likeComment = (itemType, itemId, commentId) => async (dispatch, get
     }
 
     const { data } = await axios.post(
-      `/api/${itemType}/${itemId}/comments/${commentId}/like`,
+      `/api/social/${itemType}/${itemId}/comments/${commentId}/like`,
       {},
       config
     )
@@ -344,8 +344,8 @@ export const replyToComment = (itemType, itemId, commentId, text) => async (disp
     }
 
     const { data } = await axios.post(
-      `/api/${itemType}/${itemId}/comments/${commentId}/reply`,
-      { text },
+      `/api/social/${itemType}/${itemId}/comments/${commentId}/reply`,
+      { content: text },
       config
     )
 
@@ -383,7 +383,7 @@ export const getSortedComments = (itemType, itemId, sortBy = 'recent', page = 1)
     dispatch({ type: SOCIAL_GET_COMMENTS_REQUEST })
 
     const { data } = await axios.get(
-      `/api/${itemType}/${itemId}/comments/sorted?sortBy=${sortBy}&page=${page}`
+      `/api/social/${itemType}/${itemId}/comments/sorted?sortBy=${sortBy}&page=${page}`
     )
 
     dispatch({
@@ -407,7 +407,7 @@ export const getRatingDistribution = (id) => async (dispatch) => {
   try {
     dispatch({ type: SOCIAL_RATING_DIST_REQUEST })
 
-    const { data } = await axios.get(`/api/recipes/${id}/rating-distribution`)
+    const { data } = await axios.get(`/api/social/recipes/${id}/rating-distribution`)
 
     dispatch({
       type: SOCIAL_RATING_DIST_SUCCESS,

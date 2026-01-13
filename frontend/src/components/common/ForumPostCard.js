@@ -12,10 +12,9 @@ import {
   BookmarkBorder, Report, Send
 } from '@mui/icons-material';
 import {
-  likePost, deleteForumPost, reportPost, addComment, reportForumComment
+  likePost, deleteForumPost, reportPost, addComment, reportForumComment, toggleBookmark
 } from '../../redux/actions/forumActions';
-import { bookmarkPost, unbookmarkPost } from '../../redux/actions/userActions';
-import { emitSocialAction } from '../../utils/socket';
+import { emitSocialAction, joinPostRoom, leavePostRoom } from '../../utils/socket';
 import ReportModal from './ReportModal';
 
 const ForumPostCard = ({ post, onUpdate }) => {
@@ -36,47 +35,70 @@ const ForumPostCard = ({ post, onUpdate }) => {
   // Real-time updates
   useEffect(() => {
     const handler = (data) => {
-      if (data.postId === currentPost._id) {
+      if (data.itemId === currentPost._id) {
         if (data.type === 'LIKE') {
-          setCurrentPost(prev => ({ ...prev, likes: data.likes }));
-        } else if (data.type === 'COMMENT') {
+          console.log('📡 Received SOCIAL_UPDATE LIKE event:', data);
           setCurrentPost(prev => ({
             ...prev,
-            comments: [...prev.comments, data.comment].filter(
-              (c, i, a) => a.findIndex(t => t._id === c._id) === i
-            )
+            likesCount: data.likesCount,
+            // Update userLiked if this action was performed by the current user
+            userLiked: data.userId === userInfo?._id
+              ? data.action === 'liked'
+              : prev.userLiked
           }));
+        } else if (data.type === 'COMMENT_ADDED') {
+          setCurrentPost(prev => ({
+            ...prev,
+            commentsCount: (prev.commentsCount || 0) + 1
+          }));
+        } else if (data.type === 'BOOKMARK') {
+          console.log('📡 Received SOCIAL_UPDATE BOOKMARK event:', data);
+          if (data.userId === userInfo?._id) {
+            setCurrentPost(prev => ({
+              ...prev,
+              isBookmarked: data.action === 'bookmarked'
+            }));
+          }
         }
       }
     };
     window.addEventListener('socialUpdate', (e) => handler(e.detail));
-    return () => window.removeEventListener('socialUpdate', handler);
+
+    // Join room for this post
+    joinPostRoom(currentPost._id);
+
+    return () => {
+      window.removeEventListener('socialUpdate', handler);
+      leavePostRoom(currentPost._id);
+    };
   }, [currentPost._id]);
 
-  const displayComments = useMemo(() => {
-    if (!currentPost?.comments) return [];
-    return userInfo?.role === 'admin'
-      ? currentPost.comments
-      : currentPost.comments.filter(c => c.approved && !c.isFlagged);
-  }, [currentPost.comments, userInfo?.role]);
-
-  const hasLiked = currentPost.likes?.includes(userInfo?._id);
+  const hasLiked = currentPost.userLiked;
+  const isBookmarkedInPost = currentPost.isBookmarked;
   const isOwner = userInfo?._id === currentPost.userId?._id;
   const isAdmin = userInfo?.role === 'admin';
 
   const handleLike = async () => {
     if (!userInfo) return showSnackbar('Please login to like', 'warning');
+
+    // Toggle state immediately for instantaneous feedback
+    const wasLiked = hasLiked;
+    setCurrentPost(prev => ({
+      ...prev,
+      userLiked: !wasLiked,
+      likesCount: wasLiked ? Math.max(0, (prev.likesCount || 0) - 1) : (prev.likesCount || 0) + 1
+    }));
+
     try {
-      const result = await dispatch(likePost(currentPost._id));
-      emitSocialAction({
-        type: 'LIKE',
-        itemType: 'forum',
-        itemId: currentPost._id,
-        userId: userInfo._id,
-        likes: result.likes,
-        action: hasLiked ? 'unliked' : 'liked'
-      });
+      await dispatch(likePost(currentPost._id));
+      // Action emission is handled by backend or SOCIAL_UPDATE listener
     } catch {
+      // Revert if failed
+      setCurrentPost(prev => ({
+        ...prev,
+        userLiked: wasLiked,
+        likesCount: wasLiked ? (prev.likesCount || 0) + 1 : Math.max(0, (prev.likesCount || 0) - 1)
+      }));
       showSnackbar('Failed to like post', 'error');
     }
   };
@@ -84,13 +106,12 @@ const ForumPostCard = ({ post, onUpdate }) => {
   const handleAddComment = async () => {
     if (!commentText.trim()) return showSnackbar('Enter a comment', 'warning');
     try {
-      const result = await dispatch(addComment(currentPost._id, commentText));
-      emitSocialAction({
-        type: 'COMMENT',
-        itemType: 'forum',
-        itemId: currentPost._id,
-        comment: result
-      });
+      await dispatch(addComment(currentPost._id, commentText));
+      // Local counter increment for immediate feedback
+      setCurrentPost(prev => ({
+        ...prev,
+        commentsCount: (prev.commentsCount || 0) + 1
+      }));
       setCommentText('');
       setCommentOpen(false);
       showSnackbar('Comment added', 'success');
@@ -113,9 +134,18 @@ const ForumPostCard = ({ post, onUpdate }) => {
     const url = `${window.location.origin}/forum/post/${currentPost._id}`;
     const text = `Check: ${currentPost.title}`;
     let link = '';
+
     if (platform === 'whatsapp') link = `https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`;
     if (platform === 'twitter') link = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
     if (platform === 'facebook') link = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+
+    if (platform === 'copy') {
+      navigator.clipboard.writeText(url);
+      showSnackbar('Link copied to clipboard!', 'success');
+      setShareOpen(false);
+      return;
+    }
+
     if (link) window.open(link, '_blank');
     setShareOpen(false);
     showSnackbar('Shared!', 'success');
@@ -145,20 +175,31 @@ const ForumPostCard = ({ post, onUpdate }) => {
   };
 
   const handleBookmark = async () => {
+    if (!userInfo) return showSnackbar('Please login to bookmark', 'warning');
     try {
-      await dispatch(bookmarkPost(currentPost._id));
-      showSnackbar('Post bookmarked', 'success');
+      await dispatch(toggleBookmark(currentPost._id));
+      // Update local state for immediate feedback
+      setCurrentPost(prev => {
+        const bookmarkedBy = prev.bookmarkedBy || [];
+        const isBookmarked = bookmarkedBy.includes(userInfo._id); // This refers to the state *before* the toggle
+        return {
+          ...prev,
+          bookmarkedBy: isBookmarked
+            ? bookmarkedBy.filter(id => id !== userInfo._id)
+            : [...bookmarkedBy, userInfo._id]
+        };
+      });
+      // The snackbar message should reflect the *new* state after the toggle
+      showSnackbar(isBookmarkedInPost ? 'Bookmark removed' : 'Post bookmarked', 'success');
+      emitSocialAction({
+        type: 'BOOKMARK',
+        itemType: 'forum',
+        itemId: currentPost._id,
+        userId: userInfo._id,
+        action: isBookmarkedInPost ? 'unbookmarked' : 'bookmarked'
+      });
     } catch (error) {
-      showSnackbar(error.message || 'Failed to bookmark', 'error');
-    }
-  };
-
-  const handleUnbookmark = async () => {
-    try {
-      await dispatch(unbookmarkPost(currentPost._id));
-      showSnackbar('Bookmark removed', 'success');
-    } catch (error) {
-      showSnackbar(error.message || 'Failed to remove bookmark', 'error');
+      showSnackbar(error.message || 'Failed to toggle bookmark', 'error');
     }
   };
 
@@ -188,7 +229,7 @@ const ForumPostCard = ({ post, onUpdate }) => {
           }
           subheader={new Date(currentPost.createdAt).toLocaleString()}
         />
-        <CardContent>
+        <CardContent sx={{ cursor: 'pointer' }} onClick={() => navigate(`/forum/post/${currentPost._id}`)}>
           <Typography variant="h5" gutterBottom>{currentPost.title}</Typography>
           <Typography paragraph>{currentPost.content}</Typography>
           {currentPost.tags?.length > 0 && (
@@ -196,35 +237,21 @@ const ForumPostCard = ({ post, onUpdate }) => {
               {currentPost.tags.map(t => <Chip key={t} label={`#${t}`} size="small" />)}
             </Box>
           )}
-          {displayComments.length > 0 && (
-            <Box sx={{ mt: 2, bgcolor: 'grey.50', p: 2, borderRadius: 2 }}>
-              <Typography variant="subtitle2" gutterBottom>Comments ({displayComments.length})</Typography>
-              {displayComments.slice(0, 2).map(c => (
-                <Box key={c._id} sx={{ display: 'flex', gap: 1, mb: 1 }}>
-                  <Avatar sx={{ width: 24, height: 24 }} src={getImageUrl(c.userId?.profilePic)}>{c.userId?.name?.[0]}</Avatar>
-                  <Box>
-                    <Typography variant="body2" fontWeight="medium">{c.userId?.name}</Typography>
-                    <Typography variant="body2">{c.text}</Typography>
-                  </Box>
-                  {isAdmin && <IconButton size="small" onClick={() => handleReportComment(c._id)}><Report fontSize="small" /></IconButton>}
-                </Box>
-              ))}
-            </Box>
-          )}
+
         </CardContent>
         <Box sx={{ px: 2, py: 1, borderTop: 1, borderColor: 'divider' }}>
           <Typography variant="body2" color="text.secondary">
-            {currentPost.likes?.length || 0} likes • {displayComments.length} comments
+            {currentPost.likesCount || 0} likes • {currentPost.commentsCount || 0} comments • {currentPost.viewCount || 0} views
           </Typography>
         </Box>
         <CardActions>
           <IconButton onClick={handleLike} color={hasLiked ? 'error' : 'default'}>
             {hasLiked ? <Favorite /> : <FavoriteBorder />}
           </IconButton>
-          <IconButton onClick={() => setCommentOpen(true)}><Comment /></IconButton>
+          <IconButton onClick={() => navigate(`/forum/post/${currentPost._id}#comment-section`)}><Comment /></IconButton>
           <IconButton onClick={() => setShareOpen(true)}><Share /></IconButton>
-          <IconButton onClick={() => setIsBookmarked(!isBookmarked)}>
-            {isBookmarked ? <Bookmark /> : <BookmarkBorder />}
+          <IconButton onClick={handleBookmark} color={isBookmarkedInPost ? 'primary' : 'default'}>
+            {isBookmarkedInPost ? <Bookmark /> : <BookmarkBorder />}
           </IconButton>
         </CardActions>
       </Card>
@@ -245,6 +272,7 @@ const ForumPostCard = ({ post, onUpdate }) => {
           <Button fullWidth onClick={() => handleShare('whatsapp')}>WhatsApp</Button>
           <Button fullWidth onClick={() => handleShare('twitter')}>Twitter</Button>
           <Button fullWidth onClick={() => handleShare('facebook')}>Facebook</Button>
+          <Button fullWidth onClick={() => handleShare('copy')}>Copy Link</Button>
         </DialogContent>
       </Dialog>
 

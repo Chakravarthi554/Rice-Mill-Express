@@ -51,16 +51,24 @@ const BookmarksPage = () => {
   const fetchBookmarks = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/forum/bookmarks?page=${page}&limit=20`, {
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/forum/bookmarks?page=${page}&limit=20`, {
         headers: {
-          'Authorization': `Bearer ${userInfo.token}`
+          'Authorization': `Bearer ${userInfo.token}`,
+          'Content-Type': 'application/json'
         }
       });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch bookmarks: ${response.statusText}`);
+      }
+
       const data = await response.json();
       setBookmarks(data.posts || []);
       setTotalPages(data.pages || 1);
     } catch (error) {
       console.error('Error fetching bookmarks:', error);
+      setBookmarks([]);
     } finally {
       setLoading(false);
     }
@@ -68,10 +76,12 @@ const BookmarksPage = () => {
 
   const handleUnbookmark = async (postId) => {
     try {
-      const response = await fetch(`/api/forum/${postId}/bookmark`, {
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/forum/${postId}/bookmark`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${userInfo.token}`
+          'Authorization': `Bearer ${userInfo.token}`,
+          'Content-Type': 'application/json'
         }
       });
 
@@ -242,13 +252,13 @@ const BookmarksPage = () => {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <Favorite sx={{ fontSize: 18, color: 'error.main' }} />
                         <Typography variant="caption">
-                          {post.likes?.length || 0}
+                          {post.likesCount || post.likes?.length || 0}
                         </Typography>
                       </Box>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <Comment sx={{ fontSize: 18, color: 'primary.main' }} />
                         <Typography variant="caption">
-                          {post.comments?.filter(c => c.approved).length || 0}
+                          {post.commentsCount || 0}
                         </Typography>
                       </Box>
                     </Box>

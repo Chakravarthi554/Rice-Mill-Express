@@ -1,4 +1,4 @@
-// [AI: Product reviews form & logic fixed]
+// [FORCED UPDATE: Jan 11 23:35] - Standardizing Social Engagement System
 import React, { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useParams, useNavigate, Link } from "react-router-dom";
@@ -47,6 +47,8 @@ import { listRecipes } from "../../redux/actions/recipeActions";
 import { listProducts } from "../../redux/actions/productActions"; // ✅ For recommendations
 import { listMyOrders } from "../../redux/actions/orderActions"; // ✅ For verified purchase check
 import Price from "../../components/common/Price";
+import CommentSystem from "../../components/social/CommentSystem";
+import RatingSystem from "../../components/social/RatingSystem";
 
 
 const ProductImage = styled('img')({
@@ -108,88 +110,7 @@ const ActionButton = styled(Button)(({ theme, varianttype }) => ({
   })
 }));
 
-// ✅ NEW: Review Form Component
-const ReviewFormComponent = ({ productId, onReviewSubmitted, existingReview }) => {
-  const dispatch = useDispatch();
-  const [rating, setRating] = useState(0);
-  const [comment, setComment] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(false);
-  const { userInfo } = useSelector((state) => state.userLogin);
 
-  useEffect(() => {
-    if (existingReview) {
-      setRating(existingReview.rating);
-      setComment(existingReview.comment);
-    }
-  }, [existingReview]);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!rating || !comment.trim()) {
-      setError('Please provide both rating and comment');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-      await dispatch(createProductReview(productId, { rating, comment }));
-      setSuccess(true);
-      if (!existingReview) {
-        setRating(0);
-        setComment('');
-      }
-      setTimeout(() => {
-        setSuccess(false);
-        onReviewSubmitted();
-      }, 2000);
-    } catch (err) {
-      setError(err.message || 'Failed to submit review');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <Box component="form" onSubmit={handleSubmit}>
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      {success && <Alert severity="success" sx={{ mb: 2 }}>Review submitted successfully!</Alert>}
-
-      <Box sx={{ mb: 2 }}>
-        <Typography variant="body1" gutterBottom>Rating *</Typography>
-        <MuiRating
-          value={rating}
-          onChange={(event, newValue) => setRating(newValue)}
-          size="large"
-          sx={{ mb: 1 }}
-        />
-      </Box>
-
-      <TextField
-        fullWidth
-        multiline
-        rows={4}
-        label="Your Review *"
-        placeholder="Share your experience with this product..."
-        value={comment}
-        onChange={(e) => setComment(e.target.value)}
-        required
-        sx={{ mb: 2 }}
-      />
-
-      <Button
-        type="submit"
-        variant="contained"
-        disabled={loading || !rating || !comment.trim()}
-        sx={{ borderRadius: '12px', fontWeight: 'bold' }}
-      >
-        {loading ? <CircularProgress size={24} /> : 'Submit Review'}
-      </Button>
-    </Box>
-  );
-};
 
 const ProductPage = () => {
   const { id } = useParams();
@@ -197,15 +118,8 @@ const ProductPage = () => {
   const [cartSnackbar, setCartSnackbar] = useState(false); // ✅ Cart confirmation
 
   const [selectedImage, setSelectedImage] = useState(0);
-  const [socialStats, setSocialStats] = useState({ likes: 0, comments: 0 });
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
-
-  // ✅ FIXED: Review filtering and pagination state
-  const [reviewFilter, setReviewFilter] = useState('all');
-  const [reviewPage, setReviewPage] = useState(1);
-  const reviewsPerPage = 5;
-  const [reviewFormOpen, setReviewFormOpen] = useState(false);
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -226,12 +140,14 @@ const ProductPage = () => {
 
   useEffect(() => {
     dispatch(listProductDetails(id));
-    dispatch(listProducts()); // ✅ Fetch all products for recommendations
-    // ✅ FIXED: Fetch user orders for verified purchase check
+    dispatch(listProducts());
+  }, [dispatch, id]);
+
+  useEffect(() => {
     if (userInfo) {
       dispatch(listMyOrders());
     }
-  }, [dispatch, id, userInfo]); // Only depend on id to reload when navigating to different product
+  }, [dispatch, userInfo?._id]);
 
   useEffect(() => {
     if (product && product.riceType) {
@@ -241,39 +157,7 @@ const ProductPage = () => {
 
 
 
-  useEffect(() => {
-    if (product) {
-      setSocialStats({
-        likes: product.likes?.length || 0,
-        comments: socialCommentsList.comments?.length || 0
-      });
-    }
-  }, [product, socialCommentsList]);
 
-  // ✅ FIXED: Filter reviews based on selected filter
-  const filteredReviews = React.useMemo(() => {
-    if (!product.reviews || product.reviews.length === 0) return [];
-
-    let filtered = product.reviews.filter(review => review.approved !== false);
-
-    if (reviewFilter === 'all') {
-      return filtered;
-    } else if (reviewFilter === 'verified') {
-      // Filter verified purchases (users who have purchased this product)
-      return filtered.filter(review => {
-        if (!userInfo || !userOrders) return false;
-        return userOrders.some(order =>
-          order.orderItems?.some(item =>
-            item.product?._id === product._id && order.isPaid
-          ) && order.user?._id === review.user?._id
-        );
-      });
-    } else if (typeof reviewFilter === 'number') {
-      return filtered.filter(review => review.rating === reviewFilter);
-    }
-
-    return filtered;
-  }, [product.reviews, reviewFilter, userInfo, userOrders, product._id]);
 
   const addToCartHandler = async () => {
     try {
@@ -353,8 +237,8 @@ const ProductPage = () => {
                     style={{ display: imageLoaded && !imageError ? 'block' : 'none' }}
                   />
                   <Stack direction="row" spacing={1} sx={{ position: 'absolute', top: 16, right: 16 }}>
-                    <Chip icon={<Favorite sx={{ fontSize: 16 }} />} label={socialStats.likes} size="small" color="error" variant="filled" sx={{ background: 'linear-gradient(135deg, #FF6B6B 0%, #FF5252 100%)' }} />
-                    <Chip icon={<Chat sx={{ fontSize: 16 }} />} label={socialStats.comments} size="small" color="primary" variant="filled" sx={{ background: 'linear-gradient(135deg, #2196F3 0%, #1976D2 100%)' }} />
+                    <Chip icon={<Favorite sx={{ fontSize: 16 }} />} label={product.likesCount || 0} size="small" color="error" variant="filled" sx={{ background: 'linear-gradient(135deg, #FF6B6B 0%, #FF5252 100%)' }} />
+                    <Chip icon={<Chat sx={{ fontSize: 16 }} />} label={product.commentsCount || 0} size="small" color="primary" variant="filled" sx={{ background: 'linear-gradient(135deg, #2196F3 0%, #1976D2 100%)' }} />
                   </Stack>
                   {hasOffer && (
                     <Chip icon={<LocalOffer />} label={`${discountPercentage}% OFF`} color="success" variant="filled" sx={{ position: 'absolute', top: 16, left: 16, fontWeight: 'bold', background: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)' }} />
@@ -521,139 +405,30 @@ const ProductPage = () => {
         </Grid>
       </Box>
 
-      {/* ✅ NEW: Add Review Form */}
-      {userInfo && (
-        <Box sx={{ mt: 6 }}>
-          <StyledPaper>
-            <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
-              {product.reviews?.some(r => r.user?._id === userInfo._id || r.user === userInfo._id)
-                ? "Update Your Review"
-                : "Write a Review"}
-            </Typography>
-            <ReviewFormComponent
-              productId={id}
-              existingReview={product.reviews?.find(r => r.user?._id === userInfo._id || r.user === userInfo._id)}
-              onReviewSubmitted={() => {
-                dispatch(listProductDetails(id)); // Refresh product details
-              }}
+      {/* Unified Social System */}
+      <Box sx={{ mt: 4 }}>
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={5}>
+            <RatingSystem
+              type="products"
+              itemId={id}
+              onRate={(val) => dispatch(createProductReview(id, { rating: val, comment: '' }))}
             />
-          </StyledPaper>
-        </Box>
-      )}
-
-      {/* ✅ FIXED: Reviews Section with Filtering, Pagination, and Verified Purchase */}
-      {product.reviews && product.reviews.length > 0 && (
-        <Box sx={{ mt: 6 }}>
-          <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
-            Customer Reviews ({product.numReviews || product.reviews.length})
-          </Typography>
-
-          {/* ✅ FIXED: Review Filters */}
-          <Box sx={{ mb: 3, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-            <Chip
-              label="All"
-              onClick={() => setReviewFilter('all')}
-              color={reviewFilter === 'all' ? 'primary' : 'default'}
-              clickable
-            />
-            <Chip
-              label="5 Stars"
-              onClick={() => setReviewFilter(5)}
-              color={reviewFilter === 5 ? 'primary' : 'default'}
-              clickable
-            />
-            <Chip
-              label="4 Stars"
-              onClick={() => setReviewFilter(4)}
-              color={reviewFilter === 4 ? 'primary' : 'default'}
-              clickable
-            />
-            <Chip
-              label="3 Stars"
-              onClick={() => setReviewFilter(3)}
-              color={reviewFilter === 3 ? 'primary' : 'default'}
-              clickable
-            />
-            <Chip
-              label="Verified Purchase"
-              onClick={() => setReviewFilter('verified')}
-              color={reviewFilter === 'verified' ? 'primary' : 'default'}
-              clickable
-            />
-          </Box>
-
-          {/* ✅ FIXED: Filtered Reviews */}
-          <Grid container spacing={2}>
-            {filteredReviews
-              .slice((reviewPage - 1) * reviewsPerPage, reviewPage * reviewsPerPage)
-              .map((review, idx) => {
-                // Check if user has purchased this product (verified purchase)
-                const isVerified = userInfo && userOrders?.some(order =>
-                  order.orderItems?.some(item =>
-                    item.product?._id === product._id && order.isPaid
-                  )
-                );
-
-                return (
-                  <Grid item xs={12} key={review._id || idx}>
-                    <Card sx={{ p: 3 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                        <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>
-                          {review.name?.charAt(0).toUpperCase() || review.user?.name?.charAt(0).toUpperCase()}
-                        </Avatar>
-                        <Box sx={{ flexGrow: 1 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Typography variant="subtitle1" fontWeight="bold">
-                              {review.name || review.user?.name || 'Anonymous'}
-                            </Typography>
-                            {isVerified && (
-                              <Chip
-                                label="Verified Purchase"
-                                size="small"
-                                color="success"
-                                sx={{ height: 20, fontSize: '0.7rem' }}
-                              />
-                            )}
-                          </Box>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-                            <MuiRating value={review.rating} readOnly size="small" />
-                            <Typography variant="caption" color="text.secondary">
-                              {new Date(review.createdAt || Date.now()).toLocaleDateString()}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      </Box>
-                      <Typography variant="body2" color="text.secondary">
-                        {review.comment}
-                      </Typography>
-                    </Card>
-                  </Grid>
-                );
-              })}
           </Grid>
-
-          {/* ✅ FIXED: Pagination */}
-          {filteredReviews.length > reviewsPerPage && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-              <Pagination
-                count={Math.ceil(filteredReviews.length / reviewsPerPage)}
-                page={reviewPage}
-                onChange={(e, value) => setReviewPage(value)}
-                color="primary"
-              />
-            </Box>
-          )}
-        </Box>
-      )}
+          <Grid item xs={12} md={7}>
+            <CommentSystem type="products" itemId={id} />
+          </Grid>
+        </Grid>
+      </Box>
 
       {/* ✅ Recommended Products Section */}
       {products.length > 0 && (
-        <Box sx={{ mt: 6 }}>
-          <Divider sx={{ mb: 4 }} />
-          <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
+        <Box sx={{ mt: 4 }}>
+          <Divider sx={{ mb: 3 }} />
+          <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 2 }}>
             You May Also Like
           </Typography>
-          <Grid container spacing={3}>
+          <Grid container spacing={2}>
             {products
               .filter(p => p._id !== id)
               .map(recommendedProduct => (

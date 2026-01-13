@@ -15,7 +15,7 @@ const {
 const asyncHandler = require('../middleware/asyncHandler');
 const { socialRateLimiter, strictSocialLimiter, customerLimiter } = require('../middleware/rateLimit');
 
-const { likeItem, addComment, getComments, trackShare } = require('../controllers/socialController');
+const { likeItem, addComment, getComments, trackShare, rateItem } = require('../controllers/socialController');
 
 
 const multer = require('multer');
@@ -71,8 +71,15 @@ router.get('/', getRecipes); // Get approved recipes (public or logged-in users)
 router.get('/:id', getRecipeById); // Get single recipe details
 
 // Authenticated user routes (rating/commenting)
-router.post('/:id/rate', protect, socialRateLimiter, rateRecipe);
-router.post('/:id/comment', protect, socialRateLimiter, commentOnRecipe);
+router.post('/:id/rate', protect, socialRateLimiter, (req, res, next) => {
+  req.params.type = 'recipes';
+  next();
+}, rateItem);
+
+router.post('/:id/comment', protect, socialRateLimiter, (req, res, next) => {
+  req.params.type = 'recipes';
+  next();
+}, addComment);
 
 // Delete route (Admin or Owner Seller)
 router.delete('/:id', protect, role('admin', 'seller'), deleteRecipe); // Role middleware allows admin OR seller
@@ -133,42 +140,6 @@ router.get('/:id/comments/:commentId/replies', (req, res, next) => {
 // Get rating distribution
 router.get('/:id/rating-distribution', getRatingDistribution);
 
-router.get('/:id/comments', asyncHandler(async (req, res) => {
-  try {
-    const { page = 1, limit = 20 } = req.query;
-    const skip = (page - 1) * limit;
-
-    const recipe = await Recipe.findById(req.params.id)
-      .populate('comments.userId', 'name profilePic')
-      .select('comments');
-
-    if (!recipe) {
-      return res.status(404).json({ message: 'Recipe not found' });
-    }
-
-    let comments = recipe.comments;
-    // Filter for non-admin users
-    if (req.user?.role !== 'admin') {
-      comments = comments.filter(comment => comment.approved && !comment.isFlagged);
-    }
-
-    // Sort by creation date (newest first)
-    comments.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-    // Apply pagination
-    const paginatedComments = comments.slice(skip, skip + Number(limit));
-
-    res.json({
-      comments: paginatedComments,
-      total: comments.length,
-      page: Number(page),
-      pages: Math.ceil(comments.length / limit),
-      limit: Number(limit)
-    });
-  } catch (error) {
-    console.error('Get recipe comments error:', error);
-    res.status(500).json({ message: 'Server error fetching comments', error: error.message });
-  }
-}));
+// Consolidated with socialController getComments
 
 module.exports = router;

@@ -185,27 +185,10 @@ const getRecipeById = asyncHandler(async (req, res) => {
 
   const recipe = await Recipe.findById(req.params.id)
     .populate('linkedProducts', 'name price images seller')
-    .populate('sellerId', 'name email')
-    .populate('comments.userId', 'name profilePic');
+    .populate('sellerId', 'name email');
 
   if (recipe) {
-    // Convert to plain object for manipulation
-    const recipeObj = recipe.toObject();
-
-    // Debug logging
-    console.log(`📝 Recipe ${req.params.id}: Total comments = ${recipeObj.comments.length}`);
-    const approvedCount = recipeObj.comments.filter(c => c.approved).length;
-    console.log(`✅ Approved comments = ${approvedCount}`);
-
-    // For non-admin users, only show approved comments
-    if (req.user?.role !== 'admin') {
-      recipeObj.comments = recipeObj.comments.filter(comment => comment.approved === true);
-      console.log(`👤 Non-admin user: Showing ${recipeObj.comments.length} approved comments`);
-    } else {
-      console.log(`👨‍💼 Admin user: Showing all ${recipeObj.comments.length} comments`);
-    }
-
-    res.json(recipeObj);
+    res.json(recipe);
   } else {
     res.status(404);
     throw new Error('Recipe not found');
@@ -264,67 +247,7 @@ const approveRecipe = asyncHandler(async (req, res) => {
 // @desc    Rate a recipe
 // @route   POST /api/recipes/:id/rate
 // @access  Private
-const rateRecipe = asyncHandler(async (req, res) => {
-  const { rating } = req.body;
-
-  // Enhanced validation to prevent crashes
-  if (!rating) {
-    res.status(400);
-    throw new Error('Please select a rating before submitting');
-  }
-
-  const numRating = Number(rating);
-  if (isNaN(numRating) || numRating < 1 || numRating > 5) {
-    res.status(400);
-    throw new Error('Please provide a valid rating between 1 and 5');
-  }
-
-  const recipe = await Recipe.findById(req.params.id);
-
-  if (recipe) {
-    // Check if user already rated
-    const alreadyRated = recipe.ratings.find(
-      (r) => r.userId.toString() === req.user._id.toString()
-    );
-
-    if (alreadyRated) {
-      // Update existing rating
-      alreadyRated.rating = Number(rating);
-    } else {
-      // Add new rating
-      recipe.ratings.push({ userId: req.user._id, rating: Number(rating) });
-    }
-
-    await recipe.save();
-
-    // Emit socket event
-    if (req.io) {
-      req.io.emit('RECIPE_RATED', {
-        recipeId: recipe._id,
-        rating: rating,
-        averageRating: recipe.averageRating,
-        numReviews: recipe.numReviews
-      });
-
-      // Social update for general sync
-      req.io.emit('SOCIAL_UPDATE', {
-        type: 'RATING',
-        itemType: 'recipe',
-        itemId: recipe._id,
-        userId: req.user._id,
-        rating: rating,
-        averageRating: recipe.averageRating,
-        numReviews: recipe.numReviews,
-        timestamp: new Date()
-      });
-    }
-
-    res.status(201).json({ message: 'Rating added/updated', recipe });
-  } else {
-    res.status(404);
-    throw new Error('Recipe not found');
-  }
-});
+// rateRecipe removed - consolidated into socialController.rateItem
 
 // @desc    Delete a recipe (Admin or Seller who owns it)
 // @route   DELETE /api/recipes/:id
@@ -352,215 +275,7 @@ const deleteRecipe = asyncHandler(async (req, res) => {
   }
 });
 
-// NEW: Moderate recipe comment
-const moderateRecipeComment = asyncHandler(async (req, res) => {
-  try {
-    const { recipeId, commentId } = req.params;
-    const { action } = req.body; // 'approve', 'reject', 'delete'
-
-    if (!['approve', 'reject', 'delete'].includes(action)) {
-      return res.status(400).json({ message: 'Invalid action' });
-    }
-
-    const recipe = await Recipe.findById(recipeId);
-    if (!recipe) return res.status(404).json({ message: 'Recipe not found' });
-
-    const comment = recipe.comments.id(commentId);
-    if (!comment) return res.status(404).json({ message: 'Comment not found' });
-
-    if (action === 'approve') {
-      comment.approved = true;
-      comment.isFlagged = false;
-    } else if (action === 'reject') {
-      comment.approved = false;
-    } else if (action === 'delete') {
-      recipe.comments.pull({ _id: commentId });
-    }
-
-    await recipe.save();
-
-    // Emit socket event
-    if (req.io) {
-      req.io.emit('RECIPE_COMMENT_MODERATED', {
-        recipeId: recipe._id,
-        commentId: commentId,
-        action: action
-      });
-    }
-
-    res.json({
-      message: `Comment ${action}d successfully`,
-      recipe: await Recipe.findById(recipeId).populate('comments.userId', 'name profilePic')
-    });
-  } catch (error) {
-    console.error('Error in moderateRecipeComment:', error);
-    res.status(500).json({ message: 'Server error moderating comment', error: error.message });
-  }
-});
-
-// NEW: Report recipe comment
-const reportRecipeComment = asyncHandler(async (req, res) => {
-  try {
-    const { recipeId, commentId } = req.params;
-    const { reason } = req.body;
-
-    const recipe = await Recipe.findById(recipeId);
-    if (!recipe) return res.status(404).json({ message: 'Recipe not found' });
-
-    const comment = recipe.comments.id(commentId);
-    if (!comment) return res.status(404).json({ message: 'Comment not found' });
-
-    // Check if user already reported this comment
-    const alreadyReported = comment.reports.some(report =>
-      report.userId.toString() === req.user._id.toString()
-    );
-
-    if (!alreadyReported) {
-      comment.reports.push({
-        userId: req.user._id,
-        reason: reason || 'Inappropriate content',
-        createdAt: new Date()
-      });
-
-      // Flag comment if it has 3 or more reports
-      comment.isFlagged = comment.reports.length >= 3;
-
-      await recipe.save();
-    }
-
-    res.json({ message: 'Comment reported successfully', comment });
-  } catch (error) {
-    console.error('Error in reportRecipeComment:', error);
-    res.status(500).json({ message: 'Server error reporting comment', error: error.message });
-  }
-});
-
-// NEW: Get all flagged recipe comments for admin
-const getFlaggedRecipeComments = asyncHandler(async (req, res) => {
-  try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Access denied. Admin role required.' });
-    }
-
-    const { page = 1, limit = 20 } = req.query;
-    const skip = (page - 1) * limit;
-
-    // Find recipes that have flagged comments
-    const recipes = await Recipe.find({
-      'comments.isFlagged': true
-    })
-      .populate('sellerId', 'name email')
-      .populate('comments.userId', 'name profilePic')
-      .sort({ updatedAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit))
-      .lean();
-
-    // Extract flagged comments with recipe info
-    const flaggedComments = [];
-    recipes.forEach(recipe => {
-      recipe.comments.forEach(comment => {
-        if (comment.isFlagged) {
-          flaggedComments.push({
-            ...comment,
-            type: 'recipe',
-            recipeId: recipe._id,
-            recipeTitle: recipe.title,
-            recipeAuthor: recipe.sellerId
-          });
-        }
-      });
-    });
-
-    const total = await Recipe.countDocuments({
-      'comments.isFlagged': true
-    });
-
-    res.json({
-      comments: flaggedComments,
-      total,
-      page: parseInt(page),
-      pages: Math.ceil(total / limit),
-      limit: parseInt(limit)
-    });
-  } catch (error) {
-    console.error('Error in getFlaggedRecipeComments:', error);
-    res.status(500).json({ message: 'Server error fetching flagged comments', error: error.message });
-  }
-});
-
-const commentOnRecipe = asyncHandler(async (req, res) => {
-  const { comment } = req.body;
-  if (!comment || comment.trim() === '') {
-    res.status(400);
-    throw new Error('Comment cannot be empty');
-  }
-
-  if (badWordsFilter.isProfane(comment)) {
-    res.status(400);
-    throw new Error('Comment contains inappropriate language');
-  }
-
-  const recipe = await Recipe.findById(req.params.id);
-
-  if (recipe) {
-    // Auto-approve comments for sellers and admins, require approval for customers
-    const approved = req.user.role !== 'customer';
-
-    const newComment = {
-      userId: req.user._id,
-      comment: comment.trim(),
-      approved: approved,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    recipe.comments.push(newComment);
-    await recipe.save();
-
-    // Populate the newly added comment
-    const updatedRecipe = await Recipe.findById(req.params.id)
-      .populate('comments.userId', 'name profilePic');
-
-    const addedComment = updatedRecipe.comments[updatedRecipe.comments.length - 1];
-
-    // Enhanced socket event for real-time updates
-    if (req.io) {
-      // Notify all users in the recipe room
-      req.io.to(`recipe_${recipe._id}`).emit('RECIPE_COMMENTED', {
-        recipeId: recipe._id,
-        comment: addedComment
-      });
-
-      // Notify admin if comment needs approval
-      if (!approved) {
-        req.io.to('admin').emit('NEW_RECIPE_COMMENT_NEEDS_APPROVAL', {
-          recipeId: recipe._id,
-          commentId: addedComment._id,
-          userId: req.user._id,
-          userName: req.user.name,
-          content: comment.trim(),
-          timestamp: new Date()
-        });
-      }
-
-      // Emit social update for real-time sync
-      req.io.emit('SOCIAL_UPDATE', {
-        type: 'COMMENT',
-        itemType: 'recipe',
-        itemId: recipe._id,
-        userId: req.user._id,
-        comment: addedComment,
-        needsApproval: !approved
-      });
-    }
-
-    res.status(201).json(addedComment);
-  } else {
-    res.status(404);
-    throw new Error('Recipe not found');
-  }
-});
+// moderateRecipeComment, reportRecipeComment, getFlaggedRecipeComments, commentOnRecipe removed - consolidated into socialController
 
 module.exports = {
   submitRecipe,
@@ -569,10 +284,5 @@ module.exports = {
   getPendingRecipes,
   getRecipeById,
   approveRecipe,
-  rateRecipe,
-  commentOnRecipe,
-  deleteRecipe,
-  moderateRecipeComment,
-  reportRecipeComment,
-  getFlaggedRecipeComments
+  deleteRecipe
 };

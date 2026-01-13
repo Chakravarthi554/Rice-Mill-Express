@@ -255,7 +255,7 @@ export const createProductReview = (productId, review) => async (dispatch, getSt
       },
     };
 
-    await axios.post(`/api/products/${productId}/reviews`, review, config);
+    await axios.post(`/api/social/products/${productId}/rate`, review, config);
 
     dispatch({ type: PRODUCT_CREATE_REVIEW_SUCCESS });
   } catch (error) {

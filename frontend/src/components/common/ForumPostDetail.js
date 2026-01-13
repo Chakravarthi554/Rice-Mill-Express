@@ -10,7 +10,9 @@ import {
   ThumbUp, ThumbUpOutlined, Comment, Share, Bookmark, BookmarkBorder,
   ArrowBack, Report, Send, WhatsApp, Twitter, Facebook, Link as LinkIcon
 } from '@mui/icons-material';
-import { getPostById, likePost, addComment } from '../../redux/actions/forumActions';
+import { getPostById, likePost, toggleBookmark } from '../../redux/actions/forumActions';
+import CommentSystem from '../social/CommentSystem';
+import { joinPostRoom, leavePostRoom } from '../../utils/socket';
 
 const ForumPostDetail = () => {
   const { id } = useParams();
@@ -20,21 +22,34 @@ const ForumPostDetail = () => {
   const { userInfo } = useSelector((state) => state.userLogin);
   const { post, loading, error } = useSelector((state) => state.forumPostDetails || {});
 
-  const [commentText, setCommentText] = useState('');
   const [shareOpen, setShareOpen] = useState(false);
-  const [submittingComment, setSubmittingComment] = useState(false);
 
   useEffect(() => {
     if (id) {
       dispatch(getPostById(id));
+
+      const handler = (data) => {
+        if (data.itemId === id) {
+          // We re-fetch or update local state? Re-fetching is safer for now 
+          // but maybe we can just manually update the post in redux?
+          // forumActions.js should probably handle this.
+          // For now, let's just re-fetch to be safe.
+          dispatch(getPostById(id));
+        }
+      };
+
+      window.addEventListener('socialUpdate', (e) => handler(e.detail));
+      joinPostRoom(id);
+
+      return () => {
+        window.removeEventListener('socialUpdate', handler);
+        leavePostRoom(id);
+      };
     }
   }, [dispatch, id]);
 
   const handleLike = async () => {
-    if (!userInfo) {
-      alert('Please login to like posts');
-      return;
-    }
+    if (!userInfo) return alert('Please login to like posts');
     try {
       await dispatch(likePost(id));
     } catch (error) {
@@ -42,24 +57,17 @@ const ForumPostDetail = () => {
     }
   };
 
-  const handleAddComment = async () => {
-    if (!commentText.trim()) return;
-    if (!userInfo) {
-      alert('Please login to comment');
-      return;
-    }
-
-    setSubmittingComment(true);
+  const handleBookmark = async () => {
+    if (!userInfo) return alert('Please login to bookmark posts');
     try {
-      await dispatch(addComment(id, commentText));
-      setCommentText('');
+      await dispatch(toggleBookmark(id));
+      // Re-fetch is handled by the socket listener as well, but we can do it here for extra safety
+      // although the socket listener already dispatches getPostById(id)
     } catch (error) {
-      console.error('Error adding comment:', error);
-      alert('Failed to add comment');
-    } finally {
-      setSubmittingComment(false);
+      console.error('Error bookmarking post:', error);
     }
   };
+
 
   const handleShare = (platform) => {
     const url = `${window.location.origin}/forum/post/${id}`;
@@ -130,7 +138,8 @@ const ForumPostDetail = () => {
     );
   }
 
-  const hasLiked = post.likes?.includes(userInfo?._id);
+  const hasLiked = post.userLiked;
+  const isBookmarked = post.isBookmarked;
   const isOwner = userInfo?._id === post.userId?._id;
   const isAdmin = userInfo?.role === 'admin';
 
@@ -245,7 +254,7 @@ const ForumPostDetail = () => {
           {/* Engagement Stats */}
           <Box sx={{ display: 'flex', gap: 3, mb: 2 }}>
             <Typography variant="body2" color="text.secondary">
-              ❤️ {post.likes?.length || 0} likes
+              ❤️ {post.likesCount || 0} likes
             </Typography>
             <Typography variant="body2" color="text.secondary">
               💬 {displayComments.length} comments
@@ -280,86 +289,23 @@ const ForumPostDetail = () => {
               Share
             </Button>
             <Button
-              variant="outlined"
-              startIcon={<Bookmark />}
+              variant={isBookmarked ? 'contained' : 'outlined'}
+              startIcon={isBookmarked ? <Bookmark /> : <BookmarkBorder />}
+              onClick={handleBookmark}
               disabled={!userInfo}
+              color="secondary"
             >
-              Bookmark
+              {isBookmarked ? 'Bookmarked' : 'Bookmark'}
             </Button>
           </Box>
         </CardContent>
       </Card>
 
       {/* Comments Section */}
-      <Card sx={{ borderRadius: 3, boxShadow: 3 }} id="comment-section">
-        <CardContent>
-          <Typography variant="h5" fontWeight="bold" gutterBottom>
-            💬 Comments ({displayComments.length})
-          </Typography>
-
-          {/* Add Comment */}
-          {userInfo ? (
-            <Box sx={{ mb: 3 }}>
-              <TextField
-                fullWidth
-                multiline
-                rows={3}
-                placeholder="Add a comment..."
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                sx={{ mb: 1 }}
-              />
-              <Button
-                variant="contained"
-                startIcon={<Send />}
-                onClick={handleAddComment}
-                disabled={!commentText.trim() || submittingComment}
-              >
-                {submittingComment ? 'Posting...' : 'Post Comment'}
-              </Button>
-            </Box>
-          ) : (
-            <Alert severity="info" sx={{ mb: 3 }}>
-              Please login to add comments
-            </Alert>
-          )}
-
-          <Divider sx={{ mb: 2 }} />
-
-          {/* Display Comments */}
-          {displayComments.length > 0 ? (
-            displayComments.map((comment) => (
-              <Paper key={comment._id} sx={{ p: 2, mb: 2, bgcolor: 'grey.50' }}>
-                <Box sx={{ display: 'flex', gap: 2 }}>
-                  <Avatar src={getImageUrl(comment.userId?.profilePic)} sx={{ width: 40, height: 40 }}>
-                    {comment.userId?.name?.[0]}
-                  </Avatar>
-                  <Box sx={{ flex: 1 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                      <Typography variant="subtitle2" fontWeight="bold">
-                        {comment.userId?.name}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {new Date(comment.createdAt).toLocaleString()}
-                      </Typography>
-                      {!comment.approved && isAdmin && (
-                        <Chip label="Pending" size="small" color="warning" />
-                      )}
-                    </Box>
-                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                      {comment.text}
-                    </Typography>
-                  </Box>
-                </Box>
-              </Paper>
-            ))
-          ) : (
-            <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 4 }}>
-              No comments yet. Be the first to comment!
-            </Typography>
-          )}
-        </CardContent>
-      </Card>
+      {/* Comment Section */}
+      <Box sx={{ mt: 3 }} id="comment-section">
+        <CommentSystem type="forum" itemId={id} />
+      </Box>
 
       {/* Share Dialog */}
       <Dialog open={shareOpen} onClose={() => setShareOpen(false)}>

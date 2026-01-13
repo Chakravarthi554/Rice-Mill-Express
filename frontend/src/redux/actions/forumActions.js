@@ -424,7 +424,7 @@ export const deleteForumPost = (id) => async (dispatch, getState) => {
     const config = getAuthConfig(userInfo);
 
     await safeApiCall(
-      () => axiosInstance.delete(`/api/forum/admin/${id}`, config),
+      () => axiosInstance.delete(`/api/forum/${id}`, config),
       'Delete post failed'
     );
 

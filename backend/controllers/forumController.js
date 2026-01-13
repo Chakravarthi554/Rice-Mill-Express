@@ -136,10 +136,18 @@ const getPosts = asyncHandler(async (req, res) => {
       .limit(parseInt(limit))
       .lean();
 
+    // Map user-specific status if logged in
+    const processedPosts = req.user ? await Promise.all(posts.map(async post => {
+      const Like = require('../models/Like');
+      const hasLiked = await Like.exists({ targetId: post._id, userId: req.user._id });
+      const isBookmarked = post.bookmarkedBy?.some(id => id.toString() === req.user._id.toString());
+      return { ...post, userLiked: !!hasLiked, isBookmarked };
+    })) : posts;
+
     const total = await ForumPost.countDocuments(query);
 
     res.json({
-      posts,
+      posts: processedPosts,
       total,
       page: parseInt(page),
       pages: Math.ceil(total / limit),
@@ -233,11 +241,7 @@ const getPostById = asyncHandler(async (req, res) => {
     const post = await ForumPost.findById(id)
       .populate('userId', 'name profilePic')
       .populate('linkedRecipe', 'name image ingredients')
-      .populate('linkedProduct', 'name images price')
-      .populate({
-        path: 'comments.userId',
-        select: 'name profilePic'
-      });
+      .populate('linkedProduct', 'name images price');
 
     if (!post) return res.status(404).json({ message: 'Post not found' });
 
@@ -246,12 +250,52 @@ const getPostById = asyncHandler(async (req, res) => {
       return res.status(403).json({ message: 'Post not available' });
     }
 
-    // Filter comments for non-admins
-    if (!req.user || req.user.role !== 'admin') {
-      post.comments = post.comments.filter(c => c.approved && !c.isFlagged);
+    // 🔥 NEW: Check user-specific status
+    let userLiked = false;
+    let isBookmarked = false;
+
+    if (req.user) {
+      const Like = require('../models/Like');
+      userLiked = await Like.exists({
+        targetId: post._id,
+        targetType: 'ForumPost',
+        userId: req.user._id
+      });
+      isBookmarked = post.bookmarkedBy?.some(id => id.toString() === req.user._id.toString());
     }
 
-    res.json(post);
+    // 🔥 FIXED: Unique view tracking - only increment if user hasn't viewed before
+    let currentViewCount = post.viewCount || 0;
+    if (req.user) {
+      const alreadyViewed = post.viewedBy?.some(id => id.toString() === req.user._id.toString());
+      if (!alreadyViewed) {
+        // Add user to viewedBy and increment count atomically
+        const updated = await ForumPost.findByIdAndUpdate(
+          id,
+          {
+            $addToSet: { viewedBy: req.user._id },
+            $inc: { viewCount: 1 }
+          },
+          { new: true }
+        );
+        currentViewCount = updated.viewCount;
+      }
+    } else {
+      // For non-authenticated users, increment every time (can't track uniqueness)
+      const updated = await ForumPost.findByIdAndUpdate(
+        id,
+        { $inc: { viewCount: 1 } },
+        { new: true }
+      );
+      currentViewCount = updated.viewCount;
+    }
+
+    res.json({
+      ...post.toObject(),
+      userLiked: !!userLiked,
+      isBookmarked,
+      viewCount: currentViewCount
+    });
   } catch (error) {
     console.error('Error in getPostById:', error);
     res.status(500).json({ message: 'Server error fetching post', error: error.message });
@@ -273,78 +317,39 @@ const replyToPost = asyncHandler(async (req, res) => {
     const post = await ForumPost.findById(req.params.id);
     if (!post) return res.status(404).json({ message: 'Post not found' });
 
-    // Auto-approve comments for sellers and admins, require approval for customers
-    const approved = req.user.role !== 'customer';
-
-    const newComment = {
+    // Create a new comment in the standalone Comment collection
+    const comment = await Comment.create({
+      targetId: post._id,
+      targetType: 'ForumPost',
       userId: req.user._id,
-      text: content.trim(),
-      approved: approved,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
+      content: content.trim(),
+      approved: true // Auto-approve for forum for better UX
+    });
 
-    // Use atomic update to avoid version conflicts
-    const updatedPost = await ForumPost.findByIdAndUpdate(
-      req.params.id,
-      {
-        $push: {
-          comments: newComment
-        },
-        $set: {
-          updatedAt: new Date()
-        }
-      },
-      {
-        new: true,
-        runValidators: true
-      }
-    ).populate('comments.userId', 'name profilePic')
-      .populate('userId', 'name profilePic');
+    // Update comment count on post
+    post.commentsCount = (post.commentsCount || 0) + 1;
+    await post.save();
 
-    if (!updatedPost) {
-      return res.status(404).json({ message: 'Post not found after update' });
-    }
+    const populatedComment = await Comment.findById(comment._id).populate('userId', 'name profilePic');
 
-    // Get the newly added comment (last one in the array)
-    const addedComment = updatedPost.comments[updatedPost.comments.length - 1];
-
-    // 🔥 ENHANCED: Real-time socket events for comments
+    // 🔥 ENHANCED:    // 🔥 Real-time socket events
     if (req.io) {
-      // Notify all users in the post room
-      req.io.to(`post_${post._id}`).emit('POST_COMMENTED', {
-        postId: post._id,
-        comment: addedComment,
-        postTitle: post.title
-      });
-
-      // Notify admin if comment needs approval
-      if (!approved) {
-        req.io.to('admin_room').emit('NEW_COMMENT_NEEDS_APPROVAL', {
-          postId: post._id,
-          commentId: addedComment._id,
-          userId: req.user._id,
-          userName: req.user.name,
-          content: content.trim(),
-          timestamp: new Date()
-        });
-      }
-
-      // Emit social update for real-time sync
-      req.io.emit('SOCIAL_UPDATE', {
-        type: 'COMMENT',
-        itemType: 'forum',
+      const socketPayload = {
+        type: 'COMMENT_ADDED',
         itemId: post._id,
-        userId: req.user._id,
-        comment: addedComment,
-        needsApproval: !approved,
-        timestamp: new Date()
-      });
+        itemType: 'forum',
+        comment: populatedComment,
+        commentsCount: post.commentsCount
+      };
 
-      console.log(`✅ Comment emitted via socket for post ${post._id}`);
+      req.io.to(`post_${post._id}`).emit('COMMENT', socketPayload); // Legacy support
+      req.io.to(`forum_${post._id}`).emit('SOCIAL_UPDATE', socketPayload);
+      req.io.emit('SOCIAL_UPDATE', socketPayload); // Global update
+
+      console.log(`💬 Comment emitted via socket for post ${post._id}`);
     }
 
-    res.json(addedComment);
+    res.json(populatedComment);
   } catch (error) {
     console.error('Error in replyToPost:', error);
     res.status(500).json({
@@ -354,52 +359,82 @@ const replyToPost = asyncHandler(async (req, res) => {
   }
 });
 
-// ✅ FIXED: Enhanced like post with real-time updates
+// ✅ FIXED: Enhanced like post with standalone Like collection
 const likePost = asyncHandler(async (req, res) => {
   try {
     const post = await ForumPost.findById(req.params.id);
     if (!post) return res.status(404).json({ message: 'Post not found' });
 
-    const userId = req.user._id.toString();
-    const index = post.likes.indexOf(userId);
+    const userId = req.user._id;
+    const Like = require('../models/Like');
 
-    if (index === -1) {
-      post.likes.push(userId);
+    // Check if user already liked
+    const existingLike = await Like.findOne({
+      targetId: post._id,
+      targetType: 'ForumPost',
+      userId
+    });
+
+    let action;
+    if (existingLike) {
+      // Unlike
+      await Like.findByIdAndDelete(existingLike._id);
+      post.likesCount = Math.max(0, (post.likesCount || 0) - 1);
+      action = 'unliked';
     } else {
-      post.likes.splice(index, 1);
+      // Like
+      await Like.create({
+        targetId: post._id,
+        targetType: 'ForumPost',
+        userId
+      });
+      post.likesCount = (post.likesCount || 0) + 1;
+      action = 'liked';
     }
 
+    // Sync bookmarkedBy if it's currently using embedded likes (which we deprecated)
+    // For now we just focus on the counter
     await post.save();
 
-    // 🔥 ENHANCED: Real-time socket events for likes
+    // 🔥 ENHANCED: Real-time socket events
     if (req.io) {
+      // Legacy room for backward compatibility
       req.io.to(`post_${post._id}`).emit('POST_LIKED', {
         postId: post._id,
-        likes: post.likes,
-        likesCount: post.likes.length,
+        likesCount: post.likesCount,
         userId: userId,
-        action: index === -1 ? 'liked' : 'unliked'
+        action
       });
 
-      // Emit social update for real-time sync
+      // Unified social update
       req.io.emit('SOCIAL_UPDATE', {
         type: 'LIKE',
         itemType: 'forum',
         itemId: post._id,
         userId: userId,
-        likes: post.likes,
-        likesCount: post.likes.length,
-        action: index === -1 ? 'liked' : 'unliked',
+        likesCount: post.likesCount,
+        action,
         timestamp: new Date()
+      });
+
+      // Entity room emission
+      req.io.to(`forum_${post._id}`).emit('SOCIAL_UPDATE', {
+        type: 'LIKE',
+        itemId: post._id,
+        itemType: 'forum',
+        likesCount: post.likesCount,
+        action,
+        userId
       });
 
       console.log(`❤️ Like emitted via socket for post ${post._id}`);
     }
 
     res.json({
-      ...post.toObject(),
-      userLiked: index === -1,
-      likesCount: post.likes.length
+      success: true,
+      action,
+      userLiked: action === 'liked',
+      likesCount: post.likesCount
     });
   } catch (error) {
     console.error('Error in likePost:', error);
@@ -685,17 +720,14 @@ const pinPost = asyncHandler(async (req, res) => {
 // Moderate forum comment
 const moderateComment = asyncHandler(async (req, res) => {
   try {
-    const { postId, commentId } = req.params;
+    const { commentId } = req.params;
     const { action } = req.body; // 'approve', 'reject', 'delete'
 
     if (!['approve', 'reject', 'delete'].includes(action)) {
       return res.status(400).json({ message: 'Invalid action' });
     }
 
-    const post = await ForumPost.findById(postId);
-    if (!post) return res.status(404).json({ message: 'Post not found' });
-
-    const comment = post.comments.id(commentId);
+    const comment = await Comment.findById(commentId);
     if (!comment) return res.status(404).json({ message: 'Comment not found' });
 
     if (action === 'approve') {
@@ -704,15 +736,29 @@ const moderateComment = asyncHandler(async (req, res) => {
     } else if (action === 'reject') {
       comment.approved = false;
     } else if (action === 'delete') {
-      post.comments.pull({ _id: commentId });
+      const postId = comment.targetId;
+      await Comment.findByIdAndDelete(commentId);
+
+      // Update comment count on post
+      await ForumPost.findByIdAndUpdate(postId, { $inc: { commentsCount: -1 } });
+
+      if (req.io) {
+        req.io.emit('SOCIAL_UPDATE', {
+          type: 'COMMENT_DELETED',
+          itemId: postId,
+          commentId: commentId
+        });
+      }
+      return res.json({ message: 'Comment deleted successfully' });
     }
 
-    await post.save();
+    await comment.save();
 
     // Enhanced socket event for real-time updates
     if (req.io) {
-      req.io.emit('COMMENT_MODERATED', {
-        postId: post._id,
+      req.io.emit('SOCIAL_UPDATE', {
+        type: 'COMMENT_MODERATED',
+        itemId: comment.targetId,
         commentId: commentId,
         action: action
       });
@@ -720,18 +766,15 @@ const moderateComment = asyncHandler(async (req, res) => {
       // Notify the comment author if approved
       if (action === 'approve') {
         req.io.to(`user_${comment.userId}`).emit('COMMENT_APPROVED', {
-          postId: post._id,
-          commentId: commentId,
-          postTitle: post.title
+          postId: comment.targetId,
+          commentId: commentId
         });
       }
-
-      console.log(`✅ Comment ${action}d: ${commentId} in post ${postId}`);
     }
 
     res.json({
       message: `Comment ${action}d successfully`,
-      post: await ForumPost.findById(postId).populate('comments.userId', 'name profilePic')
+      comment: await Comment.findById(commentId).populate('userId', 'name profilePic')
     });
   } catch (error) {
     console.error('Error in moderateComment:', error);
@@ -742,21 +785,19 @@ const moderateComment = asyncHandler(async (req, res) => {
 // Report forum comment
 const reportComment = asyncHandler(async (req, res) => {
   try {
-    const { postId, commentId } = req.params;
+    const { commentId } = req.params;
     const { reason } = req.body;
 
-    const post = await ForumPost.findById(postId);
-    if (!post) return res.status(404).json({ message: 'Post not found' });
-
-    const comment = post.comments.id(commentId);
+    const comment = await Comment.findById(commentId);
     if (!comment) return res.status(404).json({ message: 'Comment not found' });
 
     // Check if user already reported this comment
-    const alreadyReported = comment.reports.some(report =>
+    const alreadyReported = comment.reports && comment.reports.some(report =>
       report.userId.toString() === req.user._id.toString()
     );
 
     if (!alreadyReported) {
+      if (!comment.reports) comment.reports = [];
       comment.reports.push({
         userId: req.user._id,
         reason: reason || 'Inappropriate content',
@@ -766,12 +807,12 @@ const reportComment = asyncHandler(async (req, res) => {
       // Flag comment if it has 3 or more reports
       comment.isFlagged = comment.reports.length >= 3;
 
-      await post.save();
+      await comment.save();
 
       // Notify admin if comment gets flagged
       if (comment.isFlagged && req.io) {
         req.io.to('admin_room').emit('COMMENT_FLAGGED', {
-          postId: post._id,
+          itemId: comment.targetId,
           commentId: commentId,
           reportsCount: comment.reports.length,
           reason: reason
@@ -796,49 +837,25 @@ const getFlaggedComments = asyncHandler(async (req, res) => {
     const { page = 1, limit = 20 } = req.query;
     const skip = (page - 1) * limit;
 
-    // Find posts that have flagged comments
-    const posts = await ForumPost.find({
-      'comments.isFlagged': true
-    })
-      .populate('userId', 'name email')
-      .populate('comments.userId', 'name profilePic')
-      .sort({ updatedAt: -1 })
+    const flaggedComments = await Comment.find({ isFlagged: true, targetType: 'ForumPost' })
+      .populate('userId', 'name profilePic')
+      .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(parseInt(limit))
-      .lean();
+      .limit(parseInt(limit));
 
-    // Extract flagged comments with post info
-    const flaggedComments = [];
-    posts.forEach(post => {
-      post.comments.forEach(comment => {
-        if (comment.isFlagged) {
-          flaggedComments.push({
-            ...comment,
-            postId: post._id,
-            postTitle: post.title,
-            postAuthor: post.userId
-          });
-        }
-      });
-    });
-
-    const total = await ForumPost.countDocuments({
-      'comments.isFlagged': true
-    });
+    const total = await Comment.countDocuments({ isFlagged: true, targetType: 'ForumPost' });
 
     res.json({
       comments: flaggedComments,
       total,
       page: parseInt(page),
-      pages: Math.ceil(total / limit),
-      limit: parseInt(limit)
+      pages: Math.ceil(total / limit)
     });
   } catch (error) {
     console.error('Error in getFlaggedComments:', error);
     res.status(500).json({ message: 'Server error fetching flagged comments', error: error.message });
   }
 });
-
 // Get post statistics for admin dashboard
 const getPostStats = asyncHandler(async (req, res) => {
   try {
@@ -1207,18 +1224,52 @@ const bookmarkPost = asyncHandler(async (req, res) => {
     if (!post) return res.status(404).json({ message: 'Post not found' });
 
     const userId = req.user._id.toString();
+    const User = require('../models/User');
+
     const index = post.bookmarkedBy.findIndex(id => id.toString() === userId);
 
     let isBookmarked;
     if (index === -1) {
+      // Add bookmark to post
       post.bookmarkedBy.push(userId);
       isBookmarked = true;
+
+      // Add bookmark to user
+      await User.findByIdAndUpdate(req.user._id, {
+        $addToSet: { bookmarks: { postId: post._id, bookmarkedAt: new Date() } }
+      });
     } else {
+      // Remove bookmark from post
       post.bookmarkedBy.splice(index, 1);
       isBookmarked = false;
+
+      // Remove bookmark from user
+      await User.findByIdAndUpdate(req.user._id, {
+        $pull: { bookmarks: { postId: post._id } }
+      });
     }
 
     await post.save();
+
+    // 🔥 Real-time socket events
+    if (req.io) {
+      req.io.to(`forum_${post._id}`).emit('SOCIAL_UPDATE', {
+        type: 'BOOKMARK',
+        itemId: post._id,
+        itemType: 'forum',
+        userId: userId,
+        action: isBookmarked ? 'bookmarked' : 'unbookmarked'
+      });
+
+      // Global update for dashboard sync
+      req.io.emit('SOCIAL_UPDATE', {
+        type: 'BOOKMARK',
+        itemId: post._id,
+        itemType: 'forum',
+        userId: userId,
+        action: isBookmarked ? 'bookmarked' : 'unbookmarked'
+      });
+    }
 
     res.json({
       success: true,

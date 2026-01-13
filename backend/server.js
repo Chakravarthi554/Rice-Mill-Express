@@ -12,6 +12,7 @@ const http = require("http");
 const connectDB = require("./config/db");
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 const setupSocketServer = require("./utils/socketServer");
+const { connectRedis } = require("./utils/redis");
 
 dotenv.config();
 
@@ -296,6 +297,7 @@ app.use(notFound);
 app.use(errorHandler);
 
 // Graceful shutdown
+// Graceful shutdown
 process.on("SIGTERM", async () => {
   console.log("SIGTERM received, starting graceful shutdown...");
   server.close(() => {
@@ -318,11 +320,29 @@ process.on("SIGINT", async () => {
   });
 });
 
+// 🛡️ Global Error Handlers - PREVENT CRASHES
+process.on("uncaughtException", (err) => {
+  console.error("❌ UNCAUGHT EXCEPTION! Shutting down...");
+  console.error(err.name, err.message);
+  console.error(err.stack);
+  // Do NOT exit process in production unless necessary, but for dev we want to stay alive if possible
+  // process.exit(1); 
+});
+
+process.on("unhandledRejection", (err) => {
+  console.error("❌ UNHANDLED REJECTION! 💥");
+  console.error(err.name, err.message);
+  // server.close(() => process.exit(1));
+});
+
 // ================== SERVER STARTUP ==================
 (async () => {
   try {
     await connectDB();
     console.log("✅ MongoDB Connected");
+
+    // Initialize Redis
+    await connectRedis();
 
     const PORT = process.env.PORT || 5000;
 

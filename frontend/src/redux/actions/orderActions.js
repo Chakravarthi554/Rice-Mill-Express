@@ -31,6 +31,35 @@ import {
 import api from '../../utils/api';
 import { handleApiError } from '../../utils/handleApiError';
 
+// ✅ NEW: Download Invoice PDF
+export const downloadInvoice = (orderId) => async (dispatch) => {
+  try {
+    console.log(`🔄 Downloading invoice for order: ${orderId}`);
+
+    // Use responseType 'blob' for binary data (PDF)
+    const { data } = await api.get(`/api/orders/${orderId}/invoice`, {
+      responseType: 'blob'
+    });
+
+    const blob = new Blob([data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `invoice_${orderId.toString().slice(-8).toUpperCase()}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+
+    console.log('✅ Invoice download triggered');
+    return { success: true };
+  } catch (error) {
+    console.error('❌ Download invoice error:', error);
+    const message = handleApiError(error);
+    return { success: false, error: message };
+  }
+};
+
 // ✅ FIXED: Enhanced getMyOrders with bulk order integration
 export const listMyOrders = () => async (dispatch, getState) => {
   try {

@@ -1,4 +1,4 @@
-// frontend/src/components/common/RecipeDetail.js
+// [FORCED UPDATE: Jan 11 23:35] - Standardizing Social Engagement System
 /**
  * FILE: frontend/src/components/common/RecipeDetail.js
  * PURPOSE:
@@ -32,9 +32,10 @@ import {
 } from '../../redux/actions/socialActions';
 import { getCurrentSocket } from '../../utils/socket';
 
+import CommentSystem from '../social/CommentSystem';
+import RatingSystem from '../social/RatingSystem';
 import Loader from './Loader';
 import Message from './Message';
-import CommentItem from '../customer/CommentItem';
 
 const StyledPaper = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(3),
@@ -57,16 +58,11 @@ const RecipeDetail = () => {
   const navigate = useNavigate();
   const commentInputRef = useRef(null);
 
-  const [rating, setRating] = useState(0);
-  const [commentText, setCommentText] = useState('');
+  // Pagination and sorting (managed by CommentSystem now, but keep sortBy if needed locally)
   const [sortBy, setSortBy] = useState('recent');
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [anchorElSort, setAnchorElSort] = useState(null);
   const [copySuccess, setCopySuccess] = useState(false);
-
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [hasMoreComments, setHasMoreComments] = useState(true);
 
   // Toast notification state
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
@@ -85,78 +81,15 @@ const RecipeDetail = () => {
   useEffect(() => {
     if (recipeId) {
       dispatch(getRecipeDetails(recipeId));
-      dispatch(getSortedComments('recipes', recipeId, sortBy));
-      dispatch(getRatingDistribution(recipeId));
-      setCurrentPage(1); // Reset pagination when recipe or sort changes
     }
-  }, [dispatch, recipeId, sortBy]);
-
-  // Update pagination state based on comments response
-  useEffect(() => {
-    if (socialCommentsList.comments) {
-      const { page, pages } = socialCommentsList;
-      setHasMoreComments(page < pages);
-    }
-  }, [socialCommentsList]);
-
-
-  // Real-time updates
-  useEffect(() => {
-    const socket = getCurrentSocket();
-    if (!socket) return;
-
-    const handleSocialUpdate = (data) => {
-      if (data.itemId === recipeId || data.recipeId === recipeId) {
-        if (['COMMENT', 'COMMENT_REPLY', 'COMMENT_APPROVED', 'COMMENT_LIKE'].includes(data.type)) {
-          dispatch(getSortedComments('recipes', recipeId, sortBy));
-          // Also refresh recipe details to get updated comments
-          dispatch(getRecipeDetails(recipeId));
-        }
-        if (['LIKE', 'RATING'].includes(data.type)) {
-          dispatch(getRecipeDetails(recipeId));
-          if (data.type === 'RATING') dispatch(getRatingDistribution(recipeId));
-        }
-      }
-    };
-
-    const handleCommentApproved = (data) => {
-      if (data.itemId === recipeId) {
-        console.log('✅ Comment approved event received, refreshing recipe...');
-        dispatch(getRecipeDetails(recipeId));
-        dispatch(getSortedComments('recipes', recipeId, sortBy));
-      }
-    };
-
-    socket.on('SOCIAL_UPDATE', handleSocialUpdate);
-    socket.on('RECIPE_LIKED', handleSocialUpdate); // Legacy support
-    socket.on('COMMENT_APPROVED', handleCommentApproved);
-
-    return () => {
-      socket.off('SOCIAL_UPDATE', handleSocialUpdate);
-      socket.off('RECIPE_LIKED', handleSocialUpdate);
-      socket.off('COMMENT_APPROVED', handleCommentApproved);
-    };
-  }, [recipeId, dispatch, sortBy]);
+  }, [dispatch, recipeId]);
 
   const handleLike = () => {
-    if (!userInfo) return alert('Please log in to like this recipe.');
-    dispatch(likeItem('recipes', recipeId));
-  };
-
-  const handleAddComment = () => {
     if (!userInfo) {
-      setSnackbar({ open: true, message: 'Please log in to comment.', severity: 'warning' });
+      setSnackbar({ open: true, message: 'Please log in to like this recipe.', severity: 'warning' });
       return;
     }
-    if (commentText.trim()) {
-      dispatch(addComment('recipes', recipeId, commentText));
-      setCommentText('');
-      setSnackbar({
-        open: true,
-        message: 'Comment submitted! Awaiting admin approval.',
-        severity: 'success'
-      });
-    }
+    dispatch(likeItem('recipes', recipeId));
   };
 
   const handleShare = (platform) => {
@@ -188,18 +121,7 @@ const RecipeDetail = () => {
     }
   };
 
-  const handleSubmitRating = () => {
-    if (!userInfo) {
-      setSnackbar({ open: true, message: 'Please log in to rate this recipe.', severity: 'warning' });
-      return;
-    }
-    if (!rating || rating < 1 || rating > 5) {
-      setSnackbar({ open: true, message: 'Please select a rating between 1 and 5 stars.', severity: 'error' });
-      return;
-    }
-    dispatch(rateRecipe(recipeId, rating));
-    setSnackbar({ open: true, message: 'Rating submitted successfully!', severity: 'success' });
-  };
+
 
   const handleAddToCart = (productId) => {
     if (!userInfo) return alert('Please log in to add items to cart.');
@@ -341,117 +263,15 @@ const RecipeDetail = () => {
         <Grid item xs={12} md={5}>
           <StyledPaper sx={{ height: '100%', maxHeight: 'calc(100vh - 100px)', display: 'flex', flexDirection: 'column' }}>
             {/* Rating Section */}
-            <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-              <Stack direction="row" justifyContent="space-between" alignItems="center">
-                <Box>
-                  <Typography variant="h4" fontWeight="bold" color="primary">{displayRating.toFixed(1)}</Typography>
-                  <Rating value={displayRating} precision={0.5} readOnly size="small" />
-                  <Typography variant="caption" display="block">{recipe.numReviews} ratings</Typography>
-                </Box>
-                <Box sx={{ flexGrow: 1, ml: 3 }}>
-                  {[5, 4, 3, 2, 1].map(star => (
-                    <Stack key={star} direction="row" alignItems="center" spacing={1}>
-                      <Typography variant="caption" sx={{ minWidth: 10 }}>{star}</Typography>
-                      <StarIcon fontSize="inherit" color="disabled" sx={{ fontSize: 12 }} />
-                      <LinearProgress
-                        variant="determinate"
-                        value={socialRatingDist.percentages?.[star] || 0}
-                        sx={{ flexGrow: 1, height: 6, borderRadius: 3 }}
-                      />
-                    </Stack>
-                  ))}
-                </Box>
-              </Stack>
-              <Button
-                variant="outlined"
-                fullWidth
-                size="small"
-                sx={{ mt: 2 }}
-                onClick={() => setRating(rating === 0 ? 5 : 0)} // Toggle rating mode
-              >
-                Rate this Recipe
-              </Button>
-              <Collapse in={rating > 0 || (recipe.ratings?.some(r => r.userId === userInfo?._id))}>
-                <Box sx={{ mt: 2, textAlign: 'center' }}>
-                  <Rating value={rating} onChange={(e, v) => setRating(v)} />
-                  <Button size="small" onClick={handleSubmitRating}>Submit</Button>
-                </Box>
-              </Collapse>
-            </Box>
+            {/* Rating Section */}
+            <RatingSystem
+              type="recipes"
+              itemId={recipeId}
+              onRate={(val) => dispatch(rateRecipe(recipeId, val))}
+            />
 
-            {/* Comments Header */}
-            <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: 'grey.50' }}>
-              <Typography variant="h6" fontWeight="bold">Comments ({socialCommentsList.total})</Typography>
-              <Button
-                startIcon={<SortIcon />}
-                size="small"
-                onClick={(e) => setAnchorElSort(e.currentTarget)}
-              >
-                {sortBy === 'recent' ? 'Newest' : 'Top'}
-              </Button>
-              <Menu
-                anchorEl={anchorElSort}
-                open={Boolean(anchorElSort)}
-                onClose={() => setAnchorElSort(null)}
-              >
-                <MenuItem onClick={() => { setSortBy('recent'); setAnchorElSort(null); }}>Newest First</MenuItem>
-                <MenuItem onClick={() => { setSortBy('top'); setAnchorElSort(null); }}>Top Rated</MenuItem>
-              </Menu>
-            </Box>
-
-            {/* Comments List */}
-            <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 2 }}>
-              {commentTree.length === 0 ? (
-                <Box sx={{ textAlign: 'center', py: 4, color: 'text.secondary' }}>
-                  <CommentIcon sx={{ fontSize: 48, opacity: 0.2, mb: 1 }} />
-                  <Typography>No comments yet. Be the first!</Typography>
-                </Box>
-              ) : (
-                <>
-                  {commentTree.map(comment => (
-                    <CommentItem key={comment._id} comment={comment} recipeId={recipeId} />
-                  ))}
-
-                  {/* Load More Button */}
-                  {hasMoreComments && commentTree.length >= 20 && (
-                    <Box sx={{ textAlign: 'center', mt: 2 }}>
-                      <Button
-                        variant="outlined"
-                        onClick={() => {
-                          const nextPage = currentPage + 1;
-                          setCurrentPage(nextPage);
-                          dispatch(getSortedComments('recipes', recipeId, sortBy, nextPage));
-                        }}
-                        disabled={socialCommentsList.loading}
-                      >
-                        {socialCommentsList.loading ? <CircularProgress size={24} /> : 'Load More Comments'}
-                      </Button>
-                    </Box>
-                  )}
-                </>
-              )}
-            </Box>
-
-            {/* Add Comment Input */}
-            <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider', bgcolor: 'background.paper' }}>
-              <Stack direction="row" spacing={1}>
-                <Avatar src={getImageUrl(userInfo?.profilePic)} sx={{ width: 32, height: 32 }} />
-                <TextField
-                  inputRef={commentInputRef}
-                  fullWidth
-                  size="small"
-                  placeholder="Add a comment..."
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  multiline
-                  maxRows={3}
-                  InputProps={{ sx: { borderRadius: 3 } }}
-                />
-                <IconButton color="primary" onClick={handleAddComment} disabled={!commentText.trim()}>
-                  <SendIcon />
-                </IconButton>
-              </Stack>
-            </Box>
+            {/* Comment System */}
+            <CommentSystem type="recipes" itemId={recipeId} />
           </StyledPaper>
         </Grid>
       </Grid>
