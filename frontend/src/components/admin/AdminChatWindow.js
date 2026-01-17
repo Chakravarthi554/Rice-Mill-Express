@@ -52,6 +52,7 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
   const [selectedMsgs, setSelectedMsgs] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  const [emojiAnchorEl, setEmojiAnchorEl] = useState(null); // ✅ NEW: Emoji picker state
 
   const scrollRef = useRef();
   const fileInputRef = useRef();
@@ -185,16 +186,23 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
 
     try {
       const config = { headers: { Authorization: `Bearer ${currentUser.token}` } };
-      await axios.post('/api/chat/send', {
+      // ✅ FIX: Get response from API to add message immediately
+      const { data: sentMessage } = await axios.post('/api/chat/send', {
         receiverId: otherUser._id,
         content: msgContent,
         attachments,
         replyTo: replyingTo?._id || null
       }, config);
+      
+      // ✅ FIX: Add message to UI immediately (optimistic update)
+      setMessages(prev => [...prev, sentMessage]);
       setMessage('');
       setReplyingTo(null);
       scrollToBottom();
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      alert('Failed to send message. Please try again.');
+    }
   };
 
   const handleMsgAction = (event, msg) => {
@@ -238,6 +246,23 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
     } catch (e) { console.error(e); }
     setMsgAnchorEl(null);
   };
+
+  // ✅ NEW: Emoji picker handler
+  const handleEmojiSelect = (emoji) => {
+    setMessage(prev => prev + emoji);
+    setEmojiAnchorEl(null);
+  };
+
+  // ✅ NEW: Common emojis
+  const commonEmojis = [
+    '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇',
+    '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚',
+    '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🥸',
+    '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️',
+    '😮', '😯', '😲', '🥺', '🥵', '😢', '😭', '😱', '😨', '😰',
+    '👍', '👎', '👏', '🙏', '❤️', '💔', '💕', '💖', '💗', '💞',
+    '🔥', '⭐', '✨', '🎉', '🎈', '🎆', '🎁', '🎂', '🍰', '🥳'
+  ];
 
   return (
     <Paper elevation={3} sx={{ height: '75vh', display: 'flex', flexDirection: 'column', position: 'relative' }}>
@@ -352,8 +377,15 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
                       </Box>
                     )}
                   </Box>
-                ))}
-                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', pr: 4 }}>{msg.content}</Typography>
+                ))}  
+                {/* ✅ FIX: Handle deleted messages */}
+                {msg.isDeletedForEveryone ? (
+                  <Typography variant="body2" sx={{ fontStyle: 'italic', color: 'text.secondary', pr: 4 }}>
+                    🚫 This message was deleted
+                  </Typography>
+                ) : (
+                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', pr: 4 }}>{msg.content}</Typography>
+                )}
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5, mt: 0.2 }}>
                   {msg.isPinnedBy?.length > 0 && <PushPin sx={{ fontSize: 12, ml: 0.5, color: 'primary.main' }} />}
                   {isStarred && <StarIcon sx={{ fontSize: 12, color: 'text.secondary' }} />}
@@ -394,9 +426,10 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
       </Collapse>
 
       <Box sx={{ p: 1.5, bgcolor: '#f0f2f5', display: 'flex', alignItems: 'center', gap: 1 }}>
-        <input type="file" ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileUpload} multiple />
+        <input type="file" ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileUpload} multiple accept="image/*,video/*,audio/*,.pdf,.doc,.docx" />
         <IconButton size="small" onClick={() => fileInputRef.current.click()} disabled={uploading}><AttachFileIcon /></IconButton>
-        <IconButton size="small"><EmojiIcon /></IconButton>
+        {/* ✅ FIX: Emoji picker button */}
+        <IconButton size="small" onClick={(e) => setEmojiAnchorEl(e.currentTarget)}><EmojiIcon /></IconButton>
         <TextField
           fullWidth multiline maxRows={4} size="small" placeholder="Type a message"
           value={message} onChange={handleTyping}
@@ -419,6 +452,33 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
         <Divider />
         <MenuItem onClick={() => handleDelete('me')}><ListItemIcon><DeleteIcon fontSize="small" /></ListItemIcon>Delete for me</MenuItem>
         <MenuItem onClick={() => handleDelete('everyone')} sx={{ color: 'error.main' }}><ListItemIcon><DeleteIcon fontSize="small" color="error" /></ListItemIcon>Delete for everyone</MenuItem>
+      </Menu>
+
+      {/* ✅ NEW: Emoji Picker Menu */}
+      <Menu 
+        anchorEl={emojiAnchorEl} 
+        open={Boolean(emojiAnchorEl)} 
+        onClose={() => setEmojiAnchorEl(null)}
+        PaperProps={{
+          sx: {
+            maxWidth: 320,
+            maxHeight: 300,
+            overflow: 'auto'
+          }
+        }}
+      >
+        <Box sx={{ p: 1, display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 0.5 }}>
+          {commonEmojis.map((emoji, index) => (
+            <IconButton
+              key={index}
+              size="small"
+              onClick={() => handleEmojiSelect(emoji)}
+              sx={{ fontSize: '1.5rem', p: 0.5 }}
+            >
+              {emoji}
+            </IconButton>
+          ))}
+        </Box>
       </Menu>
     </Paper>
   );

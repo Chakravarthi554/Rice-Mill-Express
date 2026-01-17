@@ -63,6 +63,7 @@ const SellerChatWidget = () => {
     const [selectedMsgs, setSelectedMsgs] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [showSearch, setShowSearch] = useState(false);
+    const [emojiAnchorEl, setEmojiAnchorEl] = useState(null); // ✅ NEW: Emoji picker state
 
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
@@ -241,18 +242,26 @@ const SellerChatWidget = () => {
             }
 
             if (adminId) {
-                await axios.post('/api/chat/send', {
+                // ✅ FIX: Get response from API to add message immediately
+                const { data: sentMessage } = await axios.post('/api/chat/send', {
                     receiverId: adminId,
                     content: msgContent,
                     attachments,
                     replyTo: replyingTo?._id || null
                 }, config);
+                
+                // ✅ FIX: Add message to UI immediately (optimistic update)
+                setMessages(prev => [...prev, sentMessage]);
                 setMessage('');
                 setReplyingTo(null);
                 scrollToBottom();
+            } else {
+                console.warn('No admin found to send message to');
             }
         } catch (error) {
             console.error('Send failed', error);
+            // Show error to user
+            alert('Failed to send message. Please try again.');
         }
     };
 
@@ -299,6 +308,23 @@ const SellerChatWidget = () => {
         } catch (e) { console.error(e); }
         setAnchorEl(null);
     };
+
+    // ✅ NEW: Emoji picker handler
+    const handleEmojiSelect = (emoji) => {
+        setMessage(prev => prev + emoji);
+        setEmojiAnchorEl(null);
+    };
+
+    // ✅ NEW: Common emojis
+    const commonEmojis = [
+        '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇',
+        '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚',
+        '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🥸',
+        '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️',
+        '😮', '😯', '😲', '🥺', '🥵', '😢', '😭', '😱', '😨', '😰',
+        '👍', '👎', '👏', '🙏', '❤️', '💔', '💕', '💖', '💗', '💞',
+        '🔥', '⭐', '✨', '🎉', '🎈', '🎆', '🎁', '🎂', '🍰', '🥳'
+    ];
 
     return (
         <Box>
@@ -417,8 +443,15 @@ const SellerChatWidget = () => {
                                                 </Box>
                                             )}
                                         </Box>
-                                    ))}
-                                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', pr: 4 }}>{msg.content}</Typography>
+                                    ))}  
+                                    {/* ✅ FIX: Handle deleted messages */}
+                                    {msg.isDeletedForEveryone ? (
+                                        <Typography variant="body2" sx={{ fontStyle: 'italic', color: 'text.secondary', pr: 4 }}>
+                                            🚫 This message was deleted
+                                        </Typography>
+                                    ) : (
+                                        <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', pr: 4 }}>{msg.content}</Typography>
+                                    )}
                                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5, mt: 0.2 }}>
                                         {msg.isPinnedBy?.length > 0 && <PushPin sx={{ fontSize: 12, ml: 0.5, color: 'primary.main' }} />}
                                         <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.65rem' }}>
@@ -469,7 +502,10 @@ const SellerChatWidget = () => {
                     <IconButton size="small" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
                         <AttachFileIcon />
                     </IconButton>
-                    <IconButton size="small"><EmojiIcon /></IconButton>
+                    {/* ✅ FIX: Emoji picker button */}
+                    <IconButton size="small" onClick={(e) => setEmojiAnchorEl(e.currentTarget)}>
+                        <EmojiIcon />
+                    </IconButton>
                     <TextField
                         fullWidth multiline maxRows={4} size="small" placeholder="Type a message"
                         value={message} onChange={handleTyping} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
@@ -500,6 +536,33 @@ const SellerChatWidget = () => {
                     {selectedMsg?.sender._id === userInfo._id && (
                         <MenuItem onClick={() => handleDelete('everyone')} sx={{ color: 'error.main' }}><ListItemIcon><DeleteIcon fontSize="small" color="error" /></ListItemIcon>Delete for everyone</MenuItem>
                     )}
+                </Menu>
+
+                {/* ✅ NEW: Emoji Picker Menu */}
+                <Menu 
+                    anchorEl={emojiAnchorEl} 
+                    open={Boolean(emojiAnchorEl)} 
+                    onClose={() => setEmojiAnchorEl(null)}
+                    PaperProps={{
+                        sx: {
+                            maxWidth: 320,
+                            maxHeight: 300,
+                            overflow: 'auto'
+                        }
+                    }}
+                >
+                    <Box sx={{ p: 1, display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 0.5 }}>
+                        {commonEmojis.map((emoji, index) => (
+                            <IconButton
+                                key={index}
+                                size="small"
+                                onClick={() => handleEmojiSelect(emoji)}
+                                sx={{ fontSize: '1.5rem', p: 0.5 }}
+                            >
+                                {emoji}
+                            </IconButton>
+                        ))}
+                    </Box>
                 </Menu>
             </Drawer>
         </Box>
