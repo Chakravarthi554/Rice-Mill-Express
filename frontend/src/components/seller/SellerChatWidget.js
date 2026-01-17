@@ -213,6 +213,9 @@ const SellerChatWidget = () => {
             await sendMessage(null, uploadResults);
         } catch (error) {
             console.error('Upload failed', error);
+            // ✅ FIX BUG #3: Better error message for file upload failures
+            const errorMsg = error.response?.data?.message || 'File upload failed. Please check your internet connection and try again.';
+            alert(errorMsg);
         } finally {
             setUploading(false);
             if (fileInputRef.current) fileInputRef.current.value = '';

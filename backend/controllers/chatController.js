@@ -197,7 +197,21 @@ exports.toggleStar = asyncHandler(async (req, res) => {
     }
 
     await message.save();
-    res.json(message);
+    
+    // ✅ FIX BUG #5: Broadcast star updates via Socket.IO
+    const populatedMessage = await Message.findById(message._id).populate(POPULATE_MESSAGE);
+    const io = req.app.get('io');
+    if (io) {
+        const conversation = await Conversation.findById(message.conversationId);
+        if (conversation) {
+            conversation.participants.forEach(uid => {
+                io.to(`user_${uid}`).emit('chat:message_updated', populatedMessage);
+            });
+            io.to('admin_room').emit('chat:message_updated', populatedMessage);
+        }
+    }
+    
+    res.json(populatedMessage);
 });
 
 // @desc    Toggle Pin on Message
@@ -221,7 +235,18 @@ exports.toggleMessagePin = asyncHandler(async (req, res) => {
     }
 
     await message.save();
-    res.json(message);
+    
+    // ✅ FIX BUG #5: Broadcast pin updates via Socket.IO
+    const populatedMessage = await Message.findById(message._id).populate(POPULATE_MESSAGE);
+    const io = req.app.get('io');
+    if (io) {
+        conv.participants.forEach(uid => {
+            io.to(`user_${uid}`).emit('chat:message_updated', populatedMessage);
+        });
+        io.to('admin_room').emit('chat:message_updated', populatedMessage);
+    }
+    
+    res.json(populatedMessage);
 });
 
 // @desc    Get Conversations

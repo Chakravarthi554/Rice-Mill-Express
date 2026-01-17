@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
+import {  
   Box,
   Paper,
   Typography,
@@ -14,7 +14,13 @@ import {
   ListItemText,
   Divider,
   Collapse,
-  Tooltip
+  Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Grid
 } from '@mui/material';
 import {
   Send as SendIcon,
@@ -53,6 +59,7 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [emojiAnchorEl, setEmojiAnchorEl] = useState(null); // ✅ NEW: Emoji picker state
+  const [showProfile, setShowProfile] = useState(false); // ✅ FIX BUG #7: Profile dialog state
 
   const scrollRef = useRef();
   const fileInputRef = useRef();
@@ -166,13 +173,24 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
       };
       const { data: uploadResults } = await axios.post('/api/upload/chat/multiple', formData, config);
       await handleSend(null, uploadResults);
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+      console.error(e); 
+      // ✅ FIX BUG #3: Better error message for file upload failures
+      const errorMsg = e.response?.data?.message || 'File upload failed. Please check your internet connection and try again.';
+      alert(errorMsg);
+    }
     finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
   };
 
   const handleSend = async (content, attachments = []) => {
     const msgContent = content || message;
     if (!msgContent.trim() && attachments.length === 0) return;
+
+    // ✅ FIX BUG #8: Prevent sending in disabled chats
+    if (conversation.isDisabled) {
+      alert('This chat is disabled. You cannot send messages.');
+      return;
+    }
 
     if (editingMsg) {
       try {
@@ -216,6 +234,12 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
   };
 
   const handleDelete = async (mode) => {
+    // ✅ FIX BUG #8: Prevent deletion in disabled chats (unless admin override)
+    if (conversation.isDisabled && currentUser.role !== 'admin') {
+      alert('This chat is disabled. You cannot delete messages.');
+      return;
+    }
+    
     try {
       const config = { headers: { Authorization: `Bearer ${currentUser.token}` } };
       await axios.delete(`/api/chat/message/${selectedMsg._id}?mode=${mode}`, config);
@@ -239,6 +263,13 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
 
   const handleClearChat = async () => {
     if (!conversation._id) return;
+    
+    // ✅ FIX BUG #8: Prevent clearing disabled chats
+    if (conversation.isDisabled && currentUser.role !== 'admin') {
+      alert('This chat is disabled. You cannot clear messages.');
+      return;
+    }
+    
     try {
       const config = { headers: { Authorization: `Bearer ${currentUser.token}` } };
       await axios.put(`/api/chat/clear/${conversation._id}`, {}, config);
@@ -306,10 +337,19 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
           <Box>
             <Tooltip title="Search Messages"><IconButton size="small" onClick={() => setShowSearch(!showSearch)}><SearchIcon /></IconButton></Tooltip>
             <Tooltip title="Clear Chat"><IconButton size="small" onClick={handleClearChat}><DeleteIcon color="error" /></IconButton></Tooltip>
-            {/* <Tooltip title="Select Messages"><IconButton size="small" onClick={() => setSelectionMode(true)}><DeleteIcon /></IconButton></Tooltip> */}
-            <Tooltip title="Seller Profile"><IconButton size="small"><PersonIcon /></IconButton></Tooltip>
+            {/* ✅ FIX BUG #7: Wire profile view */}
+            <Tooltip title="Seller Profile"><IconButton size="small" onClick={() => setShowProfile(true)}><PersonIcon /></IconButton></Tooltip>
             <IconButton size="small" onClick={onClose}><CloseIcon /></IconButton>
           </Box>
+        </Box>
+      )}
+
+      {/* ✅ FIX BUG #8: Disabled chat warning */}
+      {conversation.isDisabled && (
+        <Box sx={{ p: 1, bgcolor: '#ffebee', borderBottom: 1, borderColor: '#ffcdd2', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography variant="caption" color="error" fontWeight="bold">
+            ⚠️ This chat is disabled. {currentUser.role === 'admin' ? 'Only admins can send messages.' : 'You cannot send or delete messages.'}
+          </Typography>
         </Box>
       )}
 
@@ -480,6 +520,69 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
           ))}
         </Box>
       </Menu>
+
+      {/* ✅ FIX BUG #7: Seller Profile Dialog */}
+      <Dialog open={showProfile} onClose={() => setShowProfile(false)} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ bgcolor: 'primary.main', color: 'white' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Avatar src={otherUser.profileImage} sx={{ width: 56, height: 56 }}>
+              {otherUser.name?.[0]}
+            </Avatar>
+            <Box>
+              <Typography variant="h6">{otherUser.name || 'Seller'}</Typography>
+              <Typography variant="caption">{otherUser.role || 'Seller'}</Typography>
+            </Box>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <Typography variant="subtitle2" color="text.secondary">Email</Typography>
+              <Typography variant="body1">{otherUser.email || 'N/A'}</Typography>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <Typography variant="subtitle2" color="text.secondary">Phone</Typography>
+              <Typography variant="body1">{otherUser.phone || 'N/A'}</Typography>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <Typography variant="subtitle2" color="text.secondary">Business Name</Typography>
+              <Typography variant="body1">{otherUser.businessDetails?.businessName || 'N/A'}</Typography>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <Typography variant="subtitle2" color="text.secondary">Business Type</Typography>
+              <Typography variant="body1">{otherUser.businessDetails?.businessType || 'N/A'}</Typography>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <Typography variant="subtitle2" color="text.secondary">GST Number</Typography>
+              <Typography variant="body1">{otherUser.businessDetails?.gstNumber || 'N/A'}</Typography>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <Typography variant="subtitle2" color="text.secondary">PAN Number</Typography>
+              <Typography variant="body1">{otherUser.businessDetails?.panNumber || 'N/A'}</Typography>
+            </Grid>
+            <Grid item xs={12}>
+              <Typography variant="subtitle2" color="text.secondary">Address</Typography>
+              <Typography variant="body1">
+                {otherUser.businessDetails?.address?.street ? 
+                  `${otherUser.businessDetails.address.street}, ${otherUser.businessDetails.address.city}, ${otherUser.businessDetails.address.state} ${otherUser.businessDetails.address.pinCode}` 
+                  : 'N/A'}
+              </Typography>
+            </Grid>
+            <Grid item xs={12}>
+              <Typography variant="subtitle2" color="text.secondary">Status</Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                <CircleIcon sx={{ fontSize: 10, color: otherUser.isOnline ? '#4caf50' : '#bdbdbd' }} />
+                <Typography variant="body2">
+                  {otherUser.isOnline ? 'Online' : otherUser.lastActive ? `Last seen ${new Date(otherUser.lastActive).toLocaleString()}` : 'Offline'}
+                </Typography>
+              </Box>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowProfile(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </Paper>
   );
 };
