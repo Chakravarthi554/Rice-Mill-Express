@@ -37,12 +37,12 @@ exports.sendMessage = asyncHandler(async (req, res) => {
     });
 
     if (!conversation) {
-        // ✅ FIX: Only admin can start conversations
-        if (req.user.role !== 'admin') {
+        // ✅ FIX: Only admin can start conversations (unless receiver is admin)
+        if (req.user.role !== 'admin' && receiver.role !== 'admin') {
             res.status(403);
-            throw new Error('Only admins can start new conversations. Please wait for admin to contact you.');
+            throw new Error('Only admins can start new conversations with users. If you need support, please contact an admin.');
         }
-        
+
         conversation = await Conversation.create({
             participants: [senderId, receiverId],
             startedBy: senderId,
@@ -115,16 +115,16 @@ exports.sendMessage = asyncHandler(async (req, res) => {
         // ✅ CRITICAL FIX: Always broadcast to admin_room regardless of who is admin
         io.to('admin_room').emit('chat:message', { message: populatedMessage, conversationId: conversation._id });
         io.to('admin_room').emit('chat:conversation_update', populatedConversation);
-        
+
         // ✅ FIX: If receiver is admin, ensure they get it even if not in admin_room
         if (receiver.role === 'admin') {
             io.to(`user_${receiverId}`).emit('chat:admin_new_message', { message: populatedMessage, conversationId: conversation._id });
         }
-        
+
         // ✅ FIX: If sender is seller, notify all admins
         if (req.user.role === 'seller') {
-            io.to('admin_room').emit('chat:seller_message', { 
-                message: populatedMessage, 
+            io.to('admin_room').emit('chat:seller_message', {
+                message: populatedMessage,
                 conversationId: conversation._id,
                 sellerId: senderId,
                 sellerName: req.user.name
@@ -306,7 +306,7 @@ exports.deleteMessage = asyncHandler(async (req, res) => {
         if (!isSender && !isAdmin) {
             res.status(401); throw new Error('Not authorized to delete for everyone');
         }
-        
+
         // ✅ FIX: Mark as deleted for everyone instead of truly deleting
         message.isDeletedForEveryone = true;
         message.content = 'This message was deleted';
@@ -320,13 +320,13 @@ exports.deleteMessage = asyncHandler(async (req, res) => {
             const conv = await Conversation.findById(message.conversationId);
             if (conv) {
                 conv.participants.forEach(pid => {
-                    io.to(`user_${pid}`).emit('chat:message_deleted', { 
+                    io.to(`user_${pid}`).emit('chat:message_deleted', {
                         messageId: message._id,
                         mode: 'everyone'
                     });
                 });
                 // Also broadcast to admin_room
-                io.to('admin_room').emit('chat:message_deleted', { 
+                io.to('admin_room').emit('chat:message_deleted', {
                     messageId: message._id,
                     mode: 'everyone'
                 });
