@@ -1022,5 +1022,6 @@ module.exports = {
   deleteUser,
   bookmarkPost,
   unbookmarkPost,
-  getBookmarks
+  getBookmarks,
+  getAdmins  // ✅ FIX: Added missing export
 };

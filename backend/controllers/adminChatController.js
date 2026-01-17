@@ -6,7 +6,7 @@ const User = require('../models/User');
 // @desc    Admin starts a conversation with a user (seller/customer)
 // @route   POST /api/admin/chat/start
 // @access  Private/Admin
-exports.startConversation = asyncHandler(async (req, res) => {
+const startConversation = asyncHandler(async (req, res) => {
     const { userId, initialMessage } = req.body;
 
     if (!userId) {
@@ -78,7 +78,7 @@ exports.startConversation = asyncHandler(async (req, res) => {
 // @desc    Get all users available for chat (sellers, customers)
 // @route   GET /api/admin/chat/available-users
 // @access  Private/Admin
-exports.getAvailableUsers = asyncHandler(async (req, res) => {
+const getAvailableUsers = asyncHandler(async (req, res) => {
     const { search, role, page = 1, limit = 20 } = req.query;
     const skip = (page - 1) * limit;
 
@@ -118,7 +118,7 @@ exports.getAvailableUsers = asyncHandler(async (req, res) => {
 // @desc    Archive/Unarchive conversation
 // @route   PUT /api/admin/chat/archive/:conversationId
 // @access  Private/Admin
-exports.toggleArchive = asyncHandler(async (req, res) => {
+const toggleArchive = asyncHandler(async (req, res) => {
     const conversation = await Conversation.findById(req.params.conversationId);
     
     if (!conversation) {
