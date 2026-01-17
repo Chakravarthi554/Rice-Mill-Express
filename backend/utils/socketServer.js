@@ -78,7 +78,8 @@ const setupSocketServer = (server) => {
     }
     if (socket.role === 'seller') {
       socket.join(`seller_${socket.userId}`);
-      logger.info(`👨‍💼 Seller ${socket.userId} joined seller room`);
+      socket.join('sellers_room'); // ✅ FIX: Global seller room for admin broadcasts
+      logger.info(`👨‍💼 Seller ${socket.userId} joined seller rooms`);
     }
 
     // 🟢 PRESENCE: Broadcast online status
@@ -371,7 +372,7 @@ const setupSocketServer = (server) => {
       try {
         const Message = require('../models/Message');
         const message = await Message.findById(messageId);
-        
+
         if (message && message.receiver.toString() === socket.userId && message.status === 'sent') {
           message.status = 'delivered';
           message.deliveredAt = new Date();
@@ -383,7 +384,7 @@ const setupSocketServer = (server) => {
             conversationId,
             deliveredAt: message.deliveredAt
           });
-          
+
           logger.info(`✅ Message ${messageId} marked as delivered`);
         }
       } catch (error) {
@@ -396,17 +397,17 @@ const setupSocketServer = (server) => {
       try {
         const Message = require('../models/Message');
         const Conversation = require('../models/Conversation');
-        
+
         // Update messages to read status
         await Message.updateMany(
-          { 
-            _id: { $in: messageIds }, 
+          {
+            _id: { $in: messageIds },
             receiver: socket.userId,
             status: { $ne: 'read' }
           },
-          { 
-            status: 'read', 
-            readAt: new Date() 
+          {
+            status: 'read',
+            readAt: new Date()
           }
         );
 
@@ -427,7 +428,7 @@ const setupSocketServer = (server) => {
             });
           }
         }
-        
+
         logger.info(`✅ ${messageIds.length} messages marked as read in conversation ${conversationId}`);
       } catch (error) {
         logger.error('Error marking messages as read:', error);

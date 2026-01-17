@@ -53,7 +53,7 @@ exports.sendMessage = asyncHandler(async (req, res) => {
     // Check if disabled
     if (conversation.isDisabled && req.user.role !== 'admin') {
         res.status(403);
-        throw new Error('This chat has been disabled by admin');
+        throw new Error('You are unable to chat with our company');
     }
 
     // 2. Create Message
@@ -106,30 +106,16 @@ exports.sendMessage = asyncHandler(async (req, res) => {
 
     const io = req.app.get('io');
     if (io) {
-        // ✅ FIX: Broadcast to both participants via their user rooms
+        // ✅ FIX: Consolidated broadcast to prevent duplicate messages (was causing 3x sends)
+        // Broadcast to both participants via their user rooms
         [senderId, receiverId].forEach(uid => {
             io.to(`user_${uid}`).emit('chat:message', { message: populatedMessage, conversationId: conversation._id });
             io.to(`user_${uid}`).emit('chat:conversation_update', populatedConversation);
         });
 
-        // ✅ CRITICAL FIX: Always broadcast to admin_room regardless of who is admin
+        // Broadcast to admin_room for monitoring (single emission only)
         io.to('admin_room').emit('chat:message', { message: populatedMessage, conversationId: conversation._id });
         io.to('admin_room').emit('chat:conversation_update', populatedConversation);
-
-        // ✅ FIX: If receiver is admin, ensure they get it even if not in admin_room
-        if (receiver.role === 'admin') {
-            io.to(`user_${receiverId}`).emit('chat:admin_new_message', { message: populatedMessage, conversationId: conversation._id });
-        }
-
-        // ✅ FIX: If sender is seller, notify all admins
-        if (req.user.role === 'seller') {
-            io.to('admin_room').emit('chat:seller_message', {
-                message: populatedMessage,
-                conversationId: conversation._id,
-                sellerId: senderId,
-                sellerName: req.user.name
-            });
-        }
     }
 
     res.status(201).json(populatedMessage);
@@ -197,7 +183,7 @@ exports.toggleStar = asyncHandler(async (req, res) => {
     }
 
     await message.save();
-    
+
     // ✅ FIX BUG #5: Broadcast star updates via Socket.IO
     const populatedMessage = await Message.findById(message._id).populate(POPULATE_MESSAGE);
     const io = req.app.get('io');
@@ -210,7 +196,7 @@ exports.toggleStar = asyncHandler(async (req, res) => {
             io.to('admin_room').emit('chat:message_updated', populatedMessage);
         }
     }
-    
+
     res.json(populatedMessage);
 });
 
@@ -235,7 +221,7 @@ exports.toggleMessagePin = asyncHandler(async (req, res) => {
     }
 
     await message.save();
-    
+
     // ✅ FIX BUG #5: Broadcast pin updates via Socket.IO
     const populatedMessage = await Message.findById(message._id).populate(POPULATE_MESSAGE);
     const io = req.app.get('io');
@@ -245,7 +231,7 @@ exports.toggleMessagePin = asyncHandler(async (req, res) => {
         });
         io.to('admin_room').emit('chat:message_updated', populatedMessage);
     }
-    
+
     res.json(populatedMessage);
 });
 
@@ -398,13 +384,35 @@ exports.toggleAction = asyncHandler(async (req, res) => {
         case 'disable':
             if (req.user.role !== 'admin') { res.status(403); throw new Error('Admin only'); }
             conversation.isDisabled = !conversation.isDisabled; // Toggle
+
+            // ✅ FIX: Broadcast state change to all participants in real-time
+            const io = req.app.get('io');
+            if (io) {
+                const eventName = conversation.isDisabled ? 'chat:conversation_disabled' : 'chat:conversation_enabled';
+                conversation.participants.forEach(pid => {
+                    io.to(`user_${pid}`).emit(eventName, {
+                        conversationId: conversation._id,
+                        isDisabled: conversation.isDisabled
+                    });
+                });
+                io.to('admin_room').emit('chat:conversation_state_changed', {
+                    conversationId: conversation._id,
+                    isDisabled: conversation.isDisabled
+                });
+            }
             break;
         default:
             res.status(400); throw new Error('Invalid action');
     }
 
     await conversation.save();
-    res.json(conversation);
+
+    // ✅ FIX: Populate conversation before sending response for complete data
+    const populatedConversation = await Conversation.findById(conversation._id)
+        .populate('participants', 'name profileImage role isOnline lastActive')
+        .populate('lastMessage');
+
+    res.json(populatedConversation);
 });
 
 // @desc    Mark Read
@@ -428,19 +436,19 @@ exports.markAsRead = asyncHandler(async (req, res) => {
         if (io && otherId) {
             io.to(`user_${otherId}`).emit('chat:read_receipt', { conversationId });
         }
-        
+
         // ✅ FIX BUG #6: Notify all conversation participants about read status change
         conversation.participants.forEach(pid => {
-            io.to(`user_${pid}`).emit('chat:message_read', { 
+            io.to(`user_${pid}`).emit('chat:message_read', {
                 conversationId,
-                userId: req.user._id 
+                userId: req.user._id
             });
         });
-        
+
         // Also emit to admin room for admin dashboard
-        io.to('admin_room').emit('chat:message_read', { 
+        io.to('admin_room').emit('chat:message_read', {
             conversationId,
-            userId: req.user._id 
+            userId: req.user._id
         });
     }
     res.json({ success: true });

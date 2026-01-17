@@ -32,12 +32,12 @@ const getAdminConversations = asyncHandler(async (req, res) => {
     const conversationsMap = new Map();
 
     allMessages.forEach(message => {
-      const otherUserId = message.sender._id.toString() === req.user._id.toString() 
-        ? message.receiver._id.toString() 
+      const otherUserId = message.sender._id.toString() === req.user._id.toString()
+        ? message.receiver._id.toString()
         : message.sender._id.toString();
 
-      const otherUser = message.sender._id.toString() === req.user._id.toString() 
-        ? message.receiver 
+      const otherUser = message.sender._id.toString() === req.user._id.toString()
+        ? message.receiver
         : message.sender;
 
       if (!conversationsMap.has(otherUserId)) {
@@ -55,7 +55,7 @@ const getAdminConversations = asyncHandler(async (req, res) => {
 
       const conversation = conversationsMap.get(otherUserId);
       conversation.messageCount++;
-      
+
       // Update last message if this one is newer
       if (message.createdAt > conversation.lastMessage.createdAt) {
         conversation.lastMessage = message;
@@ -78,7 +78,7 @@ const getAdminConversations = asyncHandler(async (req, res) => {
 
     // Apply search filter
     if (search) {
-      conversations = conversations.filter(conv => 
+      conversations = conversations.filter(conv =>
         conv.user.name.toLowerCase().includes(search.toLowerCase()) ||
         conv.user.email.toLowerCase().includes(search.toLowerCase()) ||
         (conv.lastMessage.content && conv.lastMessage.content.toLowerCase().includes(search.toLowerCase()))
@@ -120,9 +120,9 @@ const getAdminConversations = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching admin conversations:', error);
-    res.status(500).json({ 
-      message: 'Error fetching conversations', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Error fetching conversations',
+      error: error.message
     });
   }
 });
@@ -174,8 +174,9 @@ const getConversationWithUser = asyncHandler(async (req, res) => {
     );
 
     // Get user details and related orders
+    // ✅ FIX: Include businessDetails for seller profile display in admin chat
     const userDetails = await User.findById(userId)
-      .select('name email role profileImage kycStatus lastActive');
+      .select('name email role profileImage kycStatus lastActive isOnline businessDetails');
 
     const recentOrders = await Order.find({ user: userId })
       .sort({ createdAt: -1 })
@@ -197,9 +198,9 @@ const getConversationWithUser = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching conversation:', error);
-    res.status(500).json({ 
-      message: 'Error fetching conversation', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Error fetching conversation',
+      error: error.message
     });
   }
 });
@@ -250,18 +251,18 @@ const adminSendMessage = asyncHandler(async (req, res) => {
       title: 'Admin Message',
       message: content || 'You have a new message from admin',
       type: 'admin_message',
-      data: { 
+      data: {
         messageId: message._id,
-        adminId: req.user._id 
+        adminId: req.user._id
       }
     });
 
     res.status(201).json(populatedMessage);
   } catch (error) {
     console.error('Error sending admin message:', error);
-    res.status(500).json({ 
-      message: 'Error sending message', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Error sending message',
+      error: error.message
     });
   }
 });
@@ -282,9 +283,9 @@ const markConversationResolved = asyncHandler(async (req, res) => {
           { sender: userId, receiver: req.user._id }
         ]
       },
-      { 
+      {
         status: 'read',
-        $set: { 
+        $set: {
           'metadata.resolved': true,
           'metadata.resolvedAt': new Date(),
           'metadata.resolvedBy': req.user._id,
@@ -302,15 +303,15 @@ const markConversationResolved = asyncHandler(async (req, res) => {
       resolutionNotes
     });
 
-    res.json({ 
+    res.json({
       message: 'Conversation marked as resolved',
       resolvedAt: new Date()
     });
   } catch (error) {
     console.error('Error resolving conversation:', error);
-    res.status(500).json({ 
-      message: 'Error resolving conversation', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Error resolving conversation',
+      error: error.message
     });
   }
 });
@@ -385,9 +386,9 @@ const getMessageStats = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching message stats:', error);
-    res.status(500).json({ 
-      message: 'Error fetching message statistics', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Error fetching message statistics',
+      error: error.message
     });
   }
 });

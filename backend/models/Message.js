@@ -21,11 +21,26 @@ const messageSchema = new mongoose.Schema({
   orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', default: null },
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', default: null },
   image: { type: String, default: null }, // Legacy support
+  // ✅ FIX: Enhanced attachment support with MIME type validation
   attachments: [{
     url: { type: String, required: true },
     filename: { type: String, required: true },
     size: { type: Number },
-    mimeType: { type: String },
+    mimeType: {
+      type: String,
+      validate: {
+        validator: function (v) {
+          if (!v) return true; // Optional field
+          const allowedTypes = [
+            'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
+            'application/pdf', 'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+          ];
+          return allowedTypes.includes(v);
+        },
+        message: 'Unsupported file type. Allowed: JPEG, PNG, GIF, WEBP, PDF, DOC, DOCX'
+      }
+    },
     type: { type: String, enum: ['image', 'document', 'video', 'audio'] }
   }],
 
