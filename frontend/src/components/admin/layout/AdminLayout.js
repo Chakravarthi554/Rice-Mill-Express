@@ -9,7 +9,8 @@ import {
   LocalShipping as LocalShippingIcon, Forum as ForumIcon,
   Payments as PaymentsIcon, RestaurantMenu as RestaurantMenuIcon,
   Settings as SettingsIcon, Message as MessageIcon,
-  Security as SecurityIcon, Report as ReportIcon
+  Security as SecurityIcon, Report as ReportIcon,
+  People as PeopleIcon, ShoppingCart as ShoppingCartIcon
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../../context/AuthContext';
@@ -23,6 +24,8 @@ const iconMap = {
   LocalShipping: LocalShippingIcon,
   RestaurantMenu: RestaurantMenuIcon,
   Forum: ForumIcon,
+  People: PeopleIcon,
+  ShoppingCart: ShoppingCartIcon,
   Settings: SettingsIcon,
   Message: MessageIcon,
   Security: SecurityIcon,
@@ -41,18 +44,34 @@ const AdminLayout = ({ tabs, title }) => {
       socket.on('NEW_MESSAGE', (msg) => setNotifications(prev => [...prev.slice(-5), { ...msg, time: new Date() }]));
       socket.on('PAYMENT_ALERT', (alert) => setNotifications(prev => [...prev.slice(-5), { ...alert, time: new Date() }]));
     }
-    return () => socket && socket.off();
-  }, []);
+
+    // ✅ FIXED: Handle hash-based navigation
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '');
+      if (hash) {
+        const index = tabs.findIndex(t => t.label.toLowerCase().includes(hash.toLowerCase()));
+        if (index !== -1) setTabValue(index);
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    handleHashChange(); // Initial check
+
+    return () => {
+      if (socket) socket.off();
+      window.removeEventListener('hashchange', handleHashChange);
+    };
+  }, [tabs]);
 
   return (
-    <Box sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', minHeight: '100vh' }}>
-      <AppBar position="static" sx={{ background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)' }}>
+    <Box sx={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', minHeight: '100vh' }}>
+      <AppBar position="sticky" sx={{ background: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
         <Toolbar sx={{ justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <motion.div whileHover={{ scale: 1.1 }}>
-              <DashboardIcon sx={{ fontSize: 32, color: '#667eea' }} />
+              <DashboardIcon sx={{ fontSize: 32, color: '#38bdf8' }} />
             </motion.div>
-            <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#333' }}>{title}</Typography>
+            <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'white' }}>{title}</Typography>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <NotificationBadge />
@@ -64,12 +83,24 @@ const AdminLayout = ({ tabs, title }) => {
       </AppBar>
 
       <Container maxWidth="xl" sx={{ mt: 4 }}>
-        <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)} variant="scrollable"
+        <Tabs
+          value={tabValue}
+          onChange={(_, v) => setTabValue(v)}
+          variant="scrollable"
           sx={{
+            mb: 2,
             '& .MuiTab-root': {
               textTransform: 'none', fontWeight: 600, borderRadius: '12px',
-              margin: '0 4px', background: 'rgba(255,255,255,0.2)',
-              '&.Mui-selected': { background: 'linear-gradient(45deg, #FE6B8B 30%, #FF8E53 90%)', color: 'white' }
+              margin: '0 6px', color: 'rgba(255,255,255,0.7)',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              '&.Mui-selected': {
+                background: 'rgba(56, 189, 248, 0.2)',
+                color: '#38bdf8',
+                border: '1px solid rgba(56, 189, 248, 0.3)'
+              },
+              '&:hover': {
+                background: 'rgba(255,255,255,0.05)',
+              }
             },
             '& .MuiTabs-indicator': { display: 'none' }
           }}>

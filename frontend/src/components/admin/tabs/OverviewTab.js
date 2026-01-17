@@ -14,7 +14,8 @@ import {
   Avatar,
   LinearProgress,
   IconButton,
-  Tooltip
+  Tooltip,
+  Paper
 } from '@mui/material';
 import {
   People as PeopleIcon,
@@ -35,34 +36,32 @@ import {
   Backup as BackupIcon,
   AccessTime as AccessTimeIcon,
   ThumbUp as ThumbUpIcon,
-  Comment as CommentIcon,
-  Favorite as FavoriteIcon
+  Comment as CommentIcon
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom'; // ADDED FOR NAVIGATION
+import { useNavigate } from 'react-router-dom';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip as ChartTooltip, Legend } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
 import { getDashboardStats, getRealTimeActivities } from '../../../redux/actions/adminActions';
-import AnimatedStatCard from '../../common/AnimatedStatCard';
 
 // Register ChartJS components
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, ChartTooltip, Legend);
 
 const OverviewTab = () => {
   const dispatch = useDispatch();
-  const navigate = useNavigate(); // ADDED FOR NAVIGATION
+  const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [refreshing, setRefreshing] = useState(false);
 
-  const { 
-    stats = {}, 
-    topSellingRice = [], 
-    topSellers = [], 
-    monthlyRevenue = [], 
-    growthPercentage = 0, 
+  const {
+    stats = {},
+    topSellingRice = [],
+    topSellers = [],
+    monthlyRevenue = [],
+    growthPercentage = 0,
     systemHealth = {},
-    loading 
+    loading
   } = useSelector((state) => state.adminDashboardStats);
 
   const { activities = [] } = useSelector((state) => state.adminActivities);
@@ -75,13 +74,8 @@ const OverviewTab = () => {
 
   useEffect(() => {
     loadData();
-    const interval = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-
-    const dataInterval = setInterval(() => {
-      loadData();
-    }, 30000); // Refresh every 30 seconds
+    const interval = setInterval(() => setCurrentTime(new Date()), 1000);
+    const dataInterval = setInterval(() => loadData(), 15000); // Poll every 15s
 
     return () => {
       clearInterval(interval);
@@ -103,165 +97,120 @@ const OverviewTab = () => {
     }
   };
 
-  // FIXED: Navigation functions for quick actions
   const handleQuickAction = (path) => {
-    switch (path) {
-      case '#users':
-        navigate('/admin/users'); // You'll need to create this route
-        break;
-      case '#orders':
-        navigate('/admin/orders'); // You'll need to create this route
-        break;
-      case '#moderation':
-        // Switch to moderation tab using URL hash
-        window.location.hash = 'moderation';
-        break;
-      case '#payments':
-        // Switch to payments tab using URL hash
-        window.location.hash = 'payments';
-        break;
-      default:
-        console.log('Navigation not implemented for:', path);
+    if (path.startsWith('#')) {
+      window.location.hash = path.replace('#', '');
+      window.scrollTo(0, 0);
+    } else {
+      navigate(path);
     }
   };
 
-  // FIXED: Moderation navigation functions
   const handleModerationClick = (type) => {
     window.location.hash = 'moderation';
-    // You can add logic to pre-filter the moderation tab based on type
-    console.log(`Navigating to moderation for: ${type}`);
+    window.scrollTo(0, 0);
   };
 
-  const formatTime = (date) => {
-    return date.toLocaleTimeString('en-US', {
-      hour12: true,
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
-  };
-
-  const formatDate = (date) => {
-    return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
+  const formatTime = (date) => date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const formatDate = (date) => date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   const getActivityIcon = (type) => {
     switch (type) {
-      case 'ORDER_PLACED':
-        return <ShoppingCartIcon color="primary" />;
-      case 'NEW_CHAT_MESSAGE':
-        return <CommentIcon color="info" />;
-      case 'POST_APPROVED':
-        return <ThumbUpIcon color="success" />;
-      case 'RECIPE_SUBMITTED':
-        return <RestaurantMenuIcon color="warning" />;
-      default:
-        return <NotificationsIcon color="action" />;
+      case 'ORDER_PLACED': return <ShoppingCartIcon sx={{ color: '#38bdf8' }} />;
+      case 'NEW_CHAT_MESSAGE': return <CommentIcon sx={{ color: '#818cf8' }} />;
+      case 'POST_APPROVED': return <ThumbUpIcon sx={{ color: '#4ade80' }} />;
+      case 'RECIPE_SUBMITTED': return <RestaurantMenuIcon sx={{ color: '#fbbf24' }} />;
+      default: return <NotificationsIcon sx={{ color: '#94a3b8' }} />;
     }
   };
 
   const getHealthColor = (status) => {
-    switch (status) {
+    switch (status?.toLowerCase()) {
       case 'healthy':
       case 'connected':
-      case 'completed':
-        return 'success';
-      case 'warning':
-        return 'warning';
-      case 'error':
-        return 'error';
-      default:
-        return 'default';
+      case 'completed': return 'success';
+      case 'warning': return 'warning';
+      case 'error': return 'error';
+      default: return 'default';
     }
   };
 
-  // FIXED: Ensure chart data is properly formatted
   const chartData = {
-    labels: monthlyRevenue && monthlyRevenue.length > 0 
-      ? monthlyRevenue.map(item => item.month) 
-      : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-    datasets: [
-      {
-        label: 'Monthly Revenue (₹)',
-        data: monthlyRevenue && monthlyRevenue.length > 0 
-          ? monthlyRevenue.map(item => item.revenue) 
-          : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        backgroundColor: 'rgba(76, 175, 80, 0.6)',
-        borderColor: 'rgba(76, 175, 80, 1)',
-        borderWidth: 2,
-        borderRadius: 8,
-      },
-    ],
+    labels: monthlyRevenue.length > 0 ? monthlyRevenue.map(item => item.month) : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+    datasets: [{
+      label: 'Revenue (₹)',
+      data: monthlyRevenue.length > 0 ? monthlyRevenue.map(item => item.revenue) : [0, 0, 0, 0, 0, 0],
+      backgroundColor: 'rgba(56, 189, 248, 0.6)',
+      borderColor: '#38bdf8',
+      borderWidth: 2,
+      borderRadius: 8,
+    }],
   };
 
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: {
-        position: 'top',
-      },
-      title: {
-        display: true,
-        text: 'Monthly Revenue Overview',
-      },
+      legend: { labels: { color: 'rgba(255,255,255,0.7)' } },
+      title: { display: false }
     },
     scales: {
-      y: {
-        beginAtZero: true,
-        ticks: {
-          callback: function(value) {
-            return '₹' + value.toLocaleString();
-          },
-        },
-      },
-    },
+      y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(255,255,255,0.5)', callback: (v) => '₹' + v.toLocaleString() } },
+      x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.5)' } }
+    }
   };
 
-  // FIXED: Quick actions with proper navigation
-  const quickActions = [
-    { label: 'Manage Users', icon: PeopleIcon, color: 'primary', path: '#users' },
-    { label: 'View Orders', icon: ShoppingCartIcon, color: 'secondary', path: '#orders' },
-    { label: 'Moderate Content', icon: SecurityIcon, color: 'warning', path: '#moderation' },
-    { label: 'Payment Review', icon: PaymentIcon, color: 'success', path: '#payments' },
-  ];
-
-  if (loading && !refreshing) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <Typography>Loading dashboard...</Typography>
-      </Box>
-    );
-  }
+  const AppStatCard = ({ title, value, icon: Icon, trend }) => (
+    <motion.div whileHover={{ y: -5 }}>
+      <Card sx={{
+        height: '100%',
+        borderRadius: 4,
+        background: 'rgba(255, 255, 255, 0.03)',
+        backdropFilter: 'blur(10px)',
+        border: '1px solid rgba(255, 255, 255, 0.05)',
+        boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.3)'
+      }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+            <Box sx={{ p: 1, borderRadius: 2, background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8' }}>
+              <Icon />
+            </Box>
+            {trend !== undefined && (
+              <Chip
+                label={`${trend > 0 ? '+' : ''}${trend}%`}
+                size="small"
+                sx={{
+                  bgcolor: trend > 0 ? 'rgba(74, 222, 128, 0.1)' : 'rgba(248, 113, 113, 0.1)',
+                  color: trend > 0 ? '#4ade80' : '#f87171',
+                  fontWeight: 'bold'
+                }}
+              />
+            )}
+          </Box>
+          <Typography variant="h4" sx={{ color: 'white', fontWeight: 'bold', mb: 0.5 }}>{value}</Typography>
+          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 500 }}>{title}</Typography>
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
 
   return (
-    <Box sx={{ p: 3 }}>
-      {/* Header with Greeting and Refresh */}
+    <Box sx={{ p: 1 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Box>
-          <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: '#2e7d32' }}>
-            Good {currentTime.getHours() < 12 ? 'Morning' : currentTime.getHours() < 18 ? 'Afternoon' : 'Evening'}, Admin!
+          <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: 'white' }}>
+            Welcome back, Admin
           </Typography>
-          <Typography variant="h6" color="text.secondary">
+          <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.5)' }}>
             {formatDate(currentTime)} • {formatTime(currentTime)}
           </Typography>
         </Box>
-        <Tooltip title="Refresh Data">
-          <span> {/* FIXED: Added wrapper span for disabled button */}
-            <IconButton 
-              onClick={loadData} 
+        <Tooltip title="Refresh Dashboard">
+          <span>
+            <IconButton
+              onClick={loadData}
               disabled={refreshing}
-              sx={{ 
-                bgcolor: 'primary.main', 
-                color: 'white',
-                '&:hover': { bgcolor: 'primary.dark' },
-                '&:disabled': { bgcolor: 'grey.400' }
-              }}
+              sx={{ bgcolor: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', '&:hover': { bgcolor: 'rgba(56, 189, 248, 0.2)' } }}
             >
               <RefreshIcon />
             </IconButton>
@@ -269,351 +218,89 @@ const OverviewTab = () => {
         </Tooltip>
       </Box>
 
-      {refreshing && <LinearProgress sx={{ mb: 2 }} />}
+      {refreshing && <LinearProgress sx={{ mb: 3, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.05)', '& .MuiLinearProgress-bar': { bgcolor: '#38bdf8' } }} />}
 
-      {/* Stat Cards Grid */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <AnimatedStatCard
-            title="Total Users"
-            value={stats.totalUsers || 0}
-            icon={PeopleIcon}
-            color="#4caf50"
-            trend={12}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <AnimatedStatCard
-            title="Total Orders"
-            value={stats.totalOrders || 0}
-            icon={ShoppingCartIcon}
-            color="#2196f3"
-            trend={18}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <AnimatedStatCard
-            title="Active Sellers"
-            value={stats.activeSellers || 0}
-            icon={StoreIcon}
-            color="#ff9800"
-            trend={8}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <AnimatedStatCard
-            title="Active Customers"
-            value={stats.activeCustomers || 0}
-            icon={PersonIcon}
-            color="#9c27b0"
-            trend={15}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <AnimatedStatCard
-            title="Total Recipes"
-            value={stats.totalRecipes || 0}
-            icon={RestaurantMenuIcon}
-            color="#f44336"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <AnimatedStatCard
-            title="Forum Posts"
-            value={stats.totalForumPosts || 0}
-            icon={ForumIcon}
-            color="#673ab7"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <AnimatedStatCard
-            title="Total Revenue"
-            value={`₹${(stats.totalRevenue || 0).toLocaleString()}`}
-            icon={PaymentIcon}
-            color="#4caf50"
-            trend={parseFloat(growthPercentage)}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <AnimatedStatCard
-            title="Growth"
-            value={`${growthPercentage}%`}
-            icon={TrendingUpIcon}
-            color={growthPercentage >= 0 ? "#4caf50" : "#f44336"}
-          />
-        </Grid>
+        <Grid item xs={12} sm={6} md={3}><AppStatCard title="Total Users" value={stats.totalUsers || 0} icon={PeopleIcon} trend={12} /></Grid>
+        <Grid item xs={12} sm={6} md={3}><AppStatCard title="Total Orders" value={stats.totalOrders || 0} icon={ShoppingCartIcon} trend={18} /></Grid>
+        <Grid item xs={12} sm={6} md={3}><AppStatCard title="Active Sellers" value={stats.activeSellers || 0} icon={StoreIcon} trend={8} /></Grid>
+        <Grid item xs={12} sm={6} md={3}><AppStatCard title="Total Revenue" value={`₹${(stats.totalRevenue || 0).toLocaleString()}`} icon={PaymentIcon} trend={parseFloat(growthPercentage)} /></Grid>
       </Grid>
 
-      {/* Second Row: Charts and Activities */}
       <Grid container spacing={3}>
-        {/* Monthly Revenue Chart */}
         <Grid item xs={12} md={8}>
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-            <Card sx={{ height: '400px', borderRadius: 3 }}> {/* FIXED: Fixed height */}
-              <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="h6" fontWeight="bold">
-                    Revenue Analytics
-                  </Typography>
-                  <Chip 
-                    icon={<TrendingUpIcon />} 
-                    label={`${growthPercentage}% Growth`} 
-                    color={growthPercentage >= 0 ? "success" : "error"}
-                    variant="outlined"
-                  />
-                </Box>
-                <Box sx={{ flex: 1, minHeight: 0 }}> {/* FIXED: Flexible chart container */}
-                  <Bar data={chartData} options={chartOptions} />
-                </Box>
-              </CardContent>
-            </Card>
-          </motion.div>
+          <Card sx={{ height: 480, borderRadius: 4, background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+            <CardContent sx={{ height: '100%', p: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+                <Typography variant="h6" fontWeight="bold" color="white">Revenue Trends</Typography>
+                <Chip label={`${growthPercentage}% Growth`} sx={{ bgcolor: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', fontWeight: 'bold' }} />
+              </Box>
+              <Box sx={{ height: 'calc(100% - 60px)' }}>
+                <Bar data={chartData} options={chartOptions} />
+              </Box>
+            </CardContent>
+          </Card>
         </Grid>
 
-        {/* Real-time Activities */}
         <Grid item xs={12} md={4}>
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-            <Card sx={{ height: '400px', borderRadius: 3 }}> {/* FIXED: Fixed height */}
-              <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  Real-time Activities
-                </Typography>
-                <Box sx={{ flex: 1, overflow: 'auto' }}>
-                  <List>
-                    {activities.length > 0 ? activities.slice(0, 8).map((activity, index) => (
-                      <ListItem key={activity.id || index} divider>
-                        <ListItemIcon>
-                          {getActivityIcon(activity.type)}
-                        </ListItemIcon>
-                        <ListItemText
-                          primary={
-                            <Typography variant="body2" noWrap>
-                              {activity.message}
-                            </Typography>
-                          }
-                          secondary={
-                            <Typography variant="caption" color="text.secondary">
-                              {activity.timeAgo || new Date(activity.createdAt).toLocaleTimeString()}
-                            </Typography>
-                          }
-                        />
-                      </ListItem>
-                    )) : (
-                      <ListItem>
-                        <ListItemText primary="No recent activities" />
-                      </ListItem>
-                    )}
-                  </List>
-                </Box>
-              </CardContent>
-            </Card>
-          </motion.div>
-        </Grid>
-
-        {/* Third Row: Three Columns */}
-        <Grid item xs={12} md={4}>
-          {/* Pending Moderation */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-            <Card sx={{ borderRadius: 3, mb: 3 }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <WarningIcon color="warning" sx={{ mr: 1 }} />
-                  <Typography variant="h6" fontWeight="bold">
-                    Pending Moderation
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  {/* FIXED: Added onClick handlers for moderation chips */}
-                  <Chip 
-                    icon={<ForumIcon />} 
-                    label={`${pendingModeration.forumPosts} Forum Posts`} 
-                    color="warning" 
-                    variant="outlined"
-                    clickable
-                    onClick={() => handleModerationClick('forum')}
-                  />
-                  <Chip 
-                    icon={<RestaurantMenuIcon />} 
-                    label={`${pendingModeration.recipes} Recipes`} 
-                    color="warning" 
-                    variant="outlined"
-                    clickable
-                    onClick={() => handleModerationClick('recipes')}
-                  />
-                  <Chip 
-                    icon={<CommentIcon />} 
-                    label={`${pendingModeration.comments} Comments`} 
-                    color="warning" 
-                    variant="outlined"
-                    clickable
-                    onClick={() => handleModerationClick('comments')}
-                  />
-                </Box>
-                <Button 
-                  fullWidth 
-                  variant="outlined" 
-                  color="warning" 
-                  sx={{ mt: 2 }}
-                  onClick={() => handleModerationClick('all')}
-                >
-                  Review All
-                </Button>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Quick Actions */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
-            <Card sx={{ borderRadius: 3 }}>
-              <CardContent>
-                <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  Quick Actions
-                </Typography>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  {quickActions.map((action, index) => (
-                    <Button
-                      key={index}
-                      startIcon={<action.icon />}
-                      variant="outlined"
-                      color={action.color}
-                      fullWidth
-                      onClick={() => handleQuickAction(action.path)}
-                      sx={{ justifyContent: 'flex-start' }}
-                    >
-                      {action.label}
-                    </Button>
+          <Card sx={{ height: 480, borderRadius: 4, background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+            <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <Typography variant="h6" fontWeight="bold" color="white" gutterBottom>Recent Activities</Typography>
+              <Box sx={{ flex: 1, overflow: 'auto', mt: 1 }}>
+                <List disablePadding>
+                  {activities.map((activity, i) => (
+                    <ListItem key={i} sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', py: 1.5 }}>
+                      <ListItemIcon sx={{ minWidth: 45 }}>{getActivityIcon(activity.type)}</ListItemIcon>
+                      <ListItemText
+                        primary={<Typography variant="body2" color="white" noWrap>{activity.message}</Typography>}
+                        secondary={<Typography variant="caption" color="rgba(255,255,255,0.4)">{activity.timeAgo || 'Just now'}</Typography>}
+                      />
+                    </ListItem>
                   ))}
-                </Box>
-              </CardContent>
-            </Card>
-          </motion.div>
+                </List>
+              </Box>
+            </CardContent>
+          </Card>
         </Grid>
 
-        {/* Top Selling Rice Varieties */}
         <Grid item xs={12} md={4}>
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-            <Card sx={{ borderRadius: 3, mb: 3 }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <RiceBowlIcon color="success" sx={{ mr: 1 }} />
-                  <Typography variant="h6" fontWeight="bold">
-                    Top Selling Rice
-                  </Typography>
-                </Box>
-                <List>
-                  {topSellingRice && topSellingRice.length > 0 ? topSellingRice.map((item, index) => (
-                    <ListItem key={item._id || index} divider>
-                      <ListItemIcon>
-                        <Avatar sx={{ bgcolor: 'success.light', width: 32, height: 32 }}>
-                          {index + 1}
-                        </Avatar>
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={item._id || 'Unknown Rice'}
-                        secondary={`${item.totalSold || 0} bags sold`}
-                      />
-                    </ListItem>
-                  )) : (
-                    <ListItem>
-                      <ListItemText primary="No sales data available" />
-                    </ListItem>
-                  )}
-                </List>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* System Health */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
-            <Card sx={{ borderRadius: 3 }}>
-              <CardContent>
-                <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  System Health
-                </Typography>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <StorageIcon sx={{ mr: 1, color: 'primary.main' }} />
-                      <Typography>Server</Typography>
-                    </Box>
-                    <Chip 
-                      label={systemHealth.server || 'Unknown'} 
-                      color={getHealthColor(systemHealth.server)}
-                      size="small"
-                    />
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <BackupIcon sx={{ mr: 1, color: 'secondary.main' }} />
-                      <Typography>Database</Typography>
-                    </Box>
-                    <Chip 
-                      label={systemHealth.database || 'Unknown'} 
-                      color={getHealthColor(systemHealth.database)}
-                      size="small"
-                    />
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <BackupIcon sx={{ mr: 1, color: 'warning.main' }} />
-                      <Typography>Backup</Typography>
-                    </Box>
-                    <Chip 
-                      label={systemHealth.backup || 'Unknown'} 
-                      color={getHealthColor(systemHealth.backup)}
-                      size="small"
-                    />
-                  </Box>
-                  {systemHealth.uptime && (
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <AccessTimeIcon sx={{ mr: 1, color: 'info.main' }} />
-                        <Typography>Uptime</Typography>
-                      </Box>
-                      <Typography variant="body2">
-                        {Math.floor(systemHealth.uptime / 3600)}h
-                      </Typography>
-                    </Box>
-                  )}
-                </Box>
-              </CardContent>
-            </Card>
-          </motion.div>
+          <Paper sx={{ p: 3, borderRadius: 4, background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+            <Typography variant="h6" color="white" fontWeight="bold" sx={{ mb: 2 }}>Moderation</Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              <Button fullWidth variant="outlined" onClick={() => handleQuickAction('#forum')} sx={{ justifyContent: 'space-between', borderColor: 'rgba(251, 191, 36, 0.3)', color: '#fbbf24' }}>
+                Pending Posts <Chip size="small" label={pendingModeration.forumPosts} sx={{ bgcolor: 'rgba(251, 191, 36, 0.2)', color: '#fbbf24' }} />
+              </Button>
+              <Button fullWidth variant="outlined" onClick={() => handleQuickAction('#recipes')} sx={{ justifyContent: 'space-between', borderColor: 'rgba(251, 191, 36, 0.3)', color: '#fbbf24' }}>
+                Pending Recipes <Chip size="small" label={pendingModeration.recipes} sx={{ bgcolor: 'rgba(251, 191, 36, 0.2)', color: '#fbbf24' }} />
+              </Button>
+            </Box>
+          </Paper>
         </Grid>
 
-        {/* Top Active Sellers */}
         <Grid item xs={12} md={4}>
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-            <Card sx={{ borderRadius: 3 }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <LocalShippingIcon color="primary" sx={{ mr: 1 }} />
-                  <Typography variant="h6" fontWeight="bold">
-                    Top Active Sellers
-                  </Typography>
-                </Box>
-                <List>
-                  {topSellers && topSellers.length > 0 ? topSellers.map((seller, index) => (
-                    <ListItem key={seller._id || index} divider>
-                      <ListItemIcon>
-                        <Avatar sx={{ bgcolor: 'primary.light', width: 32, height: 32 }}>
-                          {index + 1}
-                        </Avatar>
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={seller.name || 'Unknown Seller'}
-                        secondary={`${seller.orderCount || 0} orders • ₹${(seller.totalRevenue || 0).toLocaleString()}`}
-                      />
-                    </ListItem>
-                  )) : (
-                    <ListItem>
-                      <ListItemText primary="No seller data available" />
-                    </ListItem>
-                  )}
-                </List>
-              </CardContent>
-            </Card>
-          </motion.div>
+          <Paper sx={{ p: 3, borderRadius: 4, background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+            <Typography variant="h6" color="white" fontWeight="bold" sx={{ mb: 2 }}>Quick Actions</Typography>
+            <Grid container spacing={1}>
+              <Grid item xs={6}><Button fullWidth variant="contained" onClick={() => handleQuickAction('#users')} sx={{ bgcolor: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', '&:hover': { bgcolor: 'rgba(56, 189, 248, 0.2)' } }}>Users</Button></Grid>
+              <Grid item xs={6}><Button fullWidth variant="contained" onClick={() => handleQuickAction('#orders')} sx={{ bgcolor: 'rgba(129, 140, 248, 0.1)', color: '#818cf8', '&:hover': { bgcolor: 'rgba(129, 140, 248, 0.2)' } }}>Orders</Button></Grid>
+              <Grid item xs={6}><Button fullWidth variant="contained" onClick={() => handleQuickAction('#payments')} sx={{ bgcolor: 'rgba(74, 222, 128, 0.1)', color: '#4ade80', '&:hover': { bgcolor: 'rgba(74, 222, 128, 0.2)' } }}>Payments</Button></Grid>
+              <Grid item xs={6}><Button fullWidth variant="contained" onClick={() => handleQuickAction('#analytics')} sx={{ bgcolor: 'rgba(251, 191, 36, 0.1)', color: '#fbbf24', '&:hover': { bgcolor: 'rgba(251, 191, 36, 0.2)' } }}>Analytics</Button></Grid>
+            </Grid>
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12} md={4}>
+          <Paper sx={{ p: 3, borderRadius: 4, background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+            <Typography variant="h6" color="white" fontWeight="bold" sx={{ mb: 2 }}>Top Sellers</Typography>
+            <List disablePadding>
+              {topSellers.slice(0, 3).map((seller, i) => (
+                <ListItem key={i} sx={{ py: 1, px: 0 }}>
+                  <Avatar sx={{ width: 32, height: 32, mr: 2, bgcolor: '#38bdf8' }}>{i + 1}</Avatar>
+                  <ListItemText primary={<Typography color="white" variant="body2">{seller.name}</Typography>} secondary={<Typography variant="caption" color="rgba(255,255,255,0.4)">{seller.orderCount} orders</Typography>} />
+                </ListItem>
+              ))}
+            </List>
+          </Paper>
         </Grid>
       </Grid>
     </Box>

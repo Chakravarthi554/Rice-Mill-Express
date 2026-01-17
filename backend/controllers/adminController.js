@@ -53,6 +53,12 @@ const getDashboardStats = asyncHandler(async (req, res) => {
   try {
     console.log('🔄 Fetching dashboard stats...');
 
+    // Date calculations for growth
+    const now = new Date();
+    const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+
     // Get total counts with error handling
     const [
       totalUsers,
@@ -64,11 +70,14 @@ const getDashboardStats = asyncHandler(async (req, res) => {
       revenueData,
       pendingForumPosts,
       pendingRecipes,
-      pendingCommentsResult,
+      pendingCommentsCount,
       topRiceVarieties,
       topSellers,
       recentActivities,
-      monthlyRevenue
+      monthlyRevenue,
+      lastMonthRevenueData,
+      newUsersCurrentMonth,
+      newUsersLastMonth
     ] = await Promise.all([
       User.countDocuments().catch(() => 0),
       Order.countDocuments().catch(() => 0),
@@ -76,29 +85,35 @@ const getDashboardStats = asyncHandler(async (req, res) => {
       User.countDocuments({ role: 'customer', active: true }).catch(() => 0),
       Recipe.countDocuments().catch(() => 0),
       ForumPost.countDocuments().catch(() => 0),
-      
-      // Revenue calculation
+
+      // Total Revenue (all time completed)
       Order.aggregate([
-        {
-          $match: {
-            isPaid: true,
-            createdAt: { $gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) }
-          }
-        },
+        { $match: { isPaid: true } },
         { $group: { _id: null, totalRevenue: { $sum: '$totalPrice' } } }
       ]).catch(() => []),
-      
+
       // Moderation counts
       ForumPost.countDocuments({ status: 'pending' }).catch(() => 0),
       Recipe.countDocuments({ status: 'pending' }).catch(() => 0),
-      
-      // Pending comments with proper error handling
-      ForumPost.aggregate([
-        { $unwind: '$comments' },
-        { $match: { 'comments.approved': false } },
-        { $count: 'count' }
-      ]).catch(() => []),
-      
+
+      // Aggregate pending comments from both collections
+      Promise.all([
+        ForumPost.aggregate([
+          { $unwind: '$comments' },
+          { $match: { 'comments.approved': false } },
+          { $count: 'count' }
+        ]).catch(() => []),
+        Recipe.aggregate([
+          { $unwind: '$comments' },
+          { $match: { 'comments.approved': false } },
+          { $count: 'count' }
+        ]).catch(() => [])
+      ]).then(([forumRes, recipeRes]) => {
+        const forumCount = forumRes && forumRes.length > 0 ? forumRes[0].count : 0;
+        const recipeCount = recipeRes && recipeRes.length > 0 ? recipeRes[0].count : 0;
+        return forumCount + recipeCount;
+      }),
+
       // Top selling rice
       Order.aggregate([
         { $unwind: '$orderItems' },
@@ -120,12 +135,12 @@ const getDashboardStats = asyncHandler(async (req, res) => {
         { $sort: { totalSold: -1 } },
         { $limit: 3 }
       ]).catch(() => []),
-      
+
       // Top sellers
       Order.aggregate([
         {
           $match: {
-            createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
+            createdAt: { $gte: startOfCurrentMonth }
           }
         },
         {
@@ -148,15 +163,15 @@ const getDashboardStats = asyncHandler(async (req, res) => {
         { $sort: { orderCount: -1 } },
         { $limit: 3 }
       ]).catch(() => []),
-      
+
       // Recent activities
       Notification.find()
         .populate('user', 'name')
         .sort({ createdAt: -1 })
         .limit(10)
         .catch(() => []),
-      
-      // Monthly revenue
+
+      // Monthly revenue for chart (current year)
       Order.aggregate([
         {
           $match: {
@@ -171,108 +186,93 @@ const getDashboardStats = asyncHandler(async (req, res) => {
           }
         },
         { $sort: { '_id': 1 } }
-      ]).catch(() => [])
+      ]).catch(() => []),
+
+      // Last month revenue for growth calculation
+      Order.aggregate([
+        {
+          $match: {
+            isPaid: true,
+            createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth }
+          }
+        },
+        { $group: { _id: null, total: { $sum: '$totalPrice' } } }
+      ]).catch(() => []),
+
+      // New users current month
+      User.countDocuments({ createdAt: { $gte: startOfCurrentMonth } }).catch(() => 0),
+
+      // New users last month
+      User.countDocuments({ createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth } }).catch(() => 0)
     ]);
 
     // Calculate totals with fallbacks
     const totalRevenue = revenueData && revenueData.length > 0 ? revenueData[0].totalRevenue : 0;
-    const pendingComments = pendingCommentsResult && pendingCommentsResult.length > 0 ? pendingCommentsResult[0].count : 0;
+    const lastMonthTotalRevenue = lastMonthRevenueData && lastMonthRevenueData.length > 0 ? lastMonthRevenueData[0].total : 0;
 
-    // Calculate growth percentage with proper error handling
-    const currentMonth = new Date().getMonth() + 1;
-    const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-    
-    const currentMonthRevenue = monthlyRevenue.find(m => m && m._id === currentMonth)?.revenue || 0;
-    const lastMonthRevenue = monthlyRevenue.find(m => m && m._id === lastMonth)?.revenue || 0;
-    
-    const growthPercentage = lastMonthRevenue > 0 
-      ? ((currentMonthRevenue - lastMonthRevenue) / lastMonthRevenue * 100).toFixed(1)
-      : currentMonthRevenue > 0 ? 100 : 0;
+    // Calculate revenue this month
+    const currentMonthNum = now.getMonth() + 1;
+    const currentMonthRevenue = monthlyRevenue.find(m => m && m._id === currentMonthNum)?.revenue || 0;
 
-    // Format monthly revenue for chart with fallbacks
+    // Calculate growth percentages
+    const calculateGrowth = (current, last) => {
+      if (last === 0) return current > 0 ? 100 : 0;
+      return parseFloat(((current - last) / last * 100).toFixed(1));
+    };
+
+    const revenueGrowth = calculateGrowth(currentMonthRevenue, lastMonthTotalRevenue);
+    const userGrowth = calculateGrowth(newUsersCurrentMonth, newUsersLastMonth);
+
+    // Format monthly revenue for chart
     const monthlyRevenueChart = Array.from({ length: 12 }, (_, i) => {
       const monthData = monthlyRevenue.find(m => m && m._id === i + 1);
       return {
-        month: new Date(2024, i).toLocaleString('default', { month: 'short' }),
+        month: new Date(2025, i).toLocaleString('default', { month: 'short' }),
         revenue: monthData?.revenue || 0
       };
     });
 
-    // System health with actual checks
-    const systemHealth = {
-      server: 'healthy',
-      database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-      backup: 'completed',
-      lastBackup: new Date(Date.now() - 12 * 60 * 60 * 1000),
-      uptime: process.uptime()
-    };
-
     const responseData = {
       stats: {
-        totalUsers: totalUsers || 0,
-        totalOrders: totalOrders || 0,
-        activeSellers: activeSellers || 0,
-        activeCustomers: activeCustomers || 0,
-        totalRecipes: totalRecipes || 0,
-        totalForumPosts: totalForumPosts || 0,
-        totalRevenue: totalRevenue || 0,
+        totalUsers,
+        totalOrders,
+        activeSellers,
+        activeCustomers,
+        totalRecipes,
+        totalForumPosts,
+        totalRevenue,
         pendingModeration: {
-          forumPosts: pendingForumPosts || 0,
-          recipes: pendingRecipes || 0,
-          comments: pendingComments || 0
+          forumPosts: pendingForumPosts,
+          recipes: pendingRecipes,
+          comments: pendingCommentsCount
         }
       },
-      topSellingRice: topRiceVarieties || [],
-      topSellers: topSellers || [],
-      recentActivities: (recentActivities || []).map(activity => ({
+      topSellingRice: topRiceVarieties,
+      topSellers,
+      recentActivities: recentActivities.map(activity => ({
         id: activity._id,
         type: activity.type,
         title: activity.title,
         message: activity.message,
         user: activity.user?.name,
-        timeAgo: activity.timeAgo,
         createdAt: activity.createdAt
       })),
       monthlyRevenue: monthlyRevenueChart,
-      growthPercentage: parseFloat(growthPercentage) || 0,
-      systemHealth
+      growthPercentage: revenueGrowth,
+      userGrowthPercentage: userGrowth,
+      systemHealth: {
+        server: 'healthy',
+        database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+        backup: 'completed',
+        uptime: process.uptime()
+      }
     };
 
-    console.log('✅ Dashboard stats prepared successfully');
     res.json(responseData);
 
   } catch (error) {
     console.error('❌ Dashboard stats error:', error);
-    res.status(500).json({
-      message: 'Error fetching dashboard stats',
-      error: error.message,
-      // Provide fallback data
-      stats: {
-        totalUsers: 0,
-        totalOrders: 0,
-        activeSellers: 0,
-        activeCustomers: 0,
-        totalRecipes: 0,
-        totalForumPosts: 0,
-        totalRevenue: 0,
-        pendingModeration: {
-          forumPosts: 0,
-          recipes: 0,
-          comments: 0
-        }
-      },
-      topSellingRice: [],
-      topSellers: [],
-      recentActivities: [],
-      monthlyRevenue: [],
-      growthPercentage: 0,
-      systemHealth: {
-        server: 'error',
-        database: 'error',
-        backup: 'error',
-        uptime: 0
-      }
-    });
+    res.status(500).json({ message: 'Error fetching stats', error: error.message });
   }
 });
 
@@ -356,8 +356,8 @@ const getCommentsForModeration = asyncHandler(async (req, res) => {
       forumPosts.forEach(post => {
         post.comments.forEach(comment => {
           if ((status === 'flagged' && comment.isFlagged) ||
-              (status === 'pending' && !comment.approved && !comment.isFlagged) ||
-              (status === 'all' && (!comment.approved || comment.isFlagged))) {
+            (status === 'pending' && !comment.approved && !comment.isFlagged) ||
+            (status === 'all' && (!comment.approved || comment.isFlagged))) {
             comments.push({
               ...comment,
               type: 'forum',
@@ -389,8 +389,8 @@ const getCommentsForModeration = asyncHandler(async (req, res) => {
       recipes.forEach(recipe => {
         recipe.comments.forEach(comment => {
           if ((status === 'flagged' && comment.isFlagged) ||
-              (status === 'pending' && !comment.approved && !comment.isFlagged) ||
-              (status === 'all' && (!comment.approved || comment.isFlagged))) {
+            (status === 'pending' && !comment.approved && !comment.isFlagged) ||
+            (status === 'all' && (!comment.approved || comment.isFlagged))) {
             comments.push({
               ...comment,
               type: 'recipe',
@@ -428,9 +428,9 @@ const getCommentsForModeration = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Error in getCommentsForModeration:', error);
-    res.status(500).json({ 
-      message: 'Server error fetching comments for moderation', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Server error fetching comments for moderation',
+      error: error.message
     });
   }
 });
@@ -443,7 +443,7 @@ const getRecipeAnalytics = asyncHandler(async (req, res) => {
     }
 
     const { timeframe = 'month' } = req.query;
-    
+
     // Calculate date ranges
     const now = new Date();
     let startDate;
@@ -574,9 +574,9 @@ const getRecipeAnalytics = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Error in getRecipeAnalytics:', error);
-    res.status(500).json({ 
-      message: 'Server error fetching recipe analytics', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Server error fetching recipe analytics',
+      error: error.message
     });
   }
 });
@@ -645,9 +645,9 @@ const moderateComment = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Error in moderateComment:', error);
-    res.status(500).json({ 
-      message: 'Server error moderating comment', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Server error moderating comment',
+      error: error.message
     });
   }
 });
@@ -696,10 +696,10 @@ const getPlatformOverview = asyncHandler(async (req, res) => {
       User.find({
         createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
       })
-      .select('name email role createdAt')
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .catch(() => [])
+        .select('name email role createdAt')
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .catch(() => [])
     ]);
 
     const responseData = {
@@ -719,8 +719,8 @@ const getPlatformOverview = asyncHandler(async (req, res) => {
 
   } catch (error) {
     console.error('❌ Error in getPlatformOverview:', error);
-    res.status(500).json({ 
-      message: 'Server error fetching platform overview', 
+    res.status(500).json({
+      message: 'Server error fetching platform overview',
       error: error.message,
       overview: {
         todayOrders: 0,
@@ -741,7 +741,7 @@ const getAnalyticsData = asyncHandler(async (req, res) => {
     console.log('🔄 Fetching comprehensive analytics data...');
 
     const { timeframe = 'week' } = req.query;
-    
+
     // Calculate date range based on timeframe
     const now = new Date();
     let startDate;
@@ -921,7 +921,7 @@ const getAnalyticsData = asyncHandler(async (req, res) => {
         })),
         topRiceTypes: topRiceTypes.map(item => ({
           name: item._id,
-          percentage: topRiceTypes.reduce((sum, i) => sum + i.totalSold, 0) > 0 
+          percentage: topRiceTypes.reduce((sum, i) => sum + i.totalSold, 0) > 0
             ? Math.round((item.totalSold / topRiceTypes.reduce((sum, i) => sum + i.totalSold, 0)) * 100)
             : 0,
           sales: item.totalRevenue
@@ -962,7 +962,7 @@ const getAnalyticsData = asyncHandler(async (req, res) => {
       paymentTrends: {
         paymentMethods: paymentStats.map(method => ({
           name: method._id ? method._id.toUpperCase() : 'Unknown',
-          value: paymentStats.reduce((sum, m) => sum + m.count, 0) > 0 
+          value: paymentStats.reduce((sum, m) => sum + m.count, 0) > 0
             ? Math.round((method.count / paymentStats.reduce((sum, m) => sum + m.count, 0)) * 100)
             : 0,
           color: method._id === 'razorpay' ? '#667eea' : '#764ba2'
@@ -1013,7 +1013,7 @@ const getAnalyticsData = asyncHandler(async (req, res) => {
           { name: 'Diwali 20% Off', sales: 50, revenue: 25000 },
           { name: 'Free Delivery', sales: 30, revenue: 15000 }
         ],
-        fraudFlags: await Payment.countDocuments({ 
+        fraudFlags: await Payment.countDocuments({
           isFlagged: true,
           createdAt: { $gte: startDate }
         }).catch(() => 0)
@@ -1078,7 +1078,7 @@ const getUserGrowthData = async (startDate) => {
       { $sort: { _id: 1 } },
       { $limit: 7 }
     ]);
-    
+
     return growthData.map(item => ({
       day: new Date(item._id).toLocaleDateString('en-US', { weekday: 'short' }),
       users: item.users
@@ -1101,7 +1101,7 @@ const getUserGrowthData = async (startDate) => {
 const exportAnalyticsCSV = asyncHandler(async (req, res) => {
   try {
     const { type = 'sales', timeframe = 'month' } = req.query;
-    
+
     console.log(`🔄 Exporting ${type} analytics as CSV for ${timeframe}...`);
 
     let csvData = '';
@@ -1185,7 +1185,7 @@ const exportAnalyticsCSV = asyncHandler(async (req, res) => {
         const productData = await Product.find({
           createdAt: { $gte: startDate }
         }).select('name seller price countInStock ratings createdAt')
-         .populate('seller', 'name');
+          .populate('seller', 'name');
 
         csvData = 'Product Name,Seller,Price,Stock,Ratings,Created At\n';
         productData.forEach(product => {
@@ -1205,9 +1205,9 @@ const exportAnalyticsCSV = asyncHandler(async (req, res) => {
     console.log('✅ Analytics data exported successfully');
   } catch (error) {
     console.error('❌ Export analytics error:', error);
-    res.status(500).json({ 
-      message: 'Error exporting analytics data', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Error exporting analytics data',
+      error: error.message
     });
   }
 });
@@ -1226,23 +1226,23 @@ const getAnalyticsAlerts = asyncHandler(async (req, res) => {
     ] = await Promise.all([
       // Low stock products
       Product.countDocuments({ countInStock: { $lt: 5 } }).catch(() => 0),
-      
+
       // Pending KYC
       KycApplication.countDocuments({ status: 'pending' }).catch(() => 0),
-      
+
       // High value COD orders
       Order.countDocuments({
         paymentMethod: 'cod',
         totalPrice: { $gt: 5000 },
         createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
       }).catch(() => 0),
-      
+
       // Delayed orders
       Order.countDocuments({
         orderStatus: { $in: ['processing', 'packed', 'shipped'] },
         createdAt: { $lte: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) }
       }).catch(() => 0),
-      
+
       // System issues
       Promise.resolve(mongoose.connection.readyState !== 1 ? 1 : 0)
     ]);

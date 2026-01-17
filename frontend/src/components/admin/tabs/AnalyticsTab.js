@@ -58,15 +58,20 @@ const AnalyticsTab = () => {
   const [timeframe, setTimeframe] = useState('week');
   const [refreshing, setRefreshing] = useState(false);
   const [exporting, setExporting] = useState(false);
-  
+
   // ✅ ADDED: Get analytics data from Redux store
   const { loading, data, error } = useSelector((state) => state.adminAnalytics || {});
-  
-  // ✅ ADDED: Load analytics data on component mount
+
+  // ✅ FIXED: Load analytics data with polling for real-time updates
   useEffect(() => {
     loadAnalyticsData();
-  }, [timeframe]);
-  
+    const interval = setInterval(() => {
+      loadAnalyticsData();
+    }, 15000); // Poll every 15 seconds
+
+    return () => clearInterval(interval);
+  }, [dispatch, timeframe]);
+
   const loadAnalyticsData = async () => {
     setRefreshing(true);
     try {
@@ -77,90 +82,38 @@ const AnalyticsTab = () => {
       setRefreshing(false);
     }
   };
-  
-  // ✅ ADDED: Use real data from API or fallback to mock data
-  const analyticsData = data || {
+
+  // ✅ FIXED: Use real data from API with robust fallbacks
+  const analyticsData = {
     salesOverview: {
-      totalSales: 50000,
-      dailySales: [
-        { day: 'Mon', sales: 8000 },
-        { day: 'Tue', sales: 12000 },
-        { day: 'Wed', sales: 9000 },
-        { day: 'Thu', sales: 15000 },
-        { day: 'Fri', sales: 11000 },
-        { day: 'Sat', sales: 13000 },
-        { day: 'Sun', sales: 10000 }
-      ],
-      topRiceTypes: [
-        { name: 'Basmati', percentage: 40, sales: 20000 },
-        { name: 'Sona Masoori', percentage: 30, sales: 15000 },
-        { name: 'Brown Rice', percentage: 15, sales: 7500 },
-        { name: 'Jasmine', percentage: 10, sales: 5000 },
-        { name: 'Others', percentage: 5, sales: 2500 }
-      ],
-      commissionEarned: 7500
+      totalSales: data?.salesOverview?.totalSales ?? 0,
+      dailySales: data?.salesOverview?.dailySales || [],
+      topRiceTypes: data?.salesOverview?.topRiceTypes || [],
+      commissionEarned: data?.salesOverview?.commissionEarned ?? 0
     },
     orderPerformance: {
-      totalOrders: 200,
-      deliveryStats: {
-        onTime: 85,
-        delayed: 10,
-        cancelled: 5
-      },
-      orderStatus: [
-        { name: 'Delivered', value: 160, color: '#4caf50' },
-        { name: 'Pending', value: 30, color: '#ff9800' },
-        { name: 'Refunded', value: 10, color: '#f44336' }
-      ],
-      topSellers: [
-        { name: 'Seller A', orders: 50, revenue: 15000 },
-        { name: 'Seller B', orders: 30, revenue: 12000 },
-        { name: 'Seller C', orders: 25, revenue: 9000 }
-      ]
+      totalOrders: data?.orderPerformance?.totalOrders ?? 0,
+      deliveryStats: data?.orderPerformance?.deliveryStats || { onTime: 0, delayed: 0, cancelled: 0 },
+      orderStatus: data?.orderPerformance?.orderStatus || [],
+      topSellers: data?.orderPerformance?.topSellers || []
     },
     paymentTrends: {
-      paymentMethods: [
-        { name: 'Razorpay', value: 60, color: '#667eea' },
-        { name: 'COD', value: 40, color: '#764ba2' }
-      ],
-      refundRate: 3,
-      dailyPayments: [
-        { date: '01 Nov', online: 8000, cod: 5000 },
-        { date: '02 Nov', online: 12000, cod: 7000 },
-        { date: '03 Nov', online: 9000, cod: 6000 },
-        { date: '04 Nov', online: 15000, cod: 8000 },
-        { date: '05 Nov', online: 11000, cod: 9000 }
-      ],
-      highValueCOD: 5
+      paymentMethods: data?.paymentTrends?.paymentMethods || [],
+      refundRate: data?.paymentTrends?.refundRate ?? 0,
+      dailyPayments: data?.paymentTrends?.dailyPayments || [],
+      highValueCOD: data?.paymentTrends?.highValueCOD ?? 0
     },
     userEngagement: {
-      activeUsers: {
-        customers: 500,
-        sellers: 10
-      },
-      recipeViews: 1000,
-      conversionRate: 20,
-      forumPosts: 50,
-      userGrowth: [
-        { month: 'Jan', users: 300 },
-        { month: 'Feb', users: 350 },
-        { month: 'Mar', users: 400 },
-        { month: 'Apr', users: 420 },
-        { month: 'May', users: 450 },
-        { month: 'Jun', users: 500 }
-      ]
+      activeUsers: data?.userEngagement?.activeUsers || { customers: 0, sellers: 0 },
+      recipeViews: data?.userEngagement?.recipeViews ?? 0,
+      conversionRate: data?.userEngagement?.conversionRate ?? 0,
+      forumPosts: data?.userEngagement?.forumPosts ?? 0,
+      userGrowth: data?.userEngagement?.userGrowth || []
     },
     inventoryAlerts: {
-      lowStock: [
-        { product: '5kg Basmati', stock: 10, threshold: 20 },
-        { product: '2kg Sona Masoori', stock: 15, threshold: 25 },
-        { product: '1kg Brown Rice', stock: 8, threshold: 15 }
-      ],
-      topPromotions: [
-        { name: 'Diwali 20% Off', sales: 50, revenue: 25000 },
-        { name: 'Free Delivery', sales: 30, revenue: 15000 }
-      ],
-      fraudFlags: 2
+      lowStock: data?.inventoryAlerts?.lowStock || [],
+      topPromotions: data?.inventoryAlerts?.topPromotions || [],
+      fraudFlags: data?.inventoryAlerts?.fraudFlags ?? 0
     }
   };
 
@@ -180,49 +133,62 @@ const AnalyticsTab = () => {
   };
 
   const StatCard = ({ title, value, icon: Icon, color, trend, subtitle }) => (
-    <motion.div whileHover={{ scale: 1.02 }} transition={{ duration: 0.2 }}>
-      <Card sx={{ height: '100%', borderRadius: 3 }}>
+    <motion.div whileHover={{ y: -5 }} transition={{ duration: 0.2 }}>
+      <Card sx={{
+        height: '100%',
+        borderRadius: 4,
+        background: 'rgba(255, 255, 255, 0.03)',
+        backdropFilter: 'blur(10px)',
+        border: '1px solid rgba(255, 255, 255, 0.05)',
+        boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.3)'
+      }}>
         <CardContent>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
             <Box>
-              <Typography color="textSecondary" gutterBottom variant="overline">
+              <Typography color="rgba(255,255,255,0.6)" gutterBottom variant="overline" sx={{ letterSpacing: 1 }}>
                 {title}
               </Typography>
-              <Typography variant="h4" component="div" fontWeight="bold">
+              <Typography variant="h4" component="div" fontWeight="bold" sx={{ color: 'white' }}>
                 {value}
               </Typography>
               {subtitle && (
-                <Typography variant="body2" color="textSecondary">
+                <Typography variant="body2" color="rgba(255,255,255,0.4)">
                   {subtitle}
                 </Typography>
               )}
             </Box>
             <Box
               sx={{
-                p: 1,
+                p: 1.5,
                 borderRadius: 2,
-                bgcolor: `${color}.light`,
-                color: `${color}.main`,
+                bgcolor: `rgba(56, 189, 248, 0.1)`,
+                color: `#38bdf8`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
               }}
             >
-              <Icon />
+              <Icon fontSize="medium" />
             </Box>
           </Box>
-          {trend && (
+          {trend !== undefined && (
             <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
               <TrendingUpIcon
                 sx={{
                   fontSize: 16,
-                  color: trend >= 0 ? 'success.main' : 'error.main',
+                  color: trend >= 0 ? '#4ade80' : '#f87171',
                   mr: 0.5,
                   transform: trend >= 0 ? 'none' : 'rotate(180deg)'
                 }}
               />
               <Typography
                 variant="body2"
-                sx={{ color: trend >= 0 ? 'success.main' : 'error.main' }}
+                sx={{ color: trend >= 0 ? '#4ade80' : '#f87171', fontWeight: 600 }}
               >
                 {trend >= 0 ? '+' : ''}{trend}%
+              </Typography>
+              <Typography variant="caption" sx={{ ml: 1, color: 'rgba(255,255,255,0.4)' }}>
+                vs last period
               </Typography>
             </Box>
           )}
@@ -250,21 +216,27 @@ const AnalyticsTab = () => {
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Box>
-          <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: '#2e7d32' }}>
+          <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: 'white' }}>
             Analytics Dashboard
           </Typography>
-          <Typography variant="h6" color="text.secondary">
+          <Typography variant="h6" color="rgba(255,255,255,0.6)">
             Real-time insights and performance metrics
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-          <FormControl size="small" sx={{ minWidth: 120 }}>
-            <InputLabel>Timeframe</InputLabel>
+          <FormControl size="small" sx={{ minWidth: 140 }}>
+            <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>Timeframe</InputLabel>
             <Select
               value={timeframe}
               label="Timeframe"
               onChange={(e) => setTimeframe(e.target.value)}
               disabled={loading}
+              sx={{
+                color: 'white',
+                '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.2)' },
+                '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.4)' },
+                '.MuiSvgIcon-root': { color: 'rgba(255,255,255,0.7)' }
+              }}
             >
               <MenuItem value="today">Today</MenuItem>
               <MenuItem value="week">This Week</MenuItem>
@@ -273,22 +245,32 @@ const AnalyticsTab = () => {
               <MenuItem value="year">This Year</MenuItem>
             </Select>
           </FormControl>
-          <Tooltip title="Export Data">
-            <Button
-              variant="outlined"
-              startIcon={<DownloadIcon />}
-              onClick={() => handleExport('csv')}
-              disabled={exporting || loading}
+          <Button
+            variant="contained"
+            startIcon={<DownloadIcon />}
+            onClick={() => handleExport('csv')}
+            disabled={exporting || loading}
+            sx={{
+              background: 'rgba(56, 189, 248, 0.2)',
+              color: '#38bdf8',
+              border: '1px solid rgba(56, 189, 248, 0.3)',
+              '&:hover': { background: 'rgba(56, 189, 248, 0.3)' }
+            }}
+          >
+            {exporting ? 'Exporting...' : 'Export'}
+          </Button>
+        </Box>
+        <Tooltip title="Refresh Data">
+          <span> {/* FIXED: Wrapped disabled button in span for Tooltip */}
+            <IconButton
+              onClick={handleRefresh}
+              disabled={refreshing || loading}
+              sx={{ color: '#38bdf8', background: 'rgba(56, 189, 248, 0.1)', '&:hover': { background: 'rgba(56, 189, 248, 0.2)' } }}
             >
-              Export
-            </Button>
-          </Tooltip>
-          <Tooltip title="Refresh Data">
-            <IconButton onClick={handleRefresh} disabled={refreshing || loading}>
               <RefreshIcon />
             </IconButton>
-          </Tooltip>
-        </Box>
+          </span>
+        </Tooltip>
       </Box>
 
       {(refreshing || loading) && <LinearProgress sx={{ mb: 2 }} />}
@@ -340,22 +322,43 @@ const AnalyticsTab = () => {
         {/* Sales Trend */}
         <Grid item xs={12} md={8}>
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <Card sx={{ borderRadius: 3, height: 400 }}>
-              <CardContent sx={{ height: '100%' }}>
-                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-                  <BarChartIcon sx={{ mr: 1 }} />
+            <Card sx={{
+              borderRadius: 4,
+              height: 450,
+              background: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid rgba(255, 255, 255, 0.05)'
+            }}>
+              <CardContent sx={{ height: '100%', p: 3 }}>
+                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', color: 'white', mb: 3 }}>
+                  <BarChartIcon sx={{ mr: 1, color: '#38bdf8' }} />
                   Sales Overview
                 </Typography>
-                <ResponsiveContainer width="100%" height="85%">
-                  <BarChart data={analyticsData.salesOverview.dailySales}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="day" />
-                    <YAxis tickFormatter={(value) => `₹${value / 1000}k`} />
-                    <ChartTooltip formatter={(value) => [`₹${value.toLocaleString()}`, 'Sales']} />
-                    <Legend />
-                    <Bar dataKey="sales" fill="#4caf50" name="Daily Sales" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                <Box sx={{ width: '100%', height: 'calc(100% - 60px)', minHeight: 150 }}> {/* FIXED: Stable child container */}
+                  <ResponsiveContainer width="100%" height="100%" debounce={50}>
+                    <BarChart data={analyticsData.salesOverview.dailySales}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                      <XAxis
+                        dataKey="day"
+                        stroke="rgba(255,255,255,0.5)"
+                        tick={{ fill: 'rgba(255,255,255,0.5)' }}
+                        axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                      />
+                      <YAxis
+                        stroke="rgba(255,255,255,0.5)"
+                        tick={{ fill: 'rgba(255,255,255,0.5)' }}
+                        tickFormatter={(value) => `₹${value / 1000}k`}
+                        axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                      />
+                      <ChartTooltip
+                        contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: 8, color: 'white' }}
+                        itemStyle={{ color: '#38bdf8' }}
+                        formatter={(value) => [`₹${value.toLocaleString()}`, 'Sales']}
+                      />
+                      <Legend wrapperStyle={{ paddingTop: 20 }} />
+                      <Bar dataKey="sales" fill="#38bdf8" name="Daily Sales" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </Box>
               </CardContent>
             </Card>
           </motion.div>
@@ -541,7 +544,7 @@ const AnalyticsTab = () => {
           </motion.div>
         </Grid>
       </Grid>
-    </Box>
+    </Box >
   );
 };
 

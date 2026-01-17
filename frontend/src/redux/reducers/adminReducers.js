@@ -3,37 +3,37 @@ import {
   ADMIN_DASHBOARD_STATS_REQUEST,
   ADMIN_DASHBOARD_STATS_SUCCESS,
   ADMIN_DASHBOARD_STATS_FAIL,
-  
+
   // Activities
   ADMIN_ACTIVITIES_REQUEST,
   ADMIN_ACTIVITIES_SUCCESS,
   ADMIN_ACTIVITIES_FAIL,
-  
+
   // Platform Overview
   ADMIN_PLATFORM_OVERVIEW_REQUEST,
   ADMIN_PLATFORM_OVERVIEW_SUCCESS,
   ADMIN_PLATFORM_OVERVIEW_FAIL,
-  
+
   // Recipe Analytics
   ADMIN_RECIPE_ANALYTICS_REQUEST,
   ADMIN_RECIPE_ANALYTICS_SUCCESS,
   ADMIN_RECIPE_ANALYTICS_FAIL,
-  
+
   // Dashboard Refresh
   ADMIN_DASHBOARD_REFRESH_REQUEST,
   ADMIN_DASHBOARD_REFRESH_SUCCESS,
   ADMIN_DASHBOARD_REFRESH_FAIL,
-  
+
   // User Management
   USER_LIST_REQUEST,
   USER_LIST_SUCCESS,
   USER_LIST_FAIL,
-  
+
   // Order Management
   ORDER_LIST_REQUEST,
   ORDER_LIST_SUCCESS,
   ORDER_LIST_FAIL,
-  
+
   // KYC Management
   KYC_APPLICATIONS_REQUEST,
   KYC_APPLICATIONS_SUCCESS,
@@ -44,17 +44,17 @@ import {
   REJECT_KYC_REQUEST,
   REJECT_KYC_SUCCESS,
   REJECT_KYC_FAIL,
-  
+
   // Search Logs
   SEARCH_LOGS_REQUEST,
   SEARCH_LOGS_SUCCESS,
   SEARCH_LOGS_FAIL,
-  
+
   // Seller Location
   SELLER_LOCATION_UPDATE_REQUEST,
   SELLER_LOCATION_UPDATE_SUCCESS,
   SELLER_LOCATION_UPDATE_FAIL,
-  
+
   // Comments Moderation
   ADMIN_COMMENTS_MODERATION_REQUEST,
   ADMIN_COMMENTS_MODERATION_SUCCESS,
@@ -64,7 +64,13 @@ import {
 // Initial States
 const initialDashboardState = {
   loading: false,
-  stats: {},
+  stats: {
+    pendingModeration: {
+      forumPosts: 0,
+      recipes: 0,
+      comments: 0
+    }
+  },
   topSellingRice: [],
   topSellers: [],
   monthlyRevenue: [],
@@ -81,13 +87,21 @@ const initialActivitiesState = {
 
 const initialPlatformOverviewState = {
   loading: false,
-  overview: {},
+  overview: {
+    recentSignups: []
+  },
   error: null,
 };
 
 const initialRecipeAnalyticsState = {
   loading: false,
-  analytics: {},
+  analytics: {
+    trends: [],
+    topSellers: [],
+    popularRiceTypes: [],
+    engagement: {},
+    statusDistribution: {}
+  },
   error: null,
 };
 
@@ -138,7 +152,28 @@ const initialCommentsModerationState = {
 
 const initialAnalyticsState = {
   loading: false,
-  data: {},
+  data: {
+    salesOverview: {
+      dailySales: [],
+      topRiceTypes: []
+    },
+    orderPerformance: {
+      orderStatus: [],
+      topSellers: []
+    },
+    paymentTrends: {
+      paymentMethods: [],
+      dailyPayments: []
+    },
+    userEngagement: {
+      activeUsers: {},
+      userGrowth: []
+    },
+    inventoryAlerts: {
+      lowStock: [],
+      topPromotions: []
+    }
+  },
   error: null,
 };
 // Dashboard Stats Reducer
