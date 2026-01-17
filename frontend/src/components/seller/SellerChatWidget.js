@@ -64,7 +64,14 @@ const SellerChatWidget = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [showSearch, setShowSearch] = useState(false);
     const [emojiAnchorEl, setEmojiAnchorEl] = useState(null); // ✅ NEW: Emoji picker state
-    const [isMuted, setIsMuted] = useState(false); // ✅ FIX BUG #9: Mute state
+    const [isMuted, setIsMuted] = useState(localStorage.getItem('chat_muted') === 'true');
+    const isMutedRef = useRef(isMuted);
+
+    useEffect(() => {
+        isMutedRef.current = isMuted;
+    }, [isMuted]);
+    const [isDisabled, setIsDisabled] = useState(false); // ✅ NEW: Track if chat is disabled
+    const [sending, setSending] = useState(false); // ✅ NEW: Loading state for sending
 
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
@@ -75,86 +82,85 @@ const SellerChatWidget = () => {
     const [socket, setSocket] = useState(null);
 
     useEffect(() => {
-        if (userInfo && isOpen && !socket) {
-            const newSocket = io(socketUrl, {
-                auth: { token: userInfo.token }
-            });
-
-            newSocket.on('connect', () => {
-                // ✅ FIX BUG #8: Ensure seller joins correct socket room
-                console.log('Seller socket connected, joining user room');
-                newSocket.emit('joinUserRoom', userInfo._id);
-                fetchConversation();
-            });
-
-            newSocket.on('chat:message', (data) => {
-                // ✅ FIX BUG #8: Prevent duplicate messages & ensure seller receives admin messages
-                console.log('Received message via socket:', data.message._id, 'from:', data.message.sender.role);
-                setMessages((prev) => {
-                    // Check if message already exists
-                    const exists = prev.some(m => m._id === data.message._id);
-                    if (exists) {
-                        console.log('Message already exists, skipping duplicate');
-                        return prev;
-                    }
-                    return [...prev, data.message];
-                });
-                scrollToBottom();
-                if (data.message.sender._id !== userInfo._id) {
-                    markAsRead(data.conversationId);
-                    
-                    // ✅ FIX BUG #9: Play notification sound if not muted
-                    if (!isMuted) {
-                        // Play notification sound
-                        const audio = new Audio('/notification.mp3'); // Adjust path as needed
-                        audio.play().catch(e => console.log('Audio play failed:', e));
-                    }
-                }
-            });
-
-            newSocket.on('chat:message_deleted', ({ messageId }) => {
-                setMessages(prev => prev.filter(m => m._id !== messageId));
-            });
-
-            newSocket.on('chat:message_updated', (updatedMsg) => {
-                // ✅ FIX BUG #3: Ensure message updates propagate correctly
-                console.log('Message updated received:', updatedMsg._id);
-                setMessages(prev => prev.map(m => {
-                    if (m._id === updatedMsg._id) {
-                        console.log('Updating message in UI:', updatedMsg._id);
-                        return updatedMsg;
-                    }
-                    return m;
-                }));
-            });
-
-            newSocket.on('chat:typing', ({ conversationId: cId }) => {
-                if (cId === conversationId) setOtherTyping(true);
-            });
-
-            newSocket.on('chat:stop_typing', ({ conversationId: cId }) => {
-                if (cId === conversationId) setOtherTyping(false);
-            });
-
-            newSocket.on('chat:chat_cleared', ({ conversationId: cId }) => {
-                if (cId === conversationId) setMessages([]);
-            });
-
-            newSocket.on('user:online', (data) => {
-                if (data.role === 'admin') setAdminOnline(true);
-            });
-
-            newSocket.on('user:offline', (data) => {
-                if (data.role === 'admin') {
-                    setAdminOnline(false);
-                    setAdminLastSeen(data.lastSeen);
-                }
-            });
-
-            setSocket(newSocket);
-            return () => newSocket.close();
+        if (!userInfo || !isOpen) {
+            if (socket) {
+                socket.disconnect();
+                setSocket(null);
+            }
+            return;
         }
-    }, [userInfo, isOpen, socket, conversationId]);
+
+        const newSocket = io(socketUrl, {
+            auth: { token: userInfo.token },
+            transports: ['websocket']
+        });
+
+        newSocket.on('connect', () => {
+            console.log('Seller socket connected:', newSocket.id);
+            newSocket.emit('joinUserRoom', userInfo._id);
+            fetchConversation();
+        });
+
+        newSocket.on('chat:message', (data) => {
+            console.log('Received message via socket:', data.message._id);
+            setMessages((prev) => {
+                if (prev.some(m => m._id === data.message._id)) return prev;
+                return [...prev, data.message];
+            });
+            scrollToBottom();
+
+            if (data.message.sender._id !== userInfo._id) {
+                markAsRead(data.conversationId);
+                // ✅ FIX BUG #9: Sound behavior (Muted = No Sound, Unmuted = Sound)
+                if (!isMutedRef.current) {
+                    console.log('Playing notification sound');
+                    const audio = new Audio('/notification.mp3');
+                    audio.play().catch(e => console.log('Audio error:', e));
+                }
+            }
+        });
+
+        newSocket.on('chat:message_updated', (updatedMsg) => {
+            setMessages(prev => prev.map(m => m._id === updatedMsg._id ? updatedMsg : m));
+        });
+
+        newSocket.on('chat:message_deleted', ({ messageId }) => {
+            setMessages(prev => prev.filter(m => m._id !== messageId));
+        });
+
+        newSocket.on('chat:chat_cleared', ({ conversationId: cId, userId: clearingUserId }) => {
+            // Only clear locally if this user is the one who cleared (or if we want a global clear)
+            if (cId === conversationId && clearingUserId === userInfo._id) {
+                setMessages([]);
+            }
+        });
+
+        newSocket.on('chat:conversation_disabled', ({ conversationId: cId, isDisabled: val }) => {
+            if (cId === conversationId) setIsDisabled(val);
+        });
+
+        newSocket.on('chat:conversation_enabled', ({ conversationId: cId }) => {
+            if (cId === conversationId) setIsDisabled(false);
+        });
+
+        newSocket.on('user:online', (data) => {
+            if (data.role === 'admin') setAdminOnline(true);
+        });
+
+        newSocket.on('user:offline', (data) => {
+            if (data.role === 'admin') {
+                setAdminOnline(false);
+                setAdminLastSeen(data.lastSeen);
+            }
+        });
+
+        setSocket(newSocket);
+
+        return () => {
+            console.log('Cleaning up seller socket');
+            newSocket.disconnect();
+        };
+    }, [userInfo?.token, isOpen, conversationId]); // Re-run if convId changes to update listeners if needed
 
     const scrollToBottom = () => {
         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
@@ -185,9 +191,10 @@ const SellerChatWidget = () => {
                     setAdminOnline(admin.isOnline);
                     setAdminLastSeen(admin.lastActive);
                 }
-                
-                // ✅ FIX BUG #9: Set mute status
+
+                // ✅ FIX BUG #9: Set states
                 setIsMuted(adminConv.mutedBy?.includes(userInfo._id) || false);
+                setIsDisabled(adminConv.isDisabled || false);
             } else {
                 // If no conversation yet, try to find an admin to start one
                 const { data: admins } = await axios.get('/api/users/admins', config);
@@ -208,15 +215,15 @@ const SellerChatWidget = () => {
             await axios.put(`/api/chat/read/${cid}`, {}, config);
         } catch (e) { console.error(e); }
     };
-    
+
     // ✅ FIX BUG #9: Toggle mute for conversation
     const handleToggleMute = async () => {
         if (!conversationId) return;
-        
+
         try {
             const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
             await axios.put(`/api/chat/action/${conversationId}`, { action: 'mute' }, config);
-            
+
             // Toggle the local state
             setIsMuted(prev => !prev);
         } catch (error) {
@@ -279,49 +286,53 @@ const SellerChatWidget = () => {
                 const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
                 // ✅ FIX BUG #3: Wait for response and update UI immediately
                 const { data: updatedMessage } = await axios.put(`/api/chat/message/${editingMsg._id}`, { content: msgContent }, config);
-                
+
                 // Update UI immediately (optimistic)
                 setMessages(prev => prev.map(m => m._id === editingMsg._id ? updatedMessage : m));
-                
+
                 setEditingMsg(null);
                 setMessage('');
                 return;
-            } catch (e) { 
-                console.error(e); 
+            } catch (e) {
+                console.error(e);
                 alert('Failed to edit message: ' + (e.response?.data?.message || 'Unknown error'));
-                return; 
+                return;
             }
         }
 
         try {
+            setSending(true);
             const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-            let adminId = messages.find(m => m.sender.role === 'admin')?.sender._id;
+            let adminId = messages.find(m => m.sender.role === 'admin' && m.sender._id !== userInfo._id)?.sender._id;
             if (!adminId) {
                 const { data: admins } = await axios.get('/api/users/admins', config);
                 if (admins?.[0]) adminId = admins[0]._id;
             }
 
             if (adminId) {
-                // ✅ FIX: Get response from API to add message immediately
                 const { data: sentMessage } = await axios.post('/api/chat/send', {
                     receiverId: adminId,
                     content: msgContent,
                     attachments,
                     replyTo: replyingTo?._id || null
                 }, config);
-                
-                // ✅ FIX: Add message to UI immediately (optimistic update)
-                setMessages(prev => [...prev, sentMessage]);
+
+                // Add to list immediately
+                setMessages(prev => {
+                    if (prev.some(m => m._id === sentMessage._id)) return prev;
+                    return [...prev, sentMessage];
+                });
                 setMessage('');
                 setReplyingTo(null);
                 scrollToBottom();
             } else {
-                console.warn('No admin found to send message to');
+                alert('No admin available to receive your message. Please try again later.');
             }
         } catch (error) {
             console.error('Send failed', error);
-            // Show error to user
-            alert('Failed to send message. Please try again.');
+            alert(error.response?.data?.message || 'Failed to send message.');
+        } finally {
+            setSending(false);
         }
     };
 
@@ -336,17 +347,19 @@ const SellerChatWidget = () => {
     };
 
     const handleDelete = async (mode) => {
+        // Optimistic update for 'me'
+        if (mode === 'me') {
+            setMessages(prev => prev.filter(m => m._id !== selectedMsg._id));
+        }
+
         try {
             const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
             await axios.delete(`/api/chat/message/${selectedMsg._id}?mode=${mode}`, config);
-            if (mode === 'me') {
-                setMessages(prev => prev.filter(m => m._id !== selectedMsg._id));
-            }
-        } catch (e) { 
-            console.error(e); 
-            // ✅ FIX BUG #2: Show permission error to user
-            const errorMsg = e.response?.data?.message || 'Failed to delete message';
-            alert(errorMsg);
+            // 'everyone' mode handled via socket chat:message_updated
+        } catch (e) {
+            console.error(e);
+            alert(e.response?.data?.message || 'Failed to delete message');
+            // Revert if needed (could refetch, but UI usually fine)
         }
         setMsgAnchorEl(null);
     };
@@ -366,15 +379,18 @@ const SellerChatWidget = () => {
 
     const handleClearChat = async () => {
         if (!conversationId) return;
+
+        // Optimistic update
+        const oldMessages = [...messages];
+        setMessages([]);
+
         try {
             const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
             await axios.put(`/api/chat/clear/${conversationId}`, {}, config);
-            setMessages([]);
-        } catch (e) { 
-            console.error(e); 
-            // ✅ FIX BUG #2: Show error to user
-            const errorMsg = e.response?.data?.message || 'Failed to clear chat';
-            alert(errorMsg);
+        } catch (e) {
+            console.error(e);
+            setMessages(oldMessages); // Rollback
+            alert(e.response?.data?.message || 'Failed to clear chat');
         }
         setAnchorEl(null);
     };
@@ -513,7 +529,7 @@ const SellerChatWidget = () => {
                                                 </Box>
                                             )}
                                         </Box>
-                                    ))}  
+                                    ))}
                                     {/* ✅ FIX: Handle deleted messages */}
                                     {msg.isDeletedForEveryone ? (
                                         <Typography variant="body2" sx={{ fontStyle: 'italic', color: 'text.secondary', pr: 4 }}>
@@ -560,31 +576,38 @@ const SellerChatWidget = () => {
                     </Box>
                 </Collapse>
 
-                <Box component="form" onSubmit={(e) => { e.preventDefault(); sendMessage(); }} sx={{ p: 1.5, bgcolor: '#f0f0f0', display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <input 
-                        type="file" 
-                        ref={fileInputRef} 
-                        style={{ display: 'none' }} 
-                        onChange={handleFileUpload} 
-                        multiple 
-                        accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
-                    />
-                    <IconButton size="small" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-                        <AttachFileIcon />
-                    </IconButton>
-                    {/* ✅ FIX: Emoji picker button */}
-                    <IconButton size="small" onClick={(e) => setEmojiAnchorEl(e.currentTarget)}>
-                        <EmojiIcon />
-                    </IconButton>
-                    <TextField
-                        fullWidth multiline maxRows={4} size="small" placeholder="Type a message"
-                        value={message} onChange={handleTyping} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-                        sx={{ bgcolor: 'white', borderRadius: '20px', '& .MuiOutlinedInput-root': { borderRadius: '20px', px: 2 } }}
-                    />
-                    <IconButton color="primary" disabled={(!message.trim() && !uploading) || uploading} onClick={() => sendMessage()}>
-                        {uploading ? <CircularProgress size={24} /> : <SendIcon />}
-                    </IconButton>
-                </Box>
+                {isDisabled ? (
+                    <Box sx={{ p: 2, bgcolor: '#fff3e0', borderTop: '1px solid #ffe0b2' }}>
+                        <Typography variant="body2" color="warning.main" textAlign="center" fontWeight="bold">
+                            You are unable to chat with our company.
+                        </Typography>
+                    </Box>
+                ) : (
+                    <Box component="form" onSubmit={(e) => { e.preventDefault(); sendMessage(); }} sx={{ p: 1.5, bgcolor: '#f0f0f0', display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            style={{ display: 'none' }}
+                            onChange={handleFileUpload}
+                            multiple
+                            accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
+                        />
+                        <IconButton size="small" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+                            <AttachFileIcon />
+                        </IconButton>
+                        <IconButton size="small" onClick={(e) => setEmojiAnchorEl(e.currentTarget)}>
+                            <EmojiIcon />
+                        </IconButton>
+                        <TextField
+                            fullWidth multiline maxRows={4} size="small" placeholder="Type a message"
+                            value={message} onChange={handleTyping} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!sending && !uploading) sendMessage(); } }}
+                            sx={{ bgcolor: 'white', borderRadius: '20px', '& .MuiOutlinedInput-root': { borderRadius: '20px', px: 2 } }}
+                        />
+                        <IconButton color="primary" disabled={(!message.trim() && !uploading && !sending) || uploading || sending} onClick={() => sendMessage()}>
+                            {(uploading || sending) ? <CircularProgress size={24} /> : <SendIcon />}
+                        </IconButton>
+                    </Box>
+                )}
 
                 {/* Main Menu */}
                 <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
@@ -613,9 +636,9 @@ const SellerChatWidget = () => {
                 </Menu>
 
                 {/* ✅ NEW: Emoji Picker Menu */}
-                <Menu 
-                    anchorEl={emojiAnchorEl} 
-                    open={Boolean(emojiAnchorEl)} 
+                <Menu
+                    anchorEl={emojiAnchorEl}
+                    open={Boolean(emojiAnchorEl)}
                     onClose={() => setEmojiAnchorEl(null)}
                     PaperProps={{
                         sx: {

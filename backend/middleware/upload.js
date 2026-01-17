@@ -4,19 +4,13 @@ const { Readable } = require('stream');
 
 // File type validation
 const fileFilter = (req, file, cb) => {
-    const allowedTypes = {
-        image: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-        document: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
-        video: ['video/mp4', 'video/mpeg', 'video/quicktime'],
-        audio: ['audio/mpeg', 'audio/wav', 'audio/ogg']
-    };
+    const fileType = getFileType(file.mimetype);
+    const isAllowed = (fileType === 'image' || fileType === 'document' || fileType === 'video' || fileType === 'audio');
 
-    const allAllowedTypes = [...allowedTypes.image, ...allowedTypes.document, ...allowedTypes.video, ...allowedTypes.audio];
-
-    if (allAllowedTypes.includes(file.mimetype)) {
+    if (isAllowed) {
         cb(null, true);
     } else {
-        cb(new Error('Invalid file type. Only images, PDFs, documents, videos, and audio files are allowed.'), false);
+        cb(new Error(`Invalid file type: ${file.mimetype}. Only images, PDFs, documents, videos, and audio files are allowed.`), false);
     }
 };
 
@@ -52,14 +46,18 @@ const uploadToCloudinary = (buffer, mimetype, originalname) => {
         const uploadStream = cloudinary.uploader.upload_stream(
             {
                 folder: `chat/${fileType}s`,
-                resource_type: resourceType,
+                resource_type: 'auto', // Let Cloudinary handle the type
+                public_id: `${Date.now()}-${originalname.split('.')[0]}`,
                 transformation: fileType === 'image' ? [
                     { width: 1200, height: 1200, crop: 'limit' },
                     { quality: 'auto:good' }
                 ] : undefined
             },
             (error, result) => {
-                if (error) return reject(error);
+                if (error) {
+                    console.error('Cloudinary Upload Error:', error);
+                    return reject(error);
+                }
                 resolve(result);
             }
         );

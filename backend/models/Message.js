@@ -31,14 +31,18 @@ const messageSchema = new mongoose.Schema({
       validate: {
         validator: function (v) {
           if (!v) return true; // Optional field
+          // Relaxed validation to allow most common office and image formats
           const allowedTypes = [
             'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
             'application/pdf', 'application/msword',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'text/plain'
           ];
-          return allowedTypes.includes(v);
+          return allowedTypes.includes(v) || v.startsWith('image/') || v.startsWith('application/');
         },
-        message: 'Unsupported file type. Allowed: JPEG, PNG, GIF, WEBP, PDF, DOC, DOCX'
+        message: 'Unsupported file type'
       }
     },
     type: { type: String, enum: ['image', 'document', 'video', 'audio'] }

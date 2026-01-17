@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {  
+import {
   Box,
   Paper,
   Typography,
@@ -62,6 +62,7 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
   const [showProfile, setShowProfile] = useState(false); // ✅ FIX BUG #7: Profile dialog state
   const [fullSellerProfile, setFullSellerProfile] = useState(null); // ✅ FIX BUG #5: Full seller data
   const [loadingProfile, setLoadingProfile] = useState(false); // ✅ FIX BUG #5: Loading state
+  const [sending, setSending] = useState(false); // ✅ NEW: Loading state for sending
 
   const scrollRef = useRef();
   const fileInputRef = useRef();
@@ -90,17 +91,19 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
     });
 
     socketRef.current.on('connect', () => {
-      socketRef.current.emit('join', 'admin_room');
+      console.log('Admin socket connected:', socketRef.current.id);
+      socketRef.current.emit('joinAdminRoom'); // Corrected event name from socketServer.js
+      socketRef.current.emit('joinUserRoom', currentUser._id);
     });
 
     socketRef.current.on('chat:message', (data) => {
       if (data.conversationId === conversation._id) {
         // ✅ FIX BUG #7 & #8: Prevent duplicate messages from admin sending
         setMessages(prev => {
-          // Check if message already exists (from optimistic update)
+          // Check if message already exists (from optimistic update or previous receive)
           const exists = prev.some(m => m._id === data.message._id);
           if (exists) {
-            console.log('Message already exists (optimistic), skipping duplicate');
+            console.log('Message already exists, skipping duplicate');
             return prev;
           }
           return [...prev, data.message];
@@ -126,8 +129,10 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
       if (cId === conversation._id) setOtherTyping(false);
     });
 
-    socketRef.current.on('chat:chat_cleared', ({ conversationId: cId }) => {
-      if (cId === conversation._id) setMessages([]);
+    socketRef.current.on('chat:chat_cleared', ({ conversationId: cId, userId: clearingUserId }) => {
+      if (cId === conversation._id && clearingUserId === currentUser._id) {
+        setMessages([]);
+      }
     });
   };
 
@@ -163,7 +168,7 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
       console.warn('Other user is not a seller or ID missing');
       return;
     }
-    
+
     setLoadingProfile(true);
     try {
       const config = { headers: { Authorization: `Bearer ${currentUser.token}` } };
@@ -209,8 +214,8 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
       };
       const { data: uploadResults } = await axios.post('/api/upload/chat/multiple', formData, config);
       await handleSend(null, uploadResults);
-    } catch (e) { 
-      console.error(e); 
+    } catch (e) {
+      console.error(e);
       // ✅ FIX BUG #3: Better error message for file upload failures
       const errorMsg = e.response?.data?.message || 'File upload failed. Please check your internet connection and try again.';
       alert(errorMsg);
@@ -239,6 +244,7 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
     }
 
     try {
+      setSending(true);
       const config = { headers: { Authorization: `Bearer ${currentUser.token}` } };
       // ✅ FIX: Get response from API to add message immediately
       const { data: sentMessage } = await axios.post('/api/chat/send', {
@@ -247,15 +253,20 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
         attachments,
         replyTo: replyingTo?._id || null
       }, config);
-      
-      // ✅ FIX: Add message to UI immediately (optimistic update)
-      setMessages(prev => [...prev, sentMessage]);
+
+      // ✅ FIX: Add message to UI immediately (optimistic update) with duplicate check
+      setMessages(prev => {
+        if (prev.some(m => m._id === sentMessage._id)) return prev;
+        return [...prev, sentMessage];
+      });
       setMessage('');
       setReplyingTo(null);
       scrollToBottom();
     } catch (e) {
       console.error(e);
-      alert('Failed to send message. Please try again.');
+      alert(e.response?.data?.message || 'Failed to send message.');
+    } finally {
+      setSending(false);
     }
   };
 
@@ -270,17 +281,18 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
   };
 
   const handleDelete = async (mode) => {
-    // ✅ FIX BUG #8: Prevent deletion in disabled chats (unless admin override)
-    if (conversation.isDisabled && currentUser.role !== 'admin') {
-      alert('This chat is disabled. You cannot delete messages.');
-      return;
+    // Optimistic update
+    if (mode === 'me') {
+      setMessages(prev => prev.filter(m => m._id !== selectedMsg._id));
     }
-    
+
     try {
       const config = { headers: { Authorization: `Bearer ${currentUser.token}` } };
       await axios.delete(`/api/chat/message/${selectedMsg._id}?mode=${mode}`, config);
-      if (mode === 'me') setMessages(prev => prev.filter(m => m._id !== selectedMsg._id));
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      alert('Delete failed');
+    }
     setMsgAnchorEl(null);
   };
 
@@ -299,18 +311,23 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
 
   const handleClearChat = async () => {
     if (!conversation._id) return;
-    
-    // ✅ FIX BUG #8: Prevent clearing disabled chats
+
     if (conversation.isDisabled && currentUser.role !== 'admin') {
       alert('This chat is disabled. You cannot clear messages.');
       return;
     }
-    
+
+    const oldMessages = [...messages];
+    setMessages([]);
+
     try {
       const config = { headers: { Authorization: `Bearer ${currentUser.token}` } };
       await axios.put(`/api/chat/clear/${conversation._id}`, {}, config);
-      setMessages([]);
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      setMessages(oldMessages);
+      alert('Clear chat failed');
+    }
     setMsgAnchorEl(null);
   };
 
@@ -453,7 +470,7 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
                       </Box>
                     )}
                   </Box>
-                ))}  
+                ))}
                 {/* ✅ FIX: Handle deleted messages */}
                 {msg.isDeletedForEveryone ? (
                   <Typography variant="body2" sx={{ fontStyle: 'italic', color: 'text.secondary', pr: 4 }}>
@@ -509,11 +526,16 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
         <TextField
           fullWidth multiline maxRows={4} size="small" placeholder="Type a message"
           value={message} onChange={handleTyping}
-          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              if (!sending && !uploading) handleSend();
+            }
+          }}
           sx={{ bgcolor: 'white', borderRadius: '20px', '& .MuiOutlinedInput-root': { borderRadius: '20px' } }}
         />
-        <IconButton color="primary" disabled={(!message.trim() && !uploading) || uploading} onClick={() => handleSend()}>
-          {uploading ? <CircularProgress size={24} /> : <SendIcon />}
+        <IconButton color="primary" disabled={(!message.trim() && !uploading && !sending) || uploading || sending} onClick={() => handleSend()}>
+          {(uploading || sending) ? <CircularProgress size={24} /> : <SendIcon />}
         </IconButton>
       </Box>
 
@@ -531,9 +553,9 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
       </Menu>
 
       {/* ✅ NEW: Emoji Picker Menu */}
-      <Menu 
-        anchorEl={emojiAnchorEl} 
-        open={Boolean(emojiAnchorEl)} 
+      <Menu
+        anchorEl={emojiAnchorEl}
+        open={Boolean(emojiAnchorEl)}
         onClose={() => setEmojiAnchorEl(null)}
         PaperProps={{
           sx: {
@@ -610,8 +632,8 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
                     <Grid item xs={12}>
                       <Typography variant="subtitle2" color="text.secondary">Address</Typography>
                       <Typography variant="body1">
-                        {profile.businessDetails?.address?.street ? 
-                          `${profile.businessDetails.address.street}, ${profile.businessDetails.address.city}, ${profile.businessDetails.address.state} ${profile.businessDetails.address.pinCode}` 
+                        {profile.businessDetails?.address?.street ?
+                          `${profile.businessDetails.address.street}, ${profile.businessDetails.address.city}, ${profile.businessDetails.address.state} ${profile.businessDetails.address.pinCode}`
                           : 'N/A'}
                       </Typography>
                     </Grid>

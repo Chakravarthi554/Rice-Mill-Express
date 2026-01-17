@@ -78,7 +78,7 @@ exports.sendMessage = asyncHandler(async (req, res) => {
             messageData.image = attachments[0].url;
         }
     } else {
-        messageData.type = type || 'text';
+        messageData.type = type || (content ? 'text' : 'document');
     }
 
     // Handle reply
@@ -106,14 +106,13 @@ exports.sendMessage = asyncHandler(async (req, res) => {
 
     const io = req.app.get('io');
     if (io) {
-        // ✅ FIX: Consolidated broadcast to prevent duplicate messages (was causing 3x sends)
-        // Broadcast to both participants via their user rooms
+        // ✅ BROADCAST to participants
         [senderId, receiverId].forEach(uid => {
             io.to(`user_${uid}`).emit('chat:message', { message: populatedMessage, conversationId: conversation._id });
             io.to(`user_${uid}`).emit('chat:conversation_update', populatedConversation);
         });
 
-        // Broadcast to admin_room for monitoring (single emission only)
+        // ✅ BROADCAST to admin_room for real-time visibility
         io.to('admin_room').emit('chat:message', { message: populatedMessage, conversationId: conversation._id });
         io.to('admin_room').emit('chat:conversation_update', populatedConversation);
     }
@@ -324,23 +323,15 @@ exports.deleteMessage = asyncHandler(async (req, res) => {
         message.attachments = [];
         await message.save();
 
-        // Broadcast
+        // Broadcast update (not delete, because we keep the message with a placeholder)
         const io = req.app.get('io');
         if (io) {
-            // We need conversation participants to broadcast
             const conv = await Conversation.findById(message.conversationId);
             if (conv) {
                 conv.participants.forEach(pid => {
-                    io.to(`user_${pid}`).emit('chat:message_deleted', {
-                        messageId: message._id,
-                        mode: 'everyone'
-                    });
+                    io.to(`user_${pid}`).emit('chat:message_updated', message);
                 });
-                // Also broadcast to admin_room
-                io.to('admin_room').emit('chat:message_deleted', {
-                    messageId: message._id,
-                    mode: 'everyone'
-                });
+                io.to('admin_room').emit('chat:message_updated', message);
             }
         }
     } else {
@@ -348,6 +339,12 @@ exports.deleteMessage = asyncHandler(async (req, res) => {
         if (!message.deletedBy.includes(req.user._id)) {
             message.deletedBy.push(req.user._id);
             await message.save();
+        }
+
+        // Notify the user who deleted (to sync multiple devices)
+        const io = req.app.get('io');
+        if (io) {
+            io.to(`user_${req.user._id}`).emit('chat:message_deleted', { messageId: message._id, mode: 'me' });
         }
     }
 
@@ -466,9 +463,12 @@ exports.clearChat = asyncHandler(async (req, res) => {
     if (io) {
         const conversation = await Conversation.findById(conversationId);
         if (conversation) {
+            // Emitting to ALL participants, but only the one who cleared will handle it 
+            // by clearing their LOCAL state. Rest will ignore.
             conversation.participants.forEach(pid => {
-                io.to(`user_${pid}`).emit('chat:chat_cleared', { conversationId });
+                io.to(`user_${pid}`).emit('chat:chat_cleared', { conversationId, userId: req.user._id });
             });
+            io.to('admin_room').emit('chat:chat_cleared', { conversationId, userId: req.user._id });
         }
     }
 
