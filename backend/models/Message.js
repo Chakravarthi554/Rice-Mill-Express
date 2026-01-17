@@ -3,21 +3,50 @@ const mongoose = require('mongoose');
 const messageSchema = new mongoose.Schema({
   sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   receiver: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  content: { 
+  conversationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Conversation', required: true },
+  content: {
     type: String,
     validate: {
-      validator: function(v) {
-        return (v && v.trim().length > 0) || !!this.image;
+      validator: function (v) {
+        // Must have content OR an image/attachment
+        // For type=text, content required. For others, just needs to exist? 
+        // Logic: if image/doc/audio, content might be optional (caption).
+        // Let's keep it simple: if 'type' is NOT text, content is optional.
+        if (this.type !== 'text') return true;
+        return (v && v.trim().length > 0);
       },
-      message: 'At least one of content or image is required'
+      message: 'Message content is required for text messages'
     }
   },
   orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', default: null },
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', default: null },
-  image: { type: String, default: null },
+  image: { type: String, default: null }, // Legacy support
+  attachments: [{
+    url: { type: String, required: true },
+    filename: { type: String, required: true },
+    size: { type: Number },
+    mimeType: { type: String },
+    type: { type: String, enum: ['image', 'document', 'video', 'audio'] }
+  }],
+
+  // New Fields
+  type: { type: String, enum: ['text', 'image', 'document', 'audio', 'video'], default: 'text' },
+  replyTo: { type: mongoose.Schema.Types.ObjectId, ref: 'Message', default: null },
+  isEdited: { type: Boolean, default: false },
+  editedAt: { type: Date },
+  isStarredBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  isPinnedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // For pinning specific messages
+  deletedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  reactions: [{
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    emoji: String
+  }],
+
   status: { type: String, enum: ['sent', 'delivered', 'read'], default: 'sent' },
+  readAt: { type: Date },
+  deliveredAt: { type: Date },
   isFlagged: { type: Boolean, default: false },
-  sentBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // Added to track sender explicitly
+  sentBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Message', messageSchema);

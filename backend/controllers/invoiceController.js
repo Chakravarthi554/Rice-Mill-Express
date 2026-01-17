@@ -3,9 +3,13 @@ const Order = require('../models/Order');
 const asyncHandler = require('express-async-handler');
 const path = require('path');
 
-// Helper to decode common HTML entities that might be in the DB
+// Helper to decode common HTML entities and normalize UTF-8 strings
 const decodeEntities = (text) => {
     if (!text) return '';
+    let str = String(text);
+    // Remove invisible control characters that can cause PDF rendering issues
+    str = str.replace(/[\u200B-\u200D\uFEFF]/g, '');
+
     const entities = {
         '&amp;': '&',
         '&lt;': '<',
@@ -21,79 +25,94 @@ const decodeEntities = (text) => {
         '&#8220;': '"',
         '&#8221;': '"',
         '&#8211;': '-',
-        '&#8212;': '--'
+        '&#8212;': '--',
+        '&trade;': '™',
+        '&reg;': '®',
+        '&copy;': '©',
+        '&euro;': '€',
+        '&#8377;': '₹'
     };
-    // First pass for common named entities
-    let decoded = text.replace(/&[#a-zA-Z0-9]+;/g, (match) => entities[match] || match);
-    // Second pass for generic character codes if any remain
+
+    let decoded = str.replace(/&[#a-zA-Z0-9]+;/g, (match) => entities[match] || match);
+    decoded = decoded.replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(dec));
+    decoded = decoded.replace(/&#x([a-fA-F0-9]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+
     try {
-        decoded = decoded.replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(dec));
+        decoded = decoded.normalize('NFC');
     } catch (e) {
-        console.warn('Failed to decode some character codes', e);
+        // Fallback
     }
-    return decoded;
+
+    return decoded.trim();
 };
 
+
 // @desc    Generate invoice PDF for an order
-// @route   GET /api/orders/:orderId/invoice
-// @access  Private (Customer who owns the order)
+// @route   GET /api/orders/:id/invoice
+// @access  Private (Owner, Seller, or Admin)
 exports.generateInvoice = asyncHandler(async (req, res) => {
     try {
-        console.log('Generating invoice for order:', req.params.id);
+        console.log('🔄 Generating invoice for order ID:', req.params.id);
 
         const order = await Order.findById(req.params.id)
             .populate('user', 'name email phone')
             .populate('seller', 'name businessDetails.businessName')
-            .populate('orderItems.product', 'name price images');
+            .populate('orderItems.product', 'name price');
 
         if (!order) {
             res.status(404);
             throw new Error('Order not found');
         }
 
-        // Verify user owns this order or is admin
-        const orderUserId = order.user?._id ? order.user._id.toString() : order.user?.toString();
-        const currentUserId = req.user?._id ? req.user._id.toString() : req.user?.toString();
+        // --- AUTHORIZATION CHECK ---
+        const currentUserId = req.user?._id?.toString();
+        const orderUserId = order.user?._id?.toString() || order.user?.toString();
+        const sellerId = order.seller?._id?.toString() || order.seller?.toString();
+        const userRole = req.user?.role;
 
-        if (orderUserId !== currentUserId && req.user?.role !== 'admin' && req.user?.role !== 'super_admin') {
+        // Allow if user is: the customer, the seller, or an admin
+        const isAuthorized = (
+            currentUserId === orderUserId ||
+            currentUserId === sellerId ||
+            userRole === 'admin' ||
+            userRole === 'super_admin'
+        );
+
+        if (!isAuthorized) {
+            console.warn(`❌ Unauthorized invoice access attempt by user ${currentUserId}`);
             res.status(403);
             throw new Error('Not authorized to access this invoice');
         }
 
-        // Create PDF document
-        const doc = new PDFDocument({ margin: 50 });
+        // --- PDF GENERATION ---
+        const doc = new PDFDocument({
+            margin: 50,
+            info: {
+                Title: `Invoice - ${order._id}`,
+                Author: 'Rice Mill Platform',
+                Subject: 'Order Invoice',
+                Keywords: 'invoice, rice mill, order'
+            }
+        });
 
         // Register Unicode-compatible fonts
         const fs = require('fs');
         const regularFontPath = path.join(__dirname, '../assets/fonts/DejaVuSans.ttf');
         const boldFontPath = path.join(__dirname, '../assets/fonts/DejaVuSans-Bold.ttf');
 
-        console.log('Checking font paths:', { regularFontPath, boldFontPath });
-        if (!fs.existsSync(regularFontPath)) {
-            console.error('Regular font not found at:', regularFontPath);
-            throw new Error(`Regular font file missing: ${regularFontPath}`);
-        }
-        if (!fs.existsSync(boldFontPath)) {
-            console.error('Bold font not found at:', boldFontPath);
-            throw new Error(`Bold font file missing: ${boldFontPath}`);
-        }
-
-        try {
+        if (!fs.existsSync(regularFontPath) || !fs.existsSync(boldFontPath)) {
+            console.error('⚠️ Unicode fonts missing, falling back to standard fonts');
+            doc.font('Helvetica');
+        } else {
             doc.registerFont('DejaVuSans', regularFontPath);
             doc.registerFont('DejaVuSans-Bold', boldFontPath);
-        } catch (fontErr) {
-            console.error('Error registering fonts:', fontErr);
-            throw fontErr;
+            doc.font('DejaVuSans');
         }
 
-        // Default to Regular
-        doc.font('DejaVuSans');
-
-        // Set response headers for PDF download
+        // Set response headers
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename=invoice_${order._id}.pdf`);
 
-        // Pipe PDF to response
         doc.pipe(res);
 
         // Header
@@ -105,113 +124,77 @@ exports.generateInvoice = asyncHandler(async (req, res) => {
         doc.font('DejaVuSans-Bold').fontSize(20).fillColor('#000').text('INVOICE', { align: 'center' });
         doc.moveDown();
 
-        // Invoice Details
-        doc.font('DejaVuSans').fontSize(10);
+        // Details
+        const rupee = '\u20B9'; // Unicode for Rupee symbol
+        doc.font('DejaVuSans').fontSize(10).fillColor('#000');
         doc.text(`Invoice Number: INV-${order._id.toString().slice(-8).toUpperCase()}`, 50, 150);
         doc.text(`Order ID: ${order._id}`, 50, 165);
         doc.text(`Date: ${new Date(order.createdAt).toLocaleDateString('en-IN')}`, 50, 180);
-        doc.text(`Payment Method: ${order.paymentMethod || 'COD'}`, 50, 195);
-        doc.text(`Order Status: ${order.orderStatus}`, 50, 210);
+        doc.text(`Payment: ${order.paymentMethod?.toUpperCase() || 'COD'}`, 50, 195);
 
-        // Customer Details
+        // BillTo / SoldBy
         doc.font('DejaVuSans-Bold').fontSize(12).text('Bill To:', 50, 240);
         doc.font('DejaVuSans').fontSize(10);
         doc.text(decodeEntities(order.user?.name || 'Customer'), 50, 260);
         doc.text(order.user?.email || '', 50, 275);
-        doc.text(order.user?.phone || 'N/A', 50, 290);
 
         if (order.shippingAddress) {
-            const street = decodeEntities(order.shippingAddress.street || '');
-            const city = decodeEntities(order.shippingAddress.city || '');
-            const state = decodeEntities(order.shippingAddress.state || '');
-            doc.text(`${street}, ${city}`, 50, 305);
-            doc.text(`${state} - ${order.shippingAddress.pinCode || ''}`, 50, 320);
+            const addr = order.shippingAddress;
+            doc.text(`${decodeEntities(addr.street)}, ${decodeEntities(addr.city)}`, 50, 290);
+            doc.text(`${decodeEntities(addr.state)} - ${addr.pinCode}`, 50, 305);
         }
 
-        // Seller Details
         if (order.seller) {
             doc.font('DejaVuSans-Bold').fontSize(12).text('Sold By:', 350, 240);
             doc.font('DejaVuSans').fontSize(10);
-            const sellerName = decodeEntities(order.seller?.businessDetails?.businessName || order.seller?.name || 'Seller');
-            doc.text(sellerName, 350, 260);
+            const sName = decodeEntities(order.seller?.businessDetails?.businessName || order.seller?.name || 'Seller');
+            doc.text(sName, 350, 260);
         }
 
-        // Line separator
-        doc.moveTo(50, 350).lineTo(550, 350).stroke();
+        // Items Table
+        doc.moveTo(50, 330).lineTo(550, 330).stroke();
+        doc.font('DejaVuSans-Bold').fontSize(11).fillColor('#2e7d32');
+        doc.text('Item Description', 50, 340);
+        doc.text('Qty', 350, 340);
+        doc.text('Rate', 420, 340);
+        doc.text('Total', 500, 340);
+        doc.moveTo(50, 355).lineTo(550, 355).stroke();
 
-        // Items Table Header
-        doc.font('DejaVuSans-Bold').fontSize(12).fillColor('#2e7d32');
-        doc.text('Item', 50, 370);
-        doc.text('Qty', 350, 370);
-        doc.text('Price', 420, 370);
-        doc.text('Total', 490, 370);
-
-        doc.moveTo(50, 385).lineTo(550, 385).stroke();
-
-        // Items
-        let yPosition = 400;
+        let y = 370;
         doc.font('DejaVuSans').fontSize(10).fillColor('#000');
 
-        if (order.orderItems && order.orderItems.length > 0) {
-            order.orderItems.forEach((item) => {
-                const itemTotal = (item.price || 0) * (item.qty || 0);
-                const productName = decodeEntities(item.product?.name || item.name || 'Product');
+        order.orderItems.forEach(item => {
+            const itemTotal = (item.price || 0) * (item.qty || 0);
+            const pName = decodeEntities(item.product?.name || item.name || 'Product');
 
-                doc.text(productName, 50, yPosition, { width: 280 });
-                doc.text((item.qty || 0).toString(), 350, yPosition);
-                doc.text(`₹ ${(item.price || 0).toFixed(2)}`, 420, yPosition);
-                doc.text(`₹ ${itemTotal.toFixed(2)}`, 490, yPosition);
+            doc.text(pName, 50, y, { width: 280 });
+            doc.text((item.qty || 0).toString(), 350, y);
+            doc.text(`${rupee} ${(item.price || 0).toFixed(2)}`, 420, y);
+            doc.text(`${rupee} ${itemTotal.toFixed(2)}`, 500, y);
 
-                // Adjust yPosition based on text height if it wraps
-                const textHeight = doc.heightOfString(productName, { width: 280 });
-                yPosition += Math.max(textHeight + 10, 25);
-            });
-        }
-
-        // Line separator before totals
-        yPosition += 10;
-        doc.moveTo(50, yPosition).lineTo(550, yPosition).stroke();
-        yPosition += 20;
+            y += Math.max(doc.heightOfString(pName, { width: 280 }) + 10, 25);
+        });
 
         // Totals
-        doc.font('DejaVuSans');
-        doc.text('Subtotal:', 380, yPosition);
-        doc.text(`₹ ${(order.itemsPrice || order.totalPrice).toFixed(2)}`, 490, yPosition);
-        yPosition += 20;
-
-        if (order.taxPrice && order.taxPrice > 0) {
-            doc.text('Tax:', 380, yPosition);
-            doc.text(`₹ ${order.taxPrice.toFixed(2)}`, 490, yPosition);
-            yPosition += 20;
-        }
-
-        if (order.shippingPrice && order.shippingPrice > 0) {
-            doc.text('Shipping:', 380, yPosition);
-            doc.text(`₹ ${order.shippingPrice.toFixed(2)}`, 490, yPosition);
-            yPosition += 20;
-        }
-
-        // Grand Total
-        yPosition += 5;
-        doc.font('DejaVuSans-Bold').fontSize(14).fillColor('#2e7d32');
-        doc.text('Total Amount:', 380, yPosition);
-        doc.text(`₹ ${order.totalPrice.toFixed(2)}`, 490, yPosition);
+        y += 10;
+        doc.moveTo(350, y).lineTo(550, y).stroke();
+        y += 10;
+        doc.font('DejaVuSans-Bold');
+        doc.text('Final Amount:', 350, y);
+        doc.text(`${rupee} ${order.totalPrice.toFixed(2)}`, 500, y);
 
         // Footer
-        doc.font('DejaVuSans').fontSize(8).fillColor('#666');
-        doc.text('Thank you for your business!', 50, 700, { align: 'center' });
-        doc.text('For support, contact: support@ricemill.com', 50, 715, { align: 'center' });
+        doc.font('DejaVuSans').fontSize(9).fillColor('#888');
+        doc.text('Computer generated invoice. No signature required.', 50, 700, { align: 'center' });
+        doc.text('Visit us at ricemill-platform.com', 50, 715, { align: 'center' });
 
-        // Finalize PDF
         doc.end();
+        console.log('✅ Invoice generation complete');
 
     } catch (error) {
-        console.error('Invoice generation error:', error);
+        console.error('❌ Invoice Error:', error);
         if (!res.headersSent) {
-            res.status(500).json({
-                success: false,
-                message: error.message || 'Failed to generate invoice'
-            });
+            res.status(500).json({ success: false, message: error.message });
         }
     }
 });

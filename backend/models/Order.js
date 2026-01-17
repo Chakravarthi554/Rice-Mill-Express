@@ -162,6 +162,16 @@ const orderSchema = new mongoose.Schema({
   trackingId: {
     type: String
   },
+  estimatedDeliveryDate: {
+    type: Date
+  },
+  actualDeliveryDate: {
+    type: Date
+  },
+  updatedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
   // Delivery Charge Fields
   deliveryCharge: {
     type: Number,
@@ -275,13 +285,7 @@ orderSchema.pre('save', function (next) {
     this.sellerEarnings = this.totalPrice - this.commissionAmount;
   }
 
-  // Add to status history if status changed
-  if (this.isModified('orderStatus') && !this.isNew) {
-    this.statusHistory.push({
-      status: this.orderStatus,
-      timestamp: new Date()
-    });
-  }
+
 
   next();
 });

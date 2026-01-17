@@ -18,7 +18,20 @@ export const getSocket = (userId, role, token) => {
 
   // Return existing connected socket
   if (socketInstance?.connected) {
-    console.log('🔄 Returning existing socket connection');
+    console.log('🔄 Reusing existing socket connection');
+
+    // 🔥 CRITICAL: Ensure we still join relevant rooms even on reuse
+    if (userId) {
+      socketInstance.emit('joinUserRoom', userId);
+      socketInstance.emit('joinNotifications', userId);
+    }
+    if (role === 'admin') {
+      socketInstance.emit('joinAdminRoom');
+    }
+    if (role === 'seller') {
+      socketInstance.emit('joinSellerRoom', userId);
+    }
+
     return socketInstance;
   }
 
@@ -144,6 +157,18 @@ export const getSocket = (userId, role, token) => {
     if (window.socialUpdateCallback) {
       window.socialUpdateCallback(data);
     }
+  });
+
+  socketInstance.on('ENGAGEMENT_UPDATE', (data) => {
+    console.log('📈 ENGAGEMENT_UPDATE received:', data);
+
+    // Standardize the event for the window
+    const event = new CustomEvent('ENGAGEMENT_UPDATE', { detail: data });
+    window.dispatchEvent(event);
+
+    // Optional: Also trigger socialUpdate listner for compatibility
+    const socialEvent = new CustomEvent('socialUpdate', { detail: data });
+    window.dispatchEvent(socialEvent);
   });
 
   socketInstance.on('NEW_FORUM_POST', (data) => {

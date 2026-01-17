@@ -6,6 +6,9 @@ const Product = require('../models/Product');
 const Notification = require('../models/Notification');
 const Payment = require('../models/Payment');
 const BulkOrder = require('../models/BulkOrder');
+const OrderStatusHistory = require('../models/OrderStatusHistory');
+const DeliveryPartner = require('../models/deliveryPartner');
+const NotificationService = require('../services/NotificationService');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const Razorpay = require('razorpay');
@@ -260,7 +263,7 @@ exports.getOrderById = asyncHandler(async (req, res) => {
 });
 
 exports.updateOrderStatus = asyncHandler(async (req, res) => {
-  const { status, reason, partnerId } = req.body;
+  const { status, reason, notes } = req.body;
   const orderId = req.params.id;
 
   if (!mongoose.Types.ObjectId.isValid(orderId)) { res.status(400); throw new Error('Invalid order ID'); }
@@ -273,10 +276,7 @@ exports.updateOrderStatus = asyncHandler(async (req, res) => {
     res.status(403); throw new Error('Not authorized to update this order status');
   }
 
-  // Status Transition Logic
-  const currentStatus = order.orderStatus;
-
-  // Looser validation to allow skipping steps
+  const previousStatus = order.orderStatus;
   const validTransitions = {
     placed: ['processing', 'packed', 'shipped', 'cancelled'],
     processing: ['packed', 'shipped', 'cancelled'],
@@ -287,83 +287,50 @@ exports.updateOrderStatus = asyncHandler(async (req, res) => {
     cancelled: [],
   };
 
-  if (req.user.role === 'admin') {
-    // Admins can do anything
-  } else if (!validTransitions[currentStatus] || !validTransitions[currentStatus].includes(status)) {
-    // Allow 'shipped' from any state if partner is assigned?
-    if (status === 'shipped' && (partnerId || order.deliveryPartner)) {
-      // Allow
-    } else {
-      res.status(400);
-      throw new Error(`Invalid status transition from ${currentStatus} to ${status}`);
+  if (req.user.role !== 'admin' && previousStatus !== status) {
+    if (!validTransitions[previousStatus] || !validTransitions[previousStatus].includes(status)) {
+      res.status(400); throw new Error(`Invalid status transition from ${previousStatus} to ${status}`);
     }
   }
 
+  // Update order fields
   order.orderStatus = status;
+  order.updatedBy = req.user._id;
 
-  // ✅ NEW: Generate OTP when Out for Delivery
-  if (status === 'out_for_delivery') {
-    const otp = Math.floor(1000 + Math.random() * 9000).toString();
-    order.deliveryOtp = otp;
+  // Track status history with reasons/notes
+  order.statusHistory.push({
+    status,
+    timestamp: new Date(),
+    reason: notes || reason || `Status updated to ${status}`
+  });
 
-    // Notify Customer with OTP
-    await Notification.create({
-      user: order.user,
-      type: 'ORDER_OTP',
-      message: `Your Order #${order._id.toString().slice(-6)} is out for delivery! Share OTP ${otp} with the delivery partner.`,
-      relatedEntity: order._id,
-      entityModel: 'Order'
-    });
-
-    // Also send SMS if possible (Placeholder)
-    console.log(`🔐 Generated OTP for Order ${order._id}: ${otp}`);
+  if (status === 'out_for_delivery' && !order.deliveryOtp) {
+    order.deliveryOtp = Math.floor(1000 + Math.random() * 9000).toString();
   }
-  order.statusHistory.push({ status, timestamp: new Date(), reason: reason || undefined });
 
-  if (status === 'shipped' && partnerId) order.deliveryPartner = partnerId;
-  if (status === 'delivered') { order.isDelivered = true; order.deliveredAt = Date.now(); }
+  if (status === 'delivered') {
+    order.isDelivered = true;
+    order.deliveredAt = Date.now();
+  }
+
   if (status === 'cancelled') {
-    order.cancelReason = reason || 'Cancelled by seller/admin';
-    // Restore stock only if order was not already delivered
+    order.cancelReason = reason || notes || 'Cancelled by seller/admin';
     if (!order.isDelivered) {
-      for (const item of order.orderItems) { await Product.findByIdAndUpdate(item.product, { $inc: { stock: item.qty } }); }
+      for (const item of order.orderItems) {
+        await Product.findByIdAndUpdate(item.product, { $inc: { stock: item.qty } });
+      }
     }
-    // Update payment status (handle potential refunds)
     const paymentUpdate = { status: order.isPaid ? 'refunded' : 'failed', notes: `Order cancelled. Reason: ${order.cancelReason}` };
     await Payment.updateOne({ order: order._id }, { $set: paymentUpdate });
     order.paymentStatus = paymentUpdate.status;
-    if (order.isPaid && order.paymentMethod === 'razorpay') {
-      console.warn(`Order ${orderId} was cancelled but paid online. Manual refund might be required.`);
-      await Notification.create({
-        user: process.env.ADMIN_USER_ID,
-        type: 'SYSTEM',
-        message: `Order #${order._id.toString().slice(-6)} (Paid Online) was cancelled. Manual refund needed.`,
-        relatedEntity: order._id,
-        entityModel: 'Order'
-      });
-    }
   }
 
   const updatedOrder = await order.save();
-  // Notify user
-  await Notification.create({
-    user: order.user,
-    type: 'ORDER_STATUS_UPDATE',
-    message: `Your order #${order._id.toString().slice(-6)} status: ${status}. ${reason ? `Reason: ${reason}` : ''}`,
-    relatedEntity: order._id,
-    entityModel: 'Order'
-  });
-  // Emit socket events
+
+  // 🔥 Real-time sync & Multi-channel notifications
   const io = req.app.get('io');
-  if (io) {
-    const updateDataEmit = { status: updatedOrder.orderStatus, isDelivered: updatedOrder.isDelivered, deliveredAt: updatedOrder.deliveredAt };
-    emitOrderUpdate(io, order.user.toString(), order._id, updateDataEmit);
-    emitOrderUpdate(io, order.seller.toString(), order._id, updateDataEmit);
-    io.to('admin').emit('ORDER_UPDATE', { type: 'ORDER_UPDATE', data: { orderId: order._id, ...updateDataEmit } });
-    if (['delivered', 'cancelled'].includes(status)) {
-      io.to(`seller_${order.seller.toString()}`).emit('REFRESH_ANALYTICS', { sellerId: order.seller.toString() });
-    }
-  }
+  const notificationService = new NotificationService(io);
+  await notificationService.notifyOrderStatusUpdate(updatedOrder, previousStatus, req.user, notes || reason, req);
 
   res.json(updatedOrder);
 });
@@ -620,82 +587,96 @@ exports.getSellerOrders = asyncHandler(async (req, res) => {
 });
 
 exports.assignDeliveryPartner = asyncHandler(async (req, res) => {
-  const { partnerId } = req.body;
+  const { partnerId: partnerIdFromReq, deliveryPartner, notes } = req.body;
+  const partnerId = partnerIdFromReq || deliveryPartner;
   const orderId = req.params.id;
+
   if (!mongoose.Types.ObjectId.isValid(orderId)) { res.status(400); throw new Error('Invalid order ID'); }
   if (partnerId && !mongoose.Types.ObjectId.isValid(partnerId)) { res.status(400); throw new Error('Invalid delivery partner ID'); }
+
   const order = await Order.findById(orderId);
   if (!order) { res.status(404); throw new Error('Order not found'); }
-  // Authorization
+
   if (req.user.role !== 'admin' && order.seller.toString() !== req.user._id.toString()) {
     res.status(403); throw new Error('Not authorized for this order');
   }
-  const oldPartner = order.deliveryPartner?.toString();
-  order.deliveryPartner = partnerId || null;
-  // Auto-update status to 'shipped' if assigning for the first time on packable orders
-  if (partnerId && !oldPartner && ['packed', 'processing'].includes(order.orderStatus)) {
-    order.orderStatus = 'shipped'; order.statusHistory.push({ status: 'shipped', timestamp: new Date() });
-  }
-  const updatedOrder = await order.save();
 
-  // Notify Delivery Partner
-  if (partnerId) {
-    await Notification.create({
-      user: partnerId,
-      type: 'SYSTEM',
-      title: 'New Delivery Assigned',
-      message: `You have been assigned to order #${order._id.toString().slice(-6)}`,
-      relatedEntity: order._id,
-      entityModel: 'Order'
+  const previousStatus = order.orderStatus;
+  const oldPartnerId = order.deliveryPartner;
+
+  // Assign partner
+  const partner = await DeliveryPartner.findById(partnerId);
+  if (partnerId && !partner) { res.status(404); throw new Error('Delivery partner not found'); }
+
+  order.deliveryPartner = partnerId || null;
+  order.updatedBy = req.user._id;
+
+  // Auto-update status to 'shipped' if assigning for the first time on packable orders
+  if (partnerId && !oldPartnerId && ['packed', 'processing'].includes(order.orderStatus)) {
+    const previousStatusForLog = order.orderStatus;
+    order.orderStatus = 'shipped';
+    order.statusHistory.push({
+      status: 'shipped',
+      timestamp: new Date(),
+      reason: `Partner assigned: ${partner.name}. Auto-shipped.`
     });
   }
-  // Emit socket events
+
+  const updatedOrder = await order.save();
+
+  // 🔥 Real-time sync & Notifications
   const io = req.app.get('io');
-  if (io) {
-    const updateDataEmit = { status: updatedOrder.orderStatus, deliveryPartner: updatedOrder.deliveryPartner };
-    emitOrderUpdate(io, order.user.toString(), order._id, updateDataEmit);
-    emitOrderUpdate(io, order.seller.toString(), order._id, updateDataEmit);
-    io.to('admin').emit('ORDER_UPDATE', { type: 'ORDER_UPDATE', data: { orderId: order._id, ...updateDataEmit } });
+  const notificationService = new NotificationService(io);
+
+  if (partnerId) {
+    await notificationService.notifyPartnerAssignment(updatedOrder, partner, req.user);
   }
-  res.json({ message: 'Delivery partner updated', order: updatedOrder });
+
+  if (previousStatus !== updatedOrder.orderStatus) {
+    await notificationService.notifyOrderStatusUpdate(updatedOrder, previousStatus, req.user, notes || 'Partner assigned & Shipped', req);
+  } else {
+    // Just sync the partner assignment without status change notification
+    if (io) {
+      io.to(`user_${order.user}`).emit('ORDER_UPDATE', { orderId: order._id, partnerId });
+      io.to(`user_${order.seller}`).emit('ORDER_UPDATE', { orderId: order._id, partnerId });
+    }
+  }
+
+  res.json({ message: 'Delivery partner assigned successfully', order: updatedOrder });
 });
 
 exports.updateOrderToDelivered = asyncHandler(async (req, res) => {
   const orderId = req.params.id;
   if (!mongoose.Types.ObjectId.isValid(orderId)) { res.status(400); throw new Error('Invalid order ID'); }
+
   const order = await Order.findById(orderId);
   if (!order) { res.status(404); throw new Error('Order not found'); }
-  // Authorization: Check roles
+
   const isSeller = order.seller.toString() === req.user._id.toString();
   const isDeliveryPartner = order.deliveryPartner?.toString() === req.user._id.toString();
   const isAdmin = req.user.role === 'admin';
-  const isAllowedRole = req.user.role === 'deliveryPartner';
 
-  if (!isAdmin && !isSeller && !(isDeliveryPartner && isAllowedRole)) {
+  if (!isAdmin && !isSeller && !isDeliveryPartner) {
     res.status(403); throw new Error('Not authorized to mark this order as delivered');
   }
-  // Check if deliverable status
+
   if (!['shipped', 'out_for_delivery'].includes(order.orderStatus)) {
     res.status(400); throw new Error(`Order cannot be marked delivered from status: ${order.orderStatus}`);
   }
-  // Update order
-  order.orderStatus = 'delivered'; order.isDelivered = true; order.deliveredAt = Date.now();
-  order.statusHistory.push({ status: 'delivered', timestamp: new Date() });
+
+  const previousStatus = order.orderStatus;
+  order.orderStatus = 'delivered';
+  order.isDelivered = true;
+  order.deliveredAt = Date.now();
+  order.updatedBy = req.user._id;
+
   const updatedOrder = await order.save();
-  // Notifications
-  await Notification.create([
-    { user: order.user, type: 'ORDER_STATUS_UPDATE', message: `Your order has been delivered` },
-    { user: order.seller, type: 'ORDER_STATUS_UPDATE', message: `Order delivered to customer` }
-  ]);
-  // Emit sockets
+
+  // 🔥 Real-time sync & Notifications
   const io = req.app.get('io');
-  if (io) {
-    const updateDataEmit = { status: 'delivered', isDelivered: true, deliveredAt: order.deliveredAt };
-    emitOrderUpdate(io, order.user.toString(), order._id, updateDataEmit);
-    emitOrderUpdate(io, order.seller.toString(), order._id, updateDataEmit);
-    io.to('admin').emit('ORDER_UPDATE', { type: 'ORDER_UPDATE', data: { orderId: order._id, ...updateDataEmit } });
-    io.to(`seller_${order.seller.toString()}`).emit('REFRESH_ANALYTICS', { sellerId: order.seller.toString() });
-  }
+  const notificationService = new NotificationService(io);
+  await notificationService.notifyOrderStatusUpdate(updatedOrder, previousStatus, req.user, 'Delivery confirmed', req);
+
   res.json({ message: 'Order marked as delivered', order: updatedOrder });
 });
 

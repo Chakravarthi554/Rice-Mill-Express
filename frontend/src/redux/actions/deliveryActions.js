@@ -138,8 +138,7 @@ export const assignDeliveryPartner = (orderId, deliveryData) => async (dispatch,
       },
     };
 
-    console.log('📡 Making API call to assign partner...');
-    const { data } = await axios.put(`/api/delivery-partners/orders/${orderId}`, deliveryData, config);
+    const { data } = await axios.put(`/api/orders/${orderId}/assign-partner`, deliveryData, config);
     console.log('✅ Partner assigned successfully:', data);
 
     dispatch({ type: DELIVERY_ASSIGN_SUCCESS, payload: data });

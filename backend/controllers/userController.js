@@ -67,6 +67,14 @@ const refreshToken = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc    Get all admins
+// @route   GET /api/users/admins
+// @access  Private
+const getAdmins = asyncHandler(async (req, res) => {
+  const admins = await User.find({ role: 'admin' }).select('name profileImage role isOnline lastActive');
+  res.json(admins);
+});
+
 const authUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   const user = await User.findOne({ email }).select('+password +refreshToken');

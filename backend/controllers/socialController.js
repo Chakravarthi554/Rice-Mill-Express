@@ -69,9 +69,12 @@ const likeItem = asyncHandler(async (req, res) => {
     const updatedItem = await updateEngagementCount(Model, id, 'likesCount', 1);
 
     // Create notification
-    if (updatedItem.userId && updatedItem.userId.toString() !== userId.toString()) {
+    // --- Item Owner & Notification Fix ---
+    const itemOwnerId = updatedItem.sellerId || updatedItem.seller || updatedItem.userId;
+
+    if (itemOwnerId && itemOwnerId.toString() !== userId.toString()) {
       await Notification.create({
-        user: updatedItem.userId,
+        user: itemOwnerId,
         type: 'SOCIAL_LIKE',
         message: `${req.user.name} liked your ${targetType.toLowerCase()}`,
         relatedEntity: id,
@@ -81,7 +84,9 @@ const likeItem = asyncHandler(async (req, res) => {
 
     // 🔥 Real-time socket events
     if (req.io) {
-      req.io.to(`${type.slice(0, -1)}_${id}`).emit('SOCIAL_UPDATE', {
+      // Room for the item itself
+      const itemRoom = `${type.slice(0, -1)}_${id}`;
+      req.io.to(itemRoom).emit('SOCIAL_UPDATE', {
         type: 'LIKE_UPDATED',
         itemType: targetType,
         itemId: id,
@@ -89,6 +94,25 @@ const likeItem = asyncHandler(async (req, res) => {
         hasLiked: true,
         userId
       });
+
+      // room for the seller/owner
+      if (itemOwnerId) {
+        req.io.to(`seller_${itemOwnerId}`).emit('ENGAGEMENT_UPDATE', {
+          type: 'NEW_ENGAGEMENT',
+          engagementType: 'like',
+          itemType: targetType,
+          itemId: id,
+          userName: req.user.name,
+          userProfilePic: req.user.profilePic,
+          createdAt: new Date(),
+          counts: {
+            likes: updatedItem.likesCount,
+            comments: updatedItem.commentsCount,
+            shares: updatedItem.sharesCount,
+            rating: updatedItem.averageRating || updatedItem.rating
+          }
+        });
+      }
     }
 
     return res.json({ success: true, likes: updatedItem.likesCount, hasLiked: true });
@@ -156,9 +180,12 @@ const addComment = asyncHandler(async (req, res) => {
     const populatedComment = await Comment.findById(comment._id).populate('userId', 'name profilePic');
 
     // Create notification for item owner
-    if (updatedItem.userId && updatedItem.userId.toString() !== userId.toString()) {
+    // --- Item Owner & Notification Fix ---
+    const itemOwnerId = updatedItem.sellerId || updatedItem.seller || updatedItem.userId;
+
+    if (itemOwnerId && itemOwnerId.toString() !== userId.toString()) {
       await Notification.create({
-        user: updatedItem.userId,
+        user: itemOwnerId,
         type: parentCommentId ? 'SOCIAL_REPLY' : 'SOCIAL_COMMENT',
         message: `${req.user.name} ${parentCommentId ? 'replied' : 'commented'} on your ${targetType.toLowerCase()}`,
         relatedEntity: id,
@@ -166,9 +193,9 @@ const addComment = asyncHandler(async (req, res) => {
       });
     }
 
-    // Notify admin for approval if not admin (still notify for moderation purposes)
+    // Notify admin for moderation purposes
     if (req.user.role !== 'admin') {
-      const adminUsers = await User.find({ role: 'admin' });
+      const adminUsers = await User.find({ role: 'admin' }).select('_id');
       for (const admin of adminUsers) {
         await Notification.create({
           user: admin._id,
@@ -201,6 +228,26 @@ const addComment = asyncHandler(async (req, res) => {
         comment: populatedComment,
         commentsCount: updatedItem.commentsCount
       });
+
+      // Seller specific notification
+      if (itemOwnerId) {
+        req.io.to(`seller_${itemOwnerId}`).emit('ENGAGEMENT_UPDATE', {
+          type: 'NEW_ENGAGEMENT',
+          engagementType: 'comment',
+          itemType: targetType,
+          itemId: id,
+          comment: populatedComment,
+          userName: req.user.name,
+          userProfilePic: req.user.profilePic,
+          createdAt: new Date(),
+          counts: {
+            likes: updatedItem.likesCount,
+            comments: updatedItem.commentsCount,
+            shares: updatedItem.sharesCount,
+            rating: updatedItem.averageRating || updatedItem.rating
+          }
+        });
+      }
     }
 
     res.status(201).json({
@@ -405,6 +452,26 @@ const trackShare = asyncHandler(async (req, res) => {
       itemType: type,
       sharesCount: updatedItem.sharesCount
     });
+
+    // Seller specific notification
+    const itemOwnerId = updatedItem.sellerId || updatedItem.seller || updatedItem.userId;
+    if (itemOwnerId) {
+      req.io.to(`seller_${itemOwnerId}`).emit('ENGAGEMENT_UPDATE', {
+        type: 'NEW_ENGAGEMENT',
+        engagementType: 'share',
+        itemType: targetType,
+        itemId: id,
+        platform: platform || 'unknown',
+        userName: req.user.name,
+        createdAt: new Date(),
+        counts: {
+          likes: updatedItem.likesCount,
+          comments: updatedItem.commentsCount,
+          shares: updatedItem.sharesCount,
+          rating: updatedItem.averageRating || updatedItem.rating
+        }
+      });
+    }
   }
 
   res.json({ success: true, sharesCount: updatedItem.sharesCount });
@@ -493,6 +560,27 @@ const rateItem = asyncHandler(async (req, res) => {
         numReviews: item.numReviews,
         distribution: item.ratingDistribution
       });
+
+      // Seller specific notification
+      const itemOwnerId = item.sellerId || item.seller || item.userId;
+      if (itemOwnerId) {
+        req.io.to(`seller_${itemOwnerId}`).emit('ENGAGEMENT_UPDATE', {
+          type: 'NEW_ENGAGEMENT',
+          engagementType: 'rating',
+          itemType: targetType,
+          itemId: id,
+          rating: Number(rating),
+          userName: req.user.name,
+          userProfilePic: req.user.profilePic,
+          createdAt: new Date(),
+          counts: {
+            likes: item.likesCount,
+            comments: item.commentsCount,
+            shares: item.sharesCount,
+            rating: item.averageRating || item.rating
+          }
+        });
+      }
     }
 
     res.json({

@@ -1,41 +1,48 @@
 const express = require('express');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const { protect } = require('../middleware/auth');
-const { uploadProfileImage } = require('../controllers/userController');
-
 const router = express.Router();
+const { protect } = require('../middleware/auth');
+const { uploadSingle, uploadMultiple, getFileType } = require('../middleware/upload');
+const asyncHandler = require('express-async-handler');
 
-const upload = require('../middleware/uploadMiddleware');
-
-// Profile image upload
-router.post('/profile-image', protect, upload.single('file'), async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
-    const result = await uploadProfileImage(req, res);
-    res.status(200).json(result);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-});
-
-// Multiple files upload
-router.post('/', protect, upload.array('files', 5), (req, res) => {
-  if (!req.files || req.files.length === 0) {
-    return res.status(400).json({ message: 'No files uploaded' });
+// @desc    Upload single file for chat
+// @route   POST /api/upload/chat
+// @access  Private
+router.post('/chat', protect, uploadSingle, asyncHandler(async (req, res) => {
+  if (!req.cloudinaryResult) {
+    res.status(400);
+    throw new Error('No file uploaded');
   }
 
-  res.status(200).json({
-    message: 'Files uploaded successfully',
-    files: req.files.map(file => ({
-      originalName: file.originalname,
-      fileName: file.filename,
-      filePath: `/uploads/${file.filename}`,
-      size: file.size,
-      mimetype: file.mimetype,
-    })),
-  });
-});
+  const result = req.cloudinaryResult;
+  const fileData = {
+    url: result.secure_url,
+    filename: req.file.originalname,
+    size: req.file.size,
+    mimeType: req.file.mimetype,
+    type: getFileType(req.file.mimetype)
+  };
+
+  res.status(200).json(fileData);
+}));
+
+// @desc    Upload multiple files for chat
+// @route   POST /api/upload/chat/multiple
+// @access  Private
+router.post('/chat/multiple', protect, uploadMultiple, asyncHandler(async (req, res) => {
+  if (!req.cloudinaryResults || req.cloudinaryResults.length === 0) {
+    res.status(400);
+    throw new Error('No files uploaded');
+  }
+
+  const filesData = req.cloudinaryResults.map((result, index) => ({
+    url: result.secure_url,
+    filename: req.files[index].originalname,
+    size: req.files[index].size,
+    mimeType: req.files[index].mimetype,
+    type: getFileType(req.files[index].mimetype)
+  }));
+
+  res.status(200).json(filesData);
+}));
 
 module.exports = router;

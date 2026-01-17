@@ -20,7 +20,7 @@ const setupSocketServer = (server) => {
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization;
-      
+
       if (!token) {
         logger.error(`❌ No token for socket ${socket.id}`);
         return next(new Error('Authentication error: No token provided'));
@@ -53,14 +53,14 @@ const setupSocketServer = (server) => {
       next();
     } catch (err) {
       logger.error(`❌ Socket auth failed: ${err.message}`);
-      
+
       if (err.name === 'TokenExpiredError') {
         return next(new Error('Token expired - please login again'));
       }
       if (err.name === 'JsonWebTokenError') {
         return next(new Error('Invalid token - please login again'));
       }
-      
+
       next(new Error('Authentication failed'));
     }
   });
@@ -70,7 +70,7 @@ const setupSocketServer = (server) => {
 
     // Join user-specific room
     socket.join(`user_${socket.userId}`);
-    
+
     // Join role-based rooms
     if (socket.role === 'admin') {
       socket.join('admin_room');
@@ -80,6 +80,18 @@ const setupSocketServer = (server) => {
       socket.join(`seller_${socket.userId}`);
       logger.info(`👨‍💼 Seller ${socket.userId} joined seller room`);
     }
+
+    // 🟢 PRESENCE: Broadcast online status
+    socket.broadcast.emit('user:online', {
+      userId: socket.userId,
+      role: socket.role
+    });
+
+    // Update DB status (async, no await needed here to block)
+    User.findByIdAndUpdate(socket.userId, {
+      isOnline: true,
+      lastActive: new Date()
+    }).catch(err => logger.error(`Failed to update online status for ${socket.userId}`, err));
 
     // Enhanced room management
     socket.on('joinUserRoom', (uid) => {
@@ -146,7 +158,7 @@ const setupSocketServer = (server) => {
     socket.on('markNotificationRead', async (data) => {
       try {
         const { notificationId, userId } = data;
-        
+
         // Verify user owns the notification
         if (userId !== socket.userId) {
           socket.emit('error', { message: 'Unauthorized' });
@@ -155,7 +167,7 @@ const setupSocketServer = (server) => {
 
         const Notification = require('../models/Notification');
         const notification = await Notification.findById(notificationId);
-        
+
         if (notification && notification.user.toString() === userId) {
           await notification.markAsRead();
           socket.emit('NOTIFICATION_READ', { notificationId });
@@ -174,9 +186,9 @@ const setupSocketServer = (server) => {
         }
 
         const Notification = require('../models/Notification');
-        const count = await Notification.countDocuments({ 
-          user: userId, 
-          read: false 
+        const count = await Notification.countDocuments({
+          user: userId,
+          read: false
         });
         socket.emit('UNREAD_COUNT', { count });
       } catch (error) {
@@ -188,7 +200,7 @@ const setupSocketServer = (server) => {
     // --- ADMIN NOTIFICATION EVENTS ---
     socket.on('RECIPE_SUBMITTED', (data) => {
       logger.info('📝 Recipe submitted:', data.recipe?.title || data.title);
-      
+
       // Notify all admins
       socket.to('admin_room').emit('NEW_RECIPE_FOR_APPROVAL', {
         recipeId: data.recipe?._id || data.recipeId,
@@ -213,7 +225,7 @@ const setupSocketServer = (server) => {
 
     socket.on('KYC_SUBMITTED', (data) => {
       logger.info('📋 KYC submitted by:', data.userName);
-      
+
       socket.to('admin_room').emit('NEW_KYC_SUBMITTED', {
         kycId: data.kycId,
         userName: data.userName,
@@ -237,7 +249,7 @@ const setupSocketServer = (server) => {
 
     socket.on('PAYMENT_DISPUTE', (data) => {
       logger.info('⚠️ Payment dispute:', data.orderId);
-      
+
       socket.to('admin_room').emit('NEW_PAYMENT_DISPUTE', {
         orderId: data.orderId,
         customerName: data.customerName,
@@ -260,7 +272,7 @@ const setupSocketServer = (server) => {
 
     socket.on('LOW_STOCK_ALERT', (data) => {
       logger.info('📉 Low stock alert:', data.productName);
-      
+
       socket.to('admin_room').emit('LOW_STOCK_WARNING', {
         productId: data.productId,
         productName: data.productName,
@@ -285,7 +297,7 @@ const setupSocketServer = (server) => {
     // --- GENERAL NOTIFICATION EMITTER ---
     socket.on('SEND_NOTIFICATION', (data) => {
       const { userId, notificationData } = data;
-      
+
       if (userId) {
         // Send to specific user
         socket.to(`user_${userId}`).emit('newNotification', {
@@ -333,7 +345,32 @@ const setupSocketServer = (server) => {
       logger.info(`🔔 Social event: ${type} on ${itemType} ${itemId} by ${userId}`);
     });
 
-    // Typing indicators
+    // Typing indicators (Enhanced)
+    socket.on('chat:typing', ({ conversationId, to }) => {
+      // Broadcast to specific conversation room if user joined it, or directly to recipient user room
+      // Since we don't force joining conversation rooms explicitly yet, exact targeting via user room is safer for direct chats
+      if (to) {
+        io.to(`user_${to}`).emit('chat:typing', {
+          userId: socket.userId,
+          conversationId
+        });
+      }
+    });
+
+    socket.on('chat:stop_typing', ({ conversationId, to }) => {
+      if (to) {
+        io.to(`user_${to}`).emit('chat:stop_typing', {
+          userId: socket.userId,
+          conversationId
+        });
+      }
+    });
+
+    // Previous legacy handlers kept for backward compatibility if needed, or replace them.
+    // The previous code had specific 'TYPING' event. We can keep it or merge.
+    // Let's keep the new ones namespaced as 'chat:' for clarity.
+
+    // Legacy handlers (optional to remove if not used by old frontend)
     socket.on('TYPING', ({ to }) => {
       if (to && to !== socket.userId) {
         io.to(`user_${to}`).emit('TYPING', { from: socket.userId });
@@ -351,9 +388,27 @@ const setupSocketServer = (server) => {
       socket.emit('PONG', { timestamp: Date.now() });
     });
 
-    socket.on('disconnect', (reason) => {
+    socket.on('disconnect', async (reason) => { // Made async
       logger.info(`🔴 Socket disconnected ${socket.id}, reason: ${reason}`);
-      
+
+      // 🔴 PRESENCE: Broadcast offline status
+      // We only broadcast if the user has no other active sockets (optional optimization, but for now simple broadcast is safer)
+      // Actually, simplest is to broadcast. Frontend can debounce.
+      socket.broadcast.emit('user:offline', {
+        userId: socket.userId,
+        lastSeen: new Date()
+      });
+
+      // Update DB status
+      try {
+        await User.findByIdAndUpdate(socket.userId, {
+          isOnline: false,
+          lastActive: new Date()
+        });
+      } catch (err) {
+        logger.error(`Failed to update offline status for ${socket.userId}`, err);
+      }
+
       // Leave all rooms on disconnect
       const rooms = [...socket.rooms];
       rooms.forEach(room => {
@@ -404,7 +459,7 @@ const setupSocketServer = (server) => {
           relatedEntity: order._id,
         }))
       );
-      
+
       logger.info(`✅ Order update broadcast for order ${orderId}`);
     } catch (err) {
       logger.error('❌ broadcastOrderUpdate error', err);
@@ -424,7 +479,7 @@ const setupSocketServer = (server) => {
 
       [order.buyer?._id, order.seller?._id].filter(Boolean)
         .forEach(uid => io.to(`user_${uid}`).emit('BULK_ORDER_UPDATE', payload));
-        
+
       logger.info(`✅ Bulk order update broadcast for order ${bulkId}`);
     } catch (err) {
       logger.error('❌ broadcastBulkOrderUpdate error', err);
@@ -434,29 +489,29 @@ const setupSocketServer = (server) => {
   // Notification utility functions
   const emitAdminNotification = (notificationData) => {
     if (!io || !notificationData) return;
-    
+
     io.to('admin_room').emit('newAdminNotification', {
       ...notificationData,
       timestamp: new Date(),
     });
-    
+
     logger.info(`🛠️ Emitted admin notification: ${notificationData.title}`);
   };
 
   const emitNotification = (userId, notificationData) => {
     if (!io || !userId || !notificationData) return;
-    
+
     io.to(`user_${userId}`).emit('newNotification', {
       ...notificationData,
       timestamp: new Date(),
     });
-    
+
     logger.info(`📩 Emitted notification to user_${userId}: ${notificationData.message}`);
   };
 
-  return { 
-    io, 
-    broadcastOrderUpdate, 
+  return {
+    io,
+    broadcastOrderUpdate,
     broadcastBulkOrderUpdate,
     emitAdminNotification,
     emitNotification

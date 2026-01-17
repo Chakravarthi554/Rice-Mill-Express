@@ -23,6 +23,16 @@ try {
   };
 }
 
+let engagementController;
+try {
+  engagementController = require('../controllers/engagementController');
+} catch (error) {
+  console.error('❌ Failed to load engagementController:', error.message);
+  engagementController = {
+    getAdminRecipesEngagement: (req, res) => res.status(501).json({ message: 'Engagement controller not loaded' })
+  };
+}
+
 let adminPaymentController;
 try {
   adminPaymentController = require('../controllers/adminPaymentController');
@@ -75,6 +85,10 @@ const {
   getRecipeAnalytics = (req, res) => res.status(501).json({ message: 'Function not available' }),
   moderateComment = (req, res) => res.status(501).json({ message: 'Function not available' })
 } = adminController;
+
+const {
+  getAdminRecipesEngagement = (req, res) => res.status(501).json({ message: 'Function not available' })
+} = engagementController;
 
 // ✅ FIXED: Extract payment controller functions with fallbacks
 const {
@@ -131,6 +145,9 @@ router.get('/platform-overview', protect, admin, getPlatformOverview);
 
 // RECIPE ANALYTICS
 router.get('/recipe-analytics', protect, admin, getRecipeAnalytics);
+
+// RECIPE ENGAGEMENT (NEW)
+router.get('/engagement/recipes', protect, admin, getAdminRecipesEngagement);
 
 // MODERATE COMMENT
 router.post('/comments/moderate', protect, admin, moderateComment);

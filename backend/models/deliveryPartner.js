@@ -24,6 +24,16 @@ const deliveryPartnerSchema = new mongoose.Schema(
     kycRejectionReason: { type: String },
     approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     approvedAt: { type: Date },
+    currentLoad: { type: Number, default: 0 },
+    rating: { type: Number, default: 5 },
+    totalDeliveries: { type: Number, default: 0 },
+    onTimeDeliveryRate: { type: Number, default: 100 },
+    isAvailable: { type: Boolean, default: true },
+    maxCapacity: { type: Number, default: 10 },
+    location: {
+      type: { type: String, enum: ['Point'], default: 'Point' },
+      coordinates: { type: [Number], default: [0, 0] } // [longitude, latitude]
+    }
   },
   { timestamps: true }
 );

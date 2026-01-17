@@ -1,322 +1,426 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
-  Card,
-  CardContent,
-  Typography,
-  TextField,
-  IconButton,
-  Avatar,
-  Chip,
   Paper,
-  Divider,
-  Button,
+  Typography,
+  Avatar,
+  IconButton,
+  TextField,
   CircularProgress,
-  Alert
+  Badge,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
+  Divider,
+  Collapse,
+  Tooltip
 } from '@mui/material';
 import {
-  Send,
-  AttachFile,
-  Close,
-  MarkChatRead,
-  LocalShipping,
-  Store,
-  Person
+  Send as SendIcon,
+  AttachFile as AttachFileIcon,
+  MoreVert as MoreVertIcon,
+  Circle as CircleIcon,
+  Delete as DeleteIcon,
+  Star as StarIcon,
+  StarBorder as StarBorderIcon,
+  Reply as ReplyIcon,
+  Edit as EditIcon,
+  ContentCopy as CopyIcon,
+  PushPin,
+  FileDownload as DownloadIcon,
+  Person as PersonIcon,
+  InsertEmoticon as EmojiIcon,
+  Close as CloseIcon,
+  Search as SearchIcon
 } from '@mui/icons-material';
-import { useDispatch, useSelector } from 'react-redux';
-import { io } from 'socket.io-client';
-import {
-  getConversationWithUser,
-  adminSendMessage,
-  markConversationResolved
-} from '../../redux/actions/adminMessageActions';
+import io from 'socket.io-client';
+import axios from 'axios';
 
-const AdminChatWindow = ({ user, onClose }) => {
-  const dispatch = useDispatch();
-  const { currentConversation, loading, error } = useSelector(state => state.adminMessages);
-  const { userInfo } = useSelector(state => state.userLogin);
-  
+const socketUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
+const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
+  const [messages, setMessages] = useState([]);
   const [message, setMessage] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  
+  const [uploading, setUploading] = useState(false);
+  const [otherTyping, setOtherTyping] = useState(false);
+  const [msgAnchorEl, setMsgAnchorEl] = useState(null);
+  const [selectedMsg, setSelectedMsg] = useState(null);
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [editingMsg, setEditingMsg] = useState(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedMsgs, setSelectedMsgs] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
+
+  const scrollRef = useRef();
+  const fileInputRef = useRef();
   const socketRef = useRef();
-  const messagesEndRef = useRef();
+  const typingTimeoutRef = useRef();
+
+  const otherUser = conversation.participants.find(p => p._id !== currentUser._id) || {};
 
   useEffect(() => {
-    if (user?._id) {
-      dispatch(getConversationWithUser(user._id));
-    }
-  }, [dispatch, user]);
-
-  useEffect(() => {
-    // Setup socket for real-time chat
-    if (userInfo?.token && user?._id) {
-      socketRef.current = io(process.env.REACT_APP_SOCKET_URL || "http://localhost:5000", {
-        auth: { token: `Bearer ${userInfo.token}` },
-        transports: ["websocket"],
-      });
-
-      socketRef.current.on('connect', () => {
-        socketRef.current.emit('joinUserRoom', user._id);
-      });
-
-      socketRef.current.on('NEW_MESSAGE', (newMessage) => {
-        if (newMessage.sender === user._id || newMessage.receiver === user._id) {
-          dispatch(getConversationWithUser(user._id));
-        }
-      });
-
-      socketRef.current.on('TYPING', (data) => {
-        if (data.from === user._id) setIsTyping(true);
-      });
-
-      socketRef.current.on('STOP_TYPING', (data) => {
-        if (data.from === user._id) setIsTyping(false);
-      });
-    }
-
+    fetchMessages();
+    setupSocket();
     return () => {
-      socketRef.current?.disconnect();
+      if (socketRef.current) socketRef.current.disconnect();
     };
-  }, [dispatch, userInfo, user]);
+  }, [conversation._id]);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [currentConversation?.messages]);
+  const setupSocket = () => {
+    if (socketRef.current) socketRef.current.disconnect();
+
+    socketRef.current = io(socketUrl, {
+      auth: { token: currentUser.token }
+    });
+
+    socketRef.current.on('connect', () => {
+      socketRef.current.emit('join', 'admin_room');
+    });
+
+    socketRef.current.on('chat:message', (data) => {
+      if (data.conversationId === conversation._id) {
+        setMessages(prev => [...prev, data.message]);
+        scrollToBottom();
+        markAsRead();
+      }
+    });
+
+    socketRef.current.on('chat:message_deleted', ({ messageId }) => {
+      setMessages(prev => prev.filter(m => m._id !== messageId));
+    });
+
+    socketRef.current.on('chat:message_updated', (updatedMsg) => {
+      setMessages(prev => prev.map(m => m._id === updatedMsg._id ? updatedMsg : m));
+    });
+
+    socketRef.current.on('chat:typing', ({ conversationId: cId }) => {
+      if (cId === conversation._id) setOtherTyping(true);
+    });
+
+    socketRef.current.on('chat:stop_typing', ({ conversationId: cId }) => {
+      if (cId === conversation._id) setOtherTyping(false);
+    });
+
+    socketRef.current.on('chat:chat_cleared', ({ conversationId: cId }) => {
+      if (cId === conversation._id) setMessages([]);
+    });
+  };
+
+  const fetchMessages = async () => {
+    if (!conversation._id) {
+      setMessages([]);
+      return;
+    }
+    try {
+      const config = { headers: { Authorization: `Bearer ${currentUser.token}` } };
+      const { data } = await axios.get(`/api/chat/messages/${conversation._id}`, config);
+      setMessages(data.messages);
+      scrollToBottom();
+      markAsRead();
+    } catch (e) { console.error(e); }
+  };
+
+  const markAsRead = async () => {
+    if (!conversation._id) return;
+    try {
+      const config = { headers: { Authorization: `Bearer ${currentUser.token}` } };
+      await axios.put(`/api/chat/read/${conversation._id}`, {}, config);
+    } catch (e) { console.error(e); }
+  };
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const handleSendMessage = () => {
-    if (message.trim() && user?._id) {
-      dispatch(adminSendMessage({
-        userId: user._id,
-        content: message.trim()
-      })).then(() => {
-        setMessage('');
-        if (socketRef.current) {
-          socketRef.current.emit('STOP_TYPING', { to: user._id });
-        }
-      });
-    }
-  };
-
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
+    setTimeout(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, 100);
   };
 
   const handleTyping = (e) => {
     setMessage(e.target.value);
-    if (socketRef.current && user?._id) {
-      socketRef.current.emit('TYPING', { to: user._id, from: userInfo._id });
-      clearTimeout(window.typingTimeout);
-      window.typingTimeout = setTimeout(() => {
-        socketRef.current.emit('STOP_TYPING', { to: user._id, from: userInfo._id });
-      }, 1000);
+    if (!socketRef.current) return;
+
+    socketRef.current.emit('chat:typing', { conversationId: conversation._id, to: otherUser._id });
+
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      if (conversation._id) {
+        socketRef.current.emit('chat:stop_typing', { conversationId: conversation._id, to: otherUser._id });
+      }
+    }, 3000);
+  };
+
+  const handleFileUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    setUploading(true);
+    const formData = new FormData();
+    files.forEach(file => formData.append('files', file));
+
+    try {
+      const config = {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          Authorization: `Bearer ${currentUser.token}`,
+        },
+      };
+      const { data: uploadResults } = await axios.post('/api/upload/chat/multiple', formData, config);
+      await handleSend(null, uploadResults);
+    } catch (e) { console.error(e); }
+    finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
+  };
+
+  const handleSend = async (content, attachments = []) => {
+    const msgContent = content || message;
+    if (!msgContent.trim() && attachments.length === 0) return;
+
+    if (editingMsg) {
+      try {
+        const config = { headers: { Authorization: `Bearer ${currentUser.token}` } };
+        await axios.put(`/api/chat/message/${editingMsg._id}`, { content: msgContent }, config);
+        setEditingMsg(null);
+        setMessage('');
+        return;
+      } catch (e) { console.error(e); return; }
     }
+
+    try {
+      const config = { headers: { Authorization: `Bearer ${currentUser.token}` } };
+      await axios.post('/api/chat/send', {
+        receiverId: otherUser._id,
+        content: msgContent,
+        attachments,
+        replyTo: replyingTo?._id || null
+      }, config);
+      setMessage('');
+      setReplyingTo(null);
+      scrollToBottom();
+    } catch (e) { console.error(e); }
   };
 
-  const handleMarkResolved = () => {
-    if (user?._id) {
-      dispatch(markConversationResolved(user._id, {
-        resolutionNotes: 'Issue resolved through chat'
-      }));
-    }
+  const handleMsgAction = (event, msg) => {
+    setSelectedMsg(msg);
+    setMsgAnchorEl(event.currentTarget);
   };
 
-  const getRoleIcon = (role) => {
-    switch (role) {
-      case 'seller': return <Store fontSize="small" />;
-      case 'deliveryPartner': return <LocalShipping fontSize="small" />;
-      default: return <Person fontSize="small" />;
-    }
+  const handleCopy = () => {
+    navigator.clipboard.writeText(selectedMsg.content);
+    setMsgAnchorEl(null);
   };
 
-  const getRoleColor = (role) => {
-    switch (role) {
-      case 'seller': return 'primary';
-      case 'deliveryPartner': return 'secondary';
-      default: return 'default';
-    }
+  const handleDelete = async (mode) => {
+    try {
+      const config = { headers: { Authorization: `Bearer ${currentUser.token}` } };
+      await axios.delete(`/api/chat/message/${selectedMsg._id}?mode=${mode}`, config);
+      if (mode === 'me') setMessages(prev => prev.filter(m => m._id !== selectedMsg._id));
+    } catch (e) { console.error(e); }
+    setMsgAnchorEl(null);
   };
 
-  const formatTime = (dateString) => {
-    if (!dateString) return '';
-    return new Date(dateString).toLocaleTimeString([], { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
+  const handleStar = async () => {
+    try {
+      const config = { headers: { Authorization: `Bearer ${currentUser.token}` } };
+      await axios.put(`/api/chat/message/${selectedMsg._id}/star`, {}, config);
+      setMessages(prev => prev.map(m => m._id === selectedMsg._id ? {
+        ...m, isStarredBy: m.isStarredBy.includes(currentUser._id)
+          ? m.isStarredBy.filter(id => id !== currentUser._id)
+          : [...m.isStarredBy, currentUser._id]
+      } : m));
+    } catch (e) { console.error(e); }
+    setMsgAnchorEl(null);
   };
 
-  if (!user) {
-    return (
-      <Card sx={{ height: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <CardContent sx={{ textAlign: 'center' }}>
-          <Typography variant="h6" color="text.secondary">
-            No user selected
-          </Typography>
-        </CardContent>
-      </Card>
-    );
-  }
+  const handleClearChat = async () => {
+    if (!conversation._id) return;
+    try {
+      const config = { headers: { Authorization: `Bearer ${currentUser.token}` } };
+      await axios.put(`/api/chat/clear/${conversation._id}`, {}, config);
+      setMessages([]);
+    } catch (e) { console.error(e); }
+    setMsgAnchorEl(null);
+  };
 
   return (
-    <Card sx={{ height: '70vh', display: 'flex', flexDirection: 'column' }}>
+    <Paper elevation={3} sx={{ height: '75vh', display: 'flex', flexDirection: 'column', position: 'relative' }}>
       {/* Header */}
-      <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center">
-          <Box display="flex" alignItems="center" gap={2}>
-            <Avatar src={user.profileImage}>
-              {user.name?.[0] || 'U'}
-            </Avatar>
+      {selectionMode ? (
+        <Box sx={{ p: 2, bgcolor: '#075e54', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <IconButton color="inherit" onClick={() => { setSelectionMode(false); setSelectedMsgs([]); }}><CloseIcon /></IconButton>
+            <Typography variant="h6">{selectedMsgs.length}</Typography>
+          </Box>
+          <Box>
+            <IconButton color="inherit" onClick={async () => {
+              try {
+                const config = { headers: { Authorization: `Bearer ${currentUser.token}` } };
+                for (const id of selectedMsgs) {
+                  await axios.delete(`/api/chat/message/${id}?mode=me`, config);
+                }
+                setMessages(prev => prev.filter(m => !selectedMsgs.includes(m._id)));
+                setSelectionMode(false);
+                setSelectedMsgs([]);
+              } catch (e) { console.error(e); }
+            }}>
+              <DeleteIcon />
+            </IconButton>
+          </Box>
+        </Box>
+      ) : (
+        <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: '#f0f2f5' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Avatar src={otherUser.profileImage}>{otherUser.name?.[0]}</Avatar>
             <Box>
-              <Typography variant="h6">
-                {user.name || 'Unknown User'}
-              </Typography>
-              <Box display="flex" alignItems="center" gap={1}>
-                <Chip
-                  icon={getRoleIcon(user.role)}
-                  label={user.role || 'user'}
-                  size="small"
-                  color={getRoleColor(user.role)}
-                  variant="outlined"
-                />
-                <Typography variant="body2" color="text.secondary">
-                  {user.email}
+              <Typography variant="subtitle1" fontWeight="600">{otherUser.name}</Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <CircleIcon sx={{ fontSize: 8, color: otherUser.isOnline ? '#4caf50' : '#bdbdbd' }} />
+                <Typography variant="caption" color="text.secondary">
+                  {otherUser.isOnline ? 'Online' : otherUser.lastActive ? `Last seen ${new Date(otherUser.lastActive).toLocaleTimeString()}` : 'Offline'}
                 </Typography>
               </Box>
             </Box>
           </Box>
-          <Box display="flex" gap={1}>
-            <Button
-              startIcon={<MarkChatRead />}
-              onClick={handleMarkResolved}
-              variant="outlined"
-              size="small"
-            >
-              Mark Resolved
-            </Button>
-            <IconButton onClick={onClose} size="small">
-              <Close />
-            </IconButton>
+          <Box>
+            <Tooltip title="Search Messages"><IconButton size="small" onClick={() => setShowSearch(!showSearch)}><SearchIcon /></IconButton></Tooltip>
+            <Tooltip title="Clear Chat"><IconButton size="small" onClick={handleClearChat}><DeleteIcon color="error" /></IconButton></Tooltip>
+            {/* <Tooltip title="Select Messages"><IconButton size="small" onClick={() => setSelectionMode(true)}><DeleteIcon /></IconButton></Tooltip> */}
+            <Tooltip title="Seller Profile"><IconButton size="small"><PersonIcon /></IconButton></Tooltip>
+            <IconButton size="small" onClick={onClose}><CloseIcon /></IconButton>
           </Box>
         </Box>
+      )}
 
-        {/* User Details */}
-        {currentConversation?.recentOrders && currentConversation.recentOrders.length > 0 && (
-          <Box mt={1}>
-            <Typography variant="body2" color="text.secondary">
-              Recent Orders: {currentConversation.recentOrders.length}
-            </Typography>
-          </Box>
-        )}
-      </Box>
+      {showSearch && (
+        <Box sx={{ p: 1, bgcolor: 'white', borderBottom: 1, borderColor: '#eee' }}>
+          <TextField
+            fullWidth size="small" placeholder="Search messages..."
+            value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+            InputProps={{
+              endAdornment: <IconButton size="small" onClick={() => setShowSearch(false)}><CloseIcon /></IconButton>
+            }}
+          />
+        </Box>
+      )}
 
       {/* Messages */}
-      <Box sx={{ flex: 1, overflow: 'auto', p: 2, bgcolor: 'grey.50' }}>
-        {loading ? (
-          <Box display="flex" justifyContent="center" alignItems="center" height="100%">
-            <CircularProgress />
-          </Box>
-        ) : error ? (
-          <Alert severity="error">{error}</Alert>
-        ) : (
-          <Box>
-            {currentConversation?.messages?.map((msg) => (
-              <Box
-                key={msg._id}
-                sx={{
-                  display: 'flex',
-                  justifyContent: msg.sender?._id === userInfo?._id ? 'flex-end' : 'flex-start',
-                  mb: 2
-                }}
-              >
-                <Paper
-                  sx={{
-                    p: 1.5,
-                    maxWidth: '70%',
-                    bgcolor: msg.sender?._id === userInfo?._id ? 'primary.main' : 'white',
-                    color: msg.sender?._id === userInfo?._id ? 'white' : 'text.primary',
-                    borderRadius: 2,
-                    boxShadow: 1
-                  }}
-                >
-                  <Typography variant="body2">
-                    {msg.content}
+      <Box ref={scrollRef} sx={{ flex: 1, p: 2, bgcolor: '#e5ddd5', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 1, backgroundImage: 'url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png")', backgroundRepeat: 'repeat' }}>
+        {messages.filter(m => m.content?.toLowerCase().includes(searchTerm.toLowerCase())).map((msg) => {
+          const isMe = msg.sender._id === currentUser._id;
+          const isStarred = msg.isStarredBy?.includes(currentUser._id);
+          const isSelected = selectedMsgs.includes(msg._id);
+          return (
+            <Box
+              key={msg._id}
+              onClick={() => {
+                if (selectionMode) {
+                  setSelectedMsgs(prev => prev.includes(msg._id) ? prev.filter(id => id !== msg._id) : [...prev, msg._id]);
+                }
+              }}
+              sx={{
+                alignSelf: isMe ? 'flex-end' : 'flex-start',
+                maxWidth: '85%',
+                cursor: selectionMode ? 'pointer' : 'default',
+                bgcolor: isSelected ? 'rgba(52, 183, 241, 0.2)' : 'transparent',
+                borderRadius: 1,
+                p: 0.5
+              }}
+            >
+              <Paper elevation={1} sx={{ p: '6px 10px', bgcolor: isMe ? '#dcf8c6' : 'white', borderRadius: isMe ? '10px 0 10px 10px' : '0 10px 10px 10px', boxShadow: 1, position: 'relative' }}>
+                {msg.replyTo && (
+                  <Box sx={{ bgcolor: 'rgba(0,0,0,0.05)', p: 0.5, mb: 0.5, borderRadius: 1, borderLeft: '4px solid #34b7f1' }}>
+                    <Typography variant="caption" color="primary" fontWeight="bold">Original</Typography>
+                    <Typography variant="body2" noWrap sx={{ opacity: 0.7 }}>{msg.replyTo.content || 'Attachment'}</Typography>
+                  </Box>
+                )}
+                {msg.attachments?.map((at, i) => (
+                  <Box key={i} sx={{ mb: 0.5 }}>
+                    {at.type === 'image' ? (
+                      <img src={at.url} alt="attachment" style={{ maxWidth: '100%', borderRadius: 8, display: 'block' }} />
+                    ) : (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1, bgcolor: 'rgba(0,0,0,0.03)', borderRadius: 1 }}>
+                        <IconButton size="small" component="a" href={at.url} target="_blank" download>
+                          <DownloadIcon fontSize="small" />
+                        </IconButton>
+                        <Typography
+                          variant="caption"
+                          sx={{ textDecoration: 'none', color: 'primary.main', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+                          component="a"
+                          href={at.url}
+                          target="_blank"
+                          download
+                        >
+                          {at.filename}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+                ))}
+                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', pr: 4 }}>{msg.content}</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5, mt: 0.2 }}>
+                  {msg.isPinnedBy?.length > 0 && <PushPin sx={{ fontSize: 12, ml: 0.5, color: 'primary.main' }} />}
+                  {isStarred && <StarIcon sx={{ fontSize: 12, color: 'text.secondary' }} />}
+                  <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.65rem' }}>
+                    {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </Typography>
-                  {msg.image && (
-                    <Box mt={1}>
-                      <img
-                        src={msg.image}
-                        alt="attachment"
-                        style={{
-                          maxWidth: '200px',
-                          maxHeight: '200px',
-                          borderRadius: '8px'
-                        }}
-                        onClick={() => window.open(msg.image, '_blank')}
-                      />
-                    </Box>
+                  {isMe && (
+                    <Typography sx={{ fontSize: 14, color: msg.status === 'read' ? '#34b7f1' : 'text.secondary', ml: 0.5 }}>
+                      {msg.status === 'read' ? '✓✓' : '✓'}
+                    </Typography>
                   )}
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      display: 'block',
-                      mt: 0.5,
-                      opacity: 0.7,
-                      textAlign: 'right'
-                    }}
-                  >
-                    {formatTime(msg.createdAt)}
-                  </Typography>
-                </Paper>
-              </Box>
-            ))}
-            {isTyping && (
-              <Box sx={{ display: 'flex', justifyContent: 'flex-start', mb: 2 }}>
-                <Paper sx={{ p: 1.5, borderRadius: 2 }}>
-                  <Typography variant="body2" fontStyle="italic">
-                    {user.name} is typing...
-                  </Typography>
-                </Paper>
-              </Box>
-            )}
-            <div ref={messagesEndRef} />
+                </Box>
+                {!selectionMode && (
+                  <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleMsgAction(e, msg); }} sx={{ position: 'absolute', top: 0, right: 0, opacity: 0, '&:hover': { opacity: 1 }, transition: '0.2s', '.MuiPaper-root:hover &': { opacity: 0.5 } }}>
+                    <MoreVertIcon fontSize="inherit" />
+                  </IconButton>
+                )}
+              </Paper>
+            </Box>
+          );
+        })}
+        {otherTyping && (
+          <Box sx={{ alignSelf: 'flex-start', bgcolor: 'white', p: '4px 10px', borderRadius: '10px' }}>
+            <Typography variant="caption" color="text.secondary">typing...</Typography>
           </Box>
         )}
       </Box>
 
-      {/* Input Area */}
-      <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
-        <Box display="flex" gap={1}>
-          <IconButton size="small">
-            <AttachFile />
-          </IconButton>
-          <TextField
-            fullWidth
-            variant="outlined"
-            placeholder="Type your message..."
-            value={message}
-            onChange={handleTyping}
-            onKeyPress={handleKeyPress}
-            size="small"
-            multiline
-            maxRows={3}
-          />
-          <IconButton
-            onClick={handleSendMessage}
-            disabled={!message.trim()}
-            color="primary"
-          >
-            <Send />
-          </IconButton>
+      {/* Input */}
+      <Collapse in={replyingTo || editingMsg}>
+        <Box sx={{ p: 1, bgcolor: 'white', borderTop: '1px solid #eee', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box sx={{ flex: 1, bgcolor: '#f0f0f0', p: 1, borderRadius: 1, borderLeft: '4px solid #34b7f1' }}>
+            <Typography variant="caption" color="primary" fontWeight="bold">{editingMsg ? 'Editing' : 'Replying'}</Typography>
+            <Typography variant="body2" noWrap>{editingMsg?.content || replyingTo?.content}</Typography>
+          </Box>
+          <IconButton size="small" onClick={() => { setReplyingTo(null); setEditingMsg(null); setMessage(''); }}><CloseIcon /></IconButton>
         </Box>
+      </Collapse>
+
+      <Box sx={{ p: 1.5, bgcolor: '#f0f2f5', display: 'flex', alignItems: 'center', gap: 1 }}>
+        <input type="file" ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileUpload} multiple />
+        <IconButton size="small" onClick={() => fileInputRef.current.click()} disabled={uploading}><AttachFileIcon /></IconButton>
+        <IconButton size="small"><EmojiIcon /></IconButton>
+        <TextField
+          fullWidth multiline maxRows={4} size="small" placeholder="Type a message"
+          value={message} onChange={handleTyping}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+          sx={{ bgcolor: 'white', borderRadius: '20px', '& .MuiOutlinedInput-root': { borderRadius: '20px' } }}
+        />
+        <IconButton color="primary" disabled={(!message.trim() && !uploading) || uploading} onClick={() => handleSend()}>
+          {uploading ? <CircularProgress size={24} /> : <SendIcon />}
+        </IconButton>
       </Box>
-    </Card>
+
+      {/* Msg Menu */}
+      <Menu anchorEl={msgAnchorEl} open={Boolean(msgAnchorEl)} onClose={() => setMsgAnchorEl(null)}>
+        <MenuItem onClick={() => { setReplyingTo(selectedMsg); setMsgAnchorEl(null); }}><ListItemIcon><ReplyIcon fontSize="small" /></ListItemIcon>Reply</MenuItem>
+        {selectedMsg?.sender._id === currentUser._id && (
+          <MenuItem onClick={() => { setEditingMsg(selectedMsg); setMessage(selectedMsg.content); setMsgAnchorEl(null); }}><ListItemIcon><EditIcon fontSize="small" /></ListItemIcon>Edit</MenuItem>
+        )}
+        <MenuItem onClick={handleCopy}><ListItemIcon><CopyIcon fontSize="small" /></ListItemIcon>Copy</MenuItem>
+        <MenuItem onClick={handleStar}><ListItemIcon>{selectedMsg?.isStarredBy?.includes(currentUser._id) ? <StarBorderIcon fontSize="small" /> : <StarIcon fontSize="small" />}</ListItemIcon>{selectedMsg?.isStarredBy?.includes(currentUser._id) ? 'Unstar' : 'Star'}</MenuItem>
+        <Divider />
+        <MenuItem onClick={() => handleDelete('me')}><ListItemIcon><DeleteIcon fontSize="small" /></ListItemIcon>Delete for me</MenuItem>
+        <MenuItem onClick={() => handleDelete('everyone')} sx={{ color: 'error.main' }}><ListItemIcon><DeleteIcon fontSize="small" color="error" /></ListItemIcon>Delete for everyone</MenuItem>
+      </Menu>
+    </Paper>
   );
 };
 

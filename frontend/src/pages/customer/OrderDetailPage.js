@@ -33,11 +33,16 @@ import {
   Phone, LocationOn, Star, Download as DownloadIcon, Visibility
 } from '@mui/icons-material';
 import Message from '../../components/common/Message';
+import OrderTimeline from '../../components/common/OrderTimeline';
+import { OrderTrackingSocket } from '../../utils/socket';
+import { useAuth } from '../../context/AuthContext';
+import DeliveryTrackingMap from '../../components/common/DeliveryTrackingMap';
 
 const OrderDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { user } = useAuth();
   const { order, loading, error } = useSelector(s => s.orderDetails || {});
   const { loading: cancelLoading, error: cancelError, success: cancelSuccess } = useSelector(s => s.orderCancel || {});
 
@@ -56,6 +61,29 @@ const OrderDetailPage = () => {
       setCancelOpen(false);
     }
   }, [cancelSuccess, dispatch, id]);
+
+  // 🔥 Real-time Tracking
+  useEffect(() => {
+    let orderSocket = null;
+
+    if (user?._id && id) {
+      orderSocket = new OrderTrackingSocket(
+        user._id,
+        user.role,
+        localStorage.getItem('token'),
+        (data) => {
+          if (data.type === 'ORDER_UPDATE' && data.data?.orderId === id) {
+            dispatch(getOrderDetails(id));
+          }
+        }
+      );
+      orderSocket.joinOrderRoom(id);
+    }
+
+    return () => {
+      if (orderSocket) orderSocket.cleanup();
+    };
+  }, [id, user?._id, user?.role, dispatch]);
 
   const handleCancel = async () => await dispatch(cancelOrder(id));
   const openCancel = () => setCancelOpen(true);
@@ -109,14 +137,27 @@ const OrderDetailPage = () => {
 
       <Grid container spacing={3}>
         {/* Progress */}
-        <Grid item xs={12}>
+        <Grid item xs={12} md={order?.orderStatus === 'shipped' || order?.orderStatus === 'out_for_delivery' ? 12 : 12}>
           <Card><CardContent>
-            <Typography variant="h6" gutterBottom>Progress</Typography>
-            <Stepper activeStep={activeStep} alternativeLabel sx={{ mt: 2 }}>
-              {steps.map(l => <Step key={l}><StepLabel>{l}</StepLabel></Step>)}
-            </Stepper>
+            <Typography variant="h6" gutterBottom>Tracking History</Typography>
+            <OrderTimeline
+              history={order.statusHistory || []}
+              currentStatus={order.orderStatus}
+            />
           </CardContent></Card>
         </Grid>
+
+        {/* Live Map */}
+        {(order?.orderStatus === 'shipped' || order?.orderStatus === 'out_for_delivery') && (
+          <Grid item xs={12}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>Live Delivery Tracking</Typography>
+                <DeliveryTrackingMap order={order} />
+              </CardContent>
+            </Card>
+          </Grid>
+        )}
 
         {/* Items */}
         <Grid item xs={12} md={8}>

@@ -113,7 +113,8 @@ const assignDeliveryToOrder = asyncHandler(async (req, res) => {
       userId: req.user._id
     });
 
-    const { deliveryPartner, trackingNumber = '' } = req.body;
+    const { deliveryPartner: partnerIdFromReqBody, partnerId, trackingNumber } = req.body;
+    const deliveryPartner = partnerIdFromReqBody || partnerId;
 
     if (!deliveryPartner) {
       console.error('❌ Missing deliveryPartner in request body');

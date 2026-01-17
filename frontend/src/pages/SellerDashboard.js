@@ -5,7 +5,7 @@ import {
     TableCell, TableContainer, TableHead, TableRow, Button, Dialog, DialogTitle,
     DialogContent, DialogActions, FormControl, InputLabel, Select, MenuItem,
     useTheme, Divider, Alert, CircularProgress, TextField, IconButton, Pagination, Chip,
-    AppBar, Toolbar, Card, CardContent
+    AppBar, Toolbar, Card, CardContent, Grid
 } from '@mui/material';
 import { grey } from '@mui/material/colors';
 import {
@@ -15,11 +15,10 @@ import {
     Chat as ChatIcon,
     Download as DownloadIcon,
     Logout as LogoutIcon,
-    Support as SupportIcon
+    Support as SupportIcon,
+    Visibility as VisibilityIcon
 } from '@mui/icons-material';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import { listSellerOrders, updateOrderStatus } from '../redux/actions/orderActions';
+import { listSellerOrders, updateOrderStatus, downloadInvoice } from '../redux/actions/orderActions';
 import { listDeliveryPartners, assignDeliveryPartner } from '../redux/actions/deliveryActions';
 import { listMyRecipes, submitRecipe, deleteRecipe } from '../redux/actions/recipeActions';
 import { listSellerProducts } from '../redux/actions/productActions';
@@ -31,79 +30,15 @@ import SellerPayments from '../components/seller/SellerPayments';
 import SellerDelivery from '../components/seller/SellerDelivery';
 import AnalyticsDashboard from '../components/seller/AnalyticsDashboard';
 import Forum from '../components/common/Forum';
+import OrderKanban from '../components/seller/OrderKanban';
+import OrderTimeline from '../components/common/OrderTimeline';
 import { useAuth } from '../context/AuthContext';
-import ChatWindow from '../components/common/ChatWindow';
+import SellerChatWidget from '../components/seller/SellerChatWidget';
 import Message from '../components/common/Message';
 import { RECIPE_SUBMIT_RESET } from '../redux/constants/RecipeConstants';
+import RecipeEngagementDashboard from '../components/seller/RecipeEngagementDashboard';
 
-// ✅ FIXED: Invoice PDF generation with proper Unicode support and no ampersand issues
-const generatePDF = (order) => {
-    const doc = new jsPDF();
-    
-    // ✅ FIXED: Use Unicode-supporting font
-    doc.setFont('DejaVuSans', 'normal');
-    doc.setFontSize(18);
-    doc.text(`Invoice for Order #${order._id?.slice(-6) || 'N/A'}`, 14, 22);
-    doc.setFontSize(11);
-    doc.setTextColor(100);
-
-    // ✅ FIXED: Escape special characters properly
-    const escapeText = (text) => String(text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    
-    doc.text(`Customer: ${escapeText(order.user?.name) || 'N/A'}`, 14, 32);
-    doc.text(`Email: ${escapeText(order.user?.email) || 'N/A'}`, 14, 38);
-    doc.text(`Date: ${order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}`, 14, 44);
-
-    doc.text('Shipping Address:', 14, 54);
-    const addr = order.shippingAddress;
-    doc.text(`${escapeText(addr?.street) || ''}, ${escapeText(addr?.city) || ''}`, 14, 60);
-    doc.text(`${escapeText(addr?.state) || ''} - ${escapeText(addr?.pinCode) || ''}`, 14, 66);
-    doc.text(`Phone: ${escapeText(addr?.phone || order.user?.phone) || 'N/A'}`, 14, 72);
-
-    const tableColumn = ["#", "Product", "Quantity", "Price", "Total"];
-    const tableRows = [];
-    order.orderItems?.forEach((item, index) => {
-        const price = Number(item.price || 0);
-        const qty = Number(item.qty || 0);
-        const total = price * qty;
-        
-        const itemData = [
-            index + 1,
-            escapeText(item.name || item.product?.name || 'Product'),
-            String(qty),
-            `₹${price.toFixed(2)}`, // ✅ FIXED: Use ₹ symbol instead of Rs.
-            `₹${total.toFixed(2)}`
-        ];
-        tableRows.push(itemData);
-    });
-
-    // ✅ FIXED: Use autoTable with Unicode font
-    autoTable(doc, {
-        head: [tableColumn],
-        body: tableRows,
-        startY: 80,
-        theme: 'grid',
-        headStyles: { fillColor: [46, 125, 50] },
-        styles: { font: 'DejaVuSans', fontSize: 10 }
-    });
-
-    const finalY = doc.lastAutoTable.finalY || 100;
-    doc.setFontSize(12);
-    doc.text(`Items Price: ₹${Number(order.itemsPrice || 0).toFixed(2)}`, 145, finalY + 10, { align: 'right' });
-    doc.text(`Shipping Price: ₹${Number(order.shippingPrice || 0).toFixed(2)}`, 145, finalY + 16, { align: 'right' });
-    doc.setFontSize(14);
-    doc.setFont('DejaVuSans', 'bold');
-    doc.text(`Total Price: ₹${Number(order.totalPrice || 0).toFixed(2)}`, 145, finalY + 24, { align: 'right' });
-
-    doc.setFont('DejaVuSans', 'normal');
-    doc.setFontSize(10);
-    doc.text(`Payment Method: ${escapeText(order.paymentMethod) || 'N/A'}`, 14, finalY + 30);
-    const paidDate = order.isPaid && order.paidAt ? new Date(order.paidAt).toLocaleDateString() : 'N/A';
-    doc.text(`Payment Status: ${order.isPaid ? `Paid on ${paidDate}` : 'Not Paid'}`, 14, finalY + 36);
-
-    doc.save(`invoice_${order._id?.slice(-6) || 'unknown'}.pdf`);
-};
-
+// ✅ Backend-driven Invoice handled via Redux actions
 
 // 🔥 NEW: Logout Component for Seller Dashboard
 const SellerLogoutButton = () => {
@@ -287,7 +222,9 @@ const RecipeForm = ({ open, onClose, onSubmit, sellerProducts = [] }) => {
 // --- Seller Recipes Panel Component ---
 const SellerRecipesPanel = () => {
     const dispatch = useDispatch();
+    const { user } = useAuth();
     const [recipeFormOpen, setRecipeFormOpen] = useState(false);
+    const [viewMode, setViewMode] = useState('list'); // 'list' or 'engagement'
 
     const {
         loading,
@@ -384,80 +321,93 @@ const SellerRecipesPanel = () => {
                 <Message severity="success">Recipe deleted successfully!</Message>
             )}
 
-            {loading && recipes.length === 0 ? (
-                <Loader />
-            ) : error ? (
-                <Message severity="error">{error}</Message>
+            <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+                <Tabs value={viewMode === 'list' ? 0 : 1} onChange={(e, v) => setViewMode(v === 0 ? 'list' : 'engagement')}>
+                    <Tab label="Recipe List" />
+                    <Tab label="Engagement Dashboard" />
+                </Tabs>
+            </Box>
+
+            {viewMode === 'engagement' ? (
+                <RecipeEngagementDashboard sellerId={user?._id} recipes={recipes} />
             ) : (
                 <>
-                    <TableContainer component={Paper}>
-                        <Table>
-                            <TableHead>
-                                <TableRow sx={{ backgroundColor: grey[100] }}>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Title</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Rice Type</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Linked Products</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Created At</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {recipes.map((recipe) => (
-                                    <TableRow key={recipe._id} hover>
-                                        <TableCell>{recipe.title}</TableCell>
-                                        <TableCell>
-                                            <Chip
-                                                label={recipe.status}
-                                                size="small"
-                                                color={
-                                                    recipe.status === 'approved' ? 'success' :
-                                                        recipe.status === 'rejected' ? 'error' :
-                                                            'warning'
-                                                }
-                                            />
-                                        </TableCell>
-                                        <TableCell>{recipe.riceType}</TableCell>
-                                        <TableCell>
-                                            {recipe.linkedProducts?.length > 0 ?
-                                                recipe.linkedProducts.map(p => p.name).join(', ') :
-                                                'None'
-                                            }
-                                        </TableCell>
-                                        <TableCell>
-                                            {new Date(recipe.createdAt).toLocaleDateString()}
-                                        </TableCell>
-                                        <TableCell>
-                                            <IconButton
-                                                size="small"
-                                                onClick={() => handleDeleteRecipe(recipe._id)}
-                                                disabled={deleting}
-                                            >
-                                                <DeleteIcon color={deleting ? 'disabled' : 'error'} />
-                                            </IconButton>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                                {recipes.length === 0 && (
-                                    <TableRow>
-                                        <TableCell colSpan={6} align="center">
-                                            No recipes submitted yet.
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
-                    {pages > 1 && (
-                        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-                            <Pagination
-                                count={pages}
-                                page={page}
-                                onChange={handlePageChange}
-                                color="primary"
-                                disabled={loading || submitting || deleting}
-                            />
-                        </Box>
+                    {loading && recipes.length === 0 ? (
+                        <Loader />
+                    ) : error ? (
+                        <Message severity="error">{error}</Message>
+                    ) : (
+                        <>
+                            <TableContainer component={Paper}>
+                                <Table>
+                                    <TableHead>
+                                        <TableRow sx={{ backgroundColor: grey[100] }}>
+                                            <TableCell sx={{ fontWeight: 'bold' }}>Title</TableCell>
+                                            <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
+                                            <TableCell sx={{ fontWeight: 'bold' }}>Rice Type</TableCell>
+                                            <TableCell sx={{ fontWeight: 'bold' }}>Linked Products</TableCell>
+                                            <TableCell sx={{ fontWeight: 'bold' }}>Created At</TableCell>
+                                            <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {recipes.map((recipe) => (
+                                            <TableRow key={recipe._id} hover>
+                                                <TableCell>{recipe.title}</TableCell>
+                                                <TableCell>
+                                                    <Chip
+                                                        label={recipe.status}
+                                                        size="small"
+                                                        color={
+                                                            recipe.status === 'approved' ? 'success' :
+                                                                recipe.status === 'rejected' ? 'error' :
+                                                                    'warning'
+                                                        }
+                                                    />
+                                                </TableCell>
+                                                <TableCell>{recipe.riceType}</TableCell>
+                                                <TableCell>
+                                                    {recipe.linkedProducts?.length > 0 ?
+                                                        recipe.linkedProducts.map(p => p.name).join(', ') :
+                                                        'None'
+                                                    }
+                                                </TableCell>
+                                                <TableCell>
+                                                    {new Date(recipe.createdAt).toLocaleDateString()}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => handleDeleteRecipe(recipe._id)}
+                                                        disabled={deleting}
+                                                    >
+                                                        <DeleteIcon color={deleting ? 'disabled' : 'error'} />
+                                                    </IconButton>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                        {recipes.length === 0 && (
+                                            <TableRow>
+                                                <TableCell colSpan={6} align="center">
+                                                    No recipes submitted yet.
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                            {pages > 1 && (
+                                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                                    <Pagination
+                                        count={pages}
+                                        page={page}
+                                        onChange={handlePageChange}
+                                        color="primary"
+                                        disabled={loading || submitting || deleting}
+                                    />
+                                </Box>
+                            )}
+                        </>
                     )}
                 </>
             )}
@@ -478,9 +428,10 @@ const SellerDashboard = () => {
     const [openDialog, setOpenDialog] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [partnerId, setPartnerId] = useState('');
-    const [chatOpen, setChatOpen] = useState(false);
-    const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [chatWithAdminOpen, setChatWithAdminOpen] = useState(false);
+    const [viewMode, setViewMode] = useState('kanban'); // 'table' or 'kanban'
+    const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+    const [invoiceLoading, setInvoiceLoading] = useState(false);
     const theme = useTheme();
     const dispatch = useDispatch();
     const { user } = useAuth();
@@ -574,9 +525,9 @@ const SellerDashboard = () => {
             alert('Please select a delivery partner.');
             return;
         }
-        
+
         try {
-            await dispatch(assignDeliveryPartner(selectedOrder._id, { deliveryPartner: partnerId, trackingNumber: '' }));
+            await dispatch(assignDeliveryPartner(selectedOrder._id, { partnerId }));
             // ✅ FIXED: Refresh orders list after successful assignment
             await dispatch(listSellerOrders());
             handleCloseDialog();
@@ -584,6 +535,37 @@ const SellerDashboard = () => {
         } catch (error) {
             console.error('Failed to assign delivery partner:', error);
             alert('Failed to assign delivery partner: ' + (error.message || 'Unknown error'));
+        }
+    };
+
+    const handleViewDetails = (order) => {
+        setSelectedOrder(order);
+        setDetailsDialogOpen(true);
+    };
+
+    // ✅ FIXED: Backend-driven Invoice Actions
+    const handleDownloadInvoice = async (orderId) => {
+        setInvoiceLoading(true);
+        const result = await dispatch(downloadInvoice(orderId));
+        setInvoiceLoading(false);
+        if (!result.success) alert(result.error || 'Failed to download invoice');
+    };
+
+    const handlePreviewInvoice = async (orderId) => {
+        setInvoiceLoading(true);
+        try {
+            const { data } = await OrderTrackingSocket.apiInstance.get(`/api/orders/${orderId}/invoice`, {
+                responseType: 'blob'
+            });
+            const blob = new Blob([data], { type: 'application/pdf' });
+            const url = window.URL.createObjectURL(blob);
+            window.open(url, '_blank');
+            // Note: We don't revoke here because it might close the new tab's access
+        } catch (error) {
+            console.error('Preview error:', error);
+            alert('Failed to preview invoice');
+        } finally {
+            setInvoiceLoading(false);
         }
     };
 
@@ -628,79 +610,6 @@ const SellerDashboard = () => {
         }
     };
 
-    const handleOpenChat = (customerId) => {
-        setSelectedCustomer(customerId);
-        setChatOpen(true);
-    };
-
-    // ✅ FIXED: Invoice PDF generation with proper Unicode support (no ampersand issues)
-    const generatePDF = (order) => {
-        const doc = new jsPDF();
-        doc.setFont('DejaVuSans', 'normal'); // ✅ FIXED: Use Unicode-supporting font
-        
-        doc.setFontSize(18);
-        doc.text(`Invoice for Order #${order._id?.slice(-6) || 'N/A'}`, 14, 22);
-        doc.setFontSize(11);
-        doc.setTextColor(100);
-
-        // ✅ FIXED: Properly escape text to prevent ampersand issues
-        const escapeText = (text) => {
-            if (!text) return '';
-            return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        };
-
-        doc.text(`Customer: ${escapeText(order.user?.name) || 'N/A'}`, 14, 32);
-        doc.text(`Email: ${escapeText(order.user?.email) || 'N/A'}`, 14, 38);
-        doc.text(`Date: ${order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}`, 14, 44);
-
-        doc.text('Shipping Address:', 14, 54);
-        const addr = order.shippingAddress;
-        doc.text(`${escapeText(addr?.street) || ''}, ${escapeText(addr?.city) || ''}`, 14, 60);
-        doc.text(`${escapeText(addr?.state) || ''} - ${escapeText(addr?.pinCode) || ''}`, 14, 66);
-        doc.text(`Phone: ${escapeText(addr?.phone || order.user?.phone) || 'N/A'}`, 14, 72);
-
-        const tableColumn = ["#", "Product", "Quantity", "Price", "Total"];
-        const tableRows = [];
-        order.orderItems?.forEach((item, index) => {
-            const price = Number(item.price || 0);
-            const qty = Number(item.qty || 0);
-            const total = price * qty;
-            
-            const itemData = [
-                index + 1,
-                escapeText(item.name || item.product?.name || 'Product'),
-                String(qty),
-                `₹${price.toFixed(2)}`, // ✅ FIXED: Use ₹ symbol
-                `₹${total.toFixed(2)}`
-            ];
-            tableRows.push(itemData);
-        });
-
-        autoTable(doc, {
-            head: [tableColumn],
-            body: tableRows,
-            startY: 80,
-            theme: 'grid',
-            headStyles: { fillColor: [46, 125, 50] },
-            styles: { font: 'DejaVuSans', fontSize: 10 } // ✅ FIXED: Specify Unicode font
-        });
-
-        const finalY = doc.lastAutoTable.finalY || 100;
-        doc.setFontSize(12);
-        doc.text(`Items Price: ₹${Number(order.itemsPrice || 0).toFixed(2)}`, 145, finalY + 10, { align: 'right' });
-        doc.text(`Shipping Price: ₹${Number(order.shippingPrice || 0).toFixed(2)}`, 145, finalY + 16, { align: 'right' });
-        doc.setFontSize(14);
-        doc.setFont('DejaVuSans', 'bold');
-        doc.text(`Total Price: ₹${Number(order.totalPrice || 0).toFixed(2)}`, 145, finalY + 24, { align: 'right' });
-
-        doc.setFont('DejaVuSans', 'normal');
-        doc.setFontSize(10);
-        doc.text(`Payment Method: ${escapeText(order.paymentMethod) || 'N/A'}`, 14, finalY + 30);
-        const paidDate = order.isPaid && order.paidAt ? new Date(order.paidAt).toLocaleDateString() : 'N/A';
-        doc.text(`Payment Status: ${order.isPaid ? `Paid on ${paidDate}` : 'Not Paid'}`, 14, finalY + 36);
-
-        doc.save(`invoice_${order._id?.slice(-6) || 'unknown'}.pdf`);
-    };
 
     const getEstimatedDeliveryDate = (createdAt) => {
         if (!createdAt) return 'N/A';
@@ -716,60 +625,18 @@ const SellerDashboard = () => {
 
     return (
         <Box sx={{ backgroundColor: '#f5f7fb', minHeight: '100vh' }}>
-            {/* 🔥 NEW: Header with Logout and Admin Chat */}
             <AppBar position="static" sx={{ mb: 3 }}>
                 <Toolbar>
                     <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
                         Seller Dashboard
                     </Typography>
-
-                    {/* Message Admin Button */}
-                    <Button
-                        color="inherit"
-                        onClick={() => setChatWithAdminOpen(true)}
-                        startIcon={<SupportIcon />}
-                        sx={{ mr: 2 }}
-                    >
-                        Message Admin
-                    </Button>
-
                     <SellerLogoutButton />
                 </Toolbar>
             </AppBar>
 
-            {/* Support Card */}
-            <Container maxWidth="xl" sx={{ mb: 2 }}>
-                <Card sx={{ bgcolor: 'primary.light', color: 'white', mb: 3 }}>
-                    <CardContent>
-                        <Box display="flex" alignItems="center" justifyContent="space-between">
-                            <Box>
-                                <Typography variant="h6" gutterBottom>
-                                    💬 Need Help?
-                                </Typography>
-                                <Typography variant="body2">
-                                    Message our admin team directly for any questions about orders, payments, or platform issues.
-                                </Typography>
-                            </Box>
-                            <Button
-                                variant="contained"
-                                sx={{ bgcolor: 'white', color: 'primary.main', '&:hover': { bgcolor: 'grey.100' } }}
-                                onClick={() => setChatWithAdminOpen(true)}
-                                startIcon={<ChatIcon />}
-                            >
-                                Message Admin
-                            </Button>
-                        </Box>
-                    </CardContent>
-                </Card>
-            </Container>
 
             <Container maxWidth="xl" sx={{ mb: 4 }}>
-                <Paper elevation={4} sx={{
-                    p: 3,
-                    mb: 3,
-                    borderRadius: 3,
-                    background: 'linear-gradient(135deg, #e8f5e9 30%, #f1f8e9 100%)',
-                }}>
+                <Paper elevation={4} sx={{ p: 3, mb: 3, borderRadius: 3, background: 'linear-gradient(135deg, #e8f5e9 30%, #f1f8e9 100%)' }}>
                     <Tabs
                         value={tabValue}
                         onChange={handleTabChange}
@@ -777,208 +644,207 @@ const SellerDashboard = () => {
                         textColor="primary"
                         variant="scrollable"
                         scrollButtons="auto"
-                        aria-label="Seller dashboard tabs"
-                        sx={{
-                            borderBottom: 1,
-                            borderColor: 'divider',
-                            '& .MuiTab-root': {
-                                fontWeight: 600,
-                                textTransform: 'none',
-                                '&.Mui-selected': { color: theme.palette.primary.main },
-                            },
-                        }}
                     >
-                        <Tab label="Profile" id="seller-tab-0" aria-controls="seller-panel-0" />
-                        <Tab label="Orders" id="seller-tab-1" aria-controls="seller-panel-1" />
-                        <Tab label="Products" id="seller-tab-2" aria-controls="seller-panel-2" />
-                        <Tab label="Payments" id="seller-tab-3" aria-controls="seller-panel-3" />
-                        <Tab label="Delivery" id="seller-tab-4" aria-controls="seller-panel-4" />
-                        <Tab label="Recipes" id="seller-tab-5" aria-controls="seller-panel-5" />
-                        <Tab label="Community Forum" id="seller-tab-6" aria-controls="seller-panel-6" />
-                        <Tab label="Analytics" id="seller-tab-7" aria-controls="seller-panel-7" />
+                        <Tab label="Profile" id="seller-tab-0" />
+                        <Tab label="Orders" id="seller-tab-1" />
+                        <Tab label="Products" id="seller-tab-2" />
+                        <Tab label="Payments" id="seller-tab-3" />
+                        <Tab label="Delivery" id="seller-tab-4" />
+                        <Tab label="Recipes" id="seller-tab-5" />
+                        <Tab label="Community Forum" id="seller-tab-6" />
+                        <Tab label="Analytics" id="seller-tab-7" />
                     </Tabs>
                 </Paper>
 
-                <Box role="tabpanel" hidden={tabValue !== 0} id="seller-panel-0" aria-labelledby="seller-tab-0">
+                <Box role="tabpanel" hidden={tabValue !== 0} id="seller-panel-0">
                     <SellerProfile />
                 </Box>
 
-                <Box role="tabpanel" hidden={tabValue !== 1} id="seller-panel-1" aria-labelledby="seller-tab-1">
-                    {ordersLoading && orders.length === 0 ? (
+                <Box role="tabpanel" hidden={tabValue !== 1} id="seller-panel-1">
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2, gap: 1 }}>
+                        <Button variant={viewMode === 'kanban' ? 'contained' : 'outlined'} onClick={() => setViewMode('kanban')} size="small">Kanban</Button>
+                        <Button variant={viewMode === 'table' ? 'contained' : 'outlined'} onClick={() => setViewMode('table')} size="small">Table</Button>
+                    </Box>
+
+                    {ordersLoading ? (
                         <Loader />
                     ) : ordersError ? (
                         <Message severity="error">{ordersError}</Message>
                     ) : (
-                        <TableContainer component={Paper} elevation={3} sx={{ mt: 2, borderRadius: 2 }}>
-                            <Table>
-                                <TableHead>
-                                    <TableRow sx={{ backgroundColor: grey[100] }}>
-                                        <TableCell sx={{ fontWeight: 'bold' }}>Order ID</TableCell>
-                                        <TableCell sx={{ fontWeight: 'bold' }}>Customer</TableCell>
-                                        <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
-                                        <TableCell sx={{ fontWeight: 'bold' }}>Total</TableCell>
-                                        <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-                                        <TableCell sx={{ fontWeight: 'bold' }}>Payment</TableCell>
-                                        <TableCell sx={{ fontWeight: 'bold' }}>Delivery Partner</TableCell>
-                                        <TableCell sx={{ fontWeight: 'bold' }}>Est. Delivery</TableCell>
-                                        <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {orders.map((order) => (
-                                        <TableRow key={order._id} hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
-                                            <TableCell>...{order._id?.slice(-6) || 'N/A'}</TableCell>
-                                            <TableCell>{order.user?.name || 'N/A'}</TableCell>
-                                            <TableCell>{order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}</TableCell>
-                                            <TableCell>₹{order.totalPrice?.toFixed(2) || '0.00'}</TableCell>
-                                            <TableCell>
-                                                <Select
-                                                    value={order.status || 'Pending'}
-                                                    onChange={(e) => handleUpdateStatus(order._id, e.target.value)}
-                                                    size="small"
-                                                    disabled={updateStatusState.loading && updateStatusState.orderId === order._id}
-                                                    sx={{ minWidth: 120 }}
-                                                >
-                                                    <MenuItem value="Pending">Pending</MenuItem>
-                                                    <MenuItem value="Processing">Processing</MenuItem>
-                                                    <MenuItem value="Shipped">Shipped</MenuItem>
-                                                    <MenuItem value="Out For Delivery">Out For Delivery</MenuItem>
-                                                    <MenuItem value="Delivered">Delivered</MenuItem>
-                                                    <MenuItem value="Cancelled">Cancelled</MenuItem>
-                                                </Select>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Chip
-                                                    label={order.isPaid ? 'Paid' : 'Pending'}
-                                                    color={order.isPaid ? 'success' : 'warning'}
-                                                    size="small"
-                                                />
-                                            </TableCell>
-                                            <TableCell>{order.deliveryPartner?.name || 'Not Assigned'}</TableCell>
-                                            <TableCell>{order.createdAt ? getEstimatedDeliveryDate(order.createdAt) : 'N/A'}</TableCell>
-                                            <TableCell>
-                                                <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'nowrap' }}>
-                                                    <Button
-                                                        size="small"
-                                                        variant="outlined"
-                                                        onClick={() => handleOpenDialog(order)}
-                                                        disabled={assignPartnerState.loading}
-                                                    >
-                                                        Assign
-                                                    </Button>
-                                                    <IconButton
-                                                        size="small"
-                                                        onClick={() => generatePDF(order)}
-                                                        title="Download Invoice"
-                                                    >
-                                                        <DownloadIcon />
-                                                    </IconButton>
-                                                </Box>
-                                            </TableCell>
+                        viewMode === 'table' ? (
+                            <TableContainer component={Paper} elevation={3} sx={{ mt: 2, borderRadius: 2 }}>
+                                <Table>
+                                    <TableHead>
+                                        <TableRow sx={{ backgroundColor: grey[100] }}>
+                                            <TableCell sx={{ fontWeight: 'bold' }}>Order ID</TableCell>
+                                            <TableCell sx={{ fontWeight: 'bold' }}>Customer</TableCell>
+                                            <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
+                                            <TableCell sx={{ fontWeight: 'bold' }}>Total</TableCell>
+                                            <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
+                                            <TableCell sx={{ fontWeight: 'bold' }}>Payment</TableCell>
+                                            <TableCell sx={{ fontWeight: 'bold' }}>Delivery Partner</TableCell>
+                                            <TableCell sx={{ fontWeight: 'bold' }}>Est. Delivery</TableCell>
+                                            <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
                                         </TableRow>
-                                    ))}
-                                    {orders.length === 0 && (
-                                        <TableRow>
-                                            <TableCell colSpan={9} align="center">
-                                                No orders found.
-                                            </TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
+                                    </TableHead>
+                                    <TableBody>
+                                        {orders && orders.map((order) => (
+                                            <TableRow key={order._id} hover>
+                                                <TableCell onClick={() => handleViewDetails(order)} sx={{ cursor: 'pointer', color: 'primary.main' }}>
+                                                    #{order._id?.slice(-6).toUpperCase()}
+                                                </TableCell>
+                                                <TableCell>{order.user?.name || 'N/A'}</TableCell>
+                                                <TableCell>{order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}</TableCell>
+                                                <TableCell>₹{order.totalPrice?.toFixed(2)}</TableCell>
+                                                <TableCell>
+                                                    <Select
+                                                        value={order.orderStatus}
+                                                        onChange={(e) => handleUpdateStatus(order._id, e.target.value)}
+                                                        size="small"
+                                                        disabled={updateStatusState.loading && updateStatusState.orderId === order._id}
+                                                    >
+                                                        <MenuItem value="placed">Pending</MenuItem>
+                                                        <MenuItem value="processing">Processing</MenuItem>
+                                                        <MenuItem value="packed">Packed</MenuItem>
+                                                        <MenuItem value="shipped">Shipped</MenuItem>
+                                                        <MenuItem value="delivered">Delivered</MenuItem>
+                                                        <MenuItem value="cancelled">Cancelled</MenuItem>
+                                                    </Select>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Chip label={order.isPaid ? 'Paid' : 'Unpaid'} color={order.isPaid ? 'success' : 'warning'} size="small" />
+                                                </TableCell>
+                                                <TableCell>{order.deliveryPartner?.name || 'Not Assigned'}</TableCell>
+                                                <TableCell>{getEstimatedDeliveryDate(order.createdAt)}</TableCell>
+                                                <TableCell>
+                                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                                        <IconButton size="small" onClick={() => handleViewDetails(order)} title="View Details"><VisibilityIcon fontSize="small" /></IconButton>
+                                                        <IconButton
+                                                            size="small"
+                                                            onClick={() => handleDownloadInvoice(order._id)}
+                                                            disabled={invoiceLoading}
+                                                            title="Download Invoice"
+                                                        >
+                                                            {invoiceLoading ? <CircularProgress size={20} /> : <DownloadIcon fontSize="small" />}
+                                                        </IconButton>
+                                                        {order.orderStatus === 'packed' && !order.deliveryPartner && (
+                                                            <Button variant="outlined" size="small" onClick={() => handleOpenDialog(order)}>Assign</Button>
+                                                        )}
+                                                    </Box>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                        {orders?.length === 0 && (
+                                            <TableRow>
+                                                <TableCell colSpan={9} align="center">No orders found.</TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        ) : (
+                            <OrderKanban orders={orders} onUpdateStatus={handleUpdateStatus} onAssignPartner={handleOpenDialog} onViewDetails={handleViewDetails} />
+                        )
                     )}
                 </Box>
 
-                <Box role="tabpanel" hidden={tabValue !== 2} id="seller-panel-2" aria-labelledby="seller-tab-2">
+                <Box role="tabpanel" hidden={tabValue !== 2} id="seller-panel-2">
                     <SellerProducts />
                 </Box>
 
-                <Box role="tabpanel" hidden={tabValue !== 3} id="seller-panel-3" aria-labelledby="seller-tab-3">
+                <Box role="tabpanel" hidden={tabValue !== 3} id="seller-panel-3">
                     <SellerPayments />
                 </Box>
 
-                <Box role="tabpanel" hidden={tabValue !== 4} id="seller-panel-4" aria-labelledby="seller-tab-4">
+                <Box role="tabpanel" hidden={tabValue !== 4} id="seller-panel-4">
                     <SellerDelivery />
                 </Box>
 
-                <Box role="tabpanel" hidden={tabValue !== 5} id="seller-panel-5" aria-labelledby="seller-tab-5">
+                <Box role="tabpanel" hidden={tabValue !== 5} id="seller-panel-5">
                     <SellerRecipesPanel />
                 </Box>
 
-                <Box role="tabpanel" hidden={tabValue !== 6} id="seller-panel-6" aria-labelledby="seller-tab-6">
+                <Box role="tabpanel" hidden={tabValue !== 6} id="seller-panel-6">
                     <Forum />
                 </Box>
 
-                <Box role="tabpanel" hidden={tabValue !== 7} id="seller-panel-7" aria-labelledby="seller-tab-7">
+                <Box role="tabpanel" hidden={tabValue !== 7} id="seller-panel-7">
                     <AnalyticsDashboard />
                 </Box>
 
                 <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-                    <DialogTitle>
-                        Assign Delivery Partner for Order #{selectedOrder?._id?.slice(-6) || 'N/A'}
-                    </DialogTitle>
+                    <DialogTitle>Assign Delivery Partner for Order #{selectedOrder?._id?.slice(-6) || 'N/A'}</DialogTitle>
                     <DialogContent>
-                        {partnersLoading ? (
-                            <Loader />
-                        ) : partnersError ? (
-                            <Alert severity="error">{partnersError}</Alert>
-                        ) : partners.length === 0 ? (
-                            <Typography>No delivery partners available.</Typography>
-                        ) : (
+                        {partnersLoading ? <Loader /> : partnersError ? <Alert severity="error">{partnersError}</Alert> : partners.length === 0 ? <Typography>No delivery partners available.</Typography> : (
                             <FormControl fullWidth sx={{ mt: 2 }}>
                                 <InputLabel id="partner-select-label">Delivery Partner</InputLabel>
-                                <Select
-                                    labelId="partner-select-label"
-                                    value={partnerId}
-                                    label="Delivery Partner"
-                                    onChange={(e) => setPartnerId(e.target.value)}
-                                >
-                                    {partners.map(p => (
-                                        <MenuItem key={p._id} value={p._id}>
-                                            {p.name} ({p.vehicleType})
-                                        </MenuItem>
-                                    ))}
+                                <Select labelId="partner-select-label" value={partnerId} label="Delivery Partner" onChange={(e) => setPartnerId(e.target.value)}>
+                                    {partners.map(p => <MenuItem key={p._id} value={p._id}>{p.name} ({p.vehicleType})</MenuItem>)}
                                 </Select>
                             </FormControl>
                         )}
-                        {assignPartnerState.error && (
-                            <Alert severity="error" sx={{ mt: 2 }}>
-                                {assignPartnerState.error}
-                            </Alert>
-                        )}
+                        {assignPartnerState.error && <Alert severity="error" sx={{ mt: 2 }}>{assignPartnerState.error}</Alert>}
                     </DialogContent>
                     <DialogActions>
                         <Button onClick={handleCloseDialog}>Cancel</Button>
-                        <Button
-                            onClick={handleAssignPartner}
-                            variant="contained"
-                            disabled={partnersLoading || partners.length === 0 || assignPartnerState.loading || !partnerId}
-                        >
+                        <Button onClick={handleAssignPartner} variant="contained" disabled={partnersLoading || partners.length === 0 || assignPartnerState.loading || !partnerId}>
                             {assignPartnerState.loading ? <CircularProgress size={24} /> : 'Assign'}
                         </Button>
                     </DialogActions>
                 </Dialog>
 
-                {/* Chat with Customer */}
-                {chatOpen && user && selectedCustomer && (
-                    <ChatWindow
-                        receiverId={selectedCustomer}
-                        onClose={() => {
-                            setChatOpen(false);
-                            setSelectedCustomer(null);
-                        }}
-                    />
-                )}
 
-                {/* Chat with Admin */}
-                {chatWithAdminOpen && (
-                    <ChatWindow
-                        receiverId={process.env.REACT_APP_ADMIN_USER_ID || 'admin'}
-                        receiverName="Admin"
-                        onClose={() => setChatWithAdminOpen(false)}
-                    />
-                )}
+                <SellerChatWidget />
+
+                <Dialog open={detailsDialogOpen} onClose={() => setDetailsDialogOpen(false)} maxWidth="md" fullWidth>
+                    <DialogTitle sx={{ bgcolor: 'primary.main', color: 'white' }}>Order Details #{selectedOrder?._id?.slice(-6).toUpperCase()}</DialogTitle>
+                    <DialogContent sx={{ mt: 2 }}>
+                        {selectedOrder && (
+                            <Grid container spacing={3}>
+                                <Grid item xs={12} md={7}>
+                                    <Typography variant="h6" gutterBottom>Track Status</Typography>
+                                    <OrderTimeline history={selectedOrder.statusHistory || []} currentStatus={selectedOrder.orderStatus} />
+                                    <Divider sx={{ my: 2 }} />
+                                    <Typography variant="h6" gutterBottom>Order Items</Typography>
+                                    <TableContainer component={Paper} variant="outlined">
+                                        <Table size="small">
+                                            <TableHead><TableRow><TableCell>Item</TableCell><TableCell align="right">Qty</TableCell><TableCell align="right">Price</TableCell></TableRow></TableHead>
+                                            <TableBody>
+                                                {selectedOrder.orderItems?.map((item) => (
+                                                    <TableRow key={item._id}><TableCell>{item.name}</TableCell><TableCell align="right">{item.qty}</TableCell><TableCell align="right">₹{item.price?.toFixed(2)}</TableCell></TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </TableContainer>
+                                </Grid>
+                                <Grid item xs={12} md={5}>
+                                    <Paper variant="outlined" sx={{ p: 2, bgcolor: grey[50] }}>
+                                        <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }} gutterBottom>Customer Information</Typography>
+                                        <Typography variant="body2"><strong>Name:</strong> {selectedOrder.user?.name}</Typography>
+                                        <Typography variant="body2"><strong>Email:</strong> {selectedOrder.user?.email}</Typography>
+                                        <Typography variant="body2" sx={{ mt: 1 }}><strong>Shipping Address:</strong></Typography>
+                                        <Typography variant="body2" color="text.secondary">{formatAddress(selectedOrder.shippingAddress)}</Typography>
+                                        <Divider sx={{ my: 2 }} />
+                                        <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }} gutterBottom>Payment Details</Typography>
+                                        <Typography variant="body2"><strong>Method:</strong> {selectedOrder.paymentMethod?.toUpperCase()}</Typography>
+                                        <Typography variant="body2"><strong>Status:</strong><Chip label={selectedOrder.isPaid ? 'PAID' : 'PENDING'} size="small" color={selectedOrder.isPaid ? 'success' : 'warning'} sx={{ ml: 1 }} /></Typography>
+                                        <Divider sx={{ my: 2 }} />
+                                        <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }} gutterBottom>Action Details</Typography>
+                                        <Typography variant="body2"><strong>Delivery Partner:</strong> {selectedOrder.deliveryPartner?.name || 'None Assigned'}</Typography>
+                                        {selectedOrder.deliveryOtp && <Typography variant="body2" color="secondary" sx={{ fontWeight: 'bold', mt: 1 }}>Verification OTP: {selectedOrder.deliveryOtp}</Typography>}
+                                    </Paper>
+                                </Grid>
+                            </Grid>
+                        )}
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setDetailsDialogOpen(false)}>Close</Button>
+                        <Button variant="outlined" onClick={() => handlePreviewInvoice(selectedOrder._id)} disabled={invoiceLoading}>Preview Invoice</Button>
+                        <Button variant="contained" onClick={() => handleDownloadInvoice(selectedOrder._id)} disabled={invoiceLoading}>
+                            {invoiceLoading ? <CircularProgress size={24} /> : 'Download Invoice'}
+                        </Button>
+                    </DialogActions>
+                </Dialog>
             </Container>
         </Box>
     );

@@ -26,15 +26,15 @@ router.put(
       user.businessDetails.address.pinCode = req.body.pinCode || user.businessDetails.address.pinCode;
       user.phone = req.body.phone || user.phone;
       user.profileImage = req.body.profileImage || user.profileImage;
-      user.productAvailability = req.body.productAvailability !== undefined 
-        ? req.body.productAvailability 
+      user.productAvailability = req.body.productAvailability !== undefined
+        ? req.body.productAvailability
         : user.productAvailability;
-      user.notificationEnabled = req.body.notificationEnabled !== undefined 
-        ? req.body.notificationEnabled 
+      user.notificationEnabled = req.body.notificationEnabled !== undefined
+        ? req.body.notificationEnabled
         : user.notificationEnabled;
       user.businessDetails.bankAccount = req.body.bankAccount || user.businessDetails.bankAccount;
       const updatedUser = await user.save();
- 
+
       res.json({
         _id: updatedUser._id,
         name: updatedUser.name,
@@ -71,5 +71,21 @@ router.get('/analytics', protect, role('seller'), kycVerified, asyncHandler(asyn
     res.status(500).json({ message: 'Failed to fetch analytics', error: error.message });
   }
 }));
+
+
+// --- Recipe Engagement Synchronization System ---
+const {
+  getSellerEngagementOverview,
+  getEngagementTrends,
+  getRecentActivityFeed,
+  getRecipeEngagementDetails,
+  replyToComment
+} = require('../controllers/engagementController');
+
+router.get('/engagement/overview', protect, role('seller'), kycVerified, getSellerEngagementOverview);
+router.get('/engagement/trends', protect, role('seller'), kycVerified, getEngagementTrends);
+router.get('/engagement/activity', protect, role('seller'), kycVerified, getRecentActivityFeed);
+router.get('/engagement/recipe/:id', protect, role('seller'), kycVerified, getRecipeEngagementDetails);
+router.post('/engagement/comments/:id/reply', protect, role('seller'), kycVerified, replyToComment);
 
 module.exports = router;

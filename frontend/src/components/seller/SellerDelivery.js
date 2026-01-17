@@ -69,16 +69,22 @@ const SellerDelivery = () => {
 
   // Set up socket for real-time updates
   useEffect(() => {
-    const { user } = JSON.parse(localStorage.getItem('userInfo')) || {};
-    if (user?._id) {
-      const socket = new OrderTrackingSocket(user._id, user.role, (data) => {
-        console.log('🔌 Socket event received:', data);
-        if (data.type === 'ORDER_UPDATE' || data.type === 'orderUpdated') {
-          console.log('🔄 Refreshing orders due to socket update');
-          dispatch(listOrdersForDelivery());
+    const userInfo = JSON.parse(localStorage.getItem('userInfo')) || {};
+    let socket = null;
+    if (userInfo.user?._id) {
+      socket = new OrderTrackingSocket(
+        userInfo.user._id,
+        userInfo.user.role,
+        userInfo.token,
+        (data) => {
+          console.log('🔌 Socket event received:', data);
+          if (data.type === 'ORDER_UPDATE') {
+            console.log('🔄 Refreshing orders due to socket update');
+            dispatch(listOrdersForDelivery());
+          }
         }
-      });
-      return () => socket.disconnect();
+      );
+      return () => socket.cleanup();
     }
   }, [dispatch]);
 
@@ -247,7 +253,7 @@ const SellerDelivery = () => {
     });
 
     if (selectedOrder && partnerId) {
-      dispatch(assignDeliveryPartner(selectedOrder._id, { deliveryPartner: partnerId, trackingNumber: '' }));
+      dispatch(assignDeliveryPartner(selectedOrder._id, { partnerId }));
     } else {
       console.error('❌ Cannot assign: Missing order or partner ID');
     }

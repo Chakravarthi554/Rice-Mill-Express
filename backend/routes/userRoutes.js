@@ -99,7 +99,8 @@ const {
   deleteAccount,
   exportUserData,
   getDashboardStats,
-  refreshToken
+  refreshToken,
+  getAdmins
 } = userController;
 
 // ✅ FIXED: Validate controller functions
@@ -134,6 +135,9 @@ router.get('/health', (req, res) => {
     }
   });
 });
+
+// Route for sellers/customers to find admins
+router.get('/admins', protect, validateController(userController, 'getAdmins'));
 
 // ✅ FIXED: Protected routes
 router.use(protect);

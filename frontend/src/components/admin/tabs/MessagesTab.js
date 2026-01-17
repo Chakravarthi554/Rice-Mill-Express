@@ -1,389 +1,437 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
-  Typography,
   Card,
   CardContent,
+  Typography,
   List,
   ListItem,
   ListItemAvatar,
   ListItemText,
   Avatar,
   Badge,
-  Chip,
   TextField,
   InputAdornment,
-  IconButton,
-  Button,
   Grid,
   Paper,
-  Divider,
   CircularProgress,
+  IconButton,
+  Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Divider,
   Menu,
   MenuItem,
-  FormControl,
-  InputLabel,
-  Select
+  ListItemIcon
 } from '@mui/material';
 import {
   Search,
-  MarkChatRead,
-  Chat,
+  Refresh,
+  Store,
   Person,
   LocalShipping,
-  Store,
   MoreVert,
-  FilterList,
-  Refresh
+  Info,
+  Block,
+  CheckCircle,
+  PushPin
 } from '@mui/icons-material';
-import { useDispatch, useSelector } from 'react-redux';
-import { io } from 'socket.io-client';
-import {
-  getAdminConversations,
-  getConversationWithUser,
-  adminSendMessage,
-  markConversationResolved,
-  getMessageStats
-} from '../../../redux/actions/adminMessageActions';
-
-
+import { useSelector } from 'react-redux';
+import axios from 'axios';
+import io from 'socket.io-client';
 import AdminChatWindow from '../AdminChatWindow';
+import { Add as AddIcon } from '@mui/icons-material';
+
+const socketUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 const MessagesTab = () => {
-  const dispatch = useDispatch();
-  const { conversations, loading, error, stats } = useSelector(state => state.adminMessages);
   const { userInfo } = useSelector(state => state.userLogin);
-  
-  const [selectedConversation, setSelectedConversation] = useState(null);
+  const [conversations, setConversations] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [roleFilter, setRoleFilter] = useState('all');
+  const [selectedConversation, setSelectedConversation] = useState(null);
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
   const [anchorEl, setAnchorEl] = useState(null);
-  const [selectedConversationMenu, setSelectedConversationMenu] = useState(null);
-  
+  const [menuConversation, setMenuConversation] = useState(null);
+  const [newChatDialogOpen, setNewChatDialogOpen] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [userSearchTerm, setUserSearchTerm] = useState('');
+  const [loadingUsers, setLoadingUsers] = useState(false);
+
   const socketRef = useRef();
 
-  useEffect(() => {
-    dispatch(getAdminConversations({ page: 1, limit: 50 }));
-    dispatch(getMessageStats());
-  }, [dispatch]);
+  const fetchConversations = async () => {
+    try {
+      setLoading(true);
+      const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
+      const { data } = await axios.get('/api/chat/conversations', config);
+      setConversations(data);
+    } catch (error) {
+      console.error('Error fetching conversations:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      setLoadingUsers(true);
+      const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
+      const { data } = await axios.get('/api/users', config);
+      // Filter out admins and delivery partners if we only want to chat with sellers/customers
+      setUsers(data.filter(u => u._id !== userInfo._id));
+    } catch (e) {
+      console.error('Error fetching users:', e);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
 
   useEffect(() => {
-    // Setup socket connection for real-time updates
-    if (userInfo?.token) {
-      socketRef.current = io(process.env.REACT_APP_SOCKET_URL || "http://localhost:5000", {
-        auth: { token: `Bearer ${userInfo.token}` },
-        transports: ["websocket"],
+    fetchConversations();
+  }, []);
+
+  useEffect(() => {
+    if (userInfo?.token && userInfo.role === 'admin') {
+      socketRef.current = io(socketUrl, {
+        auth: { token: userInfo.token }
       });
 
       socketRef.current.on('connect', () => {
-        socketRef.current.emit('joinAdminRoom');
+        console.log('Admin connected to socket');
+        // CRITICAL FIX: Join admin_room to receive all seller messages
+        socketRef.current.emit('join', 'admin_room');
       });
 
-      socketRef.current.on('NEW_MESSAGE', (newMessage) => {
-        // Refresh conversations when new message arrives
-        dispatch(getAdminConversations({ page: 1, limit: 50 }));
+      socketRef.current.on('chat:conversation_update', (updatedConv) => {
+        setConversations(prev => {
+          const exists = prev.find(c => c._id === updatedConv._id);
+          if (exists) {
+            return prev.map(c => c._id === updatedConv._id ? updatedConv : c)
+              .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+          }
+          return [updatedConv, ...prev].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+        });
       });
 
-      socketRef.current.on('ADMIN_MESSAGE_SENT', () => {
-        dispatch(getAdminConversations({ page: 1, limit: 50 }));
+      socketRef.current.on('chat:message', (data) => {
+        // Refresh conversations to update last message
+        fetchConversations();
       });
+
+      return () => socketRef.current.disconnect();
     }
+  }, [userInfo]);
 
-    return () => {
-      socketRef.current?.disconnect();
-    };
-  }, [dispatch, userInfo]);
-
-  const handleSearch = (e) => {
-    setSearchTerm(e.target.value);
+  const getOtherParticipant = (conv) => {
+    return conv.participants.find(p => p._id !== userInfo._id) || {};
   };
 
-  const handleConversationSelect = (conversation) => {
-    setSelectedConversation(conversation);
-    dispatch(getConversationWithUser(conversation.userId));
+  const getUnreadCount = (conv) => {
+    return conv.unreadCounts ? (conv.unreadCounts[userInfo._id] || 0) : 0;
   };
 
-  const handleMenuOpen = (event, conversation) => {
+  const handleViewProfile = (user) => {
+    setSelectedUser(user);
+    setProfileDialogOpen(true);
+    handleMenuClose();
+  };
+
+  const handleMenuOpen = (event, conv) => {
     setAnchorEl(event.currentTarget);
-    setSelectedConversationMenu(conversation);
+    setMenuConversation(conv);
   };
 
   const handleMenuClose = () => {
     setAnchorEl(null);
-    setSelectedConversationMenu(null);
+    setMenuConversation(null);
   };
 
-  const handleMarkResolved = () => {
-    if (selectedConversationMenu) {
-      dispatch(markConversationResolved(selectedConversationMenu.userId, {
-        resolutionNotes: 'Issue resolved by admin'
-      }));
-      handleMenuClose();
+  const handleStartNewChat = (user) => {
+    // Check if conversation already exists
+    const existing = conversations.find(c =>
+      c.participants.some(p => p._id === user._id)
+    );
+
+    if (existing) {
+      setSelectedConversation(existing);
+    } else {
+      // Create a "draft" conversation object
+      setSelectedConversation({
+        _id: null,
+        participants: [userInfo, user],
+        isActive: false
+      });
     }
+    setNewChatDialogOpen(false);
   };
 
-  const handleRefresh = () => {
-    dispatch(getAdminConversations({ page: 1, limit: 50 }));
-    dispatch(getMessageStats());
-  };
-
-  const getRoleIcon = (role) => {
-    switch (role) {
-      case 'seller': return <Store color="primary" />;
-      case 'deliveryPartner': return <LocalShipping color="secondary" />;
-      default: return <Person color="action" />;
+  const handleDisableChat = async () => {
+    if (menuConversation) {
+      try {
+        const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
+        await axios.put(`/api/chat/action/${menuConversation._id}`, {
+          action: 'disable'
+        }, config);
+        fetchConversations();
+      } catch (error) {
+        console.error('Error disabling chat:', error);
+      }
     }
+    handleMenuClose();
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'delivered': return 'success';
-      case 'sent': return 'warning';
-      case 'read': return 'info';
-      default: return 'default';
-    }
-  };
-
-  const filteredConversations = conversations?.filter(conv => {
-    const matchesSearch = 
-      conv.user?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      conv.user?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (conv.lastMessage?.content && conv.lastMessage.content.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    const matchesStatus = statusFilter === 'all' || 
-      (statusFilter === 'unread' && conv.unreadCount > 0);
-    
-    const matchesRole = roleFilter === 'all' || conv.user?.role === roleFilter;
-    
-    return matchesSearch && matchesStatus && matchesRole;
+  // Sort conversations: Pinned first, then by date
+  const sortedConversations = [...conversations].sort((a, b) => {
+    const aPinned = a.pinnedBy?.includes(userInfo._id);
+    const bPinned = b.pinnedBy?.includes(userInfo._id);
+    if (aPinned && !bPinned) return -1;
+    if (!aPinned && bPinned) return 1;
+    return new Date(b.updatedAt) - new Date(a.updatedAt);
   });
 
-  if (loading && !conversations) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress />
-      </Box>
-    );
-  }
+  const filteredConversations = sortedConversations.filter(conv => {
+    const other = getOtherParticipant(conv);
+    return other.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      other.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      other.businessName?.toLowerCase().includes(searchTerm.toLowerCase());
+  });
 
   return (
     <Box>
-      {/* Header with Stats */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-            <Typography variant="h5" gutterBottom>
-              💬 Admin Messages
-            </Typography>
-            <Button
-              startIcon={<Refresh />}
-              onClick={handleRefresh}
-              variant="outlined"
-            >
-              Refresh
-            </Button>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h5">💬 Messages</Typography>
+            <Box>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => { fetchUsers(); setNewChatDialogOpen(true); }}
+                sx={{ mr: 2 }}
+              >
+                New Chat
+              </Button>
+              <IconButton onClick={fetchConversations}><Refresh /></IconButton>
+            </Box>
           </Box>
-          
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6} md={2.4}>
-              <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'primary.light', color: 'white' }}>
-                <Typography variant="h6">{stats?.totalMessages || 0}</Typography>
-                <Typography variant="body2">Total Messages</Typography>
-              </Paper>
-            </Grid>
-            <Grid item xs={12} sm={6} md={2.4}>
-              <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'secondary.light', color: 'white' }}>
-                <Typography variant="h6">{stats?.todayMessages || 0}</Typography>
-                <Typography variant="body2">Today</Typography>
-              </Paper>
-            </Grid>
-            <Grid item xs={12} sm={6} md={2.4}>
-              <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'warning.light', color: 'white' }}>
-                <Typography variant="h6">{stats?.unreadMessages || 0}</Typography>
-                <Typography variant="body2">Unread</Typography>
-              </Paper>
-            </Grid>
-            <Grid item xs={12} sm={6} md={2.4}>
-              <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'info.light', color: 'white' }}>
-                <Typography variant="h6">{stats?.activeConversations || 0}</Typography>
-                <Typography variant="body2">Active Chats</Typography>
-              </Paper>
-            </Grid>
-            <Grid item xs={12} sm={6} md={2.4}>
-              <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'success.light', color: 'white' }}>
-                <Typography variant="h6">
-                  {conversations?.filter(c => c.unreadCount === 0).length || 0}
-                </Typography>
-                <Typography variant="body2">Resolved</Typography>
-              </Paper>
-            </Grid>
-          </Grid>
         </CardContent>
       </Card>
 
       <Grid container spacing={3}>
-        {/* Conversations List */}
+        {/* List */}
         <Grid item xs={12} md={4}>
-          <Card>
-            <CardContent>
-              <Box display="flex" alignItems="center" gap={1} mb={2}>
-                <TextField
-                  fullWidth
-                  variant="outlined"
-                  placeholder="Search conversations..."
-                  value={searchTerm}
-                  onChange={handleSearch}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Search />
-                      </InputAdornment>
-                    ),
-                  }}
-                  size="small"
-                />
-                <FormControl size="small" sx={{ minWidth: 120 }}>
-                  <InputLabel>Status</InputLabel>
-                  <Select
-                    value={statusFilter}
-                    label="Status"
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                  >
-                    <MenuItem value="all">All</MenuItem>
-                    <MenuItem value="unread">Unread</MenuItem>
-                  </Select>
-                </FormControl>
-                <FormControl size="small" sx={{ minWidth: 120 }}>
-                  <InputLabel>Role</InputLabel>
-                  <Select
-                    value={roleFilter}
-                    label="Role"
-                    onChange={(e) => setRoleFilter(e.target.value)}
-                  >
-                    <MenuItem value="all">All</MenuItem>
-                    <MenuItem value="customer">Customer</MenuItem>
-                    <MenuItem value="seller">Seller</MenuItem>
-                    <MenuItem value="deliveryPartner">Delivery</MenuItem>
-                  </Select>
-                </FormControl>
-              </Box>
+          <Card sx={{ height: '75vh', display: 'flex', flexDirection: 'column' }}>
+            <Box p={2}>
+              <TextField
+                fullWidth
+                size="small"
+                placeholder="Search conversations..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                InputProps={{ startAdornment: <InputAdornment position="start"><Search /></InputAdornment> }}
+              />
+            </Box>
+            <List sx={{ flex: 1, overflow: 'auto' }}>
+              {loading ? <CircularProgress sx={{ m: 2 }} /> : filteredConversations.map(conv => {
+                const other = getOtherParticipant(conv);
+                const unread = getUnreadCount(conv);
+                const isDisabled = conv.isDisabled;
 
-              <List sx={{ maxHeight: '60vh', overflow: 'auto' }}>
-                {filteredConversations?.map((conversation) => (
+                return (
                   <ListItem
-                    key={conversation.userId}
+                    key={conv._id}
                     button
-                    selected={selectedConversation?.userId === conversation.userId}
-                    onClick={() => handleConversationSelect(conversation)}
+                    selected={selectedConversation?._id === conv._id}
+                    onClick={() => setSelectedConversation(conv)}
                     sx={{
-                      borderLeft: conversation.unreadCount > 0 ? '4px solid #ff6b6b' : '4px solid transparent',
-                      mb: 1
+                      borderLeft: unread > 0 ? '4px solid red' : '4px solid transparent',
+                      opacity: isDisabled ? 0.6 : 1
                     }}
                   >
                     <ListItemAvatar>
-                      <Badge
-                        badgeContent={conversation.unreadCount}
-                        color="error"
-                        overlap="circular"
-                      >
-                        <Avatar src={conversation.user?.profileImage}>
-                          {conversation.user?.name?.[0] || 'U'}
-                        </Avatar>
+                      <Badge badgeContent={unread} color="error">
+                        <Avatar src={other.profileImage}>{other.name?.[0]}</Avatar>
                       </Badge>
                     </ListItemAvatar>
                     <ListItemText
                       primary={
                         <Box display="flex" alignItems="center" gap={1}>
-                          <Typography variant="subtitle1" noWrap>
-                            {conversation.user?.name || 'Unknown User'}
-                          </Typography>
-                          {getRoleIcon(conversation.user?.role)}
-                          {conversation.user?.role === 'seller' && (
-                            <Chip
-                              label="Seller"
-                              size="small"
-                              color="primary"
-                              variant="outlined"
-                            />
-                          )}
+                          <Typography variant="subtitle2">{other.name}</Typography>
+                          <Chip
+                            label={other.role}
+                            size="small"
+                            variant="outlined"
+                            sx={{ height: 20, fontSize: '0.6rem' }}
+                          />
+                          {isDisabled && <Chip label="Disabled" size="small" color="error" sx={{ height: 20 }} />}
+                          {conv.pinnedBy?.includes(userInfo._id) && <PushPin sx={{ fontSize: 16, color: 'primary.main', ml: 'auto' }} />}
                         </Box>
                       }
                       secondary={
-                        <Box>
-                          <Typography variant="body2" noWrap sx={{ color: 'text.primary' }}>
-                            {conversation.lastMessage?.content || '📎 Attachment'}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {conversation.lastMessage?.createdAt ? 
-                              new Date(conversation.lastMessage.createdAt).toLocaleTimeString() : 
-                              'No messages'
-                            }
-                          </Typography>
-                        </Box>
+                        <Typography variant="caption" noWrap display="block" color={unread > 0 ? 'text.primary' : 'text.secondary'} fontWeight={unread > 0 ? 'bold' : 'normal'}>
+                          {conv.lastMessage?.content || 'Attachment'}
+                        </Typography>
                       }
                     />
-                    <IconButton
-                      size="small"
-                      onClick={(e) => handleMenuOpen(e, conversation)}
-                    >
+                    <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleMenuOpen(e, conv); }}>
                       <MoreVert />
                     </IconButton>
                   </ListItem>
-                ))}
-                {(!filteredConversations || filteredConversations.length === 0) && (
-                  <ListItem>
-                    <ListItemText
-                      primary="No conversations found"
-                      secondary="Try adjusting your search or filters"
-                    />
-                  </ListItem>
-                )}
-              </List>
-            </CardContent>
+                );
+              })}
+              {!loading && filteredConversations.length === 0 && (
+                <Typography variant="body2" align="center" sx={{ mt: 2, color: 'text.secondary' }}>
+                  No conversations found
+                </Typography>
+              )}
+            </List>
           </Card>
         </Grid>
 
-        {/* Chat Window */}
+        {/* Window */}
         <Grid item xs={12} md={8}>
           {selectedConversation ? (
             <AdminChatWindow
-              user={selectedConversation.user}
+              conversation={selectedConversation}
+              currentUser={userInfo}
               onClose={() => setSelectedConversation(null)}
             />
           ) : (
-            <Card sx={{ height: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <CardContent sx={{ textAlign: 'center' }}>
-                <Chat sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
-                <Typography variant="h6" color="text.secondary">
-                  Select a conversation to start chatting
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                  Choose from the list on the left to view and reply to messages
-                </Typography>
-              </CardContent>
-            </Card>
+            <Paper sx={{ height: '75vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#f5f5f5' }}>
+              <Typography color="text.secondary">Select a conversation to start chatting</Typography>
+            </Paper>
           )}
         </Grid>
       </Grid>
 
       {/* Context Menu */}
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={handleMenuClose}
-      >
-        <MenuItem onClick={handleMarkResolved}>
-          <MarkChatRead sx={{ mr: 1 }} />
-          Mark as Resolved
+      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
+        <MenuItem onClick={() => handleViewProfile(getOtherParticipant(menuConversation))}>
+          <ListItemIcon><Info fontSize="small" /></ListItemIcon>
+          <ListItemText>View Profile</ListItemText>
         </MenuItem>
-        <MenuItem onClick={handleMenuClose}>
-          View User Profile
+        <MenuItem onClick={handleDisableChat}>
+          <ListItemIcon>
+            {menuConversation?.isDisabled ? <CheckCircle fontSize="small" /> : <Block fontSize="small" />}
+          </ListItemIcon>
+          <ListItemText>{menuConversation?.isDisabled ? 'Enable Chat' : 'Disable Chat'}</ListItemText>
         </MenuItem>
-        <MenuItem onClick={handleMenuClose}>
-          View Orders
+        <MenuItem onClick={async () => {
+          try {
+            const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
+            await axios.put(`/api/chat/action/${menuConversation._id}`, { action: 'pin' }, config);
+            fetchConversations();
+          } catch (e) { console.error(e); }
+          handleMenuClose();
+        }}>
+          <ListItemIcon><PushPin fontSize="small" /></ListItemIcon>
+          <ListItemText>{menuConversation?.pinnedBy?.includes(userInfo._id) ? 'Unpin Chat' : 'Pin Chat'}</ListItemText>
         </MenuItem>
       </Menu>
+
+      {/* Profile Dialog */}
+      <Dialog open={profileDialogOpen} onClose={() => setProfileDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box display="flex" alignItems="center" gap={2}>
+            <Avatar src={selectedUser?.profileImage} sx={{ width: 56, height: 56 }} />
+            <Box>
+              <Typography variant="h6">{selectedUser?.name}</Typography>
+              <Chip label={selectedUser?.role} color="primary" size="small" />
+            </Box>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}><Divider /></Grid>
+            <Grid item xs={12}>
+              <Typography variant="subtitle2" color="primary" fontWeight="bold">Business Details</Typography>
+              <Divider sx={{ mb: 1 }} />
+              <Typography variant="subtitle2" color="text.secondary">Business Name</Typography>
+              <Typography variant="body1">{selectedUser?.businessDetails?.businessName || 'N/A'}</Typography>
+            </Grid>
+            <Grid item xs={6}>
+              <Typography variant="subtitle2" color="text.secondary">GST Number</Typography>
+              <Typography variant="body1">{selectedUser?.businessDetails?.gstNumber || 'N/A'}</Typography>
+            </Grid>
+            <Grid item xs={6}>
+              <Typography variant="subtitle2" color="text.secondary">Business Type</Typography>
+              <Typography variant="body1">{selectedUser?.businessDetails?.businessType || 'N/A'}</Typography>
+            </Grid>
+            <Grid item xs={12}>
+              <Typography variant="subtitle2" color="text.secondary">Address</Typography>
+              <Typography variant="body2">
+                {selectedUser?.businessDetails?.address ?
+                  `${selectedUser.businessDetails.address.street}, ${selectedUser.businessDetails.address.city}, ${selectedUser.businessDetails.address.state} - ${selectedUser.businessDetails.address.pinCode}` :
+                  'N/A'}
+              </Typography>
+            </Grid>
+            <Grid item xs={12}>
+              <Typography variant="subtitle2" color="primary" fontWeight="bold">Account Info</Typography>
+              <Divider sx={{ mb: 1 }} />
+            </Grid>
+            <Grid item xs={12}>
+              <Typography variant="subtitle2" color="text.secondary">Email</Typography>
+              <Typography variant="body1">{selectedUser?.email || 'N/A'}</Typography>
+            </Grid>
+            <Grid item xs={6}>
+              <Typography variant="subtitle2" color="text.secondary">Phone</Typography>
+              <Typography variant="body1">{selectedUser?.phone || 'N/A'}</Typography>
+            </Grid>
+            <Grid item xs={6}>
+              <Typography variant="subtitle2" color="text.secondary">Status</Typography>
+              <Typography variant="body1" color={selectedUser?.isOnline ? 'success.main' : 'text.disabled'}>
+                {selectedUser?.isOnline ? 'Active Now' : 'Offline'}
+              </Typography>
+            </Grid>
+            <Grid item xs={12}>
+              <Typography variant="subtitle2" color="text.secondary">Last Active</Typography>
+              <Typography variant="body1">
+                {selectedUser?.lastActive ? new Date(selectedUser.lastActive).toLocaleString() : 'N/A'}
+              </Typography>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setProfileDialogOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* New Chat Dialog */}
+      <Dialog open={newChatDialogOpen} onClose={() => setNewChatDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Start New Chat</DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="Search sellers/customers..."
+            value={userSearchTerm}
+            onChange={(e) => setUserSearchTerm(e.target.value)}
+            sx={{ mb: 2, mt: 1 }}
+            InputProps={{ startAdornment: <InputAdornment position="start"><Search /></InputAdornment> }}
+          />
+          <List sx={{ maxHeight: 300, overflow: 'auto' }}>
+            {loadingUsers ? <CircularProgress size={24} sx={{ display: 'block', m: 'auto' }} /> :
+              users.filter(u =>
+                u.name.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+                u.email.toLowerCase().includes(userSearchTerm.toLowerCase())
+              ).map(user => (
+                <ListItem key={user._id} button onClick={() => handleStartNewChat(user)}>
+                  <ListItemAvatar><Avatar src={user.profileImage}>{user.name[0]}</Avatar></ListItemAvatar>
+                  <ListItemText primary={user.name} secondary={`${user.role} - ${user.email}`} />
+                </ListItem>
+              ))
+            }
+          </List>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setNewChatDialogOpen(false)}>Cancel</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
