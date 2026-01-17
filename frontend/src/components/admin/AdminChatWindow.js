@@ -60,6 +60,8 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
   const [showSearch, setShowSearch] = useState(false);
   const [emojiAnchorEl, setEmojiAnchorEl] = useState(null); // ✅ NEW: Emoji picker state
   const [showProfile, setShowProfile] = useState(false); // ✅ FIX BUG #7: Profile dialog state
+  const [fullSellerProfile, setFullSellerProfile] = useState(null); // ✅ FIX BUG #5: Full seller data
+  const [loadingProfile, setLoadingProfile] = useState(false); // ✅ FIX BUG #5: Loading state
 
   const scrollRef = useRef();
   const fileInputRef = useRef();
@@ -77,7 +79,11 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
   }, [conversation._id]);
 
   const setupSocket = () => {
-    if (socketRef.current) socketRef.current.disconnect();
+    // ✅ FIX BUG #7: Properly cleanup old socket before creating new one
+    if (socketRef.current) {
+      socketRef.current.removeAllListeners();
+      socketRef.current.disconnect();
+    }
 
     socketRef.current = io(socketUrl, {
       auth: { token: currentUser.token }
@@ -89,7 +95,16 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
 
     socketRef.current.on('chat:message', (data) => {
       if (data.conversationId === conversation._id) {
-        setMessages(prev => [...prev, data.message]);
+        // ✅ FIX BUG #7 & #8: Prevent duplicate messages from admin sending
+        setMessages(prev => {
+          // Check if message already exists (from optimistic update)
+          const exists = prev.some(m => m._id === data.message._id);
+          if (exists) {
+            console.log('Message already exists (optimistic), skipping duplicate');
+            return prev;
+          }
+          return [...prev, data.message];
+        });
         scrollToBottom();
         markAsRead();
       }
@@ -140,6 +155,27 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
 
   const scrollToBottom = () => {
     setTimeout(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, 100);
+  };
+
+  // ✅ FIX BUG #5: Fetch full seller profile with business details
+  const fetchSellerProfile = async () => {
+    if (!otherUser._id || otherUser.role !== 'seller') {
+      console.warn('Other user is not a seller or ID missing');
+      return;
+    }
+    
+    setLoadingProfile(true);
+    try {
+      const config = { headers: { Authorization: `Bearer ${currentUser.token}` } };
+      const { data } = await axios.get(`/api/users/${otherUser._id}`, config);
+      console.log('Fetched full seller profile:', data);
+      setFullSellerProfile(data);
+    } catch (e) {
+      console.error('Failed to fetch seller profile:', e);
+      alert('Failed to load seller profile: ' + (e.response?.data?.message || 'Unknown error'));
+    } finally {
+      setLoadingProfile(false);
+    }
   };
 
   const handleTyping = (e) => {
@@ -338,7 +374,7 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
             <Tooltip title="Search Messages"><IconButton size="small" onClick={() => setShowSearch(!showSearch)}><SearchIcon /></IconButton></Tooltip>
             <Tooltip title="Clear Chat"><IconButton size="small" onClick={handleClearChat}><DeleteIcon color="error" /></IconButton></Tooltip>
             {/* ✅ FIX BUG #7: Wire profile view */}
-            <Tooltip title="Seller Profile"><IconButton size="small" onClick={() => setShowProfile(true)}><PersonIcon /></IconButton></Tooltip>
+            <Tooltip title="Seller Profile"><IconButton size="small" onClick={() => { setShowProfile(true); fetchSellerProfile(); }}><PersonIcon /></IconButton></Tooltip>
             <IconButton size="small" onClick={onClose}><CloseIcon /></IconButton>
           </Box>
         </Box>
@@ -535,49 +571,64 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
           </Box>
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
-              <Typography variant="subtitle2" color="text.secondary">Email</Typography>
-              <Typography variant="body1">{otherUser.email || 'N/A'}</Typography>
+          {/* ✅ FIX BUG #5: Show loading state */}
+          {loadingProfile ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 200 }}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <Grid container spacing={2}>
+              {/* ✅ FIX BUG #5: Use fullSellerProfile if available, fallback to otherUser */}
+              {(() => {
+                const profile = fullSellerProfile || otherUser;
+                return (
+                  <>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="subtitle2" color="text.secondary">Email</Typography>
+                      <Typography variant="body1">{profile.email || 'N/A'}</Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="subtitle2" color="text.secondary">Phone</Typography>
+                      <Typography variant="body1">{profile.phone || 'N/A'}</Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="subtitle2" color="text.secondary">Business Name</Typography>
+                      <Typography variant="body1">{profile.businessDetails?.businessName || 'N/A'}</Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="subtitle2" color="text.secondary">Business Type</Typography>
+                      <Typography variant="body1">{profile.businessDetails?.businessType || 'N/A'}</Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="subtitle2" color="text.secondary">GST Number</Typography>
+                      <Typography variant="body1">{profile.businessDetails?.gstNumber || 'N/A'}</Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="subtitle2" color="text.secondary">PAN Number</Typography>
+                      <Typography variant="body1">{profile.businessDetails?.panNumber || 'N/A'}</Typography>
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Typography variant="subtitle2" color="text.secondary">Address</Typography>
+                      <Typography variant="body1">
+                        {profile.businessDetails?.address?.street ? 
+                          `${profile.businessDetails.address.street}, ${profile.businessDetails.address.city}, ${profile.businessDetails.address.state} ${profile.businessDetails.address.pinCode}` 
+                          : 'N/A'}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Typography variant="subtitle2" color="text.secondary">Status</Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                        <CircleIcon sx={{ fontSize: 10, color: profile.isOnline ? '#4caf50' : '#bdbdbd' }} />
+                        <Typography variant="body2">
+                          {profile.isOnline ? 'Online' : profile.lastActive ? `Last seen ${new Date(profile.lastActive).toLocaleString()}` : 'Offline'}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  </>
+                );
+              })()}
             </Grid>
-            <Grid item xs={12} sm={6}>
-              <Typography variant="subtitle2" color="text.secondary">Phone</Typography>
-              <Typography variant="body1">{otherUser.phone || 'N/A'}</Typography>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Typography variant="subtitle2" color="text.secondary">Business Name</Typography>
-              <Typography variant="body1">{otherUser.businessDetails?.businessName || 'N/A'}</Typography>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Typography variant="subtitle2" color="text.secondary">Business Type</Typography>
-              <Typography variant="body1">{otherUser.businessDetails?.businessType || 'N/A'}</Typography>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Typography variant="subtitle2" color="text.secondary">GST Number</Typography>
-              <Typography variant="body1">{otherUser.businessDetails?.gstNumber || 'N/A'}</Typography>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <Typography variant="subtitle2" color="text.secondary">PAN Number</Typography>
-              <Typography variant="body1">{otherUser.businessDetails?.panNumber || 'N/A'}</Typography>
-            </Grid>
-            <Grid item xs={12}>
-              <Typography variant="subtitle2" color="text.secondary">Address</Typography>
-              <Typography variant="body1">
-                {otherUser.businessDetails?.address?.street ? 
-                  `${otherUser.businessDetails.address.street}, ${otherUser.businessDetails.address.city}, ${otherUser.businessDetails.address.state} ${otherUser.businessDetails.address.pinCode}` 
-                  : 'N/A'}
-              </Typography>
-            </Grid>
-            <Grid item xs={12}>
-              <Typography variant="subtitle2" color="text.secondary">Status</Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-                <CircleIcon sx={{ fontSize: 10, color: otherUser.isOnline ? '#4caf50' : '#bdbdbd' }} />
-                <Typography variant="body2">
-                  {otherUser.isOnline ? 'Online' : otherUser.lastActive ? `Last seen ${new Date(otherUser.lastActive).toLocaleString()}` : 'Offline'}
-                </Typography>
-              </Box>
-            </Grid>
-          </Grid>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowProfile(false)}>Close</Button>

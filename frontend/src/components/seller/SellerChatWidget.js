@@ -64,6 +64,7 @@ const SellerChatWidget = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [showSearch, setShowSearch] = useState(false);
     const [emojiAnchorEl, setEmojiAnchorEl] = useState(null); // ✅ NEW: Emoji picker state
+    const [isMuted, setIsMuted] = useState(false); // ✅ FIX BUG #9: Mute state
 
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
@@ -80,14 +81,34 @@ const SellerChatWidget = () => {
             });
 
             newSocket.on('connect', () => {
+                // ✅ FIX BUG #8: Ensure seller joins correct socket room
+                console.log('Seller socket connected, joining user room');
+                newSocket.emit('joinUserRoom', userInfo._id);
                 fetchConversation();
             });
 
             newSocket.on('chat:message', (data) => {
-                setMessages((prev) => [...prev, data.message]);
+                // ✅ FIX BUG #8: Prevent duplicate messages & ensure seller receives admin messages
+                console.log('Received message via socket:', data.message._id, 'from:', data.message.sender.role);
+                setMessages((prev) => {
+                    // Check if message already exists
+                    const exists = prev.some(m => m._id === data.message._id);
+                    if (exists) {
+                        console.log('Message already exists, skipping duplicate');
+                        return prev;
+                    }
+                    return [...prev, data.message];
+                });
                 scrollToBottom();
                 if (data.message.sender._id !== userInfo._id) {
                     markAsRead(data.conversationId);
+                    
+                    // ✅ FIX BUG #9: Play notification sound if not muted
+                    if (!isMuted) {
+                        // Play notification sound
+                        const audio = new Audio('/notification.mp3'); // Adjust path as needed
+                        audio.play().catch(e => console.log('Audio play failed:', e));
+                    }
                 }
             });
 
@@ -96,7 +117,15 @@ const SellerChatWidget = () => {
             });
 
             newSocket.on('chat:message_updated', (updatedMsg) => {
-                setMessages(prev => prev.map(m => m._id === updatedMsg._id ? updatedMsg : m));
+                // ✅ FIX BUG #3: Ensure message updates propagate correctly
+                console.log('Message updated received:', updatedMsg._id);
+                setMessages(prev => prev.map(m => {
+                    if (m._id === updatedMsg._id) {
+                        console.log('Updating message in UI:', updatedMsg._id);
+                        return updatedMsg;
+                    }
+                    return m;
+                }));
             });
 
             newSocket.on('chat:typing', ({ conversationId: cId }) => {
@@ -156,6 +185,9 @@ const SellerChatWidget = () => {
                     setAdminOnline(admin.isOnline);
                     setAdminLastSeen(admin.lastActive);
                 }
+                
+                // ✅ FIX BUG #9: Set mute status
+                setIsMuted(adminConv.mutedBy?.includes(userInfo._id) || false);
             } else {
                 // If no conversation yet, try to find an admin to start one
                 const { data: admins } = await axios.get('/api/users/admins', config);
@@ -175,6 +207,22 @@ const SellerChatWidget = () => {
             const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
             await axios.put(`/api/chat/read/${cid}`, {}, config);
         } catch (e) { console.error(e); }
+    };
+    
+    // ✅ FIX BUG #9: Toggle mute for conversation
+    const handleToggleMute = async () => {
+        if (!conversationId) return;
+        
+        try {
+            const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
+            await axios.put(`/api/chat/action/${conversationId}`, { action: 'mute' }, config);
+            
+            // Toggle the local state
+            setIsMuted(prev => !prev);
+        } catch (error) {
+            console.error('Error toggling mute:', error);
+            alert('Failed to toggle mute: ' + (error.response?.data?.message || 'Unknown error'));
+        }
     };
 
     const handleTyping = (e) => {
@@ -229,11 +277,20 @@ const SellerChatWidget = () => {
         if (editingMsg) {
             try {
                 const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-                await axios.put(`/api/chat/message/${editingMsg._id}`, { content: msgContent }, config);
+                // ✅ FIX BUG #3: Wait for response and update UI immediately
+                const { data: updatedMessage } = await axios.put(`/api/chat/message/${editingMsg._id}`, { content: msgContent }, config);
+                
+                // Update UI immediately (optimistic)
+                setMessages(prev => prev.map(m => m._id === editingMsg._id ? updatedMessage : m));
+                
                 setEditingMsg(null);
                 setMessage('');
                 return;
-            } catch (e) { console.error(e); return; }
+            } catch (e) { 
+                console.error(e); 
+                alert('Failed to edit message: ' + (e.response?.data?.message || 'Unknown error'));
+                return; 
+            }
         }
 
         try {
@@ -285,7 +342,12 @@ const SellerChatWidget = () => {
             if (mode === 'me') {
                 setMessages(prev => prev.filter(m => m._id !== selectedMsg._id));
             }
-        } catch (e) { console.error(e); }
+        } catch (e) { 
+            console.error(e); 
+            // ✅ FIX BUG #2: Show permission error to user
+            const errorMsg = e.response?.data?.message || 'Failed to delete message';
+            alert(errorMsg);
+        }
         setMsgAnchorEl(null);
     };
 
@@ -308,7 +370,12 @@ const SellerChatWidget = () => {
             const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
             await axios.put(`/api/chat/clear/${conversationId}`, {}, config);
             setMessages([]);
-        } catch (e) { console.error(e); }
+        } catch (e) { 
+            console.error(e); 
+            // ✅ FIX BUG #2: Show error to user
+            const errorMsg = e.response?.data?.message || 'Failed to clear chat';
+            alert(errorMsg);
+        }
         setAnchorEl(null);
     };
 
@@ -523,7 +590,11 @@ const SellerChatWidget = () => {
                 <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
                     <MenuItem onClick={handleClearChat}>Clear Chat</MenuItem>
                     <MenuItem onClick={() => { setSelectionMode(true); setAnchorEl(null); }}>Select Messages</MenuItem>
-                    <MenuItem onClick={() => setAnchorEl(null)}>Mute Notifications</MenuItem>
+                    <MenuItem onClick={() => {
+                        // ✅ FIX BUG #9: Toggle mute for conversation
+                        handleToggleMute();
+                        setAnchorEl(null);
+                    }}>{isMuted ? 'Unmute Notifications' : 'Mute Notifications'}</MenuItem>
                 </Menu>
 
                 {/* Message Context Menu */}

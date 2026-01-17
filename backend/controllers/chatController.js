@@ -428,6 +428,20 @@ exports.markAsRead = asyncHandler(async (req, res) => {
         if (io && otherId) {
             io.to(`user_${otherId}`).emit('chat:read_receipt', { conversationId });
         }
+        
+        // ✅ FIX BUG #6: Notify all conversation participants about read status change
+        conversation.participants.forEach(pid => {
+            io.to(`user_${pid}`).emit('chat:message_read', { 
+                conversationId,
+                userId: req.user._id 
+            });
+        });
+        
+        // Also emit to admin room for admin dashboard
+        io.to('admin_room').emit('chat:message_read', { 
+            conversationId,
+            userId: req.user._id 
+        });
     }
     res.json({ success: true });
 });

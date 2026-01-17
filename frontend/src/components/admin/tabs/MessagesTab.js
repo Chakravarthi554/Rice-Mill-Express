@@ -37,7 +37,9 @@ import {
   Info,
   Block,
   CheckCircle,
-  PushPin
+  PushPin,
+  VolumeOff,
+  VolumeUp
 } from '@mui/icons-material';
 import { useSelector } from 'react-redux';
 import axios from 'axios';
@@ -121,6 +123,15 @@ const MessagesTab = () => {
       socketRef.current.on('chat:message', (data) => {
         // Refresh conversations to update last message
         fetchConversations();
+      });
+
+      // ✅ FIX BUG #6: Listen for read receipt updates to update unread counts
+      socketRef.current.on('chat:message_read', ({ conversationId, userId }) => {
+        console.log('Message read event received for conversation:', conversationId, 'by user:', userId);
+        if (userId === userInfo._id) {
+          // Update conversation to reflect read status
+          fetchConversations();
+        }
       });
 
       return () => socketRef.current.disconnect();
@@ -331,6 +342,17 @@ const MessagesTab = () => {
         }}>
           <ListItemIcon><PushPin fontSize="small" /></ListItemIcon>
           <ListItemText>{menuConversation?.pinnedBy?.includes(userInfo._id) ? 'Unpin Chat' : 'Pin Chat'}</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={async () => {
+          try {
+            const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
+            await axios.put(`/api/chat/action/${menuConversation._id}`, { action: 'mute' }, config);
+            fetchConversations();
+          } catch (e) { console.error(e); }
+          handleMenuClose();
+        }}>
+          <ListItemIcon>{menuConversation?.mutedBy?.includes(userInfo._id) ? <VolumeUp fontSize="small" /> : <VolumeOff fontSize="small" />}</ListItemIcon>
+          <ListItemText>{menuConversation?.mutedBy?.includes(userInfo._id) ? 'Unmute Chat' : 'Mute Chat'}</ListItemText>
         </MenuItem>
       </Menu>
 
