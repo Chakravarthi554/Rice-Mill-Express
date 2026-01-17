@@ -14,9 +14,9 @@ backend/dist/
 .out/
 .cache/
 .parcel-cache/
-
-# Environment variables
 .env
+# Environment variables
+
 .env.local
 .env.development
 .env.production

@@ -8,7 +8,11 @@ const {
     markAsRead,
     deleteMessage,
     clearChat,
-    toggleAction
+    toggleAction,
+    updateMessage,
+    toggleStar,
+    toggleMessagePin,
+    reportChat
 } = require('../controllers/chatController');
 
 router.post('/send', protect, sendMessage);

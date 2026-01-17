@@ -24,14 +24,28 @@ exports.sendMessage = asyncHandler(async (req, res) => {
         throw new Error('Receiver and content required');
     }
 
+    // Fetch receiver to check role
+    const receiver = await User.findById(receiverId);
+    if (!receiver) {
+        res.status(404);
+        throw new Error('Receiver not found');
+    }
+
     // 1. Find/Create Conversation
     let conversation = await Conversation.findOne({
         participants: { $all: [senderId, receiverId] }
     });
 
     if (!conversation) {
+        // ✅ FIX: Only admin can start conversations
+        if (req.user.role !== 'admin') {
+            res.status(403);
+            throw new Error('Only admins can start new conversations. Please wait for admin to contact you.');
+        }
+        
         conversation = await Conversation.create({
             participants: [senderId, receiverId],
+            startedBy: senderId,
             unreadCounts: { [senderId]: 0, [receiverId]: 0 }
         });
     }
@@ -92,18 +106,29 @@ exports.sendMessage = asyncHandler(async (req, res) => {
 
     const io = req.app.get('io');
     if (io) {
-        // Events
+        // ✅ FIX: Broadcast to both participants via their user rooms
         [senderId, receiverId].forEach(uid => {
             io.to(`user_${uid}`).emit('chat:message', { message: populatedMessage, conversationId: conversation._id });
             io.to(`user_${uid}`).emit('chat:conversation_update', populatedConversation);
         });
 
-        // Admin Room Broadcast (if receiver is admin)
-        const receiverUser = await User.findById(receiverId);
-        if (receiverUser && receiverUser.role === 'admin') {
-            io.to('admin_room').emit('chat:conversation_update', populatedConversation);
-            // Also emit message to admin room to ensure real-time visibility? 
-            // Ideally admin client listens to their user channel, but this ensures robustness.
+        // ✅ CRITICAL FIX: Always broadcast to admin_room regardless of who is admin
+        io.to('admin_room').emit('chat:message', { message: populatedMessage, conversationId: conversation._id });
+        io.to('admin_room').emit('chat:conversation_update', populatedConversation);
+        
+        // ✅ FIX: If receiver is admin, ensure they get it even if not in admin_room
+        if (receiver.role === 'admin') {
+            io.to(`user_${receiverId}`).emit('chat:admin_new_message', { message: populatedMessage, conversationId: conversation._id });
+        }
+        
+        // ✅ FIX: If sender is seller, notify all admins
+        if (req.user.role === 'seller') {
+            io.to('admin_room').emit('chat:seller_message', { 
+                message: populatedMessage, 
+                conversationId: conversation._id,
+                sellerId: senderId,
+                sellerName: req.user.name
+            });
         }
     }
 
@@ -149,7 +174,7 @@ exports.updateMessage = asyncHandler(async (req, res) => {
             conversation.participants.forEach(uid => {
                 io.to(`user_${uid}`).emit('chat:message_updated', populatedMessage);
             });
-            // Also notify admin room if relevant
+            // ✅ FIX: Also notify admin room
             io.to('admin_room').emit('chat:message_updated', populatedMessage);
         }
     }
@@ -245,7 +270,8 @@ exports.getMessages = asyncHandler(async (req, res) => {
     let query = {
         conversationId,
         // Exclude messages deleted by this user ("Delete for Me")
-        deletedBy: { $ne: req.user._id }
+        deletedBy: { $ne: req.user._id },
+        // Don't completely hide "deleted for everyone" - show placeholder instead
     };
 
     if (search) {
@@ -280,16 +306,31 @@ exports.deleteMessage = asyncHandler(async (req, res) => {
         if (!isSender && !isAdmin) {
             res.status(401); throw new Error('Not authorized to delete for everyone');
         }
-        await message.deleteOne(); // Truly delete
+        
+        // ✅ FIX: Mark as deleted for everyone instead of truly deleting
+        message.isDeletedForEveryone = true;
+        message.content = 'This message was deleted';
+        message.attachments = [];
+        await message.save();
 
         // Broadcast
         const io = req.app.get('io');
         if (io) {
             // We need conversation participants to broadcast
             const conv = await Conversation.findById(message.conversationId);
-            if (conv) conv.participants.forEach(pid => {
-                io.to(`user_${pid}`).emit('chat:message_deleted', { messageId: message._id });
-            });
+            if (conv) {
+                conv.participants.forEach(pid => {
+                    io.to(`user_${pid}`).emit('chat:message_deleted', { 
+                        messageId: message._id,
+                        mode: 'everyone'
+                    });
+                });
+                // Also broadcast to admin_room
+                io.to('admin_room').emit('chat:message_deleted', { 
+                    messageId: message._id,
+                    mode: 'everyone'
+                });
+            }
         }
     } else {
         // Delete for ME (Soft delete)
@@ -299,7 +340,7 @@ exports.deleteMessage = asyncHandler(async (req, res) => {
         }
     }
 
-    res.json({ success: true });
+    res.json({ success: true, mode });
 });
 
 // @desc    Toggle Interaction (Pin, Mute, Disable)

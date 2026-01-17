@@ -458,8 +458,17 @@ const SellerChatWidget = () => {
                 </Collapse>
 
                 <Box component="form" onSubmit={(e) => { e.preventDefault(); sendMessage(); }} sx={{ p: 1.5, bgcolor: '#f0f0f0', display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <input type="file" ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileUpload} multiple />
-                    <IconButton size="small" onClick={() => fileInputRef.current.click()} disabled={uploading}><AttachFileIcon /></IconButton>
+                    <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        style={{ display: 'none' }} 
+                        onChange={handleFileUpload} 
+                        multiple 
+                        accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
+                    />
+                    <IconButton size="small" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+                        <AttachFileIcon />
+                    </IconButton>
                     <IconButton size="small"><EmojiIcon /></IconButton>
                     <TextField
                         fullWidth multiline maxRows={4} size="small" placeholder="Type a message"

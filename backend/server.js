@@ -117,6 +117,7 @@ const loadRoutes = () => {
     { path: "/api/seller", name: "Seller", file: "./routes/sellerRoutes" },
     { path: "/api/messages", name: "Messages", file: "./routes/messageRoutes" },
     { path: "/api/chat", name: "Chat", file: "./routes/chatRoutes" },
+    { path: "/api/admin/chat", name: "Admin Chat", file: "./routes/adminChatRoutes" },
     { path: "/api/upload", name: "Upload", file: "./routes/uploadRoutes" },
     { path: "/api/recipes", name: "Recipes", file: "./routes/recipeRoutes" },
     { path: "/api/legal", name: "Legal", file: "./routes/legalRoutes" },

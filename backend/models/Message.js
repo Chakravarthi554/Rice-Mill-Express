@@ -45,8 +45,10 @@ const messageSchema = new mongoose.Schema({
   status: { type: String, enum: ['sent', 'delivered', 'read'], default: 'sent' },
   readAt: { type: Date },
   deliveredAt: { type: Date },
+  sentAt: { type: Date, default: Date.now },
   isFlagged: { type: Boolean, default: false },
   sentBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  isDeletedForEveryone: { type: Boolean, default: false },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Message', messageSchema);

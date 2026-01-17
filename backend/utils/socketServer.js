@@ -345,7 +345,7 @@ const setupSocketServer = (server) => {
       logger.info(`🔔 Social event: ${type} on ${itemType} ${itemId} by ${userId}`);
     });
 
-    // Typing indicators (Enhanced)
+    // Enhanced chat event handlers
     socket.on('chat:typing', ({ conversationId, to }) => {
       // Broadcast to specific conversation room if user joined it, or directly to recipient user room
       // Since we don't force joining conversation rooms explicitly yet, exact targeting via user room is safer for direct chats
@@ -363,6 +363,74 @@ const setupSocketServer = (server) => {
           userId: socket.userId,
           conversationId
         });
+      }
+    });
+
+    // ✅ NEW: Delivery receipt handler
+    socket.on('chat:message_delivered', async ({ messageId, conversationId }) => {
+      try {
+        const Message = require('../models/Message');
+        const message = await Message.findById(messageId);
+        
+        if (message && message.receiver.toString() === socket.userId && message.status === 'sent') {
+          message.status = 'delivered';
+          message.deliveredAt = new Date();
+          await message.save();
+
+          // Notify sender about delivery
+          io.to(`user_${message.sender}`).emit('chat:message_delivered', {
+            messageId,
+            conversationId,
+            deliveredAt: message.deliveredAt
+          });
+          
+          logger.info(`✅ Message ${messageId} marked as delivered`);
+        }
+      } catch (error) {
+        logger.error('Error marking message as delivered:', error);
+      }
+    });
+
+    // ✅ NEW: Read receipt handler
+    socket.on('chat:messages_read', async ({ conversationId, messageIds }) => {
+      try {
+        const Message = require('../models/Message');
+        const Conversation = require('../models/Conversation');
+        
+        // Update messages to read status
+        await Message.updateMany(
+          { 
+            _id: { $in: messageIds }, 
+            receiver: socket.userId,
+            status: { $ne: 'read' }
+          },
+          { 
+            status: 'read', 
+            readAt: new Date() 
+          }
+        );
+
+        // Reset unread count
+        const conversation = await Conversation.findById(conversationId);
+        if (conversation) {
+          conversation.unreadCounts.set(socket.userId.toString(), 0);
+          await conversation.save();
+
+          // Notify sender(s)
+          const otherParticipant = conversation.participants.find(p => p.toString() !== socket.userId);
+          if (otherParticipant) {
+            io.to(`user_${otherParticipant}`).emit('chat:messages_read', {
+              conversationId,
+              messageIds,
+              readBy: socket.userId,
+              readAt: new Date()
+            });
+          }
+        }
+        
+        logger.info(`✅ ${messageIds.length} messages marked as read in conversation ${conversationId}`);
+      } catch (error) {
+        logger.error('Error marking messages as read:', error);
       }
     });
 
