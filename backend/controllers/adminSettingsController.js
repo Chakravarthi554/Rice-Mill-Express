@@ -225,6 +225,49 @@ const resetSettingsToDefault = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc    Get public settings (non-sensitive) for customers and sellers
+// @route   GET /api/settings/public
+// @access  Private (all authenticated users)
+const getPublicSettings = asyncHandler(async (req, res) => {
+  try {
+    const settings = await AdminSettings.getSettings();
+
+    // Return only non-sensitive settings that should be visible to customers/sellers
+    const publicSettings = {
+      festivalMode: settings.festivalMode || { enabled: false },
+      maintenanceMode: settings.maintenanceMode || { enabled: false },
+      deliverySettings: {
+        freeDeliveryThreshold: settings.freeDeliveryThreshold,
+        deliveryFee: settings.deliveryFee,
+        minOrderValue: settings.minOrderValue
+      },
+      supportContact: settings.supportContact || {},
+      recipeOfTheDay: settings.recipeOfTheDay || null
+    };
+
+    // Populate recipe of the day if exists
+    if (publicSettings.recipeOfTheDay) {
+      await settings.populate('recipeOfTheDay', 'title image cookingTime rating');
+      publicSettings.recipeOfTheDay = {
+        _id: settings.recipeOfTheDay._id,
+        title: settings.recipeOfTheDay.title,
+        image: settings.recipeOfTheDay.image,
+        cookingTime: settings.recipeOfTheDay.cookingTime,
+        rating: settings.recipeOfTheDay.rating
+      };
+    }
+
+    res.json(publicSettings);
+  } catch (error) {
+    console.error('Error fetching public settings:', error);
+    res.status(500).json({
+      message: 'Error fetching settings',
+      error: error.message
+    });
+  }
+});
+
+
 module.exports = {
   getAdminSettings,
   updateAdminSettings,
