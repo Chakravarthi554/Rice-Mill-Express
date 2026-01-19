@@ -1,15 +1,16 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
     Box, Typography, Paper, Table, TableBody, TableCell, TableContainer,
-    TableHead, TableRow, IconButton, Tooltip, Avatar, Chip, Button, LinearProgress
+    TableHead, TableRow, IconButton, Tooltip, Avatar, Chip, Button, LinearProgress, TextField, InputAdornment
 } from '@mui/material';
 import {
     Refresh as RefreshIcon,
     Edit as EditIcon,
     Delete as DeleteIcon,
     VerifiedUser as VerifiedIcon,
-    Mail as MailIcon
+    Mail as MailIcon,
+    Search as SearchIcon
 } from '@mui/icons-material';
 import { listUsers } from '../../../redux/actions/adminActions';
 import Loader from '../../common/Loader';
@@ -17,6 +18,7 @@ import Message from '../../common/Message';
 
 const UsersTab = () => {
     const dispatch = useDispatch();
+    const [searchTerm, setSearchTerm] = useState('');
 
     const userList = useSelector((state) => state.userList);
     const { loading, error, users = [] } = userList;
@@ -27,6 +29,7 @@ const UsersTab = () => {
 
     const handleRefresh = () => {
         dispatch(listUsers());
+        setSearchTerm(''); // Clear search on refresh
     };
 
     const getRoleColor = (role) => {
@@ -37,6 +40,17 @@ const UsersTab = () => {
             default: return 'default';
         }
     };
+
+    // Filter users based on search term
+    const filteredUsers = users.filter(user => {
+        if (!searchTerm) return true;
+        const search = searchTerm.toLowerCase();
+        return (
+            user.name?.toLowerCase().includes(search) ||
+            user.email?.toLowerCase().includes(search) ||
+            user.role?.toLowerCase().includes(search)
+        );
+    });
 
     return (
         <Box>
@@ -49,24 +63,61 @@ const UsersTab = () => {
                         Manage platform access and roles for all users
                     </Typography>
                 </Box>
-                <Button
-                    variant="contained"
-                    startIcon={<RefreshIcon />}
-                    onClick={handleRefresh}
-                    disabled={loading}
-                    sx={{
-                        background: 'rgba(56, 189, 248, 0.2)',
-                        color: '#38bdf8',
-                        border: '1px solid rgba(56, 189, 248, 0.3)',
-                        '&:hover': { background: 'rgba(56, 189, 248, 0.3)' }
-                    }}
-                >
-                    Refresh
-                </Button>
+                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                    <TextField
+                        size="small"
+                        placeholder="Search users..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        InputProps={{
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <SearchIcon sx={{ color: 'rgba(255,255,255,0.5)' }} />
+                                </InputAdornment>
+                            ),
+                        }}
+                        sx={{
+                            width: 250,
+                            '& .MuiOutlinedInput-root': {
+                                color: 'white',
+                                '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.2)' },
+                                '&:hover fieldset': { borderColor: 'rgba(56, 189, 248, 0.5)' },
+                                '&.Mui-focused fieldset': { borderColor: '#38bdf8' },
+                            },
+                            '& .MuiInputBase-input::placeholder': {
+                                color: 'rgba(255,255,255,0.4)',
+                                opacity: 1
+                            }
+                        }}
+                    />
+                    <Button
+                        variant="contained"
+                        startIcon={<RefreshIcon />}
+                        onClick={handleRefresh}
+                        disabled={loading}
+                        sx={{
+                            background: 'rgba(56, 189, 248, 0.2)',
+                            color: '#38bdf8',
+                            border: '1px solid rgba(56, 189, 248, 0.3)',
+                            '&:hover': { background: 'rgba(56, 189, 248, 0.3)' }
+                        }}
+                    >
+                        Refresh
+                    </Button>
+                </Box>
             </Box>
 
             {loading && <LinearProgress sx={{ mb: 2 }} />}
             {error && <Message severity="error">{error}</Message>}
+
+            {/* Search Results Info */}
+            {searchTerm && (
+                <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                        Found {filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''} matching "{searchTerm}"
+                    </Typography>
+                </Box>
+            )}
 
             <TableContainer component={Paper} sx={{
                 borderRadius: 4,
@@ -86,14 +137,16 @@ const UsersTab = () => {
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {users.length === 0 && !loading ? (
+                        {filteredUsers.length === 0 && !loading ? (
                             <TableRow>
                                 <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
-                                    <Typography variant="body1" color="rgba(255,255,255,0.4)">No users found</Typography>
+                                    <Typography variant="body1" color="rgba(255,255,255,0.4)">
+                                        {searchTerm ? 'No users match your search' : 'No users found'}
+                                    </Typography>
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            users.map((user) => (
+                            filteredUsers.map((user) => (
                                 <TableRow key={user._id} sx={{ '&:hover': { background: 'rgba(255,255,255,0.02)' } }}>
                                     <TableCell>
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>

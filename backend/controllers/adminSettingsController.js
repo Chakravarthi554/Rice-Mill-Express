@@ -10,18 +10,18 @@ const { sendPushNotification } = require('../utils/socketNotifications');
 const getAdminSettings = asyncHandler(async (req, res) => {
   try {
     const settings = await AdminSettings.getSettings();
-    
+
     // Populate recipe of the day if exists
     if (settings.recipeOfTheDay) {
       await settings.populate('recipeOfTheDay', 'title image cookingTime rating');
     }
-    
+
     res.json(settings);
   } catch (error) {
     console.error('Error fetching admin settings:', error);
-    res.status(500).json({ 
-      message: 'Error fetching admin settings', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Error fetching admin settings',
+      error: error.message
     });
   }
 });
@@ -52,7 +52,7 @@ const updateAdminSettings = asyncHandler(async (req, res) => {
 
     // Update fields if provided
     const updateFields = {};
-    
+
     if (platformCommissionRate !== undefined) updateFields.platformCommissionRate = platformCommissionRate;
     if (codLimit !== undefined) updateFields.codLimit = codLimit;
     if (freeDeliveryThreshold !== undefined) updateFields.freeDeliveryThreshold = freeDeliveryThreshold;
@@ -86,9 +86,9 @@ const updateAdminSettings = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     console.error('Error updating admin settings:', error);
-    res.status(500).json({ 
-      message: 'Error updating admin settings', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Error updating admin settings',
+      error: error.message
     });
   }
 });
@@ -128,16 +128,16 @@ const sendBulkPushNotification = asyncHandler(async (req, res) => {
     await settings.save();
 
     console.log(`📢 Bulk notification sent to ${userIds.length} users by:`, req.user.name);
-    
+
     res.json({
       message: `Notification sent to ${userIds.length} users successfully`,
       sentAt: new Date()
     });
   } catch (error) {
     console.error('Error sending bulk notification:', error);
-    res.status(500).json({ 
-      message: 'Error sending notification', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Error sending notification',
+      error: error.message
     });
   }
 });
@@ -155,9 +155,9 @@ const getAvailableRecipes = asyncHandler(async (req, res) => {
     res.json(recipes);
   } catch (error) {
     console.error('Error fetching recipes:', error);
-    res.status(500).json({ 
-      message: 'Error fetching recipes', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Error fetching recipes',
+      error: error.message
     });
   }
 });
@@ -168,7 +168,7 @@ const getAvailableRecipes = asyncHandler(async (req, res) => {
 const resetSettingsToDefault = asyncHandler(async (req, res) => {
   try {
     const settings = await AdminSettings.getSettings();
-    
+
     // Reset to default values
     const defaultSettings = {
       platformCommissionRate: 15,
@@ -208,9 +208,9 @@ const resetSettingsToDefault = asyncHandler(async (req, res) => {
     };
 
     await AdminSettings.findByIdAndUpdate(settings._id, { $set: defaultSettings });
-    
+
     const updatedSettings = await AdminSettings.getSettings();
-    
+
     console.log('🔄 Admin settings reset to default by:', req.user.name);
     res.json({
       message: 'Settings reset to default successfully',
@@ -218,9 +218,9 @@ const resetSettingsToDefault = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     console.error('Error resetting settings:', error);
-    res.status(500).json({ 
-      message: 'Error resetting settings', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Error resetting settings',
+      error: error.message
     });
   }
 });
@@ -230,5 +230,6 @@ module.exports = {
   updateAdminSettings,
   sendBulkPushNotification,
   getAvailableRecipes,
-  resetSettingsToDefault
+  resetSettingsToDefault,
+  getPublicSettings
 };

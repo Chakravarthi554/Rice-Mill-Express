@@ -37,6 +37,7 @@ import SellerChatWidget from '../components/seller/SellerChatWidget';
 import Message from '../components/common/Message';
 import { RECIPE_SUBMIT_RESET } from '../redux/constants/RecipeConstants';
 import RecipeEngagementDashboard from '../components/seller/RecipeEngagementDashboard';
+import SettingsBanner from '../components/common/SettingsBanner';
 
 // ✅ Backend-driven Invoice handled via Redux actions
 

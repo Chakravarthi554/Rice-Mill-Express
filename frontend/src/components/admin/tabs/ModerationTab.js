@@ -52,21 +52,21 @@ import ModerationItem from '../ModerationItem';
 
 const ModerationTab = () => {
   const dispatch = useDispatch();
-  const { 
-    pendingContent, 
-    flaggedContent, 
-    stats, 
-    loading, 
-    error 
+  const {
+    pendingContent,
+    flaggedContent,
+    stats,
+    loading,
+    error
   } = useSelector(state => state.moderation);
-  
+
   const { userInfo } = useSelector(state => state.userLogin);
-  
+
   const [activeTab, setActiveTab] = useState(0);
   const [contentType, setContentType] = useState('all');
   const [actionDialog, setActionDialog] = useState({ open: false, type: '', item: null });
   const [moderationNotes, setModerationNotes] = useState('');
-  
+
   const socketRef = useRef();
 
   useEffect(() => {
@@ -75,38 +75,60 @@ const ModerationTab = () => {
   }, [dispatch, activeTab, contentType]);
 
   useEffect(() => {
-    // Setup socket for real-time updates
-    socketRef.current = io(process.env.REACT_APP_SOCKET_URL || "http://localhost:5000", {
-      auth: { token: `Bearer ${userInfo.token}` },
-      transports: ["websocket"],
-    });
+    // Setup socket for real-time updates with proper URL fallback and error handling
+    const socketUrl = process.env.REACT_APP_SOCKET_URL || process.env.REACT_APP_API_URL || "http://localhost:5000";
 
-    socketRef.current.on('connect', () => {
-      socketRef.current.emit('joinAdminRoom');
-    });
+    try {
+      socketRef.current = io(socketUrl, {
+        auth: { token: `Bearer ${userInfo?.token}` },
+        transports: ["websocket", "polling"],
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+      });
 
-    socketRef.current.on('NEW_CONTENT_PENDING', () => {
-      loadContent();
-      dispatch(getModerationStats());
-    });
+      socketRef.current.on('connect', () => {
+        console.log('✅ Socket connected to moderation updates');
+        socketRef.current.emit('joinAdminRoom');
+      });
 
-    socketRef.current.on('CONTENT_REPORTED', () => {
-      if (activeTab === 1) {
-        dispatch(getFlaggedContent({ page: 1, limit: 20 }));
-      }
-      dispatch(getModerationStats());
-    });
+      socketRef.current.on('connect_error', (error) => {
+        console.warn('⚠️ Socket connection error:', error.message);
+        // Continue without socket - moderation will work via manual refresh
+      });
 
-    return () => {
-      socketRef.current?.disconnect();
-    };
+      socketRef.current.on('NEW_CONTENT_PENDING', () => {
+        console.log('🔔 New content pending moderation');
+        loadContent();
+        dispatch(getModerationStats());
+      });
+
+      socketRef.current.on('CONTENT_REPORTED', () => {
+        console.log('🔔 Content reported');
+        if (activeTab === 1) {
+          dispatch(getFlaggedContent({ page: 1, limit: 20 }));
+        }
+        dispatch(getModerationStats());
+      });
+
+      return () => {
+        socketRef.current?.disconnect();
+      };
+    } catch (error) {
+      console.error('❌ Failed to initialize socket:', error);
+      // Continue without socket - not critical for functionality
+    }
   }, [dispatch, userInfo, activeTab]);
 
-  const loadContent = () => {
-    if (activeTab === 0) {
-      dispatch(getPendingContent({ type: contentType, page: 1, limit: 20 }));
-    } else {
-      dispatch(getFlaggedContent({ page: 1, limit: 20 }));
+  const loadContent = async () => {
+    try {
+      if (activeTab === 0) {
+        await dispatch(getPendingContent({ type: contentType, page: 1, limit: 20 }));
+      } else {
+        await dispatch(getFlaggedContent({ page: 1, limit: 20 }));
+      }
+    } catch (error) {
+      console.error('Error loading moderation content:', error);
+      // Error will be handled by Redux and displayed in the UI
     }
   };
 
@@ -207,7 +229,7 @@ const ModerationTab = () => {
               Refresh
             </Button>
           </Box>
-          
+
           <Grid container spacing={2}>
             <Grid item xs={6} sm={3}>
               <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'warning.light', color: 'warning.contrastText' }}>
@@ -242,35 +264,35 @@ const ModerationTab = () => {
         <CardContent>
           <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
             <Tabs value={activeTab} onChange={handleTabChange}>
-              <Tab 
-                icon={<ThumbUp />} 
+              <Tab
+                icon={<ThumbUp />}
                 label={
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     Pending Review
                     {stats?.pending?.total > 0 && (
-                      <Chip 
-                        label={stats.pending.total} 
-                        size="small" 
-                        color="warning" 
+                      <Chip
+                        label={stats.pending.total}
+                        size="small"
+                        color="warning"
                       />
                     )}
                   </Box>
-                } 
+                }
               />
-              <Tab 
-                icon={<Flag />} 
+              <Tab
+                icon={<Flag />}
                 label={
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     Flagged Content
                     {stats?.flagged?.total > 0 && (
-                      <Chip 
-                        label={stats.flagged.total} 
-                        size="small" 
-                        color="error" 
+                      <Chip
+                        label={stats.flagged.total}
+                        size="small"
+                        color="error"
                       />
                     )}
                   </Box>
-                } 
+                }
               />
             </Tabs>
           </Box>
@@ -311,8 +333,8 @@ const ModerationTab = () => {
                     {activeTab === 0 ? 'No content pending review' : 'No flagged content'}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {activeTab === 0 
-                      ? 'All content has been moderated' 
+                    {activeTab === 0
+                      ? 'All content has been moderated'
                       : 'No content has been reported recently'
                     }
                   </Typography>
@@ -340,8 +362,8 @@ const ModerationTab = () => {
       </Card>
 
       {/* Action Dialog */}
-      <Dialog 
-        open={actionDialog.open} 
+      <Dialog
+        open={actionDialog.open}
         onClose={closeActionDialog}
         maxWidth="sm"
         fullWidth
@@ -355,7 +377,7 @@ const ModerationTab = () => {
           <Typography variant="body1" gutterBottom>
             You are about to {actionDialog.type} this content:
           </Typography>
-          
+
           {actionDialog.item && (
             <Paper sx={{ p: 2, bgcolor: 'grey.50', mb: 2 }}>
               <Typography variant="subtitle2" gutterBottom>
@@ -388,7 +410,7 @@ const ModerationTab = () => {
             value={moderationNotes}
             onChange={(e) => setModerationNotes(e.target.value)}
             placeholder={
-              actionDialog.type === 'approve' 
+              actionDialog.type === 'approve'
                 ? 'Optional notes about why this was approved...'
                 : 'Please explain why this content is being rejected/deleted...'
             }
@@ -406,7 +428,7 @@ const ModerationTab = () => {
             variant="contained"
             color={
               actionDialog.type === 'approve' ? 'success' :
-              actionDialog.type === 'reject' ? 'warning' : 'error'
+                actionDialog.type === 'reject' ? 'warning' : 'error'
             }
             disabled={actionDialog.type !== 'approve' && !moderationNotes.trim()}
           >

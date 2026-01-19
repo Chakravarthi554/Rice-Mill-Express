@@ -123,6 +123,7 @@ const loadRoutes = () => {
     { path: "/api/forum", name: "Forum", file: "./routes/forumRoutes" },
     { path: "/api/social", name: "Social", file: "./routes/socialRoutes" },
     { path: "/api/admin/settings", name: "Admin Settings", file: "./routes/adminSettings" },
+    { path: "/api/settings", name: "Public Settings", file: "./routes/publicSettings" },
     { path: "/api/admin/messages", name: "Admin Messages", file: "./routes/adminMessageRoutes" },
     { path: "/api/admin/moderation", name: "Admin Moderation", file: "./routes/moderationRoutes" },
     { path: "/api/bulk-orders", name: "Bulk Orders", file: "./routes/bulkOrder" },
