@@ -2,7 +2,7 @@ const asyncHandler = require('express-async-handler');
 const AdminSettings = require('../models/AdminSettings');
 const Recipe = require('../models/Recipe');
 const User = require('../models/User');
-const { sendPushNotification } = require('../utils/socketNotifications');
+const { sendPushNotification } = require('../utils/pushNotifications');
 
 // @desc    Get admin settings
 // @route   GET /api/admin/settings
