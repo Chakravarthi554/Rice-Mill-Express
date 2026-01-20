@@ -85,6 +85,7 @@ frontend/public/robots.txt
 frontend/public/favicon.ico
 frontend/public/logo*.png
 frontend/public/manifest.json
+backend/config/rice-express-7eef4-firebase-adminsdk-fbsvc-01dd764cb9.json
 
 # Default images (only keep in repo if needed)
 # Remove these if you have them in public/

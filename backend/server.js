@@ -128,6 +128,7 @@ const loadRoutes = () => {
     { path: "/api/admin/moderation", name: "Admin Moderation", file: "./routes/moderationRoutes" },
     { path: "/api/bulk-orders", name: "Bulk Orders", file: "./routes/bulkOrder" },
     { path: "/api/notifications", name: "Notifications", file: "./routes/notificationRoutes" },
+    { path: "/api/delivery", name: "Delivery Confirmation", file: "./routes/deliveryConfirmationRoutes" },
   ];
 
   routes.forEach(route => {

@@ -2,6 +2,7 @@ const User = require('../models/User');
 const { generateToken, generateRefreshToken } = require('../utils/generateToken');
 const asyncHandler = require('express-async-handler');
 const jwt = require('jsonwebtoken');
+const firebaseUserSync = require('../services/firebaseUserSync');
 
 // 🔥 CRITICAL FIX: Check JWT secrets
 const checkJWTSecrets = () => {
@@ -19,7 +20,7 @@ const checkJWTSecrets = () => {
 // Register a new user
 const registerUser = asyncHandler(async (req, res) => {
   checkJWTSecrets();
-  
+
   const { name, email, password, phone, role } = req.body;
   const userExists = await User.findOne({ email });
   if (userExists) {
@@ -38,6 +39,12 @@ const registerUser = asyncHandler(async (req, res) => {
 
   if (user) {
     console.log('User created:', user._id, 'with kycStatus:', user.kycStatus);
+
+    // ✅ FIREBASE: Sync user to Firestore for Firebase rules
+    await firebaseUserSync.syncUser(user).catch(err =>
+      console.error('⚠️  Firestore sync failed (non-critical):', err.message)
+    );
+
     const accessToken = generateToken(user._id, 'access');
     const refreshToken = generateRefreshToken(user._id);
 
@@ -77,13 +84,18 @@ const registerUser = asyncHandler(async (req, res) => {
 // LOGIN USER – FIXED: Use updateOne, NOT save()
 const loginUser = asyncHandler(async (req, res) => {
   checkJWTSecrets();
-  
+
   const { email, password, phone } = req.body;
   const user = await User.findOne({ email }).select('+password');
   if (user && (await user.matchPassword(password))) {
     if (phone && user.phone !== phone) {
       return res.status(400).json({ message: 'Phone number does not match' });
     }
+
+    // ✅ FIREBASE: Sync user to Firestore for Firebase rules
+    await firebaseUserSync.syncUser(user).catch(err =>
+      console.error('⚠️  Firestore sync failed (non-critical):', err.message)
+    );
 
     const accessToken = generateToken(user._id, 'access');
     const refreshToken = generateRefreshToken(user._id);
@@ -120,12 +132,12 @@ const loginUser = asyncHandler(async (req, res) => {
 // 🔥 FIXED: Enhanced refresh token with better error handling
 const refreshAccessToken = asyncHandler(async (req, res) => {
   checkJWTSecrets();
-  
+
   const refreshToken = req.body.refreshToken || req.cookies.refreshToken || req.headers['x-refresh-token'];
-  
+
   console.log('🔄 Refresh Token: Attempting to refresh token');
   console.log('📦 Refresh Token provided:', !!refreshToken);
-  
+
   if (!refreshToken) {
     console.error('❌ Refresh Token: No refresh token provided');
     return res.status(401).json({ message: 'No refresh token provided' });
@@ -166,21 +178,21 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     });
 
     console.log('✅ Refresh Token: Tokens refreshed successfully');
-    res.json({ 
-      accessToken, 
+    res.json({
+      accessToken,
       refreshToken: newRefreshToken,
       message: 'Tokens refreshed successfully'
     });
   } catch (error) {
     console.error('❌ Refresh Token Error:', error.message);
-    
+
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({ message: 'Invalid refresh token signature' });
     }
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({ message: 'Refresh token expired' });
     }
-    
+
     res.status(401).json({ message: 'Refresh token failed' });
   }
 });
