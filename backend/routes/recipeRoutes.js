@@ -30,24 +30,28 @@ if (!fs.existsSync(recipeUploadDir)) {
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
+    console.log('📂 Recipe Upload: Saving to', recipeUploadDir);
     cb(null, recipeUploadDir); // Save to uploads/recipes/
   },
   filename: (req, file, cb) => {
     // Create a unique filename: recipe-[timestamp]-[original_name]
-    cb(null, `recipe-${Date.now()}${path.extname(file.originalname)}`);
+    const filename = `recipe-${Date.now()}${path.extname(file.originalname)}`;
+    console.log('📝 Recipe Upload: Generating filename:', filename);
+    cb(null, filename);
   },
 });
 
 // File filter (optional: accept only images)
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|gif/;
+  const allowedTypes = /jpeg|jpg|png|gif|webp/;
   const mimetype = allowedTypes.test(file.mimetype);
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
 
   if (mimetype && extname) {
     return cb(null, true);
   }
-  cb('Error: Images Only!');
+  console.log('❌ Recipe Upload: Invalid file type:', file.mimetype);
+  cb(new Error('Error: Images Only! Allowed formats: jpeg, jpg, png, gif'));
 };
 
 const upload = multer({

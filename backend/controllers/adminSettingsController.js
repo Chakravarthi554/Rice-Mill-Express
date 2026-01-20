@@ -111,12 +111,13 @@ const sendBulkPushNotification = asyncHandler(async (req, res) => {
     const userIds = users.map(user => user._id.toString());
 
     // Send notification to all users
+    const io = req.app.get('io');
     await sendPushNotification(userIds, {
       title,
       message,
-      type: 'admin_broadcast',
+      type: 'ADMIN_BROADCAST',
       data: { timestamp: new Date().toISOString() }
-    });
+    }, io);
 
     // Update the push notification in settings
     const settings = await AdminSettings.getSettings();

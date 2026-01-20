@@ -16,13 +16,13 @@ const sendPushNotification = async (userIds, notificationData, io = null) => {
   try {
     // Ensure userIds is an array
     const userIdArray = Array.isArray(userIds) ? userIds : [userIds];
-    
+
     if (userIdArray.length === 0) {
       console.warn('⚠️ No user IDs provided for push notification');
       return { success: false, message: 'No recipients' };
     }
 
-    const { title, message, type = 'general', data = {}, priority = 'normal' } = notificationData;
+    const { title, message, type = 'general', data = {}, priority = 'medium' } = notificationData;
 
     if (!title || !message) {
       console.error('❌ Push notification must have title and message');
@@ -96,9 +96,9 @@ const sendBulkPushNotification = async (notificationData, io = null) => {
     const User = require('../models/User');
     const activeUsers = await User.find({ active: { $ne: false } }).select('_id');
     const userIds = activeUsers.map(user => user._id.toString());
-    
+
     console.log(`📢 Sending bulk notification to ${userIds.length} users`);
-    
+
     return await sendPushNotification(userIds, notificationData, io);
   } catch (error) {
     console.error('❌ Error sending bulk notifications:', error);

@@ -24,16 +24,6 @@ import {
   ADMIN_DASHBOARD_REFRESH_SUCCESS,
   ADMIN_DASHBOARD_REFRESH_FAIL,
 
-  // User Management
-  USER_LIST_REQUEST,
-  USER_LIST_SUCCESS,
-  USER_LIST_FAIL,
-
-  // Order Management
-  ORDER_LIST_REQUEST,
-  ORDER_LIST_SUCCESS,
-  ORDER_LIST_FAIL,
-
   // KYC Management
   KYC_APPLICATIONS_REQUEST,
   KYC_APPLICATIONS_SUCCESS,
@@ -327,57 +317,15 @@ export const adminDashboardRefreshReducer = (state = initialDashboardRefreshStat
   }
 };
 
-// User List Reducer
-export const userListReducer = (state = initialUserListState, action) => {
+// Analytics Export Reducer
+export const adminExportAnalyticsReducer = (state = {}, action) => {
   switch (action.type) {
-    case USER_LIST_REQUEST:
-      return {
-        ...state,
-        loading: true,
-        error: null,
-      };
-    case USER_LIST_SUCCESS:
-      return {
-        ...state,
-        loading: false,
-        users: action.payload,
-        error: null,
-      };
-    case USER_LIST_FAIL:
-      return {
-        ...state,
-        loading: false,
-        error: action.payload,
-        users: [],
-      };
-    default:
-      return state;
-  }
-};
-
-// Order List Reducer
-export const orderListReducer = (state = initialOrderListState, action) => {
-  switch (action.type) {
-    case ORDER_LIST_REQUEST:
-      return {
-        ...state,
-        loading: true,
-        error: null,
-      };
-    case ORDER_LIST_SUCCESS:
-      return {
-        ...state,
-        loading: false,
-        orders: action.payload,
-        error: null,
-      };
-    case ORDER_LIST_FAIL:
-      return {
-        ...state,
-        loading: false,
-        error: action.payload,
-        orders: [],
-      };
+    case 'ADMIN_ANALYTICS_EXPORT_REQUEST':
+      return { loading: true };
+    case 'ADMIN_ANALYTICS_EXPORT_SUCCESS':
+      return { loading: false, success: true };
+    case 'ADMIN_ANALYTICS_EXPORT_FAIL':
+      return { loading: false, error: action.payload };
     default:
       return state;
   }

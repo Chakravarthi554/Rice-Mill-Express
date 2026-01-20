@@ -79,9 +79,9 @@ const getPendingContent = asyncHandler(async (req, res) => {
           'comments': { $exists: true, $not: { $size: 0 } },
           'comments.approved': false
         })
-        .populate('sellerId', 'name email profileImage')
-        .populate('comments.userId', 'name email profileImage')
-        .lean();
+          .populate('sellerId', 'name email profileImage')
+          .populate('comments.userId', 'name email profileImage')
+          .lean();
 
         recipesWithPendingComments.forEach(recipe => {
           if (recipe.comments && Array.isArray(recipe.comments)) {
@@ -109,9 +109,9 @@ const getPendingContent = asyncHandler(async (req, res) => {
           'comments': { $exists: true, $not: { $size: 0 } },
           'comments.approved': false
         })
-        .populate('userId', 'name email profileImage')
-        .populate('comments.userId', 'name email profileImage')
-        .lean();
+          .populate('userId', 'name email profileImage')
+          .populate('comments.userId', 'name email profileImage')
+          .lean();
 
         forumPostsWithPendingComments.forEach(post => {
           if (post.comments && Array.isArray(post.comments)) {
@@ -139,9 +139,9 @@ const getPendingContent = asyncHandler(async (req, res) => {
           'reviews': { $exists: true, $not: { $size: 0 } },
           'reviews.approved': false
         })
-        .populate('seller', 'name email profileImage')
-        .populate('reviews.user', 'name email profileImage')
-        .lean();
+          .populate('seller', 'name email profileImage')
+          .populate('reviews.user', 'name email profileImage')
+          .lean();
 
         productsWithPendingReviews.forEach(product => {
           if (product.reviews && Array.isArray(product.reviews)) {
@@ -169,12 +169,12 @@ const getPendingContent = asyncHandler(async (req, res) => {
           'comments': { $exists: true, $not: { $size: 0 } },
           'comments.approved': false
         });
-        
+
         const forumCommentsCount = await ForumPost.countDocuments({
           'comments': { $exists: true, $not: { $size: 0 } },
           'comments.approved': false
         });
-        
+
         const productReviewsCount = await Product.countDocuments({
           'reviews': { $exists: true, $not: { $size: 0 } },
           'reviews.approved': false
@@ -192,7 +192,7 @@ const getPendingContent = asyncHandler(async (req, res) => {
     pendingContent.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     // Apply pagination
-    const paginatedContent = type === 'all' 
+    const paginatedContent = type === 'all'
       ? pendingContent.slice(0, 15) // Limit for 'all' type
       : pendingContent.slice(skip, skip + parseInt(limit));
 
@@ -205,9 +205,9 @@ const getPendingContent = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching pending content:', error);
-    res.status(500).json({ 
-      message: 'Error fetching pending content', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Error fetching pending content',
+      error: error.message
     });
   }
 });
@@ -230,9 +230,9 @@ const getFlaggedContent = asyncHandler(async (req, res) => {
         'comments': { $exists: true, $not: { $size: 0 } },
         'comments.isFlagged': true
       })
-      .populate('sellerId', 'name email profileImage')
-      .populate('comments.userId', 'name email profileImage')
-      .lean();
+        .populate('sellerId', 'name email profileImage')
+        .populate('comments.userId', 'name email profileImage')
+        .lean();
 
       recipesWithFlaggedComments.forEach(recipe => {
         if (recipe.comments && Array.isArray(recipe.comments)) {
@@ -284,9 +284,9 @@ const getFlaggedContent = asyncHandler(async (req, res) => {
         'comments': { $exists: true, $not: { $size: 0 } },
         'comments.isFlagged': true
       })
-      .populate('userId', 'name email profileImage')
-      .populate('comments.userId', 'name email profileImage')
-      .lean();
+        .populate('userId', 'name email profileImage')
+        .populate('comments.userId', 'name email profileImage')
+        .lean();
 
       forumPostsWithFlaggedComments.forEach(post => {
         if (post.comments && Array.isArray(post.comments)) {
@@ -313,9 +313,9 @@ const getFlaggedContent = asyncHandler(async (req, res) => {
         'reviews': { $exists: true, $not: { $size: 0 } },
         'reviews.isFlagged': true
       })
-      .populate('seller', 'name email profileImage')
-      .populate('reviews.user', 'name email profileImage')
-      .lean();
+        .populate('seller', 'name email profileImage')
+        .populate('reviews.user', 'name email profileImage')
+        .lean();
 
       productsWithFlaggedReviews.forEach(product => {
         if (product.reviews && Array.isArray(product.reviews)) {
@@ -342,12 +342,12 @@ const getFlaggedContent = asyncHandler(async (req, res) => {
         'comments': { $exists: true, $not: { $size: 0 } },
         'comments.isFlagged': true
       });
-      
+
       const forumFlaggedCount = await ForumPost.countDocuments({
         'comments': { $exists: true, $not: { $size: 0 } },
         'comments.isFlagged': true
       });
-      
+
       const productFlaggedCount = await Product.countDocuments({
         'reviews': { $exists: true, $not: { $size: 0 } },
         'reviews.isFlagged': true
@@ -372,9 +372,9 @@ const getFlaggedContent = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching flagged content:', error);
-    res.status(500).json({ 
-      message: 'Error fetching flagged content', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Error fetching flagged content',
+      error: error.message
     });
   }
 });
@@ -393,7 +393,7 @@ const approveContent = asyncHandler(async (req, res) => {
       case 'recipe':
         result = await Recipe.findByIdAndUpdate(
           id,
-          { 
+          {
             status: 'approved',
             moderationNotes,
             moderatedBy: req.user._id,
@@ -406,7 +406,7 @@ const approveContent = asyncHandler(async (req, res) => {
       case 'forum_post':
         result = await ForumPost.findByIdAndUpdate(
           id,
-          { 
+          {
             status: 'approved',
             moderationNotes,
             moderatedBy: req.user._id,
@@ -419,8 +419,8 @@ const approveContent = asyncHandler(async (req, res) => {
       case 'recipe_comment':
         result = await Recipe.findOneAndUpdate(
           { 'comments._id': id },
-          { 
-            $set: { 
+          {
+            $set: {
               'comments.$.approved': true,
               'comments.$.moderationNotes': moderationNotes,
               'comments.$.moderatedBy': req.user._id,
@@ -434,8 +434,8 @@ const approveContent = asyncHandler(async (req, res) => {
       case 'forum_comment':
         result = await ForumPost.findOneAndUpdate(
           { 'comments._id': id },
-          { 
-            $set: { 
+          {
+            $set: {
               'comments.$.approved': true,
               'comments.$.moderationNotes': moderationNotes,
               'comments.$.moderatedBy': req.user._id,
@@ -449,8 +449,8 @@ const approveContent = asyncHandler(async (req, res) => {
       case 'product_review':
         result = await Product.findOneAndUpdate(
           { 'reviews._id': id },
-          { 
-            $set: { 
+          {
+            $set: {
               'reviews.$.approved': true,
               'reviews.$.moderationNotes': moderationNotes,
               'reviews.$.moderatedBy': req.user._id,
@@ -473,15 +473,15 @@ const approveContent = asyncHandler(async (req, res) => {
     const io = req.app.get('io');
     io.emit('CONTENT_APPROVED', { type, id, approvedBy: req.user._id });
 
-    res.json({ 
+    res.json({
       message: 'Content approved successfully',
       content: result
     });
   } catch (error) {
     console.error('Error approving content:', error);
-    res.status(500).json({ 
-      message: 'Error approving content', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Error approving content',
+      error: error.message
     });
   }
 });
@@ -504,7 +504,7 @@ const rejectContent = asyncHandler(async (req, res) => {
       case 'recipe':
         result = await Recipe.findByIdAndUpdate(
           id,
-          { 
+          {
             status: 'rejected',
             moderationNotes,
             moderatedBy: req.user._id,
@@ -517,7 +517,7 @@ const rejectContent = asyncHandler(async (req, res) => {
       case 'forum_post':
         result = await ForumPost.findByIdAndUpdate(
           id,
-          { 
+          {
             status: 'rejected',
             moderationNotes,
             moderatedBy: req.user._id,
@@ -530,8 +530,8 @@ const rejectContent = asyncHandler(async (req, res) => {
       case 'recipe_comment':
         result = await Recipe.findOneAndUpdate(
           { 'comments._id': id },
-          { 
-            $set: { 
+          {
+            $set: {
               'comments.$.approved': false,
               'comments.$.moderationNotes': moderationNotes,
               'comments.$.moderatedBy': req.user._id,
@@ -545,8 +545,8 @@ const rejectContent = asyncHandler(async (req, res) => {
       case 'forum_comment':
         result = await ForumPost.findOneAndUpdate(
           { 'comments._id': id },
-          { 
-            $set: { 
+          {
+            $set: {
               'comments.$.approved': false,
               'comments.$.moderationNotes': moderationNotes,
               'comments.$.moderatedBy': req.user._id,
@@ -560,8 +560,8 @@ const rejectContent = asyncHandler(async (req, res) => {
       case 'product_review':
         result = await Product.findOneAndUpdate(
           { 'reviews._id': id },
-          { 
-            $set: { 
+          {
+            $set: {
               'reviews.$.approved': false,
               'reviews.$.moderationNotes': moderationNotes,
               'reviews.$.moderatedBy': req.user._id,
@@ -584,15 +584,15 @@ const rejectContent = asyncHandler(async (req, res) => {
     const io = req.app.get('io');
     io.emit('CONTENT_REJECTED', { type, id, rejectedBy: req.user._id });
 
-    res.json({ 
+    res.json({
       message: 'Content rejected successfully',
       content: result
     });
   } catch (error) {
     console.error('Error rejecting content:', error);
-    res.status(500).json({ 
-      message: 'Error rejecting content', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Error rejecting content',
+      error: error.message
     });
   }
 });
@@ -652,14 +652,14 @@ const deleteContent = asyncHandler(async (req, res) => {
     const io = req.app.get('io');
     io.emit('CONTENT_DELETED', { type, id, deletedBy: req.user._id });
 
-    res.json({ 
+    res.json({
       message: 'Content deleted successfully'
     });
   } catch (error) {
     console.error('Error deleting content:', error);
-    res.status(500).json({ 
-      message: 'Error deleting content', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Error deleting content',
+      error: error.message
     });
   }
 });
@@ -692,15 +692,15 @@ const pinForumPost = asyncHandler(async (req, res) => {
     const io = req.app.get('io');
     io.emit('FORUM_POST_PINNED', { postId: id, pinnedBy: req.user._id });
 
-    res.json({ 
+    res.json({
       message: 'Forum post pinned successfully',
       post: pinnedPost
     });
   } catch (error) {
     console.error('Error pinning forum post:', error);
-    res.status(500).json({ 
-      message: 'Error pinning forum post', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Error pinning forum post',
+      error: error.message
     });
   }
 });
@@ -718,28 +718,35 @@ const getModerationStats = asyncHandler(async (req, res) => {
     const [
       pendingRecipes,
       pendingForumPosts,
-      todayModerated,
-      weeklyModerated
+      todayModeratedRecipes,
+      todayModeratedForum,
+      weeklyModeratedRecipes,
+      weeklyModeratedForum
     ] = await Promise.all([
       Recipe.countDocuments({ status: 'pending' }),
       ForumPost.countDocuments({ status: 'pending' }),
       // Today's moderated content
-      Recipe.countDocuments({ 
+      Recipe.countDocuments({
         moderatedAt: { $gte: startOfToday },
         $or: [{ status: 'approved' }, { status: 'rejected' }]
-      }) + ForumPost.countDocuments({
+      }),
+      ForumPost.countDocuments({
         moderatedAt: { $gte: startOfToday },
         $or: [{ status: 'approved' }, { status: 'rejected' }]
       }),
       // Weekly moderated content
-      Recipe.countDocuments({ 
+      Recipe.countDocuments({
         moderatedAt: { $gte: startOfWeek },
         $or: [{ status: 'approved' }, { status: 'rejected' }]
-      }) + ForumPost.countDocuments({
+      }),
+      ForumPost.countDocuments({
         moderatedAt: { $gte: startOfWeek },
         $or: [{ status: 'approved' }, { status: 'rejected' }]
       })
     ]);
+
+    const todayModerated = todayModeratedRecipes + todayModeratedForum;
+    const weeklyModerated = weeklyModeratedRecipes + weeklyModeratedForum;
 
     // Count comments and reviews using regular queries
     let pendingRecipeComments = 0;
@@ -821,14 +828,14 @@ const getModerationStats = asyncHandler(async (req, res) => {
       // Continue with zero counts if counting fails
     }
 
-    const totalPending = 
-      pendingRecipes + 
-      pendingForumPosts + 
+    const totalPending =
+      pendingRecipes +
+      pendingForumPosts +
       pendingRecipeComments +
       pendingForumComments +
       pendingProductReviews;
 
-    const totalFlagged = 
+    const totalFlagged =
       flaggedRecipeComments +
       flaggedForumComments +
       flaggedProductReviews;
@@ -856,9 +863,9 @@ const getModerationStats = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching moderation stats:', error);
-    res.status(500).json({ 
-      message: 'Error fetching moderation statistics', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Error fetching moderation statistics',
+      error: error.message
     });
   }
 });

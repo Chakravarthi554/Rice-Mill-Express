@@ -19,6 +19,10 @@ let badWordsFilter;
 // @route   POST /api/recipes/submit
 // @access  Private/Seller
 const submitRecipe = asyncHandler(async (req, res) => {
+  console.log('📥 Recipe Submission Request Received');
+  if (req.file) console.log('📁 File received:', req.file.filename);
+  else console.log('⚠️ No file received');
+
   const { title, ingredients, steps, riceType, linkedProducts } = req.body;
   const imagePath = req.file ? `/uploads/recipes/${req.file.filename}` : null;
 

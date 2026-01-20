@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
     Box, Typography, Paper, Table, TableBody, TableCell, TableContainer,
-    TableHead, TableRow, IconButton, Tooltip, Chip, Button, LinearProgress, TextField, InputAdornment
+    TableHead, TableRow, IconButton, Tooltip, Chip, Button, LinearProgress, TextField, InputAdornment,
+    Dialog, DialogTitle, DialogContent, DialogActions, Divider, Grid, List, ListItem, ListItemText, Avatar
 } from '@mui/material';
 import {
     Refresh as RefreshIcon,
@@ -10,18 +11,26 @@ import {
     LocalShipping as ShippingIcon,
     CheckCircle as DeliveredIcon,
     Pending as PendingIcon,
-    Search as SearchIcon
+    Search as SearchIcon,
+    Close as CloseIcon,
+    ShoppingBag as BagIcon,
+    Person as PersonIcon,
+    Payment as PaymentIcon
 } from '@mui/icons-material';
-import { listOrders } from '../../../redux/actions/adminActions';
+import { listOrders, getOrderDetails } from '../../../redux/actions/adminActions';
 import Loader from '../../common/Loader';
 import Message from '../../common/Message';
 
 const OrdersTab = () => {
     const dispatch = useDispatch();
     const [searchTerm, setSearchTerm] = useState('');
+    const [detailsOpen, setDetailsOpen] = useState(false);
 
     const orderList = useSelector((state) => state.orderList);
     const { loading, error, orders = [] } = orderList;
+
+    const orderDetails = useSelector((state) => state.orderDetails);
+    const { loading: loadingDetails, error: errorDetails, order: selectedOrder } = orderDetails || {};
 
     useEffect(() => {
         dispatch(listOrders());
@@ -30,6 +39,11 @@ const OrdersTab = () => {
     const handleRefresh = () => {
         dispatch(listOrders());
         setSearchTerm(''); // Clear search on refresh
+    };
+
+    const handleViewDetails = (id) => {
+        dispatch(getOrderDetails(id));
+        setDetailsOpen(true);
     };
 
     const getStatusColor = (status) => {
@@ -191,7 +205,13 @@ const OrdersTab = () => {
                                     </TableCell>
                                     <TableCell align="right">
                                         <Tooltip title="View Details">
-                                            <IconButton size="small" sx={{ color: '#38bdf8' }}><ViewIcon fontSize="small" /></IconButton>
+                                            <IconButton
+                                                size="small"
+                                                sx={{ color: '#38bdf8' }}
+                                                onClick={() => handleViewDetails(order._id)}
+                                            >
+                                                <ViewIcon fontSize="small" />
+                                            </IconButton>
                                         </Tooltip>
                                     </TableCell>
                                 </TableRow>
@@ -200,6 +220,150 @@ const OrdersTab = () => {
                     </TableBody>
                 </Table>
             </TableContainer>
+
+            {/* Order Details Dialog */}
+            <Dialog
+                open={detailsOpen}
+                onClose={() => setDetailsOpen(false)}
+                maxWidth="md"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        background: '#0f172a',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        color: 'white',
+                        borderRadius: 3
+                    }
+                }}
+            >
+                <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    Order Details
+                    <IconButton onClick={() => setDetailsOpen(false)} sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                        <CloseIcon />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent dividers sx={{ borderColor: 'rgba(255,255,255,0.1)' }}>
+                    {loadingDetails ? (
+                        <Box sx={{ py: 4, textAlign: 'center' }}>
+                            <Loader />
+                            <Typography sx={{ mt: 2, color: 'rgba(255,255,255,0.5)' }}>Fetching order information...</Typography>
+                        </Box>
+                    ) : errorDetails ? (
+                        <Message severity="error">{errorDetails}</Message>
+                    ) : selectedOrder ? (
+                        <Grid container spacing={3}>
+                            {/* Left Column: Items */}
+                            <Grid item xs={12} md={7}>
+                                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <BagIcon fontSize="small" color="primary" /> Order Items
+                                </Typography>
+                                <List sx={{ background: 'rgba(255,255,255,0.02)', borderRadius: 2 }}>
+                                    {selectedOrder.orderItems?.map((item, index) => (
+                                        <React.Fragment key={index}>
+                                            <ListItem sx={{ py: 1.5 }}>
+                                                <Avatar
+                                                    src={item.image}
+                                                    variant="rounded"
+                                                    sx={{ width: 50, height: 50, mr: 2, border: '1px solid rgba(255,255,255,0.1)' }}
+                                                >
+                                                    {item.name?.[0]}
+                                                </Avatar>
+                                                <ListItemText
+                                                    primary={<Typography variant="subtitle2">{item.name}</Typography>}
+                                                    secondary={
+                                                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                                                            {item.qty} x ₹{item.price.toLocaleString()}
+                                                        </Typography>
+                                                    }
+                                                />
+                                                <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                                                    ₹{(item.qty * item.price).toLocaleString()}
+                                                </Typography>
+                                            </ListItem>
+                                            {index < selectedOrder.orderItems.length - 1 && <Divider sx={{ borderColor: 'rgba(255,255,255,0.05)' }} />}
+                                        </React.Fragment>
+                                    ))}
+                                </List>
+
+                                <Box sx={{ mt: 3, p: 2, background: 'rgba(56, 189, 248, 0.05)', borderRadius: 2 }}>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                                        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>Items Price</Typography>
+                                        <Typography variant="body2">₹{selectedOrder.itemsPrice?.toLocaleString()}</Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                                        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>Tax</Typography>
+                                        <Typography variant="body2">₹{selectedOrder.taxPrice?.toLocaleString()}</Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                                        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>Shipping</Typography>
+                                        <Typography variant="body2">₹{selectedOrder.shippingPrice?.toLocaleString()}</Typography>
+                                    </Box>
+                                    <Divider sx={{ my: 1, borderColor: 'rgba(56, 189, 248, 0.2)' }} />
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#38bdf8' }}>Total Price</Typography>
+                                        <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#38bdf8' }}>₹{selectedOrder.totalPrice?.toLocaleString()}</Typography>
+                                    </Box>
+                                </Box>
+                            </Grid>
+
+                            {/* Right Column: Info */}
+                            <Grid item xs={12} md={5}>
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                    <Box>
+                                        <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <PersonIcon fontSize="small" color="primary" /> Customer Info
+                                        </Typography>
+                                        <Paper sx={{ p: 2, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <Typography variant="subtitle2">{selectedOrder.user?.name}</Typography>
+                                            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>{selectedOrder.user?.email}</Typography>
+                                            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>{selectedOrder.user?.phone}</Typography>
+                                        </Paper>
+                                    </Box>
+
+                                    <Box>
+                                        <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <ShippingIcon fontSize="small" color="primary" /> Shipping Address
+                                        </Typography>
+                                        <Paper sx={{ p: 2, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <Typography variant="body2">
+                                                {selectedOrder.shippingAddress?.address}, {selectedOrder.shippingAddress?.city}
+                                            </Typography>
+                                            <Typography variant="body2">
+                                                {selectedOrder.shippingAddress?.postalCode}, {selectedOrder.shippingAddress?.country}
+                                            </Typography>
+                                        </Paper>
+                                    </Box>
+
+                                    <Box>
+                                        <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <PaymentIcon fontSize="small" color="primary" /> Payment Status
+                                        </Typography>
+                                        <Paper sx={{ p: 2, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <Typography variant="body2" sx={{ mb: 1 }}>
+                                                Method: <strong>{selectedOrder.paymentMethod}</strong>
+                                            </Typography>
+                                            <Chip
+                                                label={selectedOrder.isPaid ? 'Paid' : 'Unpaid'}
+                                                color={selectedOrder.isPaid ? 'success' : 'warning'}
+                                                size="small"
+                                                sx={{ fontWeight: 'bold' }}
+                                            />
+                                            {selectedOrder.isPaid && (
+                                                <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'rgba(255,255,255,0.5)' }}>
+                                                    On {new Date(selectedOrder.paidAt).toLocaleString()}
+                                                </Typography>
+                                            )}
+                                        </Paper>
+                                    </Box>
+                                </Box>
+                            </Grid>
+                        </Grid>
+                    ) : null}
+                </DialogContent>
+                <DialogActions sx={{ p: 2 }}>
+                    <Button onClick={() => setDetailsOpen(false)} sx={{ color: '#38bdf8' }}>Close</Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };

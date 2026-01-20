@@ -29,6 +29,8 @@ const notificationSchema = new mongoose.Schema(
         'REFUND_REQUESTED',
         'PAYOUT_READY',
         'ADMIN_ALERT',
+        'ADMIN_BROADCAST',
+        'SYSTEM_BROADCAST',
         // Bulk order notification types
         'BULK_ORDER_REQUEST',
         'BULK_ORDER_UPDATE',
