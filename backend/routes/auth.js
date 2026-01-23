@@ -19,7 +19,7 @@ router.post('/register', asyncHandler(registerUser));
 router.post('/login', asyncHandler(loginUser));
 
 // Phone login route (Firebase)
-router.post('/phone-login', asyncHandler(loginWithPhone));
+router.post('/phone-login', loginWithPhone);
 
 // Refresh token route
 router.post('/refresh-token', asyncHandler(refreshAccessToken));

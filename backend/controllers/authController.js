@@ -318,6 +318,7 @@ const logoutUser = asyncHandler(async (req, res) => {
 module.exports = {
   registerUser,
   loginUser,
+  loginWithPhone,
   refreshAccessToken,
   resendOtp,
   verifyOtp,
