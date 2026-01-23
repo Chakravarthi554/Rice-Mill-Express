@@ -5,7 +5,7 @@ import {
     Dialog, DialogTitle, DialogContent, Alert, CircularProgress, Chip
 } from '@mui/material';
 import { CheckCircle, LocalShipping, AttachMoney } from '@mui/icons-material';
-import DeliveryOtpVerification from '../components/delivery/DeliveryOtpVerification';
+import DeliveryPhotoConfirmation from '../components/delivery/DeliveryPhotoConfirmation';
 import Message from '../components/common/Message';
 import Loader from '../components/common/Loader';
 import axios from 'axios';
@@ -16,7 +16,7 @@ const DeliveryDashboard = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [selectedOrder, setSelectedOrder] = useState(null);
-    const [showOtpModal, setShowOtpModal] = useState(false);
+    const [showPhotoModal, setShowPhotoModal] = useState(false);
 
     // Fetch orders assigned to this delivery partner
     useEffect(() => {
@@ -46,19 +46,19 @@ const DeliveryDashboard = () => {
 
     const handleOpenDeliveryModal = (order) => {
         setSelectedOrder(order);
-        setShowOtpModal(true);
+        setShowPhotoModal(true);
     };
 
     const handleDeliverySuccess = (data) => {
         console.log('Delivery confirmed:', data);
-        setShowOtpModal(false);
+        setShowPhotoModal(false);
         setSelectedOrder(null);
 
         // Refresh deliveries list
         fetchMyDeliveries();
 
         // Show success message
-        alert('✅ Delivery confirmed successfully!');
+        alert('✅ Delivery confirmed successfully with photo proof!');
     };
 
     // Calculate stats
@@ -177,13 +177,13 @@ const DeliveryDashboard = () => {
                 </Grid>
             )}
 
-            {/* Firebase OTP Verification Modal */}
-            {showOtpModal && selectedOrder && (
-                <DeliveryOtpVerification
+            {/* Photo-Based Delivery Confirmation Modal (Zepto-Style) */}
+            {showPhotoModal && selectedOrder && (
+                <DeliveryPhotoConfirmation
                     order={selectedOrder}
                     onSuccess={handleDeliverySuccess}
                     onCancel={() => {
-                        setShowOtpModal(false);
+                        setShowPhotoModal(false);
                         setSelectedOrder(null);
                     }}
                 />

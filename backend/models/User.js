@@ -15,9 +15,9 @@ const generateReferralCode = () => {
 const userSchema = mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
-    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-    phone: { type: String, required: true, unique: true, match: /^[0-9]{10}$/ },
-    password: { type: String, required: true, minlength: 8, select: false },
+    email: { type: String, unique: true, sparse: true, lowercase: true, trim: true },
+    phone: { type: String, unique: true, sparse: true },
+    password: { type: String, minlength: 8, select: false },
     role: { type: String, enum: ['customer', 'seller', 'admin', 'deliveryPartner'], default: 'customer' },
     gender: { type: String, enum: ['male', 'female', 'other', ''], default: '' },
     dob: { type: Date },
@@ -46,10 +46,10 @@ const userSchema = mongoose.Schema(
     },
     addresses: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Address' }],
     cartItems: [{
-  _id: false,
-  product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
-  quantity: { type: Number, default: 1, min: 1 },   // <-- field name is `quantity`
-}],
+      _id: false,
+      product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
+      quantity: { type: Number, default: 1, min: 1 },   // <-- field name is `quantity`
+    }],
     wishlist: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
     active: { type: Boolean, default: true, select: false },
     passwordResetToken: { type: String, select: false },
@@ -114,6 +114,30 @@ const userSchema = mongoose.Schema(
 );
 
 userSchema.index({ location: '2dsphere' });
+
+// === CUSTOM VALIDATION FOR FLEXIBLE AUTH ===
+userSchema.pre('validate', function (next) {
+  const hasPhone = this.phone && this.phone.trim();
+  const hasEmail = this.email && this.email.trim();
+  const hasPassword = this.password && this.password.trim();
+
+  // Validate: At least one authentication method must be provided
+  if (!hasPhone && !hasEmail) {
+    return next(new Error('Either phone number or email must be provided'));
+  }
+
+  // Validate: If email is provided, password must also be provided (for new users)
+  if (hasEmail && !hasPassword && this.isNew) {
+    return next(new Error('Password is required when email is provided'));
+  }
+
+  // Validate: Phone format when provided
+  if (hasPhone && !/^[0-9]{10}$/.test(this.phone)) {
+    return next(new Error('Phone number must be exactly 10 digits'));
+  }
+
+  next();
+});
 
 // === PASSWORD & REFERRAL CODE ===
 userSchema.pre('save', async function (next) {

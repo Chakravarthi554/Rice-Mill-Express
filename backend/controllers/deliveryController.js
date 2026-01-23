@@ -79,16 +79,13 @@ const createDeliveryPartner = asyncHandler(async (req, res) => {
     userData.password = password;
     userData.phone = normalizedPhone;
   } else if (hasEmailAuth) {
-    // Email-only (unlikely but handle it)
+    // Email-only authentication
     userData.email = email;
     userData.password = password;
   } else if (hasPhoneAuth) {
-    // Phone-only registration: generate random password and temp email
-    const crypto = require('crypto');
-    const randomPassword = crypto.randomBytes(16).toString('hex'); // Secure random password
-    userData.email = `${normalizedPhone}@delivery.temp`; // Use normalized phone for temp email
-    userData.password = randomPassword; // User won't know this, will login via OTP only
+    // Phone-only authentication (OTP login)
     userData.phone = normalizedPhone;
+    // No email or password needed - will authenticate via Firebase OTP
   }
 
   const user = await User.create(userData);
@@ -101,7 +98,7 @@ const createDeliveryPartner = asyncHandler(async (req, res) => {
   // 3. Create the DeliveryPartner profile linked to the User
   const partner = new DeliveryPartner({
     name,
-    email: userData.email, // Use the email we created (might be temp)
+    email: userData.email || email, // Optional: may be undefined for phone-only partners
     phone: normalizedPhone || phone, // Use normalized phone if available
     vehicle_type,
     vehicle_number,
