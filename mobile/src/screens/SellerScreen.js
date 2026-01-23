@@ -24,24 +24,35 @@ const SellerScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <View style={styles.tabContainer}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.tab, activeTab === 'pending' && styles.activeTab]}
           onPress={() => setActiveTab('pending')}
         >
           <Text style={styles.tabText}>Pending</Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.tab, activeTab === 'shipped' && styles.activeTab]}
           onPress={() => setActiveTab('shipped')}
         >
           <Text style={styles.tabText}>Shipped</Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.tab, activeTab === 'delivered' && styles.activeTab]}
           onPress={() => setActiveTab('delivered')}
         >
           <Text style={styles.tabText}>Delivered</Text>
         </TouchableOpacity>
+      </View>
+
+      <View style={styles.actionArea}>
+        <Button
+          mode="outlined"
+          icon="account-plus"
+          onPress={() => navigation.navigate('AddDeliveryPartner')}
+          style={styles.partnerButton}
+        >
+          Register Delivery Partner
+        </Button>
       </View>
 
       <ScrollView style={styles.scrollContainer}>
@@ -67,8 +78,8 @@ const SellerScreen = ({ navigation }) => {
                   <Text style={styles.orderDate}>
                     {new Date(order.createdAt).toLocaleDateString()}
                   </Text>
-                  <Button 
-                    mode="contained" 
+                  <Button
+                    mode="contained"
                     onPress={() => navigation.navigate('OrderDetail', { id: order._id })}
                     style={styles.detailButton}
                   >
@@ -81,7 +92,7 @@ const SellerScreen = ({ navigation }) => {
         )}
       </ScrollView>
 
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.addButton}
         onPress={() => navigation.navigate('AddProduct')}
       >
@@ -168,6 +179,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 4,
+  },
+  actionArea: {
+    padding: 10,
+    paddingBottom: 0,
+  },
+  partnerButton: {
+    borderColor: '#4CAF50',
+    borderWidth: 1,
   },
 });
 

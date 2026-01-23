@@ -16,14 +16,12 @@ import {
 } from '@mui/icons-material';
 import {
   listDeliveryPartners,
-  createDeliveryPartner,
   updateDeliveryPartner,
   deleteDeliveryPartner,
   assignDeliveryPartner,
   listOrdersForDelivery
 } from '../../redux/actions/deliveryActions';
 import Message from '../common/Message';
-import Loader from '../common/Loader';
 import { OrderTrackingSocket } from '../../utils/socket'; // Import socket utility
 
 const SellerDelivery = () => {
@@ -37,6 +35,8 @@ const SellerDelivery = () => {
   const [partnerData, setPartnerData] = useState({
     name: '',
     phone: '',
+    email: '',
+    password: '',
     vehicleType: '',
     vehicleNumber: '',
     licenseNumber: '',
@@ -166,12 +166,25 @@ const SellerDelivery = () => {
     const payload = {
       name: partnerData.name,
       phone: partnerData.phone,
+      email: partnerData.email,
+      password: partnerData.password,
       vehicle_type: partnerData.vehicleType,
       vehicle_number: partnerData.vehicleNumber,
       license_number: partnerData.licenseNumber,
     };
-    if (!payload.name || !payload.phone || !payload.vehicle_type || !payload.vehicle_number || !payload.license_number) {
-      alert('All fields are required: Name, Phone, Vehicle Type, Vehicle Number, License Number');
+
+    // Validate required fields
+    if (!payload.name || !payload.vehicle_type || !payload.vehicle_number || !payload.license_number) {
+      alert('Name, Vehicle Type, Vehicle Number, and License Number are required');
+      return;
+    }
+
+    // Require either phone OR (email + password)
+    const hasPhoneAuth = payload.phone && payload.phone.trim();
+    const hasEmailAuth = payload.email && payload.email.trim() && payload.password && payload.password.trim();
+
+    if (!hasPhoneAuth && !hasEmailAuth) {
+      alert('Please provide either Phone Number OR both Email and Password for login credentials');
       return;
     }
 
@@ -419,11 +432,34 @@ const SellerDelivery = () => {
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="Phone"
+                label="Phone Number"
                 name="phone"
+                type="tel"
                 value={partnerData.phone}
                 onChange={handleInputChange}
-                required
+                helperText="Required for OTP login"
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Email (Optional)"
+                name="email"
+                type="email"
+                value={partnerData.email}
+                onChange={handleInputChange}
+                helperText="Optional: Provide email+password for email login"
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Password (Optional)"
+                name="password"
+                type="password"
+                value={partnerData.password}
+                onChange={handleInputChange}
+                helperText="Required only if email is provided"
               />
             </Grid>
             <Grid item xs={12}>

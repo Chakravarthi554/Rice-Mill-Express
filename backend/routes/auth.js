@@ -5,6 +5,7 @@ const asyncHandler = require('express-async-handler');
 const {
   registerUser,
   loginUser,
+  loginWithPhone,
   refreshAccessToken,
   verifyOtp,
   resendOtp,
@@ -16,6 +17,9 @@ router.post('/register', asyncHandler(registerUser));
 
 // Login route
 router.post('/login', asyncHandler(loginUser));
+
+// Phone login route (Firebase)
+router.post('/phone-login', asyncHandler(loginWithPhone));
 
 // Refresh token route
 router.post('/refresh-token', asyncHandler(refreshAccessToken));

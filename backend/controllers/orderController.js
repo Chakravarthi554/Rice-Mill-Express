@@ -304,10 +304,6 @@ exports.updateOrderStatus = asyncHandler(async (req, res) => {
     reason: notes || reason || `Status updated to ${status}`
   });
 
-  if (status === 'out_for_delivery' && !order.deliveryOtp) {
-    order.deliveryOtp = Math.floor(1000 + Math.random() * 9000).toString();
-  }
-
   if (status === 'delivered') {
     order.isDelivered = true;
     order.deliveredAt = Date.now();
@@ -652,12 +648,8 @@ exports.updateOrderToDelivered = asyncHandler(async (req, res) => {
   const order = await Order.findById(orderId);
   if (!order) { res.status(404); throw new Error('Order not found'); }
 
-  const isSeller = order.seller.toString() === req.user._id.toString();
-  const isDeliveryPartner = order.deliveryPartner?.toString() === req.user._id.toString();
-  const isAdmin = req.user.role === 'admin';
-
-  if (!isAdmin && !isSeller && !isDeliveryPartner) {
-    res.status(403); throw new Error('Not authorized to mark this order as delivered');
+  if (!isAdmin && !isDeliveryPartner) {
+    res.status(403); throw new Error('Not authorized to mark this order as delivered. Only the assigned delivery partner can confirm delivery.');
   }
 
   if (!['shipped', 'out_for_delivery'].includes(order.orderStatus)) {
@@ -775,65 +767,3 @@ exports.getOrderInvoice = asyncHandler(async (req, res) => {
 
 });
 
-// ✅ NEW: Complete Delivery with OTP & Photo Proof
-exports.completeDelivery = asyncHandler(async (req, res) => {
-  const { otp } = req.body;
-  const orderId = req.params.id;
-
-  if (!mongoose.Types.ObjectId.isValid(orderId)) { res.status(400); throw new Error('Invalid order ID'); }
-  if (!otp) { res.status(400); throw new Error('OTP is required'); }
-
-  const order = await Order.findById(orderId);
-  if (!order) { res.status(404); throw new Error('Order not found'); }
-
-  // Verify OTP
-  if (order.deliveryOtp !== otp) {
-    res.status(400);
-    throw new Error('Invalid OTP. Please ask customer for the correct code.');
-  }
-
-  // Handle Photo Proof
-  if (req.file) {
-    order.deliveryProofImage = `/uploads/${req.file.filename}`;
-    if (order.paymentMethod === 'cod') {
-      order.codProofPhoto = `/uploads/${req.file.filename}`;
-    }
-  }
-
-  // Update Status
-  order.orderStatus = 'delivered';
-  order.isDelivered = true;
-  order.deliveredAt = Date.now();
-  order.statusHistory.push({ status: 'delivered', timestamp: new Date(), reason: 'Verified Delivery with OTP' });
-
-  // Handle COD Collection
-  if (order.paymentMethod === 'cod') {
-    order.codCollected = true;
-    order.codCollectedAt = Date.now();
-    order.paymentStatus = 'completed'; // Assuming partner collected cash
-  }
-
-  const updatedOrder = await order.save();
-
-  // Notify
-  await Notification.create([
-    { user: order.user, type: 'ORDER_DELIVERED', message: `Order #${order._id.toString().slice(-6)} delivered successfully!` },
-    { user: order.seller, type: 'ORDER_DELIVERED', message: `Order #${order._id.toString().slice(-6)} delivered & verified.` }
-  ]);
-
-  // Emit Socket
-  const io = req.app.get('io');
-  if (io) {
-    const updateData = {
-      status: 'delivered',
-      isDelivered: true,
-      deliveredAt: order.deliveredAt,
-      codCollected: order.codCollected
-    };
-    emitOrderUpdate(io, order.user.toString(), order._id, updateData);
-    emitOrderUpdate(io, order.seller.toString(), order._id, updateData);
-    io.to('admin').emit('ORDER_UPDATE', { type: 'ORDER_UPDATE', data: { orderId: order._id, ...updateData } });
-  }
-
-  res.json({ message: 'Delivery verified & completed', order: updatedOrder });
-});

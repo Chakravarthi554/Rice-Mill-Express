@@ -26,28 +26,94 @@ const getDeliveryPartners = asyncHandler(async (req, res) => {
 // @access  Private/Seller
 
 const createDeliveryPartner = asyncHandler(async (req, res) => {
-  const { name, phone, vehicle_type, vehicle_number, license_number } = req.body;
+  const { name, email, phone, password, vehicle_type, vehicle_number, license_number } = req.body;
 
-  if (!name || !phone || !vehicle_type || !vehicle_number || !license_number) {
+  // Validate required fields
+  if (!name || !vehicle_type || !vehicle_number || !license_number) {
     res.status(400);
-    throw new Error('All fields (name, phone, vehicle_type, vehicle_number, license_number) are required');
+    throw new Error('Name, vehicle_type, vehicle_number, and license_number are required');
   }
 
+  // Require either phone OR (email + password)
+  const hasPhoneAuth = phone && phone.trim();
+  const hasEmailAuth = email && email.trim() && password && password.trim();
+
+  if (!hasPhoneAuth && !hasEmailAuth) {
+    res.status(400);
+    throw new Error('Please provide either phone number OR both email and password for login credentials');
+  }
+
+  // 1. Check if user already exists
+  const existingUser = await User.findOne({
+    $or: [
+      email ? { email } : null,
+      phone ? { phone } : null
+    ].filter(Boolean)
+  });
+
+  if (existingUser) {
+    res.status(400);
+    throw new Error('User with this email or phone already exists');
+  }
+
+  // 2. Create the User login identity first
+  const userData = {
+    name,
+    role: 'deliveryPartner',
+    isVerified: true // Pre-verified since seller is adding them
+  };
+
+  // Normalize phone number to 10 digits (remove +91 or country code if present)
+  let normalizedPhone = phone;
+  if (hasPhoneAuth) {
+    normalizedPhone = phone.replace(/^\+91/, '').replace(/^\+/, '').replace(/\D/g, '');
+    if (normalizedPhone.length > 10) {
+      normalizedPhone = normalizedPhone.slice(-10); // Take last 10 digits
+    }
+    userData.phone = normalizedPhone;
+  }
+
+  // Add credentials based on what was provided
+  if (hasEmailAuth) {
+    userData.email = email;
+    userData.password = password;
+  }
+
+  if (hasPhoneAuth) {
+    userData.phone = phone;
+    // If only phone is provided, use phone as email (required by User model)
+    if (!email) {
+      userData.email = `${phone}@delivery.temp`; // Temporary email for phone-only users
+    }
+  }
+
+  const user = await User.create(userData);
+
+  if (!user) {
+    res.status(500);
+    throw new Error('Failed to create user account for delivery partner');
+  }
+
+  // 3. Create the DeliveryPartner profile linked to the User
   const partner = new DeliveryPartner({
     name,
+    email,
     phone,
     vehicle_type,
     vehicle_number,
     license_number,
     seller: req.user._id,
+    user: user._id, // Link to the Auth User
   });
 
   try {
     const createdPartner = await partner.save();
     res.status(201).json(createdPartner);
   } catch (error) {
+    // Rollback user creation if partner save fails
+    await User.findByIdAndDelete(user._id);
     res.status(500);
-    throw new Error('Failed to save delivery partner to database');
+    throw new Error('Failed to save delivery partner profile to database');
   }
 });
 
@@ -309,6 +375,37 @@ const reportCOD = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc    Get orders assigned to the logged-in delivery partner
+// @route   GET /api/orders/assigned
+// @access  Private/DeliveryPartner
+const getAssignedOrders = asyncHandler(async (req, res) => {
+  const { status } = req.query;
+
+  // 1. Find the delivery partner profile linked to this user
+  const partnerProfile = await DeliveryPartner.findOne({ user: req.user._id });
+
+  if (!partnerProfile) {
+    return res.json({ success: true, orders: [] }); // No profile = no assigned orders
+  }
+
+  // 2. Build query
+  const query = { deliveryPartner: partnerProfile._id };
+
+  if (status) {
+    query.orderStatus = status;
+  } else {
+    query.orderStatus = { $in: ['shipped', 'out_for_delivery', 'delivered'] };
+  }
+
+  // 3. Fetch orders
+  const orders = await Order.find(query)
+    .populate('user', 'name email phone')
+    .populate('seller', 'name phone businessDetails')
+    .sort('-updatedAt');
+
+  res.json({ success: true, orders });
+});
+
 module.exports = {
   getDeliveryPartners,
   createDeliveryPartner,
@@ -320,4 +417,5 @@ module.exports = {
   getPendingKYC,
   approveKYC,
   reportCOD,
+  getAssignedOrders,
 };

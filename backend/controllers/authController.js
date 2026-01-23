@@ -3,6 +3,7 @@ const { generateToken, generateRefreshToken } = require('../utils/generateToken'
 const asyncHandler = require('express-async-handler');
 const jwt = require('jsonwebtoken');
 const firebaseUserSync = require('../services/firebaseUserSync');
+const admin = require('firebase-admin'); // Import firebase-admin
 
 // 🔥 CRITICAL FIX: Check JWT secrets
 const checkJWTSecrets = () => {
@@ -126,6 +127,78 @@ const loginUser = asyncHandler(async (req, res) => {
   } else {
     res.status(401);
     throw new Error('Invalid email or password');
+  }
+});
+
+// @desc    Login with Phone (Firebase)
+// @route   POST /api/auth/phone-login
+// @access  Public
+const loginWithPhone = asyncHandler(async (req, res) => {
+  const { idToken, phone } = req.body;
+
+  if (!idToken) {
+    res.status(400);
+    throw new Error('Firebase ID Token is required');
+  }
+
+  try {
+    // 1. Verify Firebase ID Token
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const firebasePhone = decodedToken.phone_number;
+
+    // Optional: Cross-check with provided phone (though Firebase phone is authoritative)
+    // if (phone && firebasePhone !== phone) { ... }
+
+    // 2. Find or Create User
+    // For now, we assume delivery partners are created by sellers with a phone number.
+    // If we want auto-registration, we can do it here. 
+    // But for delivery partners, they should already exist.
+    let user = await User.findOne({ phone: firebasePhone });
+
+    if (!user) {
+      // If user doesn't exist, we might want to check if they should be created.
+      // For this app's delivery partner flow, sellers create partners.
+      // If we don't find them by phone, we reject or create a default user.
+      // Let's create a default customer if not found, or reject if it's strictly for existing partners.
+      // Given the context, let's look for any user with this phone.
+      res.status(404);
+      throw new Error('User not found with this phone number. Please contact your administrator.');
+    }
+
+    // 3. Sync and Tokens
+    await firebaseUserSync.syncUser(user).catch(err =>
+      console.error('⚠️ Firestore sync failed (non-critical):', err.message)
+    );
+
+    const accessToken = generateToken(user._id, 'access');
+    const refreshToken = generateRefreshToken(user._id);
+    await User.updateOne({ _id: user._id }, { $set: { refreshToken } });
+
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    const response = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      accessToken,
+    };
+
+    if (user.role === 'seller') {
+      response.kycStatus = user.kycStatus;
+    }
+
+    res.json(response);
+  } catch (error) {
+    console.error('Firebase Auth Error:', error.message);
+    res.status(401);
+    throw new Error('Invalid phone authentication');
   }
 });
 

@@ -1,0 +1,30 @@
+  // Add credentials based on what was provided
+  if (hasEmailAuth) {
+    userData.email = email;
+    userData.password = password;
+  } else if (hasPhoneAuth) {
+    // Phone-only registration: generate random password and temp email
+    const crypto = require('crypto');
+    const randomPassword = crypto.randomBytes(16).toString('hex');
+    userData.email = `${normalizedPhone}@delivery.temp`;
+    userData.password = randomPassword; // User will login via OTP only
+  }
+
+  const user = await User.create(userData);
+
+  if (!user) {
+    res.status(500);
+    throw new Error('Failed to create user account for delivery partner');
+  }
+
+  // 3. Create the DeliveryPartner profile linked to the User
+  const partner = new DeliveryPartner({
+    name,
+    email: userData.email,
+    phone: normalizedPhone || phone,
+    vehicle_type,
+    vehicle_number,
+    license_number,
+    seller: req.user._id,
+    user: user._id,
+  });

@@ -10,6 +10,7 @@ const {
   getPendingKYC,
   approveKYC,
   reportCOD,
+  getAssignedOrders,
 } = require('../controllers/deliveryController.js');
 const router = express.Router();
 const { protect, role } = require('../middleware/auth.js');
@@ -21,6 +22,9 @@ router.route('/partners')
 router.route('/partners/:id')
   .put(protect, role('seller'), updateDeliveryPartner)
   .delete(protect, role('seller'), deleteDeliveryPartner);
+
+// Partner-specific routes
+router.get('/my-deliveries', protect, role('deliveryPartner'), getAssignedOrders);
 
 // KYC routes
 router.put('/partners/:id/kyc', protect, role('seller'), upload.fields([

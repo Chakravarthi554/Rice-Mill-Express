@@ -12,6 +12,9 @@ import BulkOrderDetailScreen from './screens/BulkOrderDetailScreen';
 import ProductScreen from './screens/ProductScreen';
 import SellerScreen from './screens/SellerScreen';
 import SellerKyCScreen from './screens/SellerKyCScreen';
+import AddDeliveryPartnerScreen from './screens/AddDeliveryPartnerScreen'; // New Import
+import DeliveryPartnerDashboard from './screens/DeliveryPartnerDashboard';
+import DeliveryConfirmationScreen from './screens/DeliveryConfirmationScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -20,14 +23,14 @@ const Tab = createBottomTabNavigator();
 function BulkOrderStack() {
   return (
     <Stack.Navigator>
-      <Stack.Screen 
-        name="BulkOrders" 
-        component={BulkOrderScreen} 
+      <Stack.Screen
+        name="BulkOrders"
+        component={BulkOrderScreen}
         options={{ title: 'Bulk Orders' }}
       />
-      <Stack.Screen 
-        name="BulkOrderDetail" 
-        component={BulkOrderDetailScreen} 
+      <Stack.Screen
+        name="BulkOrderDetail"
+        component={BulkOrderDetailScreen}
         options={{ title: 'Order Details' }}
       />
     </Stack.Navigator>
@@ -38,15 +41,38 @@ function BulkOrderStack() {
 function SellerStack() {
   return (
     <Stack.Navigator>
-      <Stack.Screen 
-        name="SellerDashboard" 
-        component={SellerScreen} 
+      <Stack.Screen
+        name="SellerDashboard"
+        component={SellerScreen}
         options={{ title: 'Seller Dashboard' }}
       />
-      <Stack.Screen 
-        name="SellerKYC" 
-        component={SellerKyCScreen} 
+      <Stack.Screen
+        name="SellerKYC"
+        component={SellerKyCScreen}
         options={{ title: 'KYC Application' }}
+      />
+      <Stack.Screen
+        name="AddDeliveryPartner"
+        component={AddDeliveryPartnerScreen}
+        options={{ title: 'Register Delivery Partner' }}
+      />
+    </Stack.Navigator>
+  );
+}
+
+// NEW: Delivery Stack Navigator
+function DeliveryStack() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen
+        name="DeliveryDashboard"
+        component={DeliveryPartnerDashboard}
+        options={{ title: 'Delivery Partner Dashboard' }}
+      />
+      <Stack.Screen
+        name="DeliveryConfirmation"
+        component={DeliveryConfirmationScreen}
+        options={{ title: 'Photo Confirmation' }}
       />
     </Stack.Navigator>
   );
@@ -54,16 +80,24 @@ function SellerStack() {
 
 // Main Tab Navigator
 function MainTabs() {
+  const { userInfo } = useSelector(state => state.userLogin);
+  const role = userInfo?.role;
+
+  // If role is deliveryPartner, show a simplified dashboard
+  if (role === 'deliveryPartner' || role === 'delivery_partner') {
+    return <DeliveryStack />;
+  }
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ color, size }) => {
           let iconName;
-          
+
           if (route.name === 'Products') iconName = 'store';
           else if (route.name === 'Bulk Orders') iconName = 'shopping-cart';
           else if (route.name === 'Seller') iconName = 'storefront';
-          
+
           return <MaterialIcons name={iconName} size={size} color={color} />;
         },
       })}
@@ -74,7 +108,9 @@ function MainTabs() {
     >
       <Tab.Screen name="Products" component={ProductScreen} />
       <Tab.Screen name="Bulk Orders" component={BulkOrderStack} />
-      <Tab.Screen name="Seller" component={SellerStack} />
+      {role === 'seller' && (
+        <Tab.Screen name="Seller" component={SellerStack} />
+      )}
     </Tab.Navigator>
   );
 }

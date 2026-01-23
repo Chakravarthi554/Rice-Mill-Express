@@ -9,6 +9,7 @@ const deliveryPartnerSchema = new mongoose.Schema(
     vehicle_number: { type: String, required: true },
     license_number: { type: String, required: true },
     seller: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // The login identity for the DP
 
     // KYC Fields
     aadharNumber: { type: String },
