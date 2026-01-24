@@ -84,8 +84,11 @@ const createDeliveryPartner = asyncHandler(async (req, res) => {
     userData.password = password;
   } else if (hasPhoneAuth) {
     // Phone-only authentication (OTP login)
+    // Generate random password and temp email to satisfy User model requirements
+    const crypto = require('crypto');
     userData.phone = normalizedPhone;
-    // No email or password needed - will authenticate via Firebase OTP
+    userData.email = `${normalizedPhone}@delivery.temp`;
+    userData.password = crypto.randomBytes(16).toString('hex');
   }
 
   const user = await User.create(userData);

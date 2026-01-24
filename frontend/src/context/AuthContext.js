@@ -13,6 +13,9 @@ import {
 import { getSocket, disconnectSocket } from '../utils/socket';
 import { translations } from '../utils/constants';
 import { loginUser } from '../redux/actions/userActions';
+import { auth, db } from '../firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const AuthContext = createContext();
 
@@ -94,13 +97,13 @@ export const AuthProvider = ({ children }) => {
       console.log('🔄 Token refresh already in progress...');
       return null;
     }
-    
+
     setTokenRefreshing(true);
     console.log('🔄 AuthContext: Starting token refresh...');
-    
+
     try {
       const refreshTokenValue = localStorage.getItem('refreshToken');
-      
+
       if (!refreshTokenValue) {
         console.error('❌ AuthContext: No refresh token found');
         logout(false);
@@ -109,10 +112,10 @@ export const AuthProvider = ({ children }) => {
 
       const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
       const response = await axios.post(
-        `${API_BASE_URL}/api/auth/refresh-token`, 
+        `${API_BASE_URL}/api/auth/refresh-token`,
         { refreshToken: refreshTokenValue }
       );
-      
+
       const { accessToken, refreshToken: newRefreshToken, user: userData } = response.data;
       console.log('✅ AuthContext: Token refresh successful');
 
@@ -121,17 +124,17 @@ export const AuthProvider = ({ children }) => {
       if (newRefreshToken) {
         localStorage.setItem('refreshToken', newRefreshToken);
       }
-      
+
       // Update userInfo with new token and user data
-      const updatedUserInfo = { 
-        ...userData, 
-        token: accessToken 
+      const updatedUserInfo = {
+        ...userData,
+        token: accessToken
       };
       localStorage.setItem('userInfo', JSON.stringify(updatedUserInfo));
-      
+
       // Update axios headers
       axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
-      
+
       // Update state
       dispatch({ type: USER_LOGIN_SUCCESS, payload: updatedUserInfo });
       updateUser(updatedUserInfo);
@@ -142,102 +145,134 @@ export const AuthProvider = ({ children }) => {
       return accessToken;
     } catch (error) {
       console.error('❌ AuthContext: Token refresh failed:', error.response?.data || error.message);
-      
+
       // If refresh token is invalid, logout user
       if (error.response?.status === 401 || error.response?.status === 400) {
         console.log('🔐 AuthContext: Refresh token invalid, logging out...');
         logout(false);
       }
-      
+
       return null;
     } finally {
       setTokenRefreshing(false);
     }
   }, [dispatch, logout, tokenRefreshing, updateUser]);
 
-  // ✅ FIXED: Enhanced initialization with better error handling
+  // ✅ Firebase Auth State Listener
   useEffect(() => {
-    let isMounted = true;
-    
-    const initialize = async () => {
-      console.log('🔐 AuthContext: Initializing authentication...');
-      
-      const storedUserInfo = localStorage.getItem('userInfo');
-      const storedToken = localStorage.getItem('token');
-      const storedRefreshToken = localStorage.getItem('refreshToken');
-      
-      let userFromStorage = null;
-      
-      if (storedUserInfo) {
-        try {
-          userFromStorage = JSON.parse(storedUserInfo);
-          console.log('📁 AuthContext: Found user in storage:', userFromStorage._id);
-        } catch (e) {
-          console.error('❌ AuthContext: Failed to parse stored user info');
-          localStorage.clear();
-        }
-      }
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log('🔥 AuthContext: Firebase Auth State Changed:', firebaseUser?.uid);
 
-      if (userFromStorage && storedToken) {
-        console.log('✅ AuthContext: Restoring user session...');
-        
-        // Set axios header
-        axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
-        
-        // Verify token is still valid by making a test request
-        try {
-          const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-          await axios.get(`${API_BASE_URL}/api/users/profile`, { 
-            headers: { Authorization: `Bearer ${storedToken}` },
-            timeout: 5000
-          });
-          
-          // Token is valid, restore session
-          dispatch({ type: USER_LOGIN_SUCCESS, payload: userFromStorage });
-          updateUser(userFromStorage);
-          getSocket(userFromStorage._id, userFromStorage.role, storedToken);
-          
-          console.log('✅ AuthContext: Session restored successfully');
-        } catch (error) {
-          console.log('🔄 AuthContext: Token validation failed, attempting refresh...');
-          
-          // If we have a refresh token, try to refresh
-          if (storedRefreshToken) {
-            const newToken = await refreshToken();
-            if (!newToken) {
-              console.log('❌ AuthContext: Token refresh failed, clearing session');
-              localStorage.removeItem('userInfo');
-              localStorage.removeItem('token');
-              localStorage.removeItem('refreshToken');
-              updateUser(null);
+      if (firebaseUser) {
+        // Only skip if we already have a fully resolved user with a MongoDB ID
+        const currentUser = user || userInfo;
+        if (currentUser?.uid === firebaseUser.uid && currentUser?._id && currentUser?.role) {
+          console.log('⏩ AuthContext: User already fully initialized.');
+          setLoading(false);
+          return;
+        }
+
+        // Fetch role from Firestore if not already in state
+        if (!user && !userInfo) {
+          try {
+            const idToken = await firebaseUser.getIdToken();
+            const userDocRef = doc(db, 'users', firebaseUser.uid);
+
+            console.log('🔄 AuthContext: Fetching authoritative profile from MongoDB...');
+            let userData;
+
+            try {
+              // 1. Always try to get profile from MongoDB first (Secure source of roles)
+              const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+              const { data: profile } = await axios.get(`${API_BASE_URL}/api/users/profile`, {
+                headers: { Authorization: `Bearer ${idToken}` }
+              });
+
+              userData = {
+                ...profile,
+                uid: firebaseUser.uid,
+                emailVerified: firebaseUser.emailVerified,
+                token: idToken
+              };
+
+              // ✅ Sync to Firestore for real-time convenience (not authority)
+              await setDoc(userDocRef, {
+                uid: firebaseUser.uid,
+                name: userData.name,
+                email: userData.email,
+                phone: userData.phone,
+                role: userData.role,
+                updatedAt: new Date().toISOString()
+              }, { merge: true });
+
+            } catch (syncErr) {
+              console.warn('⚠️ AuthContext: MongoDB fetch failed, trying Firestore fallback:', syncErr.message);
+              // 2. Fallback to Firestore if MongoDB lookup fails
+              const userDoc = await getDoc(userDocRef);
+              if (userDoc.exists()) {
+                const data = userDoc.data();
+                userData = {
+                  _id: firebaseUser.uid,
+                  uid: firebaseUser.uid,
+                  email: firebaseUser.email || data.email || '',
+                  phone: firebaseUser.phoneNumber || data.phone || '',
+                  name: firebaseUser.displayName || data.name || 'User',
+                  role: data.role || 'customer',
+                  emailVerified: firebaseUser.emailVerified,
+                  token: idToken
+                };
+              } else {
+                // 3. Last resort: standard customer profile
+                userData = {
+                  _id: firebaseUser.uid,
+                  uid: firebaseUser.uid,
+                  email: firebaseUser.email || '',
+                  phone: firebaseUser.phoneNumber || '',
+                  name: firebaseUser.displayName || 'User',
+                  role: 'customer',
+                  emailVerified: firebaseUser.emailVerified,
+                  token: idToken
+                };
+              }
             }
-          } else {
-            console.log('❌ AuthContext: No refresh token available, clearing session');
-            localStorage.removeItem('userInfo');
-            localStorage.removeItem('token');
-            updateUser(null);
+
+            // ✅ UNIFIED BLOCK: Enforce email verification for Sensitive Roles (Seller/Customer)
+            if (['seller', 'customer'].includes(userData.role) && firebaseUser.email && !firebaseUser.emailVerified) {
+              console.log(`🚫 AuthContext: ${userData.role} email not verified in Firebase`);
+              userData.requiresVerification = true;
+            }
+
+            localStorage.setItem('userInfo', JSON.stringify(userData));
+            localStorage.setItem('token', userData.token);
+            axios.defaults.headers.common['Authorization'] = `Bearer ${userData.token}`;
+
+            dispatch({ type: USER_LOGIN_SUCCESS, payload: userData });
+            updateUser(userData);
+          } catch (error) {
+            console.error('❌ AuthContext: Error resolving MongoDB/Firestore profile:', error.message);
+            // Even if sync fails, set loading false to avoid infinite spinners
           }
         }
       } else {
-        console.log('❌ AuthContext: No valid session found');
-        localStorage.removeItem('userInfo');
-        localStorage.removeItem('token');
-        localStorage.removeItem('refreshToken');
-        updateUser(null);
+        console.log('❌ AuthContext: No Firebase user found');
       }
-      
-      if (isMounted) {
-        setLoading(false);
-        console.log('✅ AuthContext: Initialization complete');
-      }
-    };
+      setLoading(false);
+    });
 
-    initialize();
-    
-    return () => { 
-      isMounted = false; 
-    };
-  }, [dispatch, refreshToken, updateUser]);
+    return () => unsubscribe();
+  }, [dispatch, updateUser, user, userInfo]);
+
+  // Handle Redirection Persistence
+  useEffect(() => {
+    const storedUserInfo = localStorage.getItem('userInfo');
+    if (storedUserInfo && !user && !userInfo) {
+      try {
+        const parsed = JSON.parse(storedUserInfo);
+        dispatch({ type: USER_LOGIN_SUCCESS, payload: parsed });
+        updateUser(parsed);
+      } catch (e) { }
+    }
+  }, [dispatch, updateUser, user, userInfo]);
 
   // Response interceptor for token refresh
   useEffect(() => {
@@ -245,7 +280,7 @@ export const AuthProvider = ({ children }) => {
       (response) => response,
       async (error) => {
         const originalRequest = error.config;
-        
+
         if (error.response?.status === 401 && !originalRequest._retry) {
           console.log('🔐 AuthContext: 401 detected in interceptor, refreshing token...');
           originalRequest._retry = true;
@@ -259,35 +294,45 @@ export const AuthProvider = ({ children }) => {
             return Promise.reject(error);
           }
         }
-        
+
         // Handle 404 errors for missing endpoints gracefully
         if (error.response?.status === 404) {
           console.warn('⚠️ API endpoint not found:', originalRequest.url);
           // Don't throw for 404s, let components handle them
         }
-        
+
         return Promise.reject(error);
       }
     );
-    
+
     return () => axios.interceptors.response.eject(interceptor);
   }, [refreshToken, logout]);
 
   // Redirect logic
   useEffect(() => {
-    if (!loading && userInfo && location.pathname === '/login') {
+    const isAuthPath = location.pathname === '/login' || location.pathname === '/register' || location.pathname === '/';
+    if (!loading && userInfo && isAuthPath) {
       const redirectPath = () => {
         if (userInfo.role === 'admin') return '/admin/dashboard';
         if (userInfo.role === 'customer') return '/customer/dashboard';
+        if (userInfo.role === 'deliveryPartner') return '/delivery/dashboard';
+
+        // Mandatory email verification check for Sellers/Customers
+        if (!userInfo.emailVerified && userInfo.requiresVerification) {
+          return '/verify-email-notice';
+        }
+
         if (userInfo.role === 'seller') {
           return userInfo.kycStatus === 'approved'
             ? '/seller/dashboard'
             : '/seller/kyc';
         }
-        return '/';
+        return '/customer/dashboard';
       };
-      
-      navigate(redirectPath(), { replace: true });
+
+      const path = redirectPath();
+      console.log('🔀 AuthContext: Redirecting to:', path);
+      navigate(path, { replace: true });
     }
   }, [loading, userInfo, navigate, location.pathname]);
 
@@ -312,38 +357,60 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     dispatch({ type: USER_REGISTER_REQUEST });
     try {
+      // 1. Create user in Firebase FIRST
+      const { createUserWithEmailAndPassword, updateProfile } = await import('firebase/auth');
+      const userCredential = await createUserWithEmailAndPassword(auth, userData.email, userData.password);
+      const firebaseUser = userCredential.user;
+
+      // Update Firebase display name
+      await updateProfile(firebaseUser, { displayName: userData.name });
+
+      // ✅ Send Verification Email automatically
+      const { sendEmailVerification } = await import('firebase/auth');
+      await sendEmailVerification(firebaseUser);
+      console.log('📧 AuthContext: Verification email sent to:', userData.email);
+
       const registrationData = {
         ...userData,
+        firebaseUid: firebaseUser.uid,
         kycStatus: userData.role === 'seller' ? 'not_submitted' : 'not_required',
         phone: userData.phone || '',
       };
-      
+
+      // 2. Sync with MongoDB
       const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
       const { data } = await axios.post(`${API_BASE_URL}/api/auth/register`, registrationData);
-      
+
       if (data.success) {
-        localStorage.setItem('token', data.accessToken);
-        localStorage.setItem('refreshToken', data.refreshToken);
-        
+        const idToken = await firebaseUser.getIdToken();
+        localStorage.setItem('token', idToken);
+        localStorage.setItem('refreshToken', firebaseUser.refreshToken);
+
+        // Fetch full profile (bridging MongoDB roles)
         const { data: profileData } = await axios.get(`${API_BASE_URL}/api/users/profile`, {
-          headers: { Authorization: `Bearer ${data.accessToken}` },
+          headers: { Authorization: `Bearer ${idToken}` },
         });
-        
-        const fullUserData = { ...profileData, token: data.accessToken };
+
+        const fullUserData = { ...profileData, token: idToken };
         localStorage.setItem('userInfo', JSON.stringify(fullUserData));
+
         dispatch({ type: USER_LOGIN_SUCCESS, payload: fullUserData });
         updateUser(fullUserData);
-        getSocket(fullUserData._id, fullUserData.role, data.accessToken);
-        axios.defaults.headers.common['Authorization'] = `Bearer ${data.accessToken}`;
+        getSocket(fullUserData._id, fullUserData.role, idToken);
+        axios.defaults.headers.common['Authorization'] = `Bearer ${idToken}`;
+
+        setMessage('Registration successful! Welcome to Rice-Express.');
         return { success: true };
       } else {
-        const msg = data.message || 'Registration failed';
+        const msg = data.message || 'Registration failed at profile sync';
         dispatch({ type: USER_REGISTER_FAIL, payload: msg });
         return { success: false, message: msg };
       }
     } catch (error) {
-      const errMsg = error.response?.data?.message || error.message;
+      console.error('Registration Error:', error);
+      const errMsg = error.response?.data?.message || error.message || 'Registration failed';
       dispatch({ type: USER_REGISTER_FAIL, payload: errMsg });
+      setMessage(errMsg);
       return { success: false, message: errMsg };
     }
   };

@@ -14,14 +14,17 @@ class FirebaseUserSync {
         try {
             const userRef = db.collection('users').doc(user._id.toString());
 
+            // Convert to object if it's a Mongoose document to avoid prototype serialization issues
+            const userObj = typeof user.toObject === 'function' ? user.toObject() : JSON.parse(JSON.stringify(user));
+
             const userData = {
                 uid: user._id.toString(),
-                email: user.email,
-                name: user.name,
-                role: user.role,
-                phone: user.phone || null,
-                profileImage: user.profileImage || null,
-                businessDetails: user.businessDetails || null,
+                email: userObj.email,
+                name: userObj.name,
+                role: userObj.role,
+                phone: userObj.phone || null,
+                profileImage: userObj.profileImage || null,
+                businessDetails: userObj.businessDetails || null,
                 isOnline: true,
                 lastActive: new Date(),
                 updatedAt: new Date()
@@ -29,7 +32,7 @@ class FirebaseUserSync {
 
             await userRef.set(userData, { merge: true });
 
-            console.log(`✅ User ${user.email} (${user.role}) synced to Firestore`);
+            console.log(`✅ User ${userObj.email} (${userObj.role}) synced to Firestore`);
             return true;
         } catch (error) {
             console.error('❌ Firestore sync error:', error.message);

@@ -1,169 +1,402 @@
-import React, { useState, useEffect } from 'react';
-import { Container, Typography, Box, TextField, Button, CircularProgress, Paper, Alert, FormControlLabel, Checkbox, Grid, Tabs, Tab } from '@mui/material';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { auth, RecaptchaVerifier } from '../firebase';
-import { signInWithPhoneNumber } from 'firebase/auth';
-import axios from 'axios';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Container,
+  Box,
+  Typography,
+  TextField,
+  Button,
+  Paper,
+  Divider,
+  Alert,
+  CircularProgress,
+  IconButton,
+  Checkbox,
+  FormControlLabel
+} from '@mui/material';
+import {
+  Google as GoogleIcon,
+  Close as CloseIcon
+} from '@mui/icons-material';
+import { auth, db } from '../firebase';
+import {
+  signInWithEmailAndPassword,
+  signInWithPhoneNumber,
+  RecaptchaVerifier,
+  signInWithPopup,
+  GoogleAuthProvider
+} from 'firebase/auth';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 const LoginPage = () => {
-  const [email, setEmail] = useState('admin@ricemill.com');
-  const [password, setPassword] = useState('adminpass123');
-  const [phone, setPhone] = useState('');
-  const [otp, setOtp] = useState('');
-  const [loginMode, setLoginMode] = useState('email'); // 'email' or 'phone'
-  const [otpSent, setOtpSent] = useState(false);
-  const [confirmationResult, setConfirmationResult] = useState(null);
-  const [rememberMe, setRememberMe] = useState(false);
-  const { login, loading, isAuthenticated, message, setMessage } = useAuth();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (message && !loading) {
-      const timer = setTimeout(() => setMessage(''), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [message, loading, setMessage]);
+  const [step, setStep] = useState(1); // 1: Email/Phone, 2: Password/OTP
+  const [emailOrPhone, setEmailOrPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [otp, setOtp] = useState('');
+  const [isEmail, setIsEmail] = useState(true);
+  const [rememberMe, setRememberMe] = useState(false);
 
-  // Redirect based on role if already logged in
-  useEffect(() => {
-    if (isAuthenticated) {
-      const user = JSON.parse(localStorage.getItem('userInfo'));
-      if (user?.role === 'seller') {
-        navigate('/seller/dashboard');
-      } else if (user?.role === 'admin') {
-        navigate('/admin/dashboard');
-      } else {
-        navigate('/customer/dashboard');
-      }
-    }
-  }, [isAuthenticated, navigate]);
+  const [otpSent, setOtpSent] = useState(false);
+  const [confirmationResult, setConfirmationResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
 
-  // Setup reCAPTCHA when switching to phone mode
+  // Redirection is now handled centrally by AuthContext
+  // This prevents race conditions where a user might be redirected 
+  // before their role is securely hashed in MongoDB.
+
+  const recaptchaRef = React.useRef(null);
+
+  // Setup reCAPTCHA
   useEffect(() => {
-    if (loginMode === 'phone' && !window.recaptchaVerifier) {
+    if (!recaptchaRef.current) {
       try {
-        window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        console.log('🛡️ Recaptcha: Initializing...');
+        recaptchaRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
           size: 'invisible',
-          callback: () => {
-            console.log('reCAPTCHA solved');
-          },
+          callback: () => console.log('✅ reCAPTCHA solved'),
+          'expired-callback': () => {
+            console.log('⚠️ reCAPTCHA expired');
+            if (recaptchaRef.current) recaptchaRef.current.clear();
+            recaptchaRef.current = null;
+          }
         });
       } catch (error) {
-        console.error('reCAPTCHA setup error:', error);
+        console.error('❌ reCAPTCHA setup error:', error);
       }
     }
-  }, [loginMode]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (loginMode === 'email') {
-      const result = await login(email, password);
-      if (!result.success) setMessage(result.message || 'Login failed.');
-    } else {
-      if (!otpSent) {
-        // Send OTP via Firebase
-        try {
-          setMessage('');
-          const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
-          const appVerifier = window.recaptchaVerifier;
+    return () => {
+      // Don't clear on unmount as it might be needed for the async flow, 
+      // but if the app is truly leaving the page, we might want cleanup.
+    };
+  }, []);
+
+  // Manual role resolution is now handled by AuthContext listener
+  // We just let the listener in AuthContext handle the sync and redirect
+
+  const handleInitialContinue = () => {
+    if (!emailOrPhone.trim()) {
+      setMessage('Please enter your email or phone number');
+      return;
+    }
+
+    // Check if it's email or phone
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const isE = emailRegex.test(emailOrPhone);
+    setIsEmail(isE);
+
+    setStep(2);
+    setMessage('');
+  };
+
+  const handleUseDifferentEmail = () => {
+    setStep(1);
+    setPassword('');
+    setOtp('');
+    setOtpSent(false);
+  };
+
+  const handleGoogleSignIn = async () => {
+    try {
+      setLoading(true);
+      setMessage('');
+
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+      // Success! AuthContext will handle the redirect.
+
+    } catch (error) {
+      console.error('Google sign-in error:', error);
+      if (error.code === 'auth/popup-blocked') {
+        setMessage('Popup blocked. Please allow popups for this site.');
+      } else if (error.code === 'auth/popup-closed-by-user') {
+        setMessage('Sign-in cancelled.');
+      } else {
+        setMessage(error.message || 'Failed to sign in with Google');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFinalContinue = async () => {
+    setLoading(true);
+    setMessage('');
+
+    try {
+      if (isEmail) {
+        // Email/Password login
+        await signInWithEmailAndPassword(auth, emailOrPhone, password);
+        // Success! AuthContext will handle the redirect.
+      } else {
+        // Phone OTP flow
+        if (!otpSent) {
+          const formattedPhone = emailOrPhone.startsWith('+') ? emailOrPhone : `+91${emailOrPhone}`;
+          const appVerifier = recaptchaRef.current;
+
+          if (!appVerifier) {
+            throw new Error('reCAPTCHA not initialized. Please refresh.');
+          }
+
           const confirmation = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
           setConfirmationResult(confirmation);
           setOtpSent(true);
           setMessage('OTP sent successfully!');
-        } catch (error) {
-          console.error('Error sending OTP:', error);
-          setMessage(error.message || 'Failed to send OTP. Please try again.');
-          // Reset reCAPTCHA
-          if (window.recaptchaVerifier) {
-            window.recaptchaVerifier.clear();
-            window.recaptchaVerifier = null;
-          }
-        }
-      } else {
-        // Verify OTP and login
-        try {
-          setMessage('');
-          const result = await confirmationResult.confirm(otp);
-          const idToken = await result.user.getIdToken();
-
-          // Call backend to exchange Firebase token for app JWT
-          const { data } = await axios.post('/api/auth/phone-login', {
-            idToken,
-            phone: result.user.phoneNumber,
-          });
-
-          // Store user info and token
-          localStorage.setItem('userInfo', JSON.stringify(data));
-          localStorage.setItem('accessToken', data.accessToken);
-
-          setMessage('Login successful!');
-
-          // Redirect based on role
-          if (data.role === 'seller') {
-            navigate('/seller/dashboard');
-          } else if (data.role === 'admin') {
-            navigate('/admin/dashboard');
-          } else if (data.role === 'deliveryPartner') {
-            navigate('/delivery/dashboard');
-          } else {
-            navigate('/customer/dashboard');
-          }
-        } catch (error) {
-          console.error('Error verifying OTP:', error);
-          setMessage(error.response?.data?.message || 'Invalid OTP. Please try again.');
+        } else {
+          await confirmationResult.confirm(otp);
+          // Success! AuthContext will handle the redirect.
         }
       }
+    } catch (error) {
+      console.error('Login error:', error);
+      if (error.code === 'auth/billing-not-enabled') {
+        setMessage('Phone authentication requires a paid plan. Please use Google or Email.');
+      } else {
+        setMessage(error.message || 'Authentication failed. Please check your credentials.');
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <Container component="main" maxWidth="xs">
-      <Paper elevation={3} sx={{ p: 4, mt: 8, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <Typography component="h1" variant="h4" gutterBottom>
-          Sign in
-        </Typography>
+    <Container component="main" maxWidth={false} disableGutters sx={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#f5f5f5',
+      background: 'url("https://images.unsplash.com/photo-1586201375761-83865001e31c?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80")', // Example rice background
+      backgroundSize: 'cover'
+    }}>
+      <Paper elevation={3} sx={{
+        p: 0,
+        width: '100%',
+        maxWidth: 450,
+        borderRadius: 2,
+        overflow: 'hidden',
+        position: 'relative'
+      }}>
+        {/* Close Button */}
+        <IconButton sx={{ position: 'absolute', right: 8, top: 8, color: '#333' }}>
+          <CloseIcon />
+        </IconButton>
 
-        <Box sx={{ borderBottom: 1, borderColor: 'divider', width: '100%', mb: 2 }}>
-          <Tabs value={loginMode} onChange={(e, val) => setLoginMode(val)} centered>
-            <Tab label="Email" value="email" />
-            <Tab label="Phone" value="phone" />
-          </Tabs>
-        </Box>
-
-        <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1, width: '100%' }}>
-          {loginMode === 'email' ? (
+        <Box sx={{ p: 4 }}>
+          {step === 1 ? (
             <>
-              <TextField margin="normal" required fullWidth id="email" label="Email Address" name="email" autoComplete="email" autoFocus={loginMode === 'email'} value={email} onChange={(e) => setEmail(e.target.value)} />
-              <TextField margin="normal" required fullWidth name="password" label="Password" type="password" id="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+              <Typography variant="h6" sx={{
+                mb: 3,
+                fontWeight: 600,
+                fontSize: '15px',
+                letterSpacing: '0.1em',
+                color: '#333'
+              }}>
+                SIGN IN / CREATE AN ACCOUNT
+              </Typography>
+
+              <Typography variant="body2" sx={{ mb: 4, color: '#666' }}>
+                Enter your email or phone number to sign in or create a new account.
+              </Typography>
+
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="caption" sx={{ display: 'block', mb: 1, fontWeight: 500, color: '#333' }}>
+                  Email or Phone Number <span style={{ color: 'red' }}>*</span>
+                </Typography>
+                <TextField
+                  fullWidth
+                  variant="outlined"
+                  value={emailOrPhone}
+                  onChange={(e) => setEmailOrPhone(e.target.value)}
+                  placeholder="name@email.com or 9876543210"
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '0px',
+                      height: '45px'
+                    }
+                  }}
+                />
+              </Box>
+
+              <Button
+                fullWidth
+                variant="contained"
+                onClick={handleInitialContinue}
+                disabled={loading}
+                sx={{
+                  py: 1.5,
+                  bgcolor: '#000',
+                  color: '#fff',
+                  borderRadius: '0px',
+                  textTransform: 'none',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  '&:hover': {
+                    bgcolor: '#333'
+                  },
+                  mb: 4
+                }}
+              >
+                CONTINUE
+              </Button>
+
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                <Divider sx={{ flex: 1 }} />
+                <Typography sx={{ px: 2, color: '#ccc', fontSize: '12px' }}>OR</Typography>
+                <Divider sx={{ flex: 1 }} />
+              </Box>
+
+              <Button
+                fullWidth
+                variant="outlined"
+                onClick={handleGoogleSignIn}
+                disabled={loading}
+                startIcon={<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" style={{ width: 18 }} />}
+                sx={{
+                  py: 1.5,
+                  color: '#333',
+                  borderColor: '#ddd',
+                  borderRadius: '0px',
+                  textTransform: 'none',
+                  fontSize: '14px',
+                  fontWeight: 400,
+                  '&:hover': {
+                    borderColor: '#999',
+                    bgcolor: 'transparent'
+                  },
+                  mb: 3
+                }}
+              >
+                Continue with google
+              </Button>
+
+              <Box sx={{ textAlign: 'center', mt: 2 }}>
+                <Typography variant="body2" sx={{ color: '#666' }}>
+                  New here? <a href="/register" onClick={(e) => { e.preventDefault(); navigate('/register'); }} style={{ color: '#000', fontWeight: 600, textDecoration: 'none' }}>Create an Account</a>
+                </Typography>
+              </Box>
+
+              <Typography variant="caption" sx={{ display: 'block', textAlign: 'center', mt: 4, color: '#999', fontSize: '10px' }}>
+                By continuing, you agree to our <a href="#" style={{ color: '#999' }}>Terms of Service</a> and <a href="#" style={{ color: '#999' }}>Privacy Policy</a>
+              </Typography>
             </>
           ) : (
             <>
-              <TextField margin="normal" required fullWidth id="phone" label="Phone Number" name="phone" autoComplete="tel" autoFocus={loginMode === 'phone'} value={phone} onChange={(e) => setPhone(e.target.value)} disabled={otpSent} />
-              {otpSent && (
-                <TextField margin="normal" required fullWidth id="otp" label="Enter OTP" name="otp" value={otp} onChange={(e) => setOtp(e.target.value)} autoFocus />
+              <Typography variant="h6" sx={{
+                mb: 3,
+                fontWeight: 600,
+                fontSize: '15px',
+                color: '#333'
+              }}>
+                SIGN IN
+              </Typography>
+
+              <Typography variant="body2" sx={{ mb: 4, color: '#666' }}>
+                Please sign in with your {isEmail ? 'email and password' : 'OTP'}.
+              </Typography>
+
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="caption" sx={{ display: 'block', mb: 1, fontWeight: 500, color: '#333' }}>
+                  {isEmail ? 'Email' : 'Phone'} <span style={{ color: 'red' }}>*</span>
+                </Typography>
+                <TextField
+                  fullWidth
+                  variant="outlined"
+                  value={emailOrPhone}
+                  disabled
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '0px',
+                      height: '45px',
+                      backgroundColor: '#f9f9f9'
+                    }
+                  }}
+                />
+              </Box>
+
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="caption" sx={{ display: 'block', mb: 1, fontWeight: 500, color: '#333' }}>
+                  {isEmail ? 'Password' : 'Enter OTP'} <span style={{ color: 'red' }}>*</span>
+                </Typography>
+                <TextField
+                  fullWidth
+                  type={isEmail ? 'password' : 'text'}
+                  variant="outlined"
+                  value={isEmail ? password : otp}
+                  onChange={(e) => isEmail ? setPassword(e.target.value) : setOtp(e.target.value)}
+                  placeholder={isEmail ? 'Enter your password' : 'Enter 6-digit OTP'}
+                  autoFocus
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '0px',
+                      height: '45px'
+                    }
+                  }}
+                />
+              </Box>
+
+              {isEmail && (
+                <FormControlLabel
+                  control={<Checkbox checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} color="primary" />}
+                  label={<Typography variant="body2" sx={{ fontSize: '13px' }}>Remember me</Typography>}
+                  sx={{ mb: 3 }}
+                />
               )}
+
+              <Button
+                fullWidth
+                variant="contained"
+                onClick={handleFinalContinue}
+                disabled={loading}
+                sx={{
+                  py: 1.5,
+                  bgcolor: '#000',
+                  color: '#fff',
+                  borderRadius: '0px',
+                  textTransform: 'none',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  '&:hover': {
+                    bgcolor: '#333'
+                  },
+                  mb: 2
+                }}
+              >
+                {loading ? <CircularProgress size={24} color="inherit" /> : 'CONTINUE'}
+              </Button>
+
+              <Button
+                fullWidth
+                variant="outlined"
+                onClick={handleUseDifferentEmail}
+                disabled={loading}
+                sx={{
+                  py: 1.5,
+                  color: '#333',
+                  borderColor: '#ddd',
+                  borderRadius: '0px',
+                  textTransform: 'none',
+                  fontSize: '14px',
+                  fontWeight: 400,
+                  '&:hover': {
+                    borderColor: '#999',
+                    bgcolor: 'transparent'
+                  }
+                }}
+              >
+                USE A DIFFERENT EMAIL
+              </Button>
             </>
           )}
 
-          <FormControlLabel control={<Checkbox checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} color="primary" />} label="Remember Me" />
-
-          <Button type="submit" fullWidth variant="contained" sx={{ mt: 3, mb: 2 }} disabled={loading}>
-            {loading ? <CircularProgress size={24} /> : (loginMode === 'phone' && !otpSent ? 'Send OTP' : 'Sign In')}
-          </Button>
-          <Grid container>
-            <Grid item xs>
-              <Link to="/forgotpassword" variant="body2">
-                Forgot password?
-              </Link>
-            </Grid>
-            <Grid item>
-              <Link to="/register" variant="body2">
-                {"Don't have an account? Sign Up"}
-              </Link>
-            </Grid>
-          </Grid>
-          {message && <Alert severity={message.includes('success') || message.includes('Welcome') ? 'success' : 'error'} sx={{ mt: 2, width: '100%' }}>{message}</Alert>}
+          {message && (
+            <Alert severity={message.includes('success') ? 'success' : 'error'} sx={{ mt: 3 }}>
+              {message}
+            </Alert>
+          )}
         </Box>
       </Paper>
       <div id="recaptcha-container"></div>

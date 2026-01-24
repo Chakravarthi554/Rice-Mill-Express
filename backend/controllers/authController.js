@@ -22,7 +22,7 @@ const checkJWTSecrets = () => {
 const registerUser = asyncHandler(async (req, res) => {
   checkJWTSecrets();
 
-  const { name, email, password, phone, role } = req.body;
+  const { name, email, password, phone, role, firebaseUid } = req.body;
   const userExists = await User.findOne({ email });
   if (userExists) {
     res.status(400);
@@ -34,7 +34,8 @@ const registerUser = asyncHandler(async (req, res) => {
     email,
     password,
     phone,
-    role: role || 'seller',
+    role: role || 'customer',
+    firebaseUid,
     kycStatus: role === 'seller' ? 'not_submitted' : 'not_required',
   });
 
@@ -204,44 +205,36 @@ const loginWithPhone = asyncHandler(async (req, res) => {
 
 // 🔥 FIXED: Enhanced refresh token with better error handling
 const refreshAccessToken = asyncHandler(async (req, res) => {
-  checkJWTSecrets();
-
   const refreshToken = req.body.refreshToken || req.cookies.refreshToken || req.headers['x-refresh-token'];
 
-  console.log('🔄 Refresh Token: Attempting to refresh token');
-  console.log('📦 Refresh Token provided:', !!refreshToken);
-
   if (!refreshToken) {
-    console.error('❌ Refresh Token: No refresh token provided');
     return res.status(401).json({ message: 'No refresh token provided' });
   }
 
   try {
-    console.log('🔄 Refresh Token: Verifying token...');
-    const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
-    console.log('✅ Refresh Token: Token verified for user:', decoded.id);
+    let decoded;
+    let user;
 
-    const user = await User.findById(decoded.id);
+    // Try legacy JWT first
+    try {
+      decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
+      user = await User.findById(decoded.id);
+    } catch (err) {
+      // Try Firebase
+      const { auth: firebaseAuth } = require('../config/firebase');
+      decoded = await firebaseAuth.verifyIdToken(refreshToken);
+      user = await User.findOne({ $or: [{ firebaseUid: decoded.uid }, { email: decoded.email }] });
+    }
 
     if (!user) {
-      console.error('❌ Refresh Token: User not found');
       return res.status(401).json({ message: 'User not found' });
     }
 
-    // 🔥 FIXED: Check if refreshToken field exists and matches
-    if (!user.refreshToken || user.refreshToken !== refreshToken) {
-      console.error('❌ Refresh Token: Invalid refresh token or token mismatch');
-      return res.status(401).json({ message: 'Invalid refresh token' });
-    }
-
-    const accessToken = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '15m' });
+    // Generate new legacy tokens (backward compatibility)
+    const accessToken = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1m' });
     const newRefreshToken = jwt.sign({ id: user._id, role: user.role }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: '7d' });
 
-    // UPDATE ONLY refreshToken
-    await User.updateOne(
-      { _id: user._id },
-      { $set: { refreshToken: newRefreshToken } }
-    );
+    await User.updateOne({ _id: user._id }, { $set: { refreshToken: newRefreshToken } });
 
     res.cookie('refreshToken', newRefreshToken, {
       httpOnly: true,
@@ -250,7 +243,6 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    console.log('✅ Refresh Token: Tokens refreshed successfully');
     res.json({
       accessToken,
       refreshToken: newRefreshToken,
@@ -258,15 +250,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Refresh Token Error:', error.message);
-
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({ message: 'Invalid refresh token signature' });
-    }
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({ message: 'Refresh token expired' });
-    }
-
-    res.status(401).json({ message: 'Refresh token failed' });
+    res.status(401).json({ message: 'Refresh token failed: ' + error.message });
   }
 });
 

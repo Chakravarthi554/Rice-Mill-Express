@@ -22,6 +22,7 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import CustomerDashboard from './pages/CustomerDashboard';
 import SellerDashboard from './pages/SellerDashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import DeliveryPartnerDashboard from './pages/DeliveryPartnerDashboard';
 import SellerKycPage from './pages/seller/SellerKycPage';
 import AdminForumPanel from './components/admin/AdminForumPanel';
 import ProductPage from './pages/customer/ProductPage';
@@ -33,6 +34,7 @@ import WishlistPage from './pages/customer/WishlistPage';
 import NotificationsPage from './pages/customer/NotificationsPage';
 import DeliveryKYCApproval from './components/admin/DeliveryKYCApproval';
 import OrderSuccessPage from './pages/customer/OrderSuccessPage';
+import VerifyEmailNotice from './pages/VerifyEmailNotice';
 
 import AccountManagement from './components/customer/AccountManagement';
 import LogoutPage from './components/customer/LogoutPage';
@@ -139,6 +141,7 @@ function App() {
               <Route path="/orders/success" element={<ProtectedRoute><OrderSuccessPage /></ProtectedRoute>} />
               <Route path="/bulk-order" element={<ProtectedRoute><BulkOrderPage /></ProtectedRoute>} />
               <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
+              <Route path="/verify-email-notice" element={<ProtectedRoute><VerifyEmailNotice /></ProtectedRoute>} />
 
               {/* --- SELLER --- */}
               <Route
@@ -148,6 +151,12 @@ function App() {
               <Route
                 path="/seller/kyc"
                 element={<ProtectedRoute roles={['seller']}><SellerKycPage /></ProtectedRoute>}
+              />
+
+              {/* --- DELIVERY PARTNER --- */}
+              <Route
+                path="/delivery/dashboard"
+                element={<ProtectedRoute roles={['deliveryPartner']}><DeliveryPartnerDashboard /></ProtectedRoute>}
               />
 
               {/* --- ADMIN --- */}

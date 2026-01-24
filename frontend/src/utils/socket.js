@@ -16,23 +16,29 @@ export const getSocket = (userId, role, token) => {
     return null;
   }
 
-  // Return existing connected socket
+  // Return existing connected socket ONLY if token hasn't changed
   if (socketInstance?.connected) {
-    console.log('🔄 Reusing existing socket connection');
+    const currentToken = socketInstance.auth?.token;
 
-    // 🔥 CRITICAL: Ensure we still join relevant rooms even on reuse
-    if (userId) {
-      socketInstance.emit('joinUserRoom', userId);
-      socketInstance.emit('joinNotifications', userId);
-    }
-    if (role === 'admin') {
-      socketInstance.emit('joinAdminRoom');
-    }
-    if (role === 'seller') {
-      socketInstance.emit('joinSellerRoom', userId);
-    }
+    if (currentToken && currentToken === tokenStr) {
+      console.log('🔄 Reusing existing socket connection (Token fresh)');
 
-    return socketInstance;
+      // 🔥 CRITICAL: Ensure we still join relevant rooms even on reuse
+      if (userId) {
+        socketInstance.emit('joinUserRoom', userId);
+        socketInstance.emit('joinNotifications', userId);
+      }
+      if (role === 'admin') {
+        socketInstance.emit('joinAdminRoom');
+      }
+      if (role === 'seller') {
+        socketInstance.emit('joinSellerRoom', userId);
+      }
+
+      return socketInstance;
+    } else {
+      console.log('⚠️ Socket token changed or missing, forcing reconnection...');
+    }
   }
 
   // Clean up existing socket

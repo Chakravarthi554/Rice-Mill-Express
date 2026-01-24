@@ -2,18 +2,16 @@ const socketio = require('socket.io');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const logger = require('./logger');
+const { auth: firebaseAuth } = require('../config/firebase');
 
 const setupSocketServer = (server) => {
   const io = socketio(server, {
     cors: {
-      origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+      origin: ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:3001'],
       methods: ['GET', 'POST'],
       credentials: true,
     },
     transports: ['websocket', 'polling'],
-    pingTimeout: 60000, // Increased timeout
-    pingInterval: 25000,
-    connectTimeout: 45000,
   });
 
   // 🔥 ENHANCED AUTH: Better token validation with role checking
@@ -30,22 +28,67 @@ const setupSocketServer = (server) => {
       const cleanToken = (token || '').replace(/^Bearer\s+/i, '').trim();
       if (!cleanToken) return next(new Error('Invalid token format'));
 
-      // 🔥 CRITICAL FIX: Validate JWT_SECRET exists
-      if (!process.env.JWT_SECRET) {
-        logger.error('❌ JWT_SECRET is not configured');
-        return next(new Error('Server configuration error'));
+      let decoded;
+      let user;
+
+      // 1. Try Firebase verification FIRST
+      try {
+        decoded = await firebaseAuth.verifyIdToken(cleanToken);
+        logger.info(`✅ Socket Auth: Firebase Token verified for UID: ${decoded.uid}`);
+
+        user = await User.findOne({
+          $or: [{ firebaseUid: decoded.uid }, { email: decoded.email }]
+        }).select('role name email firebaseUid');
+
+        if (user && !user.firebaseUid) {
+          user.firebaseUid = decoded.uid;
+          await user.save();
+        }
+
+        // ✅ AUTO-PROVISION: If user not found in MongoDB but valid in Firebase
+        if (!user) {
+          logger.info(`🆕 Socket Auth: Provisioning MongoDB user for Firebase UID: ${decoded.uid}`);
+
+          let sanitisedPhone = decoded.phone_number || '';
+          if (sanitisedPhone) {
+            sanitisedPhone = sanitisedPhone.replace(/\D/g, '').slice(-10);
+          }
+
+          user = await User.create({
+            name: decoded.name || decoded.email?.split('@')[0] || 'User',
+            email: decoded.email,
+            phone: sanitisedPhone || undefined,
+            firebaseUid: decoded.uid,
+            role: 'customer',
+            isVerified: true
+          });
+        }
+      } catch (err) {
+        // Distinguish between Firebase verification errors and DB errors
+        const isFirebaseError = err.code && err.code.startsWith('auth/');
+
+        if (isFirebaseError) {
+          logger.warn(`🔵 Socket Auth: Firebase verification failed, trying legacy JWT: ${err.message}`);
+          try {
+            if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET not configured');
+            decoded = jwt.verify(cleanToken, process.env.JWT_SECRET);
+            user = await User.findById(decoded.id).select('role name email');
+          } catch (jwtErr) {
+            // Re-throw original firebase error if legacy also fails
+            throw new Error(`Auth failed: ${err.message}`);
+          }
+        } else {
+          // If it's a DB error (like validation), re-throw it
+          throw err;
+        }
       }
 
-      const decoded = jwt.verify(cleanToken, process.env.JWT_SECRET);
-
-      // Fetch user with role from DB
-      const user = await User.findById(decoded.id).select('role name email');
       if (!user) {
-        throw new Error('User not found');
+        throw new Error('User not found in database');
       }
 
       // Attach user info to socket
-      socket.userId = decoded.id;
+      socket.userId = user._id.toString();
       socket.role = user.role;
       socket.userInfo = user;
 
@@ -53,15 +96,7 @@ const setupSocketServer = (server) => {
       next();
     } catch (err) {
       logger.error(`❌ Socket auth failed: ${err.message}`);
-
-      if (err.name === 'TokenExpiredError') {
-        return next(new Error('Token expired - please login again'));
-      }
-      if (err.name === 'JsonWebTokenError') {
-        return next(new Error('Invalid token - please login again'));
-      }
-
-      next(new Error('Authentication failed'));
+      next(new Error('Authentication failed: ' + err.message));
     }
   });
 
@@ -96,11 +131,14 @@ const setupSocketServer = (server) => {
 
     // Enhanced room management
     socket.on('joinUserRoom', (uid) => {
-      if (uid === socket.userId) {
+      // ✅ FLEXIBLE JOIN: Allow joining if UID matches MongoDB ID OR Firebase UID
+      const isMatch = uid === socket.userId || uid === socket.userInfo?.firebaseUid;
+
+      if (isMatch) {
         socket.join(`user_${uid}`);
         logger.info(`✅ Socket ${socket.id} joined user room: user_${uid}`);
       } else {
-        logger.warn(`⚠️ Socket ${socket.id} attempted to join another user's room: user_${uid}`);
+        logger.warn(`⚠️ Socket ${socket.id} attempted to join unauthorized room: user_${uid} (Current: ${socket.userId})`);
       }
     });
 

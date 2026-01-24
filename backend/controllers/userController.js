@@ -16,7 +16,6 @@ const generateTokens = (id, role) => {
   return { accessToken, refreshToken };
 };
 
-// ✅ FIXED: Add refreshToken function
 const refreshToken = asyncHandler(async (req, res) => {
   const { refreshToken } = req.body;
 
@@ -28,8 +27,21 @@ const refreshToken = asyncHandler(async (req, res) => {
   }
 
   try {
-    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
-    const user = await User.findById(decoded.id).select('-password');
+    let decoded;
+    let user;
+
+    // Try verifying as legacy JWT first for this specific controller function
+    try {
+      decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+      user = await User.findById(decoded.id).select('-password');
+    } catch (err) {
+      // If it fails, maybe it's a Firebase token being passed to the wrong endpoint?
+      // In a pure Firebase setup, we'd usually use Firebase client SDK for refresh.
+      // But let's try to handle it if it arrives here.
+      const { auth: firebaseAuth } = require('../config/firebase');
+      decoded = await firebaseAuth.verifyIdToken(refreshToken);
+      user = await User.findOne({ $or: [{ firebaseUid: decoded.uid }, { email: decoded.email }] });
+    }
 
     if (!user) {
       return res.status(401).json({
@@ -89,11 +101,11 @@ const authUser = asyncHandler(async (req, res) => {
 });
 
 const registerUser = asyncHandler(async (req, res) => {
-  const { name, email, password, role, phone } = req.body;
+  const { name, email, password, role, phone, firebaseUid } = req.body;
   const userExists = await User.findOne({ email });
   if (userExists) return res.status(400).json({ message: 'User already exists' });
 
-  const user = await User.create({ name, email, password, role, phone });
+  const user = await User.create({ name, email, password, role, phone, firebaseUid });
   const { accessToken, refreshToken: newRefreshToken } = generateTokens(user._id, user.role);
   await User.updateOne({ _id: user._id }, { $set: { refreshToken: newRefreshToken } });
 

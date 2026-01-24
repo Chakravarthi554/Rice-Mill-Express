@@ -19,6 +19,7 @@ const userSchema = mongoose.Schema(
     phone: { type: String, unique: true, sparse: true },
     password: { type: String, minlength: 8, select: false },
     role: { type: String, enum: ['customer', 'seller', 'admin', 'deliveryPartner'], default: 'customer' },
+    firebaseUid: { type: String, unique: true, sparse: true },
     gender: { type: String, enum: ['male', 'female', 'other', ''], default: '' },
     dob: { type: Date },
     trusted: { type: Boolean, default: false },
@@ -127,7 +128,8 @@ userSchema.pre('validate', function (next) {
   }
 
   // Validate: If email is provided, password must also be provided (for new users)
-  if (hasEmail && !hasPassword && this.isNew) {
+  // EXCEPT if they are authenticated via Firebase (Social/Phone)
+  if (hasEmail && !this.firebaseUid && !hasPassword && this.isNew) {
     return next(new Error('Password is required when email is provided'));
   }
 

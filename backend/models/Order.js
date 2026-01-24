@@ -248,6 +248,19 @@ const orderSchema = new mongoose.Schema({
     default: 0,
     min: 0
   },
+  deliveryConfirmation: {
+    otpVerified: { type: Boolean, default: false },
+    verifiedAt: { type: Date },
+    verifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    photoProofUrl: { type: String },
+    location: {
+      latitude: Number,
+      longitude: Number,
+      accuracy: Number,
+      timestamp: String
+    },
+    notes: { type: String }
+  },
   notes: {
     type: String
   }

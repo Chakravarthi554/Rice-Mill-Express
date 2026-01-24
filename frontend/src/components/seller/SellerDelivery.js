@@ -206,7 +206,11 @@ const SellerDelivery = () => {
           body: JSON.stringify(payload)
         });
 
-        if (!response.ok) throw new Error('Failed to create partner');
+        if (!response.ok) {
+          // Extract the actual error message from backend
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to create partner');
+        }
         const createdPartner = await response.json();
         partnerId = createdPartner._id;
 

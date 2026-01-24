@@ -304,23 +304,21 @@ app.use(errorHandler);
 // Graceful shutdown
 process.on("SIGTERM", async () => {
   console.log("SIGTERM received, starting graceful shutdown...");
-  server.close(() => {
+  server.close(async () => {
     console.log("HTTP server closed");
-    mongoose.connection.close(false, () => {
-      console.log("MongoDB connection closed");
-      process.exit(0);
-    });
+    await mongoose.connection.close(false);
+    console.log("MongoDB connection closed");
+    process.exit(0);
   });
 });
 
 process.on("SIGINT", async () => {
   console.log("SIGINT received, starting graceful shutdown...");
-  server.close(() => {
+  server.close(async () => {
     console.log("HTTP server closed");
-    mongoose.connection.close(false, () => {
-      console.log("MongoDB connection closed");
-      process.exit(0);
-    });
+    await mongoose.connection.close(false);
+    console.log("MongoDB connection closed");
+    process.exit(0);
   });
 });
 

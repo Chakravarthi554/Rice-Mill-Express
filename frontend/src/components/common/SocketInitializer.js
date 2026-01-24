@@ -30,7 +30,7 @@ const SocketInitializer = () => {
 
     socket.on('disconnect', (reason) => {
       console.log('🔴 Socket disconnected:', reason);
-      
+
       // Auto-reconnect for certain disconnect reasons
       if (reason === 'io server disconnect') {
         console.log('🔄 Server disconnected socket, attempting reconnect...');
@@ -40,7 +40,7 @@ const SocketInitializer = () => {
 
     socket.on('connect_error', (error) => {
       console.error('❌ Socket connection error:', error.message);
-      
+
       // Handle authentication errors
       if (error.message.includes('auth') || error.message.includes('token')) {
         console.log('🔐 Auth error, clearing storage and redirecting...');
@@ -61,11 +61,11 @@ const SocketInitializer = () => {
     return () => {
       console.log('🧹 Cleaning up socket initializer');
       clearInterval(pingInterval);
-      
+
       // Don't disconnect socket - keep connection alive for app lifetime
       // Only disconnect on logout or token refresh
     };
-  }, [userInfo?._id]); // Only depend on user ID
+  }, [userInfo?._id, userInfo?.token]); // Depend on ID and Token for freshness
 
   return null;
 };
