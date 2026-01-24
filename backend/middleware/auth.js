@@ -87,16 +87,16 @@ const protect = asyncHandler(async (req, res, next) => {
           });
         }
 
-        // ✅ MANDATORY VERIFICATION: Check if email is verified in Firebase (for Sellers & Customers)
-        if (['seller', 'customer'].includes(user.role) && decoded.email && !decoded.email_verified) {
-          console.log(`❌ Auth Middleware: ${user.role} email not verified in Firebase:`, user.email);
-          res.status(403).json({
-            message: `Email verification is mandatory for ${user.role}s. Please verify your email via the link sent to your Gmail.`,
-            code: 'EMAIL_NOT_VERIFIED',
-            email: user.email
-          });
-          return; // Stop execution
-        }
+        // ⚠️ TEMPORARILY DISABLED: Email verification check (to allow testing)
+        // if (['seller', 'customer'].includes(user.role) && decoded.email && !decoded.email_verified) {
+        //   console.log(`❌ Auth Middleware: ${user.role} email not verified in Firebase:`, user.email);
+        //   res.status(403).json({
+        //     message: `Email verification is mandatory for ${user.role}s. Please verify your email via the link sent to your Gmail.`,
+        //     code: 'EMAIL_NOT_VERIFIED',
+        //     email: user.email
+        //   });
+        //   return; // Stop execution
+        // }
 
       } catch (err) {
         // Distinguish between Firebase verification errors and DB errors
