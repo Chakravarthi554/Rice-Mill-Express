@@ -232,11 +232,20 @@ const firebaseLogin = asyncHandler(async (req, res) => {
     let user = await User.findOne({ firebaseUid: uid });
 
     if (!user) {
-      // User doesn't exist in MongoDB - this should only happen for Google/Phone first-time users
-      // For email/password, they should have been created during registration
-      console.log('⚠️ Firebase Login: User not found in MongoDB for UID:', uid);
-      res.status(404);
-      throw new Error('User profile not found. Please complete registration first.');
+      // 🔥 BUG FIX #1: Auto-create user for Google/Phone first-time logins
+      console.log('🆕 Firebase Login: Creating new user for UID:', uid);
+
+      user = await User.create({
+        name: name || email?.split('@')[0] || phone_number || 'User',
+        email: email || null,
+        phone: phone_number ? phone_number.replace(/^\+91/, '') : null,
+        firebaseUid: uid,
+        role: 'customer', // Default role - ALWAYS from MongoDB
+        isVerified: email_verified || false,
+        profileImage: picture || '/uploads/default_avatar.jpg'
+      });
+
+      console.log('✅ User created in MongoDB:', user._id, 'Role:', user.role);
     }
 
     // 3. Update user info if needed (for Google/Phone logins)

@@ -115,8 +115,7 @@ const userSchema = mongoose.Schema(
 );
 
 userSchema.index({ location: '2dsphere' });
-userSchema.index({ firebaseUid: 1 }); // ✅ Index for Firebase UID lookups
-
+// firebaseUid index created automatically by unique: true in schema (line 22)
 
 // === CUSTOM VALIDATION FOR FLEXIBLE AUTH ===
 userSchema.pre('validate', function (next) {
