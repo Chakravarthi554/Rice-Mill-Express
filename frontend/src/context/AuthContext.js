@@ -164,88 +164,27 @@ export const AuthProvider = ({ children }) => {
       console.log('🔥 AuthContext: Firebase Auth State Changed:', firebaseUser?.uid);
 
       if (firebaseUser) {
-        // 🔥 CRITICAL: Don't skip if we just logged in or if we want to ensure role freshness
-        // Previously we were skipping if 'user' existed, which caused Admin activation to not show up locally.
-        console.log('🔄 AuthContext: Resolving profile for UID:', firebaseUser.uid);
-
-        // Fetch role from Firestore if not already in state
+        // Only fetch profile if we don't have user data yet
         if (!user && !userInfo) {
           try {
+            console.log('🔄 AuthContext: Fetching profile for UID:', firebaseUser.uid);
+
+            // Get Firebase ID token
             const idToken = await firebaseUser.getIdToken();
-            const userDocRef = doc(db, 'users', firebaseUser.uid);
+            const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
-            console.log('🔄 AuthContext: Fetching authoritative profile from MongoDB...');
-            let userData;
+            // ✅ Use unified Firebase login endpoint
+            const response = await axios.post(`${API_BASE_URL}/api/auth/firebase-login`, { idToken });
+            const profile = response.data;
 
-            try {
-              const idToken = await firebaseUser.getIdToken();
-              const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+            const userData = {
+              ...profile,
+              uid: firebaseUser.uid,
+              emailVerified: firebaseUser.emailVerified,
+              token: idToken
+            };
 
-              // ✅ DETECT PROVIDER: If Google, force sync via new endpoint
-              const isGoogle = firebaseUser.providerData.some(p => p.providerId === 'google.com');
-
-              let profileResponse;
-              if (isGoogle) {
-                console.log('🔄 AuthContext: Google Login detected, calling sync endpoint...');
-                profileResponse = await axios.post(`${API_BASE_URL}/api/auth/google-login`, { idToken });
-              } else {
-                // Standard profile fetch for Email/Phone (who should already exist)
-                profileResponse = await axios.get(`${API_BASE_URL}/api/users/profile`, {
-                  headers: { Authorization: `Bearer ${idToken}` }
-                });
-              }
-
-              const profile = profileResponse.data;
-
-              userData = {
-                ...profile,
-                uid: firebaseUser.uid,
-                emailVerified: firebaseUser.emailVerified,
-                token: idToken
-              };
-
-              // ✅ Sync to Firestore for real-time convenience (not authority)
-              await setDoc(userDocRef, {
-                uid: firebaseUser.uid,
-                name: userData.name,
-                email: userData.email,
-                phone: userData.phone || '',
-                role: userData.role,
-                updatedAt: new Date().toISOString()
-              }, { merge: true });
-
-            } catch (syncErr) {
-              console.warn('⚠️ AuthContext: MongoDB fetch failed, trying Firestore fallback:', syncErr.message);
-              // 2. Fallback to Firestore if MongoDB lookup fails
-              const userDoc = await getDoc(userDocRef);
-              if (userDoc.exists()) {
-                const data = userDoc.data();
-                userData = {
-                  _id: firebaseUser.uid,
-                  uid: firebaseUser.uid,
-                  email: firebaseUser.email || data.email || '',
-                  phone: firebaseUser.phoneNumber || data.phone || '',
-                  name: firebaseUser.displayName || data.name || 'User',
-                  role: data.role || 'customer',
-                  emailVerified: firebaseUser.emailVerified,
-                  token: idToken
-                };
-              } else {
-                // 3. Last resort: standard customer profile
-                userData = {
-                  _id: firebaseUser.uid,
-                  uid: firebaseUser.uid,
-                  email: firebaseUser.email || '',
-                  phone: firebaseUser.phoneNumber || '',
-                  name: firebaseUser.displayName || 'User',
-                  role: 'customer',
-                  emailVerified: firebaseUser.emailVerified,
-                  token: idToken
-                };
-              }
-            }
-
-            // ✅ UNIFIED BLOCK: Enforce email verification for Sensitive Roles (Seller/Customer)
+            // ✅ Check email verification for sellers/customers
             if (['seller', 'customer'].includes(userData.role) && firebaseUser.email && !firebaseUser.emailVerified) {
               console.log(`🚫 AuthContext: ${userData.role} email not verified in Firebase`);
               userData.requiresVerification = true;
@@ -257,9 +196,16 @@ export const AuthProvider = ({ children }) => {
 
             dispatch({ type: USER_LOGIN_SUCCESS, payload: userData });
             updateUser(userData);
+
+            console.log('✅ AuthContext: Profile loaded successfully, Role:', userData.role);
           } catch (error) {
-            console.error('❌ AuthContext: Error resolving MongoDB/Firestore profile:', error.message);
-            // Even if sync fails, set loading false to avoid infinite spinners
+            console.error('❌ AuthContext: Error fetching profile:', error.message);
+
+            // If user not found in MongoDB, they need to complete registration
+            if (error.response?.status === 404) {
+              console.log('⚠️ AuthContext: User not found in MongoDB, may need to register');
+              // Don't logout, let them complete registration
+            }
           }
         }
       } else {

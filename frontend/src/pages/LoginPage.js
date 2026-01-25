@@ -105,8 +105,25 @@ const LoginPage = () => {
       setMessage('');
 
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+
+      // ✅ Get Firebase ID token and send to backend
+      const idToken = await result.user.getIdToken();
+
+      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${API_BASE_URL}/api/auth/google-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Google sign-in failed');
+      }
+
       // Success! AuthContext will handle the redirect.
+      console.log('✅ Google sign-in successful');
 
     } catch (error) {
       console.error('Google sign-in error:', error);

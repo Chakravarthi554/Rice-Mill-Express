@@ -210,6 +210,102 @@ const loginWithPhone = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc    Unified Firebase Login (Email/Google/Phone)
+// @route   POST /api/auth/firebase-login
+// @access  Public
+const firebaseLogin = asyncHandler(async (req, res) => {
+  const { idToken } = req.body;
+
+  if (!idToken) {
+    res.status(400);
+    throw new Error('Firebase ID Token is required');
+  }
+
+  try {
+    // 1. Verify Firebase ID Token
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const { uid, email, phone_number, name, picture, email_verified } = decodedToken;
+
+    console.log('🔐 Firebase Login: UID:', uid, 'Email:', email, 'Phone:', phone_number);
+
+    // 2. Find user in MongoDB by Firebase UID
+    let user = await User.findOne({ firebaseUid: uid });
+
+    if (!user) {
+      // User doesn't exist in MongoDB - this should only happen for Google/Phone first-time users
+      // For email/password, they should have been created during registration
+      console.log('⚠️ Firebase Login: User not found in MongoDB for UID:', uid);
+      res.status(404);
+      throw new Error('User profile not found. Please complete registration first.');
+    }
+
+    // 3. Update user info if needed (for Google/Phone logins)
+    let needsUpdate = false;
+    if (email && !user.email) {
+      user.email = email;
+      needsUpdate = true;
+    }
+    if (phone_number && !user.phone) {
+      user.phone = phone_number.replace(/^\+91/, ''); // Remove country code
+      needsUpdate = true;
+    }
+    if (picture && !user.profileImage) {
+      user.profileImage = picture;
+      needsUpdate = true;
+    }
+
+    if (needsUpdate) {
+      await User.updateOne({ _id: user._id }, {
+        $set: {
+          email: user.email,
+          phone: user.phone,
+          profileImage: user.profileImage
+        }
+      });
+    }
+
+    // 4. Sync to Firestore
+    await firebaseUserSync.syncUser(user).catch(err =>
+      console.error('⚠️ Firestore sync failed (non-critical):', err.message)
+    );
+
+    // 5. Generate backend tokens for legacy compatibility
+    const accessToken = generateToken(user._id, 'access');
+    const refreshToken = generateRefreshToken(user._id);
+    await User.updateOne({ _id: user._id }, { $set: { refreshToken } });
+
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    // 6. Return Profile
+    const response = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone || '',
+      role: user.role,
+      emailVerified: email_verified || false,
+      accessToken,
+    };
+
+    if (user.role === 'seller') {
+      response.kycStatus = user.kycStatus;
+    }
+
+    console.log('✅ Firebase Login successful for:', email || phone_number, 'Role:', user.role);
+    res.json(response);
+
+  } catch (error) {
+    console.error('❌ Firebase Login Error:', error.message);
+    res.status(401);
+    throw new Error(error.message || 'Firebase authentication failed');
+  }
+});
+
 // @desc    Login/Sync with Google (Firebase)
 // @route   POST /api/auth/google-login
 // @access  Public
@@ -393,5 +489,6 @@ module.exports = {
   verifyOtp,
   verifyOtp,
   logoutUser,
-  loginWithGoogle
+  loginWithGoogle,
+  firebaseLogin
 };

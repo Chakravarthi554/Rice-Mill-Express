@@ -9,23 +9,43 @@ class FirebaseUserSync {
      * Sync MongoDB user to Firestore
      * Call this after signup/login
      * @param {Object} user - MongoDB user object
+     * @param {number} retryCount - Current retry attempt (internal use)
      */
-    async syncUser(user) {
+    async syncUser(user, retryCount = 0) {
+        const MAX_RETRIES = 3;
+
         try {
+            // ✅ Validation: Ensure user has required fields
+            if (!user || !user._id) {
+                console.error('❌ Firestore sync: Invalid user object - missing _id');
+                return false;
+            }
+
             // ✅ FIX: Use Firebase UID as the document key if available
             // This aligns with frontend AuthContext which looks up by auth.currentUser.uid
             const docId = user.firebaseUid || user._id.toString();
+
+            if (!docId) {
+                console.error('❌ Firestore sync: No valid document ID (firebaseUid or _id)');
+                return false;
+            }
+
             const userRef = db.collection('users').doc(docId);
 
             // Convert to object if it's a Mongoose document to avoid prototype serialization issues
             const userObj = typeof user.toObject === 'function' ? user.toObject() : JSON.parse(JSON.stringify(user));
 
+            // ✅ Validation: Ensure email or phone exists
+            if (!userObj.email && !userObj.phone) {
+                console.warn('⚠️ Firestore sync: User has neither email nor phone:', docId);
+            }
+
             const userData = {
                 uid: user.firebaseUid || user._id.toString(), // Store consistent UID
                 mongoId: user._id.toString(), // Keep ref to mongo ID
-                email: userObj.email,
-                name: userObj.name,
-                role: userObj.role,
+                email: userObj.email || null,
+                name: userObj.name || 'User',
+                role: userObj.role || 'customer',
                 phone: userObj.phone || null,
                 profileImage: userObj.profileImage || null,
                 businessDetails: userObj.businessDetails || null,
@@ -36,11 +56,20 @@ class FirebaseUserSync {
 
             await userRef.set(userData, { merge: true });
 
-            console.log(`✅ User ${userObj.email} synced to Firestore (Doc ID: ${docId})`);
+            console.log(`✅ User ${userObj.email || userObj.phone || docId} synced to Firestore (Doc ID: ${docId})`);
             return true;
         } catch (error) {
-            console.error('❌ Firestore sync error:', error.message);
+            console.error(`❌ Firestore sync error (attempt ${retryCount + 1}/${MAX_RETRIES}):`, error.message);
+
+            // ✅ Retry logic: Retry up to MAX_RETRIES times
+            if (retryCount < MAX_RETRIES - 1) {
+                console.log(`🔄 Retrying Firestore sync in 1 second...`);
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                return this.syncUser(user, retryCount + 1);
+            }
+
             // Don't throw - sync failure shouldn't block login
+            console.error('❌ Firestore sync failed after max retries');
             return false;
         }
     }
