@@ -57,14 +57,32 @@ const protect = asyncHandler(async (req, res, next) => {
         decoded = await firebaseAuth.verifyIdToken(token);
         console.log('✅ Auth Middleware: Firebase Token verified for UID:', decoded.uid);
 
-        // Find user by Firebase UID (or email as fallback)
-        user = await User.findOne({
-          $or: [{ firebaseUid: decoded.uid }, { email: decoded.email }]
-        }).select('-password');
+        // Prepare lookup criteria
+        const lookupCriteria = [{ firebaseUid: decoded.uid }];
+        if (decoded.email) lookupCriteria.push({ email: decoded.email });
 
+        // Add sanitised phone lookup if available
+        let sanitisedPhone = '';
+        if (decoded.phone_number) {
+          sanitisedPhone = decoded.phone_number.replace(/\D/g, '').slice(-10);
+          if (sanitisedPhone.length === 10) {
+            lookupCriteria.push({ phone: sanitisedPhone });
+          }
+        }
+
+        // Find user by Firebase UID, Email, OR Phone
+        user = await User.findOne({ $or: lookupCriteria }).select('-password');
+
+        // Link new Firebase UID to existing user if needed (e.g. first time Phone login for Email user)
         if (user && !user.firebaseUid) {
           user.firebaseUid = decoded.uid;
           await user.save();
+        } else if (user && user.firebaseUid !== decoded.uid) {
+          // Edge case: User has one UID (e.g. Email) but logged in with another (Phone). 
+          // We generally trust the logged-in session, but we shouldn't overwrite the main UID lightly 
+          // unless we support multiple UIDs (linkedAccounts). 
+          // For now, logging this event is sufficient, or we rely on the fact we FOUND the user.
+          console.log(`ℹ️ Auth Middleware: Secondary login method used (UID: ${decoded.uid}) for user ${user._id}`);
         }
 
         // ✅ AUTO-PROVISION: If user not found in MongoDB but valid in Firebase
@@ -152,7 +170,15 @@ const optionalAuth = asyncHandler(async (req, res, next) => {
 
       try {
         decoded = await firebaseAuth.verifyIdToken(token);
-        user = await User.findOne({ $or: [{ firebaseUid: decoded.uid }, { email: decoded.email }] });
+
+        const lookupCriteria = [{ firebaseUid: decoded.uid }];
+        if (decoded.email) lookupCriteria.push({ email: decoded.email });
+        if (decoded.phone_number) {
+          const p = decoded.phone_number.replace(/\D/g, '').slice(-10);
+          if (p.length === 10) lookupCriteria.push({ phone: p });
+        }
+
+        user = await User.findOne({ $or: lookupCriteria });
 
         if (!user) {
           let sanitisedPhone = decoded.phone_number || '';

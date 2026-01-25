@@ -12,13 +12,17 @@ class FirebaseUserSync {
      */
     async syncUser(user) {
         try {
-            const userRef = db.collection('users').doc(user._id.toString());
+            // ✅ FIX: Use Firebase UID as the document key if available
+            // This aligns with frontend AuthContext which looks up by auth.currentUser.uid
+            const docId = user.firebaseUid || user._id.toString();
+            const userRef = db.collection('users').doc(docId);
 
             // Convert to object if it's a Mongoose document to avoid prototype serialization issues
             const userObj = typeof user.toObject === 'function' ? user.toObject() : JSON.parse(JSON.stringify(user));
 
             const userData = {
-                uid: user._id.toString(),
+                uid: user.firebaseUid || user._id.toString(), // Store consistent UID
+                mongoId: user._id.toString(), // Keep ref to mongo ID
                 email: userObj.email,
                 name: userObj.name,
                 role: userObj.role,
@@ -32,7 +36,7 @@ class FirebaseUserSync {
 
             await userRef.set(userData, { merge: true });
 
-            console.log(`✅ User ${userObj.email} (${userObj.role}) synced to Firestore`);
+            console.log(`✅ User ${userObj.email} synced to Firestore (Doc ID: ${docId})`);
             return true;
         } catch (error) {
             console.error('❌ Firestore sync error:', error.message);

@@ -36,9 +36,15 @@ const setupSocketServer = (server) => {
         decoded = await firebaseAuth.verifyIdToken(cleanToken);
         logger.info(`✅ Socket Auth: Firebase Token verified for UID: ${decoded.uid}`);
 
-        user = await User.findOne({
-          $or: [{ firebaseUid: decoded.uid }, { email: decoded.email }]
-        }).select('role name email firebaseUid');
+        // Prepare lookup criteria
+        const lookupCriteria = [{ firebaseUid: decoded.uid }];
+        if (decoded.email) lookupCriteria.push({ email: decoded.email });
+        if (decoded.phone_number) {
+          const p = decoded.phone_number.replace(/\D/g, '').slice(-10);
+          if (p.length === 10) lookupCriteria.push({ phone: p });
+        }
+
+        user = await User.findOne({ $or: lookupCriteria }).select('role name email firebaseUid');
 
         if (user && !user.firebaseUid) {
           user.firebaseUid = decoded.uid;

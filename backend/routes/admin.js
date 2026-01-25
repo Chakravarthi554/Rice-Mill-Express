@@ -83,7 +83,8 @@ const {
   getAnalyticsData = (req, res) => res.status(501).json({ message: 'Function not available' }),
   getPlatformOverview = (req, res) => res.status(501).json({ message: 'Function not available' }),
   getRecipeAnalytics = (req, res) => res.status(501).json({ message: 'Function not available' }),
-  moderateComment = (req, res) => res.status(501).json({ message: 'Function not available' })
+  moderateComment = (req, res) => res.status(501).json({ message: 'Function not available' }),
+  bootstrapAdmin = (req, res) => res.status(501).json({ message: 'Function not available' })
 } = adminController;
 
 const {
@@ -124,7 +125,11 @@ router.get('/health', (req, res) => {
 router.get('/users', protect, admin, getUsers);
 router.get('/orders', protect, admin, getOrders);
 router.get('/search-logs', protect, admin, getSearchLogs);
+router.get('/search-logs', protect, admin, getSearchLogs);
 router.put('/seller-location', protect, admin, updateSellerLocation);
+
+// 🛡️ ADMIN BOOTSTRAP API (Isolated, Protected by Auth only)
+router.post('/bootstrap', protect, bootstrapAdmin);
 
 // EXPORT ANALYTICS (CSV)
 router.get('/export/analytics', protect, admin, exportAnalyticsCSV);

@@ -117,7 +117,12 @@ const getUserProfile = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id).populate('addresses wishlist').select('-password -refreshToken');
   if (!user) return res.status(404).json({ message: 'User not found' });
 
+  // ✅ CHECK: If bootstrap is allowed (Only if NO admins exist)
+  const adminCount = await User.countDocuments({ role: 'admin' });
+
   const profile = user.toObject();
+  profile.canBootstrap = (adminCount === 0);
+
   if (user.role !== 'seller') {
     delete profile.kycStatus;
   }

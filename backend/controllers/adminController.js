@@ -1316,6 +1316,27 @@ const getAnalyticsAlerts = asyncHandler(async (req, res) => {
   }
 });
 
+const bootstrapAdmin = asyncHandler(async (req, res) => {
+  // 1. Check if ANY admin already exists
+  const adminCount = await User.countDocuments({ role: 'admin' });
+  if (adminCount > 0) {
+    res.status(403);
+    throw new Error('Admin account already exists. Bootstrap disabled.');
+  }
+
+  const user = await User.findById(req.user._id);
+
+  if (user) {
+    user.role = 'admin';
+    await user.save();
+    console.log(`✅ User ${user.email} promoted to ADMIN via bootstrap API`);
+    res.json({ message: 'User promoted to Admin. Please logout and login again.' });
+  } else {
+    res.status(404);
+    throw new Error('User not found');
+  }
+});
+
 module.exports = {
   getUsers,
   getOrders,
@@ -1329,5 +1350,7 @@ module.exports = {
   getPlatformOverview,
   exportAnalyticsCSV,
   getAnalyticsData,
-  getAnalyticsAlerts
+  getAnalyticsData,
+  getAnalyticsAlerts,
+  bootstrapAdmin
 };

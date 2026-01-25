@@ -23,6 +23,13 @@ const registerUser = asyncHandler(async (req, res) => {
   checkJWTSecrets();
 
   const { name, email, password, phone, role, firebaseUid } = req.body;
+
+  // ✅ FIX: Sanitise phone to exactly 10 digits for MongoDB validation
+  let sanitisedPhone = phone || '';
+  if (sanitisedPhone) {
+    sanitisedPhone = sanitisedPhone.replace(/\D/g, '').slice(-10);
+  }
+
   const userExists = await User.findOne({ email });
   if (userExists) {
     res.status(400);
@@ -33,7 +40,7 @@ const registerUser = asyncHandler(async (req, res) => {
     name,
     email,
     password,
-    phone,
+    phone: sanitisedPhone || undefined,
     role: role || 'customer',
     firebaseUid,
     kycStatus: role === 'seller' ? 'not_submitted' : 'not_required',
@@ -203,6 +210,84 @@ const loginWithPhone = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc    Login/Sync with Google (Firebase)
+// @route   POST /api/auth/google-login
+// @access  Public
+const loginWithGoogle = asyncHandler(async (req, res) => {
+  const { idToken } = req.body;
+
+  if (!idToken) {
+    res.status(400);
+    throw new Error('Firebase ID Token is required');
+  }
+
+  try {
+    // 1. Verify Token
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const { uid, email, name, picture } = decodedToken;
+
+    // 2. Find or Create User
+    let user = await User.findOne({
+      $or: [{ firebaseUid: uid }, { email: email }]
+    });
+
+    if (!user) {
+      console.log('🆕 Google Login: Provisioning new user:', email);
+      user = await User.create({
+        name: name || email.split('@')[0],
+        email: email,
+        firebaseUid: uid,
+        role: 'customer', // Default role
+        isVerified: true,  // Google is verified
+        profileImage: picture
+      });
+    } else if (!user.firebaseUid) {
+      // Link existing email user to Google UID
+      user.firebaseUid = uid;
+      if (picture && !user.profileImage) user.profileImage = picture;
+      await user.save();
+    }
+
+    // 3. Sync to Firestore
+    await firebaseUserSync.syncUser(user).catch(err =>
+      console.error('⚠️ Firestore sync failed:', err.message)
+    );
+
+    // 4. Generate Tokens
+    const accessToken = generateToken(user._id, 'access');
+    const refreshToken = generateRefreshToken(user._id);
+    await User.updateOne({ _id: user._id }, { $set: { refreshToken } });
+
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    // 5. Return Profile
+    const response = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone || '',
+      role: user.role,
+      accessToken,
+    };
+
+    if (user.role === 'seller') {
+      response.kycStatus = user.kycStatus;
+    }
+
+    res.json(response);
+
+  } catch (error) {
+    console.error('Google Auth Error:', error);
+    res.status(401);
+    throw new Error('Invalid Google authentication');
+  }
+});
+
 // 🔥 FIXED: Enhanced refresh token with better error handling
 const refreshAccessToken = asyncHandler(async (req, res) => {
   const refreshToken = req.body.refreshToken || req.cookies.refreshToken || req.headers['x-refresh-token'];
@@ -306,5 +391,7 @@ module.exports = {
   refreshAccessToken,
   resendOtp,
   verifyOtp,
+  verifyOtp,
   logoutUser,
+  loginWithGoogle
 };

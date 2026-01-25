@@ -5,12 +5,42 @@ import Dashboard from '../components/customer/Dashboard';
 import ProductFilter from '../components/common/ProductFilter';
 import SettingsBanner from '../components/common/SettingsBanner';
 import { Box, Tabs, Tab, Container } from '@mui/material';
+import { useAuth } from '../context/AuthContext';
 
 const CustomerDashboard = () => {
+  const { user: userInfo } = useAuth();
   const [activeTab, setActiveTab] = useState(0);
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
+  };
+
+  const handleBootstrapAdmin = async () => {
+    try {
+      const confirm = window.confirm('Are you sure you want to activate ADMIN access for this account?');
+      if (!confirm) return;
+
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5000/api/admin/bootstrap', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        alert('✅ Admin access activated! Please log in again to see the Admin Dashboard.');
+        localStorage.clear();
+        window.location.href = '/login';
+      } else {
+        const data = await response.json();
+        alert(`Failed: ${data.message}`);
+      }
+    } catch (error) {
+      console.error('Bootstrap error:', error);
+      alert('Failed to activate admin access.');
+    }
   };
 
   return (
@@ -19,6 +49,26 @@ const CustomerDashboard = () => {
       <SettingsBanner />
       <Box sx={{ minHeight: '100vh', bgcolor: '#f4f6f8' }}>
         <Container maxWidth="xl" sx={{ pt: 3 }}>
+          {/* 🛡️ DEV HELPERS - Only visible if NO admin exists in system */}
+          {userInfo?.canBootstrap && (
+            <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                onClick={handleBootstrapAdmin}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#d32f2f',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                🛡️ Activate Admin Access
+              </button>
+            </Box>
+          )}
+
           <Tabs
             value={activeTab}
             onChange={handleTabChange}

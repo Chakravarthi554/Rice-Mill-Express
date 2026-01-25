@@ -164,13 +164,9 @@ export const AuthProvider = ({ children }) => {
       console.log('🔥 AuthContext: Firebase Auth State Changed:', firebaseUser?.uid);
 
       if (firebaseUser) {
-        // Only skip if we already have a fully resolved user with a MongoDB ID
-        const currentUser = user || userInfo;
-        if (currentUser?.uid === firebaseUser.uid && currentUser?._id && currentUser?.role) {
-          console.log('⏩ AuthContext: User already fully initialized.');
-          setLoading(false);
-          return;
-        }
+        // 🔥 CRITICAL: Don't skip if we just logged in or if we want to ensure role freshness
+        // Previously we were skipping if 'user' existed, which caused Admin activation to not show up locally.
+        console.log('🔄 AuthContext: Resolving profile for UID:', firebaseUser.uid);
 
         // Fetch role from Firestore if not already in state
         if (!user && !userInfo) {
@@ -182,11 +178,24 @@ export const AuthProvider = ({ children }) => {
             let userData;
 
             try {
-              // 1. Always try to get profile from MongoDB first (Secure source of roles)
+              const idToken = await firebaseUser.getIdToken();
               const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-              const { data: profile } = await axios.get(`${API_BASE_URL}/api/users/profile`, {
-                headers: { Authorization: `Bearer ${idToken}` }
-              });
+
+              // ✅ DETECT PROVIDER: If Google, force sync via new endpoint
+              const isGoogle = firebaseUser.providerData.some(p => p.providerId === 'google.com');
+
+              let profileResponse;
+              if (isGoogle) {
+                console.log('🔄 AuthContext: Google Login detected, calling sync endpoint...');
+                profileResponse = await axios.post(`${API_BASE_URL}/api/auth/google-login`, { idToken });
+              } else {
+                // Standard profile fetch for Email/Phone (who should already exist)
+                profileResponse = await axios.get(`${API_BASE_URL}/api/users/profile`, {
+                  headers: { Authorization: `Bearer ${idToken}` }
+                });
+              }
+
+              const profile = profileResponse.data;
 
               userData = {
                 ...profile,
@@ -200,7 +209,7 @@ export const AuthProvider = ({ children }) => {
                 uid: firebaseUser.uid,
                 name: userData.name,
                 email: userData.email,
-                phone: userData.phone,
+                phone: userData.phone || '',
                 role: userData.role,
                 updatedAt: new Date().toISOString()
               }, { merge: true });
@@ -399,6 +408,8 @@ export const AuthProvider = ({ children }) => {
         getSocket(fullUserData._id, fullUserData.role, idToken);
         axios.defaults.headers.common['Authorization'] = `Bearer ${idToken}`;
 
+        // ✅ UX: Show success message before any redirect
+        window.alert('✅ Registration successful! Welcome to Rice-Express.');
         setMessage('Registration successful! Welcome to Rice-Express.');
         return { success: true };
       } else {
