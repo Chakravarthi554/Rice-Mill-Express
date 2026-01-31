@@ -34,7 +34,74 @@ const deliveryPartnerSchema = new mongoose.Schema(
     location: {
       type: { type: String, enum: ['Point'], default: 'Point' },
       coordinates: { type: [Number], default: [0, 0] } // [longitude, latitude]
-    }
+    },
+
+    // Device Security & Session Management
+    loggedInDevices: [{
+      deviceId: String,
+      deviceName: String,
+      deviceType: String, // mobile, tablet, desktop
+      lastLogin: Date,
+      ipAddress: String,
+      userAgent: String
+    }],
+
+    // Activity Tracking
+    lastActiveAt: {
+      type: Date,
+      default: Date.now
+    },
+    autoLogoutEnabled: {
+      type: Boolean,
+      default: true
+    },
+    autoLogoutMinutes: {
+      type: Number,
+      default: 30
+    },
+
+    // User Preferences
+    language: {
+      type: String,
+      enum: ['en', 'hi', 'te', 'ta', 'kn', 'ml'],
+      default: 'en'
+    },
+    notificationsEnabled: {
+      type: Boolean,
+      default: true
+    },
+    darkMode: {
+      type: Boolean,
+      default: false
+    },
+
+    // Push Notification Tokens
+    fcmTokens: [{
+      token: String,
+      deviceId: String,
+      addedAt: { type: Date, default: Date.now }
+    }],
+
+    // Emergency Contacts
+    emergencyContacts: [{
+      name: String,
+      phone: String,
+      relation: String
+    }],
+
+    // Emergency Alerts History
+    emergencyAlerts: [{
+      timestamp: { type: Date, default: Date.now },
+      location: {
+        latitude: Number,
+        longitude: Number
+      },
+      orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order' },
+      resolved: { type: Boolean, default: false },
+      resolvedAt: Date,
+      resolvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      notes: String
+    }]
   },
   { timestamps: true }
 );

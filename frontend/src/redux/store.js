@@ -61,7 +61,6 @@ import {
   adminPlatformOverviewReducer,
   adminRecipeAnalyticsReducer,
   adminDashboardRefreshReducer,
-  kycApplicationsReducer,
   searchLogsReducer,
   sellerLocationReducer,
   adminCommentsModerationReducer,
@@ -87,7 +86,7 @@ import {
 } from './reducers/paymentReducers';
 
 import {
-  kycSubmitReducer, kycStatusReducer, kycReviewReducer
+  kycApplicationsReducer, kycSubmitReducer, kycStatusReducer, kycReviewReducer
 } from './reducers/kycReducers';
 
 import {

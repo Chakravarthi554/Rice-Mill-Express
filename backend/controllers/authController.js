@@ -273,8 +273,8 @@ const firebaseLogin = asyncHandler(async (req, res) => {
       });
     }
 
-    // 4. Sync to Firestore
-    await firebaseUserSync.syncUser(user).catch(err =>
+    // 4. Sync to Firestore (non-blocking - fire and forget)
+    firebaseUserSync.syncUser(user).catch(err =>
       console.error('⚠️ Firestore sync failed (non-critical):', err.message)
     );
 
@@ -309,9 +309,24 @@ const firebaseLogin = asyncHandler(async (req, res) => {
     res.json(response);
 
   } catch (error) {
-    console.error('❌ Firebase Login Error:', error.message);
-    res.status(401);
-    throw new Error(error.message || 'Firebase authentication failed');
+    console.error('❌ Firebase Login Error:', error);
+
+    // Provide specific error messages
+    let statusCode = 401;
+    let errorMessage = 'Firebase authentication failed';
+
+    if (error.code === 'auth/id-token-expired') {
+      errorMessage = 'Session expired. Please login again.';
+    } else if (error.code === 'auth/invalid-id-token') {
+      errorMessage = 'Invalid authentication token. Please login again.';
+    } else if (error.code === 'auth/user-disabled') {
+      errorMessage = 'This account has been disabled.';
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+
+    res.status(statusCode);
+    throw new Error(errorMessage);
   }
 });
 

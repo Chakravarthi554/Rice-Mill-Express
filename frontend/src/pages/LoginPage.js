@@ -85,7 +85,15 @@ const LoginPage = () => {
 
     // Check if it's email or phone
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const isE = emailRegex.test(emailOrPhone);
+    const phoneRegex = /^[0-9]{10}$/; // 10 digit phone number
+
+    const isE = emailRegex.test(emailOrPhone.trim());
+    const isP = phoneRegex.test(emailOrPhone.trim());
+
+    console.log('📧 LoginPage: Input:', emailOrPhone);
+    console.log('📧 LoginPage: Is Email?', isE);
+    console.log('📱 LoginPage: Is Phone?', isP);
+
     setIsEmail(isE);
 
     setStep(2);
@@ -146,7 +154,9 @@ const LoginPage = () => {
     try {
       if (isEmail) {
         // Email/Password login
+        console.log('🔐 LoginPage: Attempting email/password login for:', emailOrPhone);
         await signInWithEmailAndPassword(auth, emailOrPhone, password);
+        console.log('✅ LoginPage: Firebase authentication successful');
         // Success! AuthContext will handle the redirect.
       } else {
         // Phone OTP flow
@@ -168,12 +178,28 @@ const LoginPage = () => {
         }
       }
     } catch (error) {
-      console.error('Login error:', error);
-      if (error.code === 'auth/billing-not-enabled') {
-        setMessage('Phone authentication requires a paid plan. Please use Google or Email.');
-      } else {
-        setMessage(error.message || 'Authentication failed. Please check your credentials.');
+      console.error('❌ LoginPage: Login error:', error);
+
+      // Provide user-friendly error messages
+      let errorMessage = 'Authentication failed. Please try again.';
+
+      if (error.code === 'auth/user-not-found') {
+        errorMessage = 'No account found with this email. Please register first.';
+      } else if (error.code === 'auth/wrong-password') {
+        errorMessage = 'Incorrect password. Please try again.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Invalid email address format.';
+      } else if (error.code === 'auth/user-disabled') {
+        errorMessage = 'This account has been disabled. Please contact support.';
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = 'Too many failed attempts. Please try again later.';
+      } else if (error.code === 'auth/billing-not-enabled') {
+        errorMessage = 'Phone authentication requires a paid plan. Please use Google or Email.';
+      } else if (error.message) {
+        errorMessage = error.message;
       }
+
+      setMessage(errorMessage);
     } finally {
       setLoading(false);
     }

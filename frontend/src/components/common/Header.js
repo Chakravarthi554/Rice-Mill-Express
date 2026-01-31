@@ -19,7 +19,7 @@ import {
 import { styled, alpha } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { logoutUser } from '../../redux/actions/userActions';
+import { useAuth } from '../../context/AuthContext';
 import { listFilteredProducts, listProducts } from '../../redux/actions/productActions';
 import NotificationBadge from './NotificationBadge';
 
@@ -65,6 +65,7 @@ const StyledInputBase = styled(InputBase)(({ theme }) => ({
 const Header = ({ onSearch }) => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { logout } = useAuth();
   const [anchorEl, setAnchorEl] = useState(null);
   const [keyword, setKeyword] = useState('');
   const searchTimeoutRef = useRef(null);
@@ -119,9 +120,8 @@ const Header = ({ onSearch }) => {
   };
 
   const handleLogout = () => {
-    dispatch(logoutUser());
     handleMenuClose();
-    navigate('/login');
+    logout(); // AuthContext handles Firebase signOut and redirect
   };
 
   return (

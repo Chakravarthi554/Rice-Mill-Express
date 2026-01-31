@@ -37,17 +37,40 @@ app.set("trust proxy", 1);
 // Initialize Socket.io
 console.log("🔄 Initializing Socket.io server...");
 try {
-  const { io, broadcastOrderUpdate, broadcastBulkOrderUpdate } = setupSocketServer(server);
+  const {
+    io,
+    broadcastOrderUpdate,
+    broadcastBulkOrderUpdate,
+    broadcastDeliveryPickup,
+    broadcastNavigationStarted,
+    broadcastDeliveryCompleted,
+    broadcastEmergencyAlert,
+    broadcastReplacementRequest,
+  } = setupSocketServer(server);
+
   app.set("io", io);
+  app.set("broadcastOrderUpdate", broadcastOrderUpdate);
+  app.set("broadcastDeliveryPickup", broadcastDeliveryPickup);
+  app.set("broadcastNavigationStarted", broadcastNavigationStarted);
+  app.set("broadcastDeliveryCompleted", broadcastDeliveryCompleted);
+  app.set("broadcastEmergencyAlert", broadcastEmergencyAlert);
+  app.set("broadcastReplacementRequest", broadcastReplacementRequest);
+
   console.log("✅ Socket.io server initialized");
 } catch (error) {
   console.error("❌ Socket.io initialization failed:", error.message);
   process.exit(1);
 }
 
-// Attach io to each request
+// Attach io and broadcast functions to each request
 app.use((req, res, next) => {
   req.io = app.get("io");
+  req.broadcastOrderUpdate = app.get("broadcastOrderUpdate");
+  req.broadcastDeliveryPickup = app.get("broadcastDeliveryPickup");
+  req.broadcastNavigationStarted = app.get("broadcastNavigationStarted");
+  req.broadcastDeliveryCompleted = app.get("broadcastDeliveryCompleted");
+  req.broadcastEmergencyAlert = app.get("broadcastEmergencyAlert");
+  req.broadcastReplacementRequest = app.get("broadcastReplacementRequest");
   next();
 });
 
@@ -129,6 +152,8 @@ const loadRoutes = () => {
     { path: "/api/bulk-orders", name: "Bulk Orders", file: "./routes/bulkOrder" },
     { path: "/api/notifications", name: "Notifications", file: "./routes/notificationRoutes" },
     { path: "/api/delivery", name: "Delivery Confirmation", file: "./routes/deliveryConfirmationRoutes" },
+    { path: "/api/replacements", name: "Replacements", file: "./routes/replacementRoutes" },
+    { path: "/api/dp", name: "Delivery Partner System", file: "./routes/deliveryPartnerNewRoutes" },
   ];
 
   routes.forEach(route => {

@@ -74,8 +74,18 @@ export const AuthProvider = ({ children }) => {
     key;
 
   const logout = useCallback(
-    (redirect = true) => {
+    async (redirect = true) => {
       console.log('🚪 AuthContext: Logging out...');
+
+      // Sign out from Firebase first
+      try {
+        await auth.signOut();
+        console.log('✅ AuthContext: Firebase sign-out successful');
+      } catch (error) {
+        console.error('❌ AuthContext: Firebase sign-out error:', error);
+      }
+
+      // Clear local storage and state
       localStorage.removeItem('userInfo');
       localStorage.removeItem('token');
       localStorage.removeItem('refreshToken');
@@ -86,6 +96,7 @@ export const AuthProvider = ({ children }) => {
       dispatch({ type: USER_LOGOUT });
       updateUser(null);
       setMessage('Logged out successfully!');
+
       if (redirect) navigate('/login', { replace: true });
     },
     [dispatch, navigate, updateUser]
@@ -158,64 +169,125 @@ export const AuthProvider = ({ children }) => {
     }
   }, [dispatch, logout, tokenRefreshing, updateUser]);
 
+  // ✅ Track which UID we're currently fetching to prevent infinite loops
+  const fetchingUidRef = React.useRef(null);
+
   // ✅ Firebase Auth State Listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       console.log('🔥 AuthContext: Firebase Auth State Changed:', firebaseUser?.uid);
 
       if (firebaseUser) {
-        // Only fetch profile if we don't have user data yet
-        if (!user && !userInfo) {
+        // ✅ ROBUST GUARD: Prevent multiple fetches for the same UID
+        if (fetchingUidRef.current === firebaseUser.uid) {
+          console.log('⏩ AuthContext: Already fetching profile for UID:', firebaseUser.uid);
+          return;
+        }
+
+        // Check if we already have this user loaded
+        const storedUser = localStorage.getItem('userInfo');
+        if (storedUser) {
           try {
-            console.log('🔄 AuthContext: Fetching profile for UID:', firebaseUser.uid);
-
-            // Get Firebase ID token
-            const idToken = await firebaseUser.getIdToken();
-            const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-
-            // ✅ Use unified Firebase login endpoint
-            const response = await axios.post(`${API_BASE_URL}/api/auth/firebase-login`, { idToken });
-            const profile = response.data;
-
-            const userData = {
-              ...profile,
-              uid: firebaseUser.uid,
-              emailVerified: firebaseUser.emailVerified,
-              token: idToken
-            };
-
-            // ✅ Check email verification for sellers/customers
-            if (['seller', 'customer'].includes(userData.role) && firebaseUser.email && !firebaseUser.emailVerified) {
-              console.log(`🚫 AuthContext: ${userData.role} email not verified in Firebase`);
-              userData.requiresVerification = true;
+            const parsed = JSON.parse(storedUser);
+            if (parsed.uid === firebaseUser.uid && parsed.token) {
+              console.log('⏩ AuthContext: User profile already in localStorage for UID:', firebaseUser.uid);
+              // Update Redux if needed
+              if (!userInfo || userInfo.uid !== firebaseUser.uid) {
+                dispatch({ type: USER_LOGIN_SUCCESS, payload: parsed });
+                updateUser(parsed);
+              }
+              setLoading(false);
+              return;
             }
+          } catch (e) {
+            console.warn('⚠️ AuthContext: Failed to parse stored user, will fetch fresh');
+          }
+        }
 
-            localStorage.setItem('userInfo', JSON.stringify(userData));
-            localStorage.setItem('token', userData.token);
-            axios.defaults.headers.common['Authorization'] = `Bearer ${userData.token}`;
+        // Mark this UID as being fetched
+        fetchingUidRef.current = firebaseUser.uid;
 
-            dispatch({ type: USER_LOGIN_SUCCESS, payload: userData });
-            updateUser(userData);
+        try {
+          console.log('🔄 AuthContext: Fetching profile for UID:', firebaseUser.uid);
 
-            console.log('✅ AuthContext: Profile loaded successfully, Role:', userData.role);
-          } catch (error) {
-            console.error('❌ AuthContext: Error fetching profile:', error.message);
+          // Get Firebase ID token
+          const idToken = await firebaseUser.getIdToken();
+          const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
-            // If user not found in MongoDB, they need to complete registration
-            if (error.response?.status === 404) {
-              console.log('⚠️ AuthContext: User not found in MongoDB, may need to register');
-              // Don't logout, let them complete registration
-            }
+          console.log('📡 AuthContext: Calling API:', `${API_BASE_URL}/api/auth/firebase-login`);
+
+          // ✅ Use unified Firebase login endpoint
+          const response = await axios.post(`${API_BASE_URL}/api/auth/firebase-login`, { idToken });
+
+          console.log('📦 AuthContext: API Response received:', response.status, response.data);
+
+          const profile = response.data;
+
+          const userData = {
+            ...profile,
+            uid: firebaseUser.uid,
+            emailVerified: firebaseUser.emailVerified,
+            token: idToken
+          };
+
+          console.log('👤 AuthContext: User data prepared:', { role: userData.role, email: userData.email });
+
+          // ✅ Check email verification for sellers/customers
+          if (['seller', 'customer'].includes(userData.role) && firebaseUser.email && !firebaseUser.emailVerified) {
+            console.log(`🚫 AuthContext: ${userData.role} email not verified in Firebase`);
+            userData.requiresVerification = true;
+          }
+
+          localStorage.setItem('userInfo', JSON.stringify(userData));
+          localStorage.setItem('token', userData.token);
+          axios.defaults.headers.common['Authorization'] = `Bearer ${userData.token}`;
+
+          console.log('💾 AuthContext: Saved to localStorage');
+
+          dispatch({ type: USER_LOGIN_SUCCESS, payload: userData });
+          updateUser(userData);
+
+          console.log('✅ AuthContext: Profile loaded successfully, Role:', userData.role);
+
+          // Clear the fetching ref
+          fetchingUidRef.current = null;
+        } catch (error) {
+          console.error('❌ AuthContext: Error fetching profile:', error);
+          console.error('❌ AuthContext: Error details:', {
+            message: error.message,
+            response: error.response?.data,
+            status: error.response?.status
+          });
+
+          // Clear the fetching ref on error too
+          fetchingUidRef.current = null;
+
+          // Set user-visible error message
+          const errorMsg = error.response?.data?.message || error.message || 'Failed to load user profile';
+          setMessage(errorMsg);
+
+          // If user not found in MongoDB, they need to complete registration
+          if (error.response?.status === 404) {
+            console.log('⚠️ AuthContext: User not found in MongoDB');
+            setMessage('Account not found. Please register first.');
+            // Sign out from Firebase to allow re-registration
+            await auth.signOut();
+          } else if (error.response?.status === 401) {
+            console.log('⚠️ AuthContext: Authentication failed');
+            setMessage('Authentication failed. Please try logging in again.');
+            await auth.signOut();
           }
         }
       } else {
         console.log('❌ AuthContext: No Firebase user found');
+        // Clear the ref when user logs out
+        fetchingUidRef.current = null;
       }
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [dispatch, updateUser, user, userInfo]);
+  }, [dispatch, updateUser]);
 
   // Handle Redirection Persistence
   useEffect(() => {
@@ -359,13 +431,30 @@ export const AuthProvider = ({ children }) => {
         setMessage('Registration successful! Welcome to Rice-Express.');
         return { success: true };
       } else {
+        // MongoDB registration failed - clean up Firebase account
+        console.error('❌ AuthContext: MongoDB registration failed, cleaning up Firebase account');
+        await firebaseUser.delete();
+
         const msg = data.message || 'Registration failed at profile sync';
         dispatch({ type: USER_REGISTER_FAIL, payload: msg });
         return { success: false, message: msg };
       }
     } catch (error) {
       console.error('Registration Error:', error);
-      const errMsg = error.response?.data?.message || error.message || 'Registration failed';
+
+      // Handle specific Firebase errors
+      let errMsg = error.message || 'Registration failed';
+
+      if (error.code === 'auth/email-already-in-use') {
+        errMsg = 'This email is already registered. Please login instead or use a different email.';
+      } else if (error.code === 'auth/weak-password') {
+        errMsg = 'Password is too weak. Please use at least 8 characters.';
+      } else if (error.code === 'auth/invalid-email') {
+        errMsg = 'Invalid email address format.';
+      } else if (error.response?.data?.message) {
+        errMsg = error.response.data.message;
+      }
+
       dispatch({ type: USER_REGISTER_FAIL, payload: errMsg });
       setMessage(errMsg);
       return { success: false, message: errMsg };

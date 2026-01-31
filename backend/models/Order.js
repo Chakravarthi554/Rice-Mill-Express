@@ -261,6 +261,110 @@ const orderSchema = new mongoose.Schema({
     },
     notes: { type: String }
   },
+  // Delivery Partner Status Tracking
+  deliveryPartnerStatus: {
+    type: String,
+    enum: ['not_started', 'assigned', 'picked_up', 'in_transit', 'delivered'],
+    default: 'not_started'
+  },
+  deliveryStartedAt: {
+    type: Date
+  },
+  deliveryStartLocation: {
+    latitude: Number,
+    longitude: Number,
+    timestamp: Date
+  },
+
+  // Pickup Confirmation
+  deliveryPartnerPickedAt: {
+    type: Date
+  },
+  pickupConfirmedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+
+  // Navigation Tracking
+  navigationStartedAt: {
+    type: Date
+  },
+  estimatedArrivalTime: {
+    type: Date
+  },
+
+  // Photo-Based Delivery Proof (Cloudinary)
+  deliveryPhotoUrl: {
+    type: String
+  },
+  deliveryPhotoTimestamp: {
+    type: Date
+  },
+  deliveryPhotoOrderId: {
+    type: String
+  },
+  deliveryPhotoCloudinaryId: {
+    type: String
+  },
+
+  // COD Collection Tracking
+  codCollectedConfirmedAt: {
+    type: Date
+  },
+  codCollectionPhotoUrl: {
+    type: String
+  },
+
+  // Replacement Request Tracking
+  hasReplacementRequest: {
+    type: Boolean,
+    default: false
+  },
+  replacementStatus: {
+    type: String,
+    enum: ['none', 'requested', 'approved', 'rejected'],
+    default: 'none'
+  },
+  replacementReason: {
+    type: String,
+    enum: ['damaged_product', 'wrong_product', 'quality_issue', 'incomplete_order', 'other']
+  },
+  replacementDescription: {
+    type: String
+  },
+  replacementPhotoUrl: {
+    type: String
+  },
+  replacementPhotoCloudinaryId: {
+    type: String
+  },
+  replacementRequestedAt: {
+    type: Date
+  },
+  replacementRequestedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  replacementReviewedAt: {
+    type: Date
+  },
+  replacementReviewedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  replacementReviewNotes: {
+    type: String
+  },
+
+  // Auto-Status Update History
+  autoStatusUpdates: [{
+    from: String,
+    to: String,
+    triggeredBy: String,
+    timestamp: { type: Date, default: Date.now },
+    reason: String
+  }],
+
   notes: {
     type: String
   }

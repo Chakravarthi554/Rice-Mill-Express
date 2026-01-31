@@ -192,14 +192,14 @@ const SellerKycPage = () => {
           <Typography><strong>Admin Notes:</strong> {data.reviewNotes}</Typography>
         </Box>
       )}
-      
+
       {/* Message Admin Button */}
       <Box sx={{ mt: 3, p: 2, border: '1px solid', borderColor: 'primary.main', borderRadius: 1 }}>
         <Typography variant="h6" gutterBottom color="primary">
           Need Help with KYC?
         </Typography>
         <Typography variant="body2" sx={{ mb: 2 }}>
-          If you have questions about your KYC application or need assistance, 
+          If you have questions about your KYC application or need assistance,
           you can message the admin directly.
         </Typography>
         <Button
@@ -236,8 +236,8 @@ const SellerKycPage = () => {
           <Typography variant="body2" sx={{ mb: 2 }}>
             Message our admin team directly for any KYC-related questions or assistance.
           </Typography>
-          <Button 
-            variant="contained" 
+          <Button
+            variant="contained"
             sx={{ bgcolor: 'white', color: 'primary.main', '&:hover': { bgcolor: 'grey.100' } }}
             onClick={() => setChatWithAdminOpen(true)}
           >
@@ -274,15 +274,15 @@ const SellerKycPage = () => {
 
             {activeStep === 1 && (
               <>
-                <Grid item xs={12}><FileUpload label="ID Proof" onFileSelect={(f) => handleFileChange(f, 'idProof')} /></Grid>
+                <Grid item xs={12}><FileUpload label="ID Proof" onUploadComplete={(f) => handleFileChange(f, 'idProof')} /></Grid>
                 {errors.idProof && <Grid item xs={12}><Alert severity="error">{errors.idProof}</Alert></Grid>}
-                <Grid item xs={12}><FileUpload label="Address Proof" onFileSelect={(f) => handleFileChange(f, 'addressProof')} /></Grid>
+                <Grid item xs={12}><FileUpload label="Address Proof" onUploadComplete={(f) => handleFileChange(f, 'addressProof')} /></Grid>
                 {errors.addressProof && <Grid item xs={12}><Alert severity="error">{errors.addressProof}</Alert></Grid>}
-                <Grid item xs={12}><FileUpload label="Business Proof" onFileSelect={(f) => handleFileChange(f, 'businessProof')} /></Grid>
+                <Grid item xs={12}><FileUpload label="Business Proof" onUploadComplete={(f) => handleFileChange(f, 'businessProof')} /></Grid>
                 {errors.businessProof && <Grid item xs={12}><Alert severity="error">{errors.businessProof}</Alert></Grid>}
-                <Grid item xs={12}><FileUpload label="GST Certificate" onFileSelect={(f) => handleFileChange(f, 'gstCertificate')} /></Grid>
+                <Grid item xs={12}><FileUpload label="GST Certificate" onUploadComplete={(f) => handleFileChange(f, 'gstCertificate')} /></Grid>
                 {errors.gstCertificate && <Grid item xs={12}><Alert severity="error">{errors.gstCertificate}</Alert></Grid>}
-                <Grid item xs={12}><FileUpload label="PAN Card" onFileSelect={(f) => handleFileChange(f, 'panCard')} /></Grid>
+                <Grid item xs={12}><FileUpload label="PAN Card" onUploadComplete={(f) => handleFileChange(f, 'panCard')} /></Grid>
                 {errors.panCard && <Grid item xs={12}><Alert severity="error">{errors.panCard}</Alert></Grid>}
               </>
             )}

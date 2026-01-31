@@ -8,8 +8,14 @@ const User = require('../models/User.js');
 // @access  Private/Seller
 const getDeliveryPartners = asyncHandler(async (req, res) => {
   console.log('🔍 Fetching delivery partners for seller:', req.user._id);
-  const partners = await DeliveryPartner.find({ seller: req.user._id });
-  console.log('📦 Found partners:', {
+
+  // ✅ FIXED: Only return approved partners for order assignment
+  const partners = await DeliveryPartner.find({
+    seller: req.user._id,
+    kycStatus: 'approved' // Only show approved partners
+  }).populate('user', 'name email phone');
+
+  console.log('📦 Found approved partners:', {
     count: partners.length,
     partners: partners.map(p => ({
       id: p._id,
@@ -18,6 +24,7 @@ const getDeliveryPartners = asyncHandler(async (req, res) => {
       seller: p.seller
     }))
   });
+
   res.json(partners);
 });
 
@@ -69,7 +76,8 @@ const createDeliveryPartner = asyncHandler(async (req, res) => {
   const userData = {
     name,
     role: 'deliveryPartner',
-    isVerified: true // Pre-verified since seller is adding them
+    isVerified: false, // Will be set to true when admin approves KYC
+    emailVerified: false // Will be set to true when admin approves KYC
   };
 
   // Add credentials based on what was provided
@@ -98,6 +106,39 @@ const createDeliveryPartner = asyncHandler(async (req, res) => {
     throw new Error('Failed to create user account for delivery partner');
   }
 
+  console.log('✅ User created in MongoDB:', user._id);
+
+  // ✅ CRITICAL FIX: Create Firebase Auth account
+  try {
+    const admin = require('firebase-admin');
+
+    // Only create Firebase account for email-based auth (not phone-only)
+    if (hasEmailAuth) {
+      const firebaseUserRecord = await admin.auth().createUser({
+        email: userData.email,
+        password: password,
+        displayName: name,
+        emailVerified: false, // Will be verified when admin approves
+      });
+
+      console.log('✅ Firebase Auth account created:', firebaseUserRecord.uid);
+
+      // Update MongoDB user with Firebase UID
+      user.firebaseUid = firebaseUserRecord.uid;
+      await user.save();
+
+      console.log('✅ Firebase UID linked to MongoDB user');
+    } else {
+      console.log('⏩ Skipping Firebase Auth creation for phone-only partner (will use OTP)');
+    }
+  } catch (firebaseError) {
+    // Rollback MongoDB user if Firebase creation fails
+    await User.findByIdAndDelete(user._id);
+    console.error('❌ Firebase Auth creation failed:', firebaseError.message);
+    res.status(500);
+    throw new Error(`Failed to create Firebase account: ${firebaseError.message}`);
+  }
+
   // 3. Create the DeliveryPartner profile linked to the User
   const partner = new DeliveryPartner({
     name,
@@ -112,10 +153,23 @@ const createDeliveryPartner = asyncHandler(async (req, res) => {
 
   try {
     const createdPartner = await partner.save();
+    console.log('✅ Delivery partner profile created:', createdPartner._id);
     res.status(201).json(createdPartner);
   } catch (error) {
     // Rollback user creation if partner save fails
     await User.findByIdAndDelete(user._id);
+
+    // Also delete Firebase account if it was created
+    if (user.firebaseUid) {
+      try {
+        const admin = require('firebase-admin');
+        await admin.auth().deleteUser(user.firebaseUid);
+        console.log('✅ Firebase account rolled back');
+      } catch (fbError) {
+        console.error('⚠️ Failed to rollback Firebase account:', fbError.message);
+      }
+    }
+
     res.status(500);
     throw new Error('Failed to save delivery partner profile to database');
   }
@@ -337,24 +391,60 @@ const getPendingKYC = asyncHandler(async (req, res) => {
 // @access  Private/Admin
 const approveKYC = asyncHandler(async (req, res) => {
   const { status, rejectionReason } = req.body;
-  const partner = await DeliveryPartner.findById(req.params.id);
 
-  if (partner) {
-    partner.kycStatus = status; // 'approved' or 'rejected'
-    if (status === 'rejected') {
-      partner.kycRejectionReason = rejectionReason;
-    } else if (status === 'approved') {
-      partner.approvedBy = req.user._id;
-      partner.approvedAt = Date.now();
-      partner.kycRejectionReason = undefined;
-    }
+  // Populate user to access linked User document
+  const partner = await DeliveryPartner.findById(req.params.id).populate('user');
 
-    const updatedPartner = await partner.save();
-    res.json(updatedPartner);
-  } else {
+  if (!partner) {
     res.status(404);
     throw new Error('Delivery partner not found');
   }
+
+  // Update delivery partner status
+  partner.kycStatus = status; // 'approved' or 'rejected'
+
+  if (status === 'rejected') {
+    partner.kycRejectionReason = rejectionReason;
+  } else if (status === 'approved') {
+    partner.approvedBy = req.user._id;
+    partner.approvedAt = Date.now();
+    partner.kycRejectionReason = undefined;
+
+    // ✅ CRITICAL FIX: Update linked User document for login access
+    if (partner.user) {
+      console.log('🔄 Updating User document for delivery partner:', partner.user._id);
+
+      const user = await User.findById(partner.user);
+      if (user) {
+        // Enable login and set proper role
+        user.isVerified = true;
+        user.emailVerified = true;
+        user.role = 'deliveryPartner';
+
+        await user.save();
+        console.log('✅ User document updated successfully');
+
+        // ✅ CRITICAL FIX: Sync to Firestore for Firebase Auth
+        try {
+          const firebaseUserSync = require('../utils/firebaseUserSync');
+          await firebaseUserSync.syncUser(user);
+          console.log('✅ Delivery partner synced to Firestore');
+        } catch (firestoreError) {
+          console.error('⚠️ Firestore sync failed (non-critical):', firestoreError.message);
+          // Don't fail the approval if Firestore sync fails
+        }
+      } else {
+        console.warn('⚠️ Linked User document not found for partner:', partner._id);
+      }
+    } else {
+      console.warn('⚠️ No linked User for delivery partner:', partner._id);
+    }
+  }
+
+  const updatedPartner = await partner.save();
+  console.log(`✅ Delivery partner ${status}:`, updatedPartner._id);
+
+  res.json(updatedPartner);
 });
 
 // @desc    Report COD collected
@@ -407,7 +497,264 @@ const getAssignedOrders = asyncHandler(async (req, res) => {
     .populate('seller', 'name phone businessDetails')
     .sort('-updatedAt');
 
+
   res.json({ success: true, orders });
+});
+
+// @desc    Get single order details for delivery partner
+// @route   GET /api/delivery-partners/orders/:orderId
+// @access  Private/DeliveryPartner
+const getOrderDetails = asyncHandler(async (req, res) => {
+  const { orderId } = req.params;
+
+  // 1. Get delivery partner profile
+  const partnerProfile = await DeliveryPartner.findOne({ user: req.user._id });
+
+  if (!partnerProfile) {
+    res.status(404);
+    throw new Error('Delivery partner profile not found');
+  }
+
+  // 2. Fetch order and verify it's assigned to this partner
+  const order = await Order.findById(orderId)
+    .populate('user', 'name email phone')
+    .populate('seller', 'name phone email businessDetails')
+    .populate('deliveryPartner');
+
+  if (!order) {
+    res.status(404);
+    throw new Error('Order not found');
+  }
+
+  // 3. Verify this order is assigned to the logged-in delivery partner
+  if (!order.deliveryPartner || order.deliveryPartner._id.toString() !== partnerProfile._id.toString()) {
+    res.status(403);
+    throw new Error('You are not authorized to view this order');
+  }
+
+  res.json({ success: true, order });
+});
+
+// @desc    Start delivery (mark as in_transit)
+// @route   POST /api/delivery-partners/orders/:orderId/start
+// @access  Private/DeliveryPartner
+const startDelivery = asyncHandler(async (req, res) => {
+  const { orderId } = req.params;
+  const { latitude, longitude } = req.body;
+
+  // 1. Get delivery partner profile
+  const partnerProfile = await DeliveryPartner.findOne({ user: req.user._id });
+
+  if (!partnerProfile) {
+    res.status(404);
+    throw new Error('Delivery partner profile not found');
+  }
+
+  // 2. Fetch order
+  const order = await Order.findById(orderId);
+
+  if (!order) {
+    res.status(404);
+    throw new Error('Order not found');
+  }
+
+  // 3. Verify assignment
+  if (!order.deliveryPartner || order.deliveryPartner.toString() !== partnerProfile._id.toString()) {
+    res.status(403);
+    throw new Error('You are not authorized to update this order');
+  }
+
+  // 4. Verify order status allows starting delivery
+  if (!['shipped', 'out_for_delivery'].includes(order.orderStatus)) {
+    res.status(400);
+    throw new Error(`Cannot start delivery for order with status: ${order.orderStatus}`);
+  }
+
+  // 5. Update order status
+  order.deliveryPartnerStatus = 'in_transit';
+  order.orderStatus = 'out_for_delivery';
+  order.deliveryStartedAt = new Date();
+
+  // Optional: Capture start location
+  if (latitude && longitude) {
+    order.deliveryStartLocation = {
+      latitude,
+      longitude,
+      timestamp: new Date()
+    };
+  }
+
+  // Add to status history
+  order.statusHistory.push({
+    status: 'out_for_delivery',
+    timestamp: new Date(),
+    reason: 'Delivery started by partner'
+  });
+
+  await order.save();
+
+  res.json({
+    success: true,
+    message: 'Delivery started successfully',
+    order
+  });
+});
+
+// @desc    Confirm delivery with photo proof
+// @route   POST /api/delivery-partners/orders/:orderId/confirm
+// @access  Private/DeliveryPartner
+const confirmDelivery = asyncHandler(async (req, res) => {
+  const { orderId } = req.params;
+  const { latitude, longitude, notes } = req.body;
+
+  // 1. Get delivery partner profile
+  const partnerProfile = await DeliveryPartner.findOne({ user: req.user._id });
+
+  if (!partnerProfile) {
+    res.status(404);
+    throw new Error('Delivery partner profile not found');
+  }
+
+  // 2. Fetch order
+  const order = await Order.findById(orderId);
+
+  if (!order) {
+    res.status(404);
+    throw new Error('Order not found');
+  }
+
+  // 3. Verify assignment
+  if (!order.deliveryPartner || order.deliveryPartner.toString() !== partnerProfile._id.toString()) {
+    res.status(403);
+    throw new Error('You are not authorized to update this order');
+  }
+
+  // 4. Verify order status
+  if (order.orderStatus === 'delivered') {
+    res.status(400);
+    throw new Error('Order is already marked as delivered');
+  }
+
+  // 5. Check for photo proof (required)
+  if (!req.file) {
+    res.status(400);
+    throw new Error('Delivery photo proof is required');
+  }
+
+  // 6. Update order with delivery confirmation
+  order.deliveryPartnerStatus = 'delivered';
+  order.orderStatus = 'delivered';
+  order.isDelivered = true;
+  order.deliveredAt = new Date();
+  order.actualDeliveryDate = new Date();
+
+  // Set delivery confirmation details
+  order.deliveryConfirmation = {
+    otpVerified: false, // No OTP required, using photo proof instead
+    verifiedAt: new Date(),
+    verifiedBy: req.user._id,
+    photoProofUrl: `/uploads/${req.file.filename}`,
+    location: latitude && longitude ? {
+      latitude,
+      longitude,
+      accuracy: 0,
+      timestamp: new Date().toISOString()
+    } : undefined,
+    notes: notes || 'Delivery confirmed with photo proof'
+  };
+
+  // Add to status history
+  order.statusHistory.push({
+    status: 'delivered',
+    timestamp: new Date(),
+    reason: 'Delivery confirmed by partner with photo proof'
+  });
+
+  await order.save();
+
+  res.json({
+    success: true,
+    message: 'Delivery confirmed successfully',
+    order
+  });
+});
+
+// @desc    Request replacement for an order
+// @route   POST /api/delivery-partners/orders/:orderId/replacement
+// @access  Private/DeliveryPartner
+const requestReplacement = asyncHandler(async (req, res) => {
+  const { orderId } = req.params;
+  const { reason, description } = req.body;
+
+  // Import Replacement model
+  const Replacement = require('../models/Replacement.js');
+
+  // 1. Validate required fields
+  if (!reason || !description) {
+    res.status(400);
+    throw new Error('Reason and description are required');
+  }
+
+  // 2. Check for photo proof (required for delivery partner)
+  if (!req.file) {
+    res.status(400);
+    throw new Error('Photo proof is required for replacement requests');
+  }
+
+  // 3. Get delivery partner profile
+  const partnerProfile = await DeliveryPartner.findOne({ user: req.user._id });
+
+  if (!partnerProfile) {
+    res.status(404);
+    throw new Error('Delivery partner profile not found');
+  }
+
+  // 4. Fetch order
+  const order = await Order.findById(orderId);
+
+  if (!order) {
+    res.status(404);
+    throw new Error('Order not found');
+  }
+
+  // 5. Verify assignment
+  if (!order.deliveryPartner || order.deliveryPartner.toString() !== partnerProfile._id.toString()) {
+    res.status(403);
+    throw new Error('You are not authorized to request replacement for this order');
+  }
+
+  // 6. Check if replacement already requested
+  const existingReplacement = await Replacement.findOne({
+    order: orderId,
+    status: { $in: ['pending', 'approved'] }
+  });
+
+  if (existingReplacement) {
+    res.status(400);
+    throw new Error('A replacement request already exists for this order');
+  }
+
+  // 7. Create replacement request
+  const replacement = await Replacement.create({
+    order: orderId,
+    requestedBy: req.user._id,
+    requesterRole: 'deliveryPartner',
+    reason,
+    description,
+    photoProof: `/uploads/${req.file.filename}`,
+    status: 'pending'
+  });
+
+  // 8. Update order
+  order.hasReplacementRequest = true;
+  order.replacementStatus = 'requested';
+  await order.save();
+
+  res.status(201).json({
+    success: true,
+    message: 'Replacement request submitted successfully',
+    replacement
+  });
 });
 
 module.exports = {
@@ -422,4 +769,8 @@ module.exports = {
   approveKYC,
   reportCOD,
   getAssignedOrders,
+  getOrderDetails,
+  startDelivery,
+  confirmDelivery,
+  requestReplacement,
 };

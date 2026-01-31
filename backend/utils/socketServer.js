@@ -122,6 +122,11 @@ const setupSocketServer = (server) => {
       socket.join('sellers_room'); // ✅ FIX: Global seller room for admin broadcasts
       logger.info(`👨‍💼 Seller ${socket.userId} joined seller rooms`);
     }
+    if (socket.role === 'deliveryPartner') {
+      socket.join(`delivery_partner_${socket.userId}`);
+      socket.join('delivery_partners_room'); // Global delivery partner room
+      logger.info(`🚚 Delivery Partner ${socket.userId} joined delivery partner rooms`);
+    }
 
     // 🟢 PRESENCE: Broadcast online status
     socket.broadcast.emit('user:online', {
@@ -555,12 +560,25 @@ const setupSocketServer = (server) => {
 
       const payload = {
         type: 'ORDER_UPDATE',
-        data: { orderId, status: order.orderStatus, ...extra },
+        data: {
+          orderId,
+          status: order.orderStatus,
+          deliveryPartnerStatus: order.deliveryPartnerStatus,
+          isDelivered: order.isDelivered,
+          deliveredAt: order.deliveredAt,
+          ...extra
+        },
       };
 
+      // Emit to all relevant parties
       userList.forEach(uid => io.to(`user_${uid}`).emit('ORDER_UPDATE', payload));
       io.to(`order_${orderId}`).emit('ORDER_UPDATE', payload);
       io.to('admin_room').emit('ORDER_UPDATE', payload);
+
+      // Also emit to delivery partner room if assigned
+      if (order.deliveryPartner) {
+        io.to(`delivery_partner_${order.deliveryPartner._id}`).emit('ORDER_UPDATE', payload);
+      }
 
       // Create notifications
       const Notification = require('../models/Notification');
@@ -577,6 +595,80 @@ const setupSocketServer = (server) => {
     } catch (err) {
       logger.error('❌ broadcastOrderUpdate error', err);
     }
+  };
+
+  // Delivery Partner specific event handlers
+  const broadcastDeliveryPickup = (orderId, deliveryPartnerId, orderData) => {
+    io.to(`order_${orderId}`).emit('delivery:pickup-confirmed', {
+      orderId,
+      deliveryPartnerId,
+      timestamp: new Date(),
+      ...orderData
+    });
+    io.to('admin_room').emit('delivery:pickup-confirmed', {
+      orderId,
+      deliveryPartnerId,
+      timestamp: new Date(),
+      ...orderData
+    });
+    logger.info(`✅ Delivery pickup broadcast for order ${orderId}`);
+  };
+
+  const broadcastNavigationStarted = (orderId, deliveryPartnerId, navigationData) => {
+    io.to(`order_${orderId}`).emit('delivery:navigation-started', {
+      orderId,
+      deliveryPartnerId,
+      timestamp: new Date(),
+      ...navigationData
+    });
+    logger.info(`✅ Navigation started broadcast for order ${orderId}`);
+  };
+
+  const broadcastDeliveryCompleted = (orderId, deliveryPartnerId, deliveryData) => {
+    io.to(`order_${orderId}`).emit('delivery:completed', {
+      orderId,
+      deliveryPartnerId,
+      timestamp: new Date(),
+      ...deliveryData
+    });
+    io.to('admin_room').emit('delivery:completed', {
+      orderId,
+      deliveryPartnerId,
+      timestamp: new Date(),
+      ...deliveryData
+    });
+    logger.info(`✅ Delivery completed broadcast for order ${orderId}`);
+  };
+
+  const broadcastEmergencyAlert = (alertData) => {
+    // Alert admin and seller
+    io.to('admin_room').emit('emergency:alert', {
+      ...alertData,
+      timestamp: new Date()
+    });
+
+    if (alertData.sellerId) {
+      io.to(`seller_${alertData.sellerId}`).emit('emergency:alert', {
+        ...alertData,
+        timestamp: new Date()
+      });
+    }
+
+    logger.info(`🚨 Emergency alert broadcast from delivery partner ${alertData.deliveryPartnerId}`);
+  };
+
+  const broadcastReplacementRequest = (orderId, replacementData) => {
+    io.to(`order_${orderId}`).emit('replacement:requested', {
+      orderId,
+      timestamp: new Date(),
+      ...replacementData
+    });
+    io.to('admin_room').emit('replacement:requested', {
+      orderId,
+      timestamp: new Date(),
+      ...replacementData
+    });
+    logger.info(`✅ Replacement request broadcast for order ${orderId}`);
   };
 
   const broadcastBulkOrderUpdate = async (bulkId) => {
@@ -627,7 +719,12 @@ const setupSocketServer = (server) => {
     broadcastOrderUpdate,
     broadcastBulkOrderUpdate,
     emitAdminNotification,
-    emitNotification
+    emitNotification,
+    broadcastDeliveryPickup,
+    broadcastNavigationStarted,
+    broadcastDeliveryCompleted,
+    broadcastEmergencyAlert,
+    broadcastReplacementRequest,
   };
 };
 
