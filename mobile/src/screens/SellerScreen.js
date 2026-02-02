@@ -1,20 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { useSelector, useDispatch } from 'react-redux';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useSelector } from 'react-redux';
 import { Card, Button } from 'react-native-paper';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import { getSellerOrders } from '../redux/actions/orderActions';
+import { MaterialIcons } from '@expo/vector-icons';
+import { apiService } from '../services/api';
 
 const SellerScreen = ({ navigation }) => {
-  const dispatch = useDispatch();
-  const { sellerOrders, loading } = useSelector(state => state.sellerOrders);
+  const { user } = useSelector(state => state.auth);
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('pending');
 
   useEffect(() => {
-    dispatch(getSellerOrders());
-  }, [dispatch]);
+    fetchSellerOrders();
+  }, []);
 
-  const filteredOrders = sellerOrders.filter(order => {
+  const fetchSellerOrders = async () => {
+    try {
+      setLoading(true);
+      const response = await apiService.getSellerOrders();
+      setOrders(response.data || []);
+    } catch (error) {
+      console.error('Error fetching seller orders:', error);
+      setOrders([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredOrders = orders.filter(order => {
     if (activeTab === 'pending') {
       return ['placed', 'packed'].includes(order.orderStatus);
     }
@@ -57,7 +71,7 @@ const SellerScreen = ({ navigation }) => {
 
       <ScrollView style={styles.scrollContainer}>
         {loading ? (
-          <Text>Loading...</Text>
+          <ActivityIndicator size="large" color="#4CAF50" style={{ marginTop: 20 }} />
         ) : filteredOrders.length === 0 ? (
           <Text style={styles.noOrders}>No {activeTab} orders found</Text>
         ) : (

@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { Button, TextInput, Card } from 'react-native-paper';
+import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
+import { Button, TextInput, Card, ActivityIndicator } from 'react-native-paper';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import { useDispatch, useSelector } from 'react-redux';
-import { submitKycApplication } from '../redux/actions/kycActions';
+import { apiService } from '../services/api';
 
 const SellerKycScreen = ({ navigation }) => {
   const [step, setStep] = useState(1);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     businessName: '',
     businessType: '',
@@ -28,8 +28,6 @@ const SellerKycScreen = ({ navigation }) => {
     gstCertificate: null,
     panCard: null
   });
-  const dispatch = useDispatch();
-  const { loading } = useSelector(state => state.kycSubmit);
 
   const handleNext = () => {
     if (step === 1 && (!formData.businessName || !formData.gstNumber || !formData.panNumber)) {
@@ -43,28 +41,43 @@ const SellerKycScreen = ({ navigation }) => {
     setStep(step - 1);
   };
 
-  const handleSubmit = () => {
-    const formDataToSend = new FormData();
-    
-    // Append business details
-    formDataToSend.append('businessName', formData.businessName);
-    formDataToSend.append('businessType', formData.businessType);
-    formDataToSend.append('gstNumber', formData.gstNumber);
-    formDataToSend.append('panNumber', formData.panNumber);
-    formDataToSend.append('businessAddress', JSON.stringify(formData.businessAddress));
-    
-    // Append documents
-    Object.entries(documents).forEach(([key, file]) => {
-      if (file) {
-        formDataToSend.append(key, {
-          uri: file.uri,
-          name: file.name,
-          type: file.mimeType || 'application/octet-stream'
-        });
-      }
-    });
-    
-    dispatch(submitKycApplication(formDataToSend, navigation));
+  const handleSubmit = async () => {
+    try {
+      setLoading(true);
+
+      const formDataToSend = new FormData();
+
+      // Append business details
+      formDataToSend.append('businessName', formData.businessName);
+      formDataToSend.append('businessType', formData.businessType);
+      formDataToSend.append('gstNumber', formData.gstNumber);
+      formDataToSend.append('panNumber', formData.panNumber);
+      formDataToSend.append('businessAddress', JSON.stringify(formData.businessAddress));
+
+      // Append documents
+      Object.entries(documents).forEach(([key, file]) => {
+        if (file) {
+          formDataToSend.append(key, {
+            uri: file.uri,
+            name: file.name,
+            type: file.mimeType || 'application/octet-stream'
+          });
+        }
+      });
+
+      await apiService.submitKyc(formDataToSend);
+
+      Alert.alert(
+        'Success',
+        'KYC application submitted successfully!',
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
+    } catch (error) {
+      console.error('KYC submission error:', error);
+      Alert.alert('Error', error.response?.data?.message || 'Failed to submit KYC application');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const pickDocument = async (fieldName) => {
@@ -72,7 +85,7 @@ const SellerKycScreen = ({ navigation }) => {
       const result = await DocumentPicker.getDocumentAsync({
         type: ['image/*', 'application/pdf'],
       });
-      
+
       if (!result.canceled) {
         setDocuments(prev => ({
           ...prev,
@@ -92,7 +105,7 @@ const SellerKycScreen = ({ navigation }) => {
         aspect: [4, 3],
         quality: 1,
       });
-      
+
       if (!result.canceled) {
         setDocuments(prev => ({
           ...prev,
@@ -116,28 +129,28 @@ const SellerKycScreen = ({ navigation }) => {
             <TextInput
               label="Business Name *"
               value={formData.businessName}
-              onChangeText={text => setFormData({...formData, businessName: text})}
+              onChangeText={text => setFormData({ ...formData, businessName: text })}
               style={styles.input}
               mode="outlined"
             />
             <TextInput
               label="Business Type"
               value={formData.businessType}
-              onChangeText={text => setFormData({...formData, businessType: text})}
+              onChangeText={text => setFormData({ ...formData, businessType: text })}
               style={styles.input}
               mode="outlined"
             />
             <TextInput
               label="GST Number *"
               value={formData.gstNumber}
-              onChangeText={text => setFormData({...formData, gstNumber: text})}
+              onChangeText={text => setFormData({ ...formData, gstNumber: text })}
               style={styles.input}
               mode="outlined"
             />
             <TextInput
               label="PAN Number *"
               value={formData.panNumber}
-              onChangeText={text => setFormData({...formData, panNumber: text})}
+              onChangeText={text => setFormData({ ...formData, panNumber: text })}
               style={styles.input}
               mode="outlined"
             />
@@ -147,7 +160,7 @@ const SellerKycScreen = ({ navigation }) => {
               value={formData.businessAddress.street}
               onChangeText={text => setFormData({
                 ...formData,
-                businessAddress: {...formData.businessAddress, street: text}
+                businessAddress: { ...formData.businessAddress, street: text }
               })}
               style={styles.input}
               mode="outlined"
@@ -157,7 +170,7 @@ const SellerKycScreen = ({ navigation }) => {
               value={formData.businessAddress.city}
               onChangeText={text => setFormData({
                 ...formData,
-                businessAddress: {...formData.businessAddress, city: text}
+                businessAddress: { ...formData.businessAddress, city: text }
               })}
               style={styles.input}
               mode="outlined"
@@ -167,7 +180,7 @@ const SellerKycScreen = ({ navigation }) => {
               value={formData.businessAddress.state}
               onChangeText={text => setFormData({
                 ...formData,
-                businessAddress: {...formData.businessAddress, state: text}
+                businessAddress: { ...formData.businessAddress, state: text }
               })}
               style={styles.input}
               mode="outlined"
@@ -177,7 +190,7 @@ const SellerKycScreen = ({ navigation }) => {
               value={formData.businessAddress.pinCode}
               onChangeText={text => setFormData({
                 ...formData,
-                businessAddress: {...formData.businessAddress, pinCode: text}
+                businessAddress: { ...formData.businessAddress, pinCode: text }
               })}
               style={styles.input}
               mode="outlined"
@@ -189,7 +202,7 @@ const SellerKycScreen = ({ navigation }) => {
         return (
           <View style={styles.formContainer}>
             <Text style={styles.sectionTitle}>Upload Required Documents</Text>
-            
+
             <Card style={styles.documentCard}>
               <Card.Title title="ID Proof (Aadhar/Passport)" />
               <Card.Content>
@@ -204,7 +217,7 @@ const SellerKycScreen = ({ navigation }) => {
                 <Button onPress={() => takePhoto('idProof')}>Take Photo</Button>
               </Card.Actions>
             </Card>
-            
+
             {/* Repeat similar Card components for other documents */}
             <Card style={styles.documentCard}>
               <Card.Title title="Address Proof" />
@@ -220,7 +233,7 @@ const SellerKycScreen = ({ navigation }) => {
                 <Button onPress={() => takePhoto('addressProof')}>Take Photo</Button>
               </Card.Actions>
             </Card>
-            
+
             <Card style={styles.documentCard}>
               <Card.Title title="Business Proof" />
               <Card.Content>
@@ -241,7 +254,7 @@ const SellerKycScreen = ({ navigation }) => {
         return (
           <View style={styles.formContainer}>
             <Text style={styles.sectionTitle}>Review Your Application</Text>
-            
+
             <Card style={styles.reviewCard}>
               <Card.Title title="Business Details" />
               <Card.Content>
@@ -251,7 +264,7 @@ const SellerKycScreen = ({ navigation }) => {
                 <Text>PAN: {formData.panNumber}</Text>
               </Card.Content>
             </Card>
-            
+
             <Card style={styles.reviewCard}>
               <Card.Title title="Business Address" />
               <Card.Content>
@@ -264,7 +277,7 @@ const SellerKycScreen = ({ navigation }) => {
                 </Text>
               </Card.Content>
             </Card>
-            
+
             <Card style={styles.reviewCard}>
               <Card.Title title="Documents" />
               <Card.Content>
@@ -287,13 +300,13 @@ const SellerKycScreen = ({ navigation }) => {
       <View style={styles.stepIndicator}>
         <Text style={styles.stepText}>Step {step} of 3</Text>
       </View>
-      
+
       {renderStep()}
-      
+
       <View style={styles.buttonContainer}>
         {step > 1 && (
-          <Button 
-            mode="outlined" 
+          <Button
+            mode="outlined"
             onPress={handlePrev}
             style={styles.button}
           >
@@ -301,16 +314,16 @@ const SellerKycScreen = ({ navigation }) => {
           </Button>
         )}
         {step < 3 ? (
-          <Button 
-            mode="contained" 
+          <Button
+            mode="contained"
             onPress={handleNext}
             style={styles.button}
           >
             Next
           </Button>
         ) : (
-          <Button 
-            mode="contained" 
+          <Button
+            mode="contained"
             onPress={handleSubmit}
             style={styles.button}
             loading={loading}

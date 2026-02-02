@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
-import { useSelector, useDispatch } from 'react-redux';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert } from 'react-native';
+import { useSelector } from 'react-redux';
 import { Card, Button, ActivityIndicator, Badge } from 'react-native-paper';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import axios from 'axios';
+import { MaterialIcons } from '@expo/vector-icons';
+import { apiService } from '../services/api';
 
 const DeliveryPartnerDashboard = ({ navigation }) => {
     const [orders, setOrders] = useState([]);
@@ -11,21 +11,16 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
     const [refreshing, setRefreshing] = useState(false);
     const [activeTab, setActiveTab] = useState('assigned');
 
-    const { userInfo } = useSelector(state => state.userLogin);
+    const { user } = useSelector(state => state.auth);
 
     const fetchOrders = async () => {
         try {
             setLoading(true);
-            const config = {
-                headers: {
-                    Authorization: `Bearer ${userInfo.token}`,
-                },
-            };
-            // Fetch assigned orders from the backend
-            const { data } = await axios.get('/api/orders/assigned', config);
-            setOrders(data.orders || []);
+            const response = await apiService.getDeliveryPartnerOrders();
+            setOrders(response.data || []);
         } catch (error) {
             console.error('Error fetching assigned orders:', error);
+            setOrders([]);
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -34,7 +29,7 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
 
     useEffect(() => {
         fetchOrders();
-    }, [userInfo]);
+    }, []);
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -76,19 +71,19 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
                 </View>
 
                 <View style={styles.infoRow}>
-                    <Icon name="person" size={18} color="#666" />
+                    <MaterialIcons name="person" size={18} color="#666" />
                     <Text style={styles.infoText}>{order.shippingAddress.name}</Text>
                 </View>
 
                 <View style={styles.infoRow}>
-                    <Icon name="location-on" size={18} color="#666" />
+                    <MaterialIcons name="location-on" size={18} color="#666" />
                     <Text style={styles.infoText} numberOfLines={2}>
                         {order.shippingAddress.street}, {order.shippingAddress.city}
                     </Text>
                 </View>
 
                 <View style={styles.infoRow}>
-                    <Icon name="phone" size={18} color="#666" />
+                    <MaterialIcons name="phone" size={18} color="#666" />
                     <Text style={styles.infoText}>{order.shippingAddress.phone}</Text>
                 </View>
 
@@ -164,7 +159,7 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
                     <ActivityIndicator animating={true} style={styles.loader} />
                 ) : filteredOrders.length === 0 ? (
                     <View style={styles.emptyContainer}>
-                        <Icon name="local-shipping" size={64} color="#ccc" />
+                        <MaterialIcons name="local-shipping" size={64} color="#ccc" />
                         <Text style={styles.emptyText}>No {activeTab} orders found</Text>
                     </View>
                 ) : (

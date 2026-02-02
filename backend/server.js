@@ -88,7 +88,15 @@ app.use(cookieParser());
 // Enhanced CORS setup
 app.use(
   cors({
-    origin: ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001"],
+    origin: [
+      "http://localhost:3000",
+      "http://127.0.0.1:3000",
+      "http://localhost:3001",
+      "exp://10.65.213.143:8081",     // Expo mobile app (local network)
+      "http://10.65.213.143:8081",    // Expo mobile app (alternative)
+      /^exp:\/\/192\.168\.\d{1,3}\.\d{1,3}:8081$/,  // Expo on any local network
+      /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}:8081$/,  // HTTP on any local network
+    ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],

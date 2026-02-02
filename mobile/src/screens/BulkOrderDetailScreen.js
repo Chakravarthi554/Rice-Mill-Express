@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { 
-  Card, 
-  Button, 
+import {
+  Card,
+  Button,
   DataTable,
   Divider,
   ActivityIndicator,
   Snackbar
 } from 'react-native-paper';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { MaterialIcons } from '@expo/vector-icons';
 import { updateBulkOrder } from '../redux/actions/bulkOrderActions';
 import { getBulkOrderDetails } from '../redux/actions/bulkOrderActions';
 import {
@@ -75,10 +75,10 @@ const BulkOrderDetailScreen = ({ route, navigation }) => {
   if (error) {
     return (
       <View style={styles.errorContainer}>
-        <Icon name="error-outline" size={50} color="#F44336" />
+        <MaterialIcons name="error-outline" size={50} color="#F44336" />
         <Text style={styles.errorText}>{error}</Text>
-        <Button 
-          mode="contained" 
+        <Button
+          mode="contained"
           onPress={() => navigation.goBack()}
           style={styles.button}
         >
@@ -104,7 +104,7 @@ const BulkOrderDetailScreen = ({ route, navigation }) => {
               <DataTable.Title numeric>Price</DataTable.Title>
               <DataTable.Title numeric>Total</DataTable.Title>
             </DataTable.Header>
-            
+
             {bulkOrder.items.map((item, index) => (
               <DataTable.Row key={index}>
                 <DataTable.Cell>{item.name}</DataTable.Cell>
@@ -164,8 +164,8 @@ const BulkOrderDetailScreen = ({ route, navigation }) => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Payment Terms</Text>
             <Text style={styles.infoText}>
-              {bulkOrder.paymentTerms === 'advance' ? '100% Advance Payment' : 
-               bulkOrder.paymentTerms === 'credit' ? 'Credit' : 'Cash on Delivery'}
+              {bulkOrder.paymentTerms === 'advance' ? '100% Advance Payment' :
+                bulkOrder.paymentTerms === 'credit' ? 'Credit' : 'Cash on Delivery'}
             </Text>
           </View>
 
@@ -177,8 +177,8 @@ const BulkOrderDetailScreen = ({ route, navigation }) => {
           )}
 
           {userInfo.role === 'seller' && bulkOrder.status === 'confirmed' && (
-            <Button 
-              mode="contained" 
+            <Button
+              mode="contained"
               onPress={handleFulfillOrder}
               style={styles.actionButton}
             >
@@ -255,84 +255,5 @@ const styles = StyleSheet.create({
     width: '80%',
   },
 });
-
-export const getBulkOrderDetails = (id) => async (dispatch, getState) => {
-  try {
-    dispatch({
-      type: BULK_ORDER_DETAILS_REQUEST,
-    });
-
-    const {
-      userLogin: { userInfo },
-    } = getState();
-
-    const config = {
-      headers: {
-        Authorization: `Bearer ${userInfo.token}`,
-      },
-    };
-
-    const { data } = await axios.get(`/api/bulkorders/${id}`, config);
-
-    dispatch({
-      type: BULK_ORDER_DETAILS_SUCCESS,
-      payload: data,
-    });
-  } catch (error) {
-    dispatch({
-      type: BULK_ORDER_DETAILS_FAIL,
-      payload:
-        error.response && error.response.data.message
-          ? error.response.data.message
-          : error.message,
-    });
-  }
-};
-export const updateBulkOrder = (id, updateData) => async (dispatch, getState) => {
-  try {
-    dispatch({
-      type: BULK_ORDER_UPDATE_REQUEST,
-    });
-
-    const {
-      userLogin: { userInfo },
-    } = getState();
-
-    const config = {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${userInfo.token}`,
-      },
-    };
-
-    let endpoint = `/api/bulkorders/${id}`;
-    let payload = updateData;
-
-    // Handle fulfillment action
-    if (updateData.action === 'fulfill') {
-      endpoint = `/api/bulkorders/${id}/fulfill`;
-      payload = {};
-    }
-
-    const { data } = await axios.put(endpoint, payload, config);
-
-    dispatch({
-      type: BULK_ORDER_UPDATE_SUCCESS,
-      payload: data,
-    });
-
-    // Refresh the order details after update
-    dispatch(getBulkOrderDetails(id));
-
-  } catch (error) {
-    dispatch({
-      type: BULK_ORDER_UPDATE_FAIL,
-      payload:
-        error.response && error.response.data.message
-          ? error.response.data.message
-          : error.message,
-    });
-  }
-};
 
 export default BulkOrderDetailScreen;
