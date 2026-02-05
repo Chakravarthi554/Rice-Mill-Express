@@ -1,25 +1,46 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert } from 'react-native';
 import { useSelector } from 'react-redux';
 import { Card, Button, ActivityIndicator, Badge } from 'react-native-paper';
 import { MaterialIcons } from '@expo/vector-icons';
 import { apiService } from '../services/api';
+import { auth } from '../config/firebase';
 
 const DeliveryPartnerDashboard = ({ navigation }) => {
     const [orders, setOrders] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [activeTab, setActiveTab] = useState('assigned');
 
-    const { user } = useSelector(state => state.auth);
+    const { user, token } = useSelector(state => state.auth);
+
 
     const fetchOrders = async () => {
         try {
             setLoading(true);
-            const response = await apiService.getDeliveryPartnerOrders();
-            setOrders(response.data || []);
+            const response = await apiService.getAssignedOrders();
+            // Handle { orders: [...] } response structure
+            let ordersData = [];
+            if (response.data && Array.isArray(response.data.orders)) {
+                ordersData = response.data.orders;
+            } else if (Array.isArray(response.data)) {
+                ordersData = response.data;
+            } else {
+                console.warn('⚠️ Unexpected API response format:', typeof response.data, response.data);
+            }
+
+            console.log(`📊 Fetched ${ordersData.length} orders`);
+            if (ordersData.length > 0) {
+                console.log('📝 Sample order status:', ordersData[0].orderStatus);
+            }
+
+            setOrders(ordersData);
         } catch (error) {
             console.error('Error fetching assigned orders:', error);
+            // Only show alert if it's not an auth error (user will see login screen)
+            if (error.response?.status !== 401) {
+                // Alert.alert('Error', 'Failed to fetch orders. Please try again.');
+            }
             setOrders([]);
         } finally {
             setLoading(false);
@@ -28,24 +49,38 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
     };
 
     useEffect(() => {
-        fetchOrders();
-    }, []);
+        // Only fetch orders if we have a Redux user AND Firebase is initialized
+        // This prevents 401 errors from using stale storage tokens before Firebase is ready
+        if (user && auth.currentUser) {
+            console.log('✅ Auth ready, fetching orders...');
+            fetchOrders();
+        } else if (user && !auth.currentUser) {
+            console.log('⏳ Waiting for Firebase auth to initialize before fetching...');
+        }
+    }, [user, token]); // Re-run when token updates from App.js listener
 
     const onRefresh = () => {
         setRefreshing(true);
         fetchOrders();
     };
 
-    const filteredOrders = orders.filter(order => {
-        if (activeTab === 'assigned') {
-            return order.orderStatus === 'shipped';
-        } else if (activeTab === 'pending') {
-            return order.orderStatus === 'out_for_delivery';
-        } else if (activeTab === 'delivered') {
-            return order.orderStatus === 'delivered';
-        }
-        return true;
-    });
+    const filteredOrders = useMemo(() => {
+        if (!Array.isArray(orders)) return [];
+
+        const filtered = orders.filter(order => {
+            if (activeTab === 'assigned') {
+                return order.orderStatus === 'shipped';
+            } else if (activeTab === 'pending') {
+                return order.orderStatus === 'out_for_delivery';
+            } else if (activeTab === 'delivered') {
+                return order.orderStatus === 'delivered';
+            }
+            return true;
+        });
+
+        console.log(`🔍 Tab '${activeTab}' filtered ${filtered.length} orders from ${orders.length} total`);
+        return filtered;
+    }, [orders, activeTab]);
 
     const getStatusColor = (status) => {
         switch (status) {
@@ -60,7 +95,7 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
         <Card
             key={order._id}
             style={styles.card}
-            onPress={() => navigation.navigate('DeliveryConfirmation', { orderId: order._id })}
+            onPress={() => navigation.navigate('OrderDetails', { orderId: order._id })}
         >
             <Card.Content>
                 <View style={styles.cardHeader}>
@@ -104,11 +139,11 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
                     ) : (
                         <Button
                             mode="contained"
-                            onPress={() => navigation.navigate('DeliveryConfirmation', { orderId: order._id })}
+                            onPress={() => navigation.navigate('OrderDetails', { orderId: order._id })}
                             style={styles.confirmButton}
                             labelStyle={styles.confirmButtonLabel}
                         >
-                            Confirm Delivery
+                            View Details
                         </Button>
                     )}
                 </View>
@@ -119,17 +154,23 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
     return (
         <View style={styles.container}>
             <View style={styles.header}>
-                <View style={styles.headerStats}>
-                    <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{orders.filter(o => o.orderStatus === 'delivered').length}</Text>
+                <View style={styles.summaryContainer}>
+                    <View style={styles.summaryCard}>
+                        <Text style={styles.statValue}>{(Array.isArray(orders) ? orders : []).length}</Text>
                         <Text style={styles.statLabel}>Total</Text>
                     </View>
-                    <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{orders.filter(o => o.orderStatus === 'delivered' && new Date(o.deliveredAt).toDateString() === new Date().toDateString()).length}</Text>
+                    <View style={styles.summaryCard}>
+                        <Text style={styles.statValue}>
+                            {(Array.isArray(orders) ? orders : []).filter(o => {
+                                const orderDate = new Date(o.createdAt);
+                                const today = new Date();
+                                return orderDate.toDateString() === today.toDateString();
+                            }).length}
+                        </Text>
                         <Text style={styles.statLabel}>Today</Text>
                     </View>
-                    <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{orders.filter(o => o.orderStatus === 'shipped' || o.orderStatus === 'out_for_delivery').length}</Text>
+                    <View style={styles.summaryCard}>
+                        <Text style={styles.statValue}>{(Array.isArray(orders) ? orders : []).filter(o => o.orderStatus === 'shipped' || o.orderStatus === 'out_for_delivery').length}</Text>
                         <Text style={styles.statLabel}>Active</Text>
                     </View>
                 </View>

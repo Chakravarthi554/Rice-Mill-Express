@@ -485,10 +485,12 @@ exports.getOrders = asyncHandler(async (req, res) => {
 exports.getSellerOrders = asyncHandler(async (req, res) => {
   const pageSize = Number(req.query.limit) || 50;
   const page = Number(req.query.pageNumber) || 1;
-  const { status, sort = '-createdAt' } = req.query;
+  const { status, sort = '-createdAt', hasReplacementRequest, replacementStatus } = req.query;
 
   const query = { seller: req.user._id };
   if (status) query.orderStatus = status;
+  if (hasReplacementRequest) query.hasReplacementRequest = hasReplacementRequest === 'true';
+  if (replacementStatus) query.replacementStatus = replacementStatus;
 
   // Also get bulk orders for this seller
   const bulkOrdersQuery = { seller: req.user._id };

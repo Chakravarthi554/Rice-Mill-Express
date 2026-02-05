@@ -8,13 +8,13 @@ import {
   BULK_ORDER_UPDATE_REQUEST,
   BULK_ORDER_UPDATE_SUCCESS,
   BULK_ORDER_UPDATE_FAIL,
-} from '../constants/bulkOrderConstants';
+} from '../../constants/bulkOrderConstants';
 import {
- 
+
   BULK_ORDER_DETAILS_REQUEST,
   BULK_ORDER_DETAILS_SUCCESS,
   BULK_ORDER_DETAILS_FAIL,
-} from '../constants/bulkOrderConstants';
+} from '../../constants/bulkOrderConstants';
 
 
 

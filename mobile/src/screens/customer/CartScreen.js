@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+console.log('🛒 CartScreen loading...');
 import {
     View,
     Text,

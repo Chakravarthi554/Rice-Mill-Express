@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+console.log('📱 HomeScreen loading...');
 import {
     View,
     Text,
@@ -27,7 +28,7 @@ export default function HomeScreen({ navigation }) {
         try {
             setLoading(true);
             const response = await apiService.getProducts();
-            setProducts(response.data);
+            setProducts(response.data.products || []);
         } catch (error) {
             console.error('Error fetching products:', error);
         } finally {

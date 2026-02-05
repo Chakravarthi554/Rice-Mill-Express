@@ -9,7 +9,7 @@ import {
   BULK_ORDER_UPDATE_REQUEST,
   BULK_ORDER_UPDATE_SUCCESS,
   BULK_ORDER_UPDATE_FAIL,
-} from '../constants/bulkOrderConstants';
+} from '../../constants/bulkOrderConstants';
 
 export const createBulkOrder = (orderData) => async (dispatch, getState) => {
   try {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+console.log('📄 BulkOrderDetailScreen loading...');
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import {

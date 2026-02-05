@@ -4,7 +4,7 @@ import { Button, Card, ActivityIndicator, HelperText } from 'react-native-paper'
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { useSelector } from 'react-redux';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { MaterialIcons } from '@expo/vector-icons';
 import axios from 'axios';
 
 const DeliveryConfirmationScreen = ({ route, navigation }) => {
@@ -140,7 +140,7 @@ const DeliveryConfirmationScreen = ({ route, navigation }) => {
                             <Image source={{ uri: photo.uri }} style={styles.previewImage} />
                         ) : (
                             <View style={styles.placeholderBox}>
-                                <Icon name="camera-alt" size={48} color="#999" />
+                                <MaterialIcons name="camera-alt" size={48} color="#999" />
                                 <Text style={styles.placeholderText}>Tap to open camera</Text>
                             </View>
                         )}
@@ -148,7 +148,7 @@ const DeliveryConfirmationScreen = ({ route, navigation }) => {
 
                     {location && (
                         <View style={styles.locationTag}>
-                            <Icon name="location-searching" size={16} color="#4CAF50" />
+                            <MaterialIcons name="location-searching" size={16} color="#4CAF50" />
                             <Text style={styles.locationText}>Location Captured</Text>
                         </View>
                     )}

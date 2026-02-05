@@ -641,34 +641,59 @@ const confirmDelivery = asyncHandler(async (req, res) => {
     throw new Error('Delivery photo proof is required');
   }
 
-  // 6. Update order with delivery confirmation
-  order.deliveryPartnerStatus = 'delivered';
-  order.orderStatus = 'delivered';
-  order.isDelivered = true;
-  order.deliveredAt = new Date();
-  order.actualDeliveryDate = new Date();
+  // Check if this is a replacement delivery
+  if (order.replacementStatus === 'approved' || order.orderStatus === 'replacement_approved') {
+    // 6a. Update replacement delivery details
+    order.replacementStatus = 'delivered';
+    order.orderStatus = 'delivered'; // Or 'replacement_delivered' if you prefer specific distinction
 
-  // Set delivery confirmation details
-  order.deliveryConfirmation = {
-    otpVerified: false, // No OTP required, using photo proof instead
-    verifiedAt: new Date(),
-    verifiedBy: req.user._id,
-    photoProofUrl: `/uploads/${req.file.filename}`,
-    location: latitude && longitude ? {
-      latitude,
-      longitude,
-      accuracy: 0,
-      timestamp: new Date().toISOString()
-    } : undefined,
-    notes: notes || 'Delivery confirmed with photo proof'
-  };
+    order.replacementDeliveryConfirmation = {
+      photoProofUrl: `/uploads/${req.file.filename}`,
+      deliveredAt: new Date(),
+      location: latitude && longitude ? {
+        latitude,
+        longitude,
+        timestamp: new Date()
+      } : undefined,
+      deliveredBy: req.user._id
+    };
 
-  // Add to status history
-  order.statusHistory.push({
-    status: 'delivered',
-    timestamp: new Date(),
-    reason: 'Delivery confirmed by partner with photo proof'
-  });
+    // Add status history
+    order.statusHistory.push({
+      status: 'replacement_delivered',
+      timestamp: new Date(),
+      reason: 'Replacement delivery confirmed by partner'
+    });
+  } else {
+    // 6b. Standard delivery update
+    order.deliveryPartnerStatus = 'delivered';
+    order.orderStatus = 'delivered';
+    order.isDelivered = true;
+    order.deliveredAt = new Date();
+    order.actualDeliveryDate = new Date();
+
+    // Set delivery confirmation details
+    order.deliveryConfirmation = {
+      otpVerified: false,
+      verifiedAt: new Date(),
+      verifiedBy: req.user._id,
+      photoProofUrl: `/uploads/${req.file.filename}`,
+      location: latitude && longitude ? {
+        latitude,
+        longitude,
+        accuracy: 0,
+        timestamp: new Date().toISOString()
+      } : undefined,
+      notes: notes || 'Delivery confirmed with photo proof'
+    };
+
+    // Add status history
+    order.statusHistory.push({
+      status: 'delivered',
+      timestamp: new Date(),
+      reason: 'Delivery confirmed by partner with photo proof'
+    });
+  }
 
   await order.save();
 
@@ -684,6 +709,14 @@ const confirmDelivery = asyncHandler(async (req, res) => {
 // @access  Private/DeliveryPartner
 const requestReplacement = asyncHandler(async (req, res) => {
   const { orderId } = req.params;
+  
+  console.log('📝 Replacement Request Received:', {
+    orderId,
+    body: req.body,
+    file: req.file ? { fieldname: req.file.fieldname, mimetype: req.file.mimetype, size: req.file.size } : 'No File',
+    contentType: req.headers['content-type']
+  });
+
   const { reason, description } = req.body;
 
   // Import Replacement model
@@ -691,12 +724,14 @@ const requestReplacement = asyncHandler(async (req, res) => {
 
   // 1. Validate required fields
   if (!reason || !description) {
+    console.warn('❌ Missing reason or description');
     res.status(400);
     throw new Error('Reason and description are required');
   }
 
   // 2. Check for photo proof (required for delivery partner)
   if (!req.file) {
+    console.warn('❌ Missing photo proof file');
     res.status(400);
     throw new Error('Photo proof is required for replacement requests');
   }
@@ -717,7 +752,9 @@ const requestReplacement = asyncHandler(async (req, res) => {
     throw new Error('Order not found');
   }
 
-  // 5. Verify assignment
+  // 5. Verify assignment (Relaxed check if order is delivered, enabling post-delivery request)
+  // If order is delivered, any active partner *could* theoretically request, but usually it's the one who delivered.
+  // We'll stick to strict assignment check for now, assuming partner is still assigned.
   if (!order.deliveryPartner || order.deliveryPartner.toString() !== partnerProfile._id.toString()) {
     res.status(403);
     throw new Error('You are not authorized to request replacement for this order');
@@ -745,16 +782,137 @@ const requestReplacement = asyncHandler(async (req, res) => {
     status: 'pending'
   });
 
-  // 8. Update order
+  // 8. Update order with replacement details
   order.hasReplacementRequest = true;
   order.replacementStatus = 'requested';
+  order.replacementReason = reason;
+  order.replacementDescription = description;
+  order.replacementPhotoUrl = `/uploads/${req.file.filename}`;
+  order.replacementRequestedBy = req.user._id;
+  order.replacementRequestedAt = Date.now();
+
   await order.save();
+
+  // Notify Seller logic can go here
 
   res.status(201).json({
     success: true,
     message: 'Replacement request submitted successfully',
     replacement
   });
+});
+
+// @desc    Review replacement request (Approve/Reject/Refund)
+// @route   PUT /api/delivery-partners/orders/:orderId/replacement-review
+// @access  Private/Seller/Admin
+const reviewReplacement = asyncHandler(async (req, res) => {
+  const { orderId } = req.params;
+  const { decision, notes } = req.body; // decision: 'approve', 'reject', 'refund'
+
+  const order = await Order.findById(orderId);
+
+  if (!order) {
+    res.status(404);
+    throw new Error('Order not found');
+  }
+
+  // Authorization check (Seller or Admin)
+  if (order.seller.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+    res.status(403);
+    throw new Error('Not authorized to review this replacement');
+  }
+
+  if (decision === 'approve') {
+    order.replacementStatus = 'approved';
+    order.orderStatus = 'replacement_approved'; // This status indicates we are waiting for re-dispatch
+  } else if (decision === 'reject') {
+    order.replacementStatus = 'rejected';
+    // If rejected, order remains "delivered" (or whatever it was)
+    order.orderStatus = 'delivered';
+  } else if (decision === 'refund') {
+    order.replacementStatus = 'refund_approved';
+    order.orderStatus = 'refund_approved';
+  } else {
+    res.status(400);
+    throw new Error('Invalid decision. Use approve, reject, or refund');
+  }
+
+  order.replacementDecisionBy = req.user._id;
+  order.replacementDecisionAt = Date.now();
+  order.replacementDecisionNotes = notes;
+
+  const updatedOrder = await order.save();
+  res.json(updatedOrder);
+});
+
+// @desc    Re-dispatch replacement order
+// @route   POST /api/delivery-partners/orders/:orderId/redispatch
+// @access  Private/Seller
+const redispatchReplacement = asyncHandler(async (req, res) => {
+  const { orderId } = req.params;
+  const { deliveryPartnerId } = req.body; 
+
+  const order = await Order.findById(orderId);
+
+  if (!order) {
+    res.status(404);
+    throw new Error('Order not found');
+  }
+
+  if (order.replacementStatus !== 'approved') {
+    res.status(400);
+    throw new Error('Replacement must be approved before re-dispatch');
+  }
+
+  // 1. Assign new partner
+  order.deliveryPartner = deliveryPartnerId;
+  
+  // 2. Reset Status to 'shipped' so it appears in the new partner's assigned list
+  order.orderStatus = 'shipped';
+  order.deliveryPartnerStatus = 'assigned';
+  
+  // 3. Reset Delivery Tracking Fields (Clear previous delivery data)
+  order.isDelivered = false;
+  order.deliveredAt = undefined;
+  order.actualDeliveryDate = undefined;
+  order.deliveryStartedAt = undefined;
+  order.deliveryStartLocation = undefined;
+  order.deliveryPartnerPickedAt = undefined;
+  order.pickupConfirmedBy = undefined;
+  order.deliveryConfirmation = undefined;
+  order.codCollected = false;
+  order.codCollectedAt = undefined;
+
+  // 4. Record this action
+  order.statusHistory.push({
+    status: 'shipped',
+    timestamp: new Date(),
+    reason: 'Replacement re-dispatched to new partner'
+  });
+
+  const updatedOrder = await order.save();
+
+  // Notify new partner
+  const DeliveryPartner = require('../models/deliveryPartner');
+  const Notification = require('../models/Notification');
+  const partner = await DeliveryPartner.findById(deliveryPartnerId);
+  
+  if (partner && partner.user) {
+    await Notification.create({
+      user: partner.user,
+      type: 'ORDER_ASSIGNED',
+      message: `Replacement order #${order._id.toString().slice(-6)} assigned to you`,
+      relatedEntity: order._id,
+      entityModel: 'Order'
+    });
+    
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`delivery_${partner.user.toString()}`).emit('ORDER_ASSIGNED', updatedOrder);
+    }
+  }
+
+  res.json({ success: true, message: 'Replacement re-dispatched successfully', order: updatedOrder });
 });
 
 module.exports = {
@@ -773,4 +931,6 @@ module.exports = {
   startDelivery,
   confirmDelivery,
   requestReplacement,
+  reviewReplacement,
+  redispatchReplacement
 };

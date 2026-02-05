@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
+console.log('📋 BulkOrderScreen loading...');
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { 
-  Card, 
-  Button, 
+import {
+  Card,
+  Button,
   TextInput,
   RadioButton,
   DataTable,
@@ -11,7 +12,7 @@ import {
   Portal,
   Provider as PaperProvider
 } from 'react-native-paper';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { MaterialIcons } from '@expo/vector-icons';
 import { getBulkOrders, createBulkOrder, updateBulkOrder } from '../redux/actions/bulkOrderActions';
 import { listProducts } from '../redux/actions/productActions';
 
@@ -47,9 +48,9 @@ const BulkOrderScreen = ({ navigation }) => {
   });
 
   const requestedOrders = filteredOrders.filter(o => o.status === 'requested');
-  const activeOrders = filteredOrders.filter(o => 
+  const activeOrders = filteredOrders.filter(o =>
     ['quote_sent', 'negotiating', 'confirmed'].includes(o.status));
-  const completedOrders = filteredOrders.filter(o => 
+  const completedOrders = filteredOrders.filter(o =>
     ['fulfilled', 'cancelled'].includes(o.status));
 
   const handleCreateOrder = () => {
@@ -57,14 +58,14 @@ const BulkOrderScreen = ({ navigation }) => {
       product: product._id,
       quantity: product.bulkQuantity || 50
     }));
-    
+
     dispatch(createBulkOrder({
       items,
       shippingAddress: shippingInfo,
       paymentTerms,
       notes
     }));
-    
+
     setSelectedProducts([]);
     setShippingInfo({});
     setPaymentTerms('advance');
@@ -72,7 +73,7 @@ const BulkOrderScreen = ({ navigation }) => {
   };
 
   const handleUpdateOrder = () => {
-    dispatch(updateBulkOrder(currentOrder._id, { 
+    dispatch(updateBulkOrder(currentOrder._id, {
       action,
       discount: action === 'send_quote' ? discount : undefined
     }));
@@ -81,8 +82,8 @@ const BulkOrderScreen = ({ navigation }) => {
 
   const calculateTotal = (order) => {
     return order.items.reduce((sum, item) => {
-      const price = item.negotiatedPrice || 
-                   (item.product.price * (1 - (order.discount || 0) / 100));
+      const price = item.negotiatedPrice ||
+        (item.product.price * (1 - (order.discount || 0) / 100));
       return sum + (price * item.quantity);
     }, 0);
   };
@@ -103,23 +104,23 @@ const BulkOrderScreen = ({ navigation }) => {
     <PaperProvider>
       <ScrollView style={styles.container}>
         <Text style={styles.header}>Bulk Order Portal</Text>
-        
+
         {userInfo.role === 'customer' && (
           <View style={styles.section}>
-            <Button 
-              mode="contained" 
+            <Button
+              mode="contained"
               onPress={() => setShowProductModal(true)}
               style={styles.button}
             >
               Create New Bulk Order
             </Button>
-            
+
             {selectedProducts.length > 0 && (
               <Card style={styles.card}>
                 <Card.Title title="Order Summary" />
-                 key={order._id} 
-  style={styles.orderCard}
-  onPress={() => navigation.navigate('BulkOrderDetail', { orderId: order._id })}
+                key={order._id}
+                style={styles.orderCard}
+                onPress={() => navigation.navigate('BulkOrderDetail', { orderId: order._id })}
 
                 <Card.Content>
                   <DataTable>
@@ -128,7 +129,7 @@ const BulkOrderScreen = ({ navigation }) => {
                       <DataTable.Title numeric>Qty (kg)</DataTable.Title>
                       <DataTable.Title numeric>Total</DataTable.Title>
                     </DataTable.Header>
-                    
+
                     {selectedProducts.map(product => (
                       <DataTable.Row key={product._id}>
                         <DataTable.Cell>
@@ -155,49 +156,49 @@ const BulkOrderScreen = ({ navigation }) => {
                       </DataTable.Row>
                     ))}
                   </DataTable>
-                  
+
                   <Text style={styles.sectionTitle}>Shipping Information</Text>
                   <TextInput
                     label="Name"
                     value={shippingInfo.name || ''}
-                    onChangeText={(text) => setShippingInfo({...shippingInfo, name: text})}
+                    onChangeText={(text) => setShippingInfo({ ...shippingInfo, name: text })}
                     style={styles.input}
                   />
                   <TextInput
                     label="Phone"
                     value={shippingInfo.phone || ''}
-                    onChangeText={(text) => setShippingInfo({...shippingInfo, phone: text})}
+                    onChangeText={(text) => setShippingInfo({ ...shippingInfo, phone: text })}
                     style={styles.input}
                   />
                   <TextInput
                     label="Address"
                     value={shippingInfo.street || ''}
-                    onChangeText={(text) => setShippingInfo({...shippingInfo, street: text})}
+                    onChangeText={(text) => setShippingInfo({ ...shippingInfo, street: text })}
                     multiline
                     style={styles.input}
                   />
                   <TextInput
                     label="City"
                     value={shippingInfo.city || ''}
-                    onChangeText={(text) => setShippingInfo({...shippingInfo, city: text})}
+                    onChangeText={(text) => setShippingInfo({ ...shippingInfo, city: text })}
                     style={styles.input}
                   />
                   <TextInput
                     label="State"
                     value={shippingInfo.state || ''}
-                    onChangeText={(text) => setShippingInfo({...shippingInfo, state: text})}
+                    onChangeText={(text) => setShippingInfo({ ...shippingInfo, state: text })}
                     style={styles.input}
                   />
                   <TextInput
                     label="PIN Code"
                     value={shippingInfo.pinCode || ''}
-                    onChangeText={(text) => setShippingInfo({...shippingInfo, pinCode: text})}
+                    onChangeText={(text) => setShippingInfo({ ...shippingInfo, pinCode: text })}
                     style={styles.input}
                   />
-                  
+
                   <Text style={styles.sectionTitle}>Payment Terms</Text>
-                  <RadioButton.Group 
-                    onValueChange={setPaymentTerms} 
+                  <RadioButton.Group
+                    onValueChange={setPaymentTerms}
                     value={paymentTerms}
                   >
                     <View style={styles.radioOption}>
@@ -213,7 +214,7 @@ const BulkOrderScreen = ({ navigation }) => {
                       <Text>Cash on Delivery</Text>
                     </View>
                   </RadioButton.Group>
-                  
+
                   <TextInput
                     label="Additional Notes"
                     value={notes}
@@ -221,9 +222,9 @@ const BulkOrderScreen = ({ navigation }) => {
                     multiline
                     style={styles.input}
                   />
-                  
-                  <Button 
-                    mode="contained" 
+
+                  <Button
+                    mode="contained"
                     onPress={handleCreateOrder}
                     disabled={createLoading || !shippingInfo.street}
                     style={styles.submitButton}
@@ -235,7 +236,7 @@ const BulkOrderScreen = ({ navigation }) => {
             )}
           </View>
         )}
-        
+
         <View style={styles.tabContainer}>
           <TouchableOpacity
             style={[styles.tab, activeTab === 'active' && styles.activeTab]}
@@ -264,143 +265,143 @@ const BulkOrderScreen = ({ navigation }) => {
             </Text>
           </TouchableOpacity>
         </View>
-        
+
         {ordersLoading ? (
           <Text>Loading orders...</Text>
         ) : (
           <View style={styles.ordersContainer}>
-            {(activeTab === 'active' ? activeOrders : 
-             
-                activeTab === 'requests' ? requestedOrders : 
-              completedOrders).length === 0 ? (
+            {(activeTab === 'active' ? activeOrders :
+
+              activeTab === 'requests' ? requestedOrders :
+                completedOrders).length === 0 ? (
               <Text style={styles.noOrdersText}>No orders found</Text>
             ) : (
-              (activeTab === 'active' ? activeOrders : 
-               activeTab === 'requests' ? requestedOrders : 
-               completedOrders).map(order => (
-                <Card key={order._id} style={styles.orderCard}>
-                  <Card.Title 
-                    title={`Order #${order.orderNumber}`}
-                    subtitle={`Status: ${order.status.replace('_', ' ')}`}
-                    subtitleStyle={{ color: getStatusColor(order.status) }}
-                    right={() => (
-                      <Text style={styles.orderTotal}>
-                        ₹{calculateTotal(order).toFixed(2)}
-                      </Text>
-                    )}
-                  />
-                  <Card.Content>
-                    <DataTable>
-                      <DataTable.Header>
-                        <DataTable.Title>Product</DataTable.Title>
-                        <DataTable.Title numeric>Qty (kg)</DataTable.Title>
-                        <DataTable.Title numeric>Price</DataTable.Title>
-                      </DataTable.Header>
-                      
-                      {order.items.map(item => (
-                        <DataTable.Row key={item._id}>
-                          <DataTable.Cell>{item.product.name}</DataTable.Cell>
-                          <DataTable.Cell numeric>{item.quantity}</DataTable.Cell>
-                          <DataTable.Cell numeric>
-                            ₹{(item.negotiatedPrice || 
-                               (item.product.price * (1 - (order.discount || 0) / 100))).toFixed(2)}
-                          </DataTable.Cell>
-                        </DataTable.Row>
-                      ))}
-                    </DataTable>
-                    
-                    <View style={styles.orderMeta}>
-                      <Text style={styles.metaText}>
-                        <Text style={styles.metaLabel}>Buyer: </Text>
-                        {order.buyer.name}
-                      </Text>
-                      <Text style={styles.metaText}>
-                        <Text style={styles.metaLabel}>Seller: </Text>
-                        {order.seller.name}
-                      </Text>
-                      <Text style={styles.metaText}>
-                        <Text style={styles.metaLabel}>Created: </Text>
-                        {new Date(order.createdAt).toLocaleDateString()}
-                      </Text>
-                      {order.status === 'quote_sent' && userInfo.role === 'customer' && (
-                        <View style={styles.negotiationBox}>
-                          <Text style={styles.negotiationText}>
-                            Seller has sent a quote. Would you like to accept?
+              (activeTab === 'active' ? activeOrders :
+                activeTab === 'requests' ? requestedOrders :
+                  completedOrders).map(order => (
+                    <Card key={order._id} style={styles.orderCard}>
+                      <Card.Title
+                        title={`Order #${order.orderNumber}`}
+                        subtitle={`Status: ${order.status.replace('_', ' ')}`}
+                        subtitleStyle={{ color: getStatusColor(order.status) }}
+                        right={() => (
+                          <Text style={styles.orderTotal}>
+                            ₹{calculateTotal(order).toFixed(2)}
                           </Text>
-                          <View style={styles.negotiationButtons}>
-                            <Button 
-                              mode="outlined" 
-                              onPress={() => {
-                                setCurrentOrder(order);
-                                setAction('accept_quote');
-                                setShowActionDialog(true);
-                              }}
-                              style={styles.negotiationButton}
-                            >
-                              Accept
-                            </Button>
-                            <Button 
-                              mode="outlined" 
-                              onPress={() => {
-                                setCurrentOrder(order);
-                                setAction('negotiate');
-                                setShowActionDialog(true);
-                              }}
-                              style={styles.negotiationButton}
-                            >
-                              Negotiate
-                            </Button>
-                          </View>
-                        </View>
-                      )}
-                      {order.status === 'negotiating' && userInfo.role === 'seller' && (
-                        <View style={styles.negotiationBox}>
-                          <Text style={styles.negotiationText}>
-                            Customer is negotiating the price.
+                        )}
+                      />
+                      <Card.Content>
+                        <DataTable>
+                          <DataTable.Header>
+                            <DataTable.Title>Product</DataTable.Title>
+                            <DataTable.Title numeric>Qty (kg)</DataTable.Title>
+                            <DataTable.Title numeric>Price</DataTable.Title>
+                          </DataTable.Header>
+
+                          {order.items.map(item => (
+                            <DataTable.Row key={item._id}>
+                              <DataTable.Cell>{item.product.name}</DataTable.Cell>
+                              <DataTable.Cell numeric>{item.quantity}</DataTable.Cell>
+                              <DataTable.Cell numeric>
+                                ₹{(item.negotiatedPrice ||
+                                  (item.product.price * (1 - (order.discount || 0) / 100))).toFixed(2)}
+                              </DataTable.Cell>
+                            </DataTable.Row>
+                          ))}
+                        </DataTable>
+
+                        <View style={styles.orderMeta}>
+                          <Text style={styles.metaText}>
+                            <Text style={styles.metaLabel}>Buyer: </Text>
+                            {order.buyer.name}
                           </Text>
-                          <Button 
-                            mode="contained" 
-                            onPress={() => {
-                              setCurrentOrder(order);
-                              setAction('update_quote');
-                              setShowActionDialog(true);
-                            }}
-                            style={styles.negotiationButton}
-                          >
-                            Update Quote
-                          </Button>
+                          <Text style={styles.metaText}>
+                            <Text style={styles.metaLabel}>Seller: </Text>
+                            {order.seller.name}
+                          </Text>
+                          <Text style={styles.metaText}>
+                            <Text style={styles.metaLabel}>Created: </Text>
+                            {new Date(order.createdAt).toLocaleDateString()}
+                          </Text>
+                          {order.status === 'quote_sent' && userInfo.role === 'customer' && (
+                            <View style={styles.negotiationBox}>
+                              <Text style={styles.negotiationText}>
+                                Seller has sent a quote. Would you like to accept?
+                              </Text>
+                              <View style={styles.negotiationButtons}>
+                                <Button
+                                  mode="outlined"
+                                  onPress={() => {
+                                    setCurrentOrder(order);
+                                    setAction('accept_quote');
+                                    setShowActionDialog(true);
+                                  }}
+                                  style={styles.negotiationButton}
+                                >
+                                  Accept
+                                </Button>
+                                <Button
+                                  mode="outlined"
+                                  onPress={() => {
+                                    setCurrentOrder(order);
+                                    setAction('negotiate');
+                                    setShowActionDialog(true);
+                                  }}
+                                  style={styles.negotiationButton}
+                                >
+                                  Negotiate
+                                </Button>
+                              </View>
+                            </View>
+                          )}
+                          {order.status === 'negotiating' && userInfo.role === 'seller' && (
+                            <View style={styles.negotiationBox}>
+                              <Text style={styles.negotiationText}>
+                                Customer is negotiating the price.
+                              </Text>
+                              <Button
+                                mode="contained"
+                                onPress={() => {
+                                  setCurrentOrder(order);
+                                  setAction('update_quote');
+                                  setShowActionDialog(true);
+                                }}
+                                style={styles.negotiationButton}
+                              >
+                                Update Quote
+                              </Button>
+                            </View>
+                          )}
+                          {order.status === 'requested' && userInfo.role === 'seller' && (
+                            <View style={styles.actionButtons}>
+                              <Button
+                                mode="contained"
+                                onPress={() => {
+                                  setCurrentOrder(order);
+                                  setAction('send_quote');
+                                  setShowActionDialog(true);
+                                }}
+                                style={styles.actionButton}
+                              >
+                                Send Quote
+                              </Button>
+                              <Button
+                                mode="outlined"
+                                onPress={() => {
+                                  setCurrentOrder(order);
+                                  setAction('reject');
+                                  setShowActionDialog(true);
+                                }}
+                                style={styles.actionButton}
+                              >
+                                Reject
+                              </Button>
+                            </View>
+                          )}
                         </View>
-                      )}
-                      {order.status === 'requested' && userInfo.role === 'seller' && (
-                        <View style={styles.actionButtons}>
-                          <Button 
-                            mode="contained" 
-                            onPress={() => {
-                              setCurrentOrder(order);
-                              setAction('send_quote');
-                              setShowActionDialog(true);
-                            }}
-                            style={styles.actionButton}
-                          >
-                            Send Quote
-                          </Button>
-                          <Button 
-                            mode="outlined" 
-                            onPress={() => {
-                              setCurrentOrder(order);
-                              setAction('reject');
-                              setShowActionDialog(true);
-                            }}
-                            style={styles.actionButton}
-                          >
-                            Reject
-                          </Button>
-                        </View>
-                      )}
-                    </View>
-                  </Card.Content>
-                </Card>
-              ))
+                      </Card.Content>
+                    </Card>
+                  ))
             )}
           </View>
         )}
@@ -408,8 +409,8 @@ const BulkOrderScreen = ({ navigation }) => {
 
       {/* Product Selection Modal */}
       <Portal>
-        <Dialog 
-          visible={showProductModal} 
+        <Dialog
+          visible={showProductModal}
           onDismiss={() => setShowProductModal(false)}
           style={styles.modal}
         >
@@ -417,8 +418,8 @@ const BulkOrderScreen = ({ navigation }) => {
           <Dialog.Content>
             <ScrollView style={styles.modalContent}>
               {products.map(product => (
-                <Card 
-                  key={product._id} 
+                <Card
+                  key={product._id}
                   style={[
                     styles.productCard,
                     selectedProducts.some(p => p._id === product._id) && styles.selectedProductCard
@@ -427,7 +428,7 @@ const BulkOrderScreen = ({ navigation }) => {
                     if (selectedProducts.some(p => p._id === product._id)) {
                       setSelectedProducts(selectedProducts.filter(p => p._id !== product._id));
                     } else {
-                      setSelectedProducts([...selectedProducts, {...product, bulkQuantity: 50}]);
+                      setSelectedProducts([...selectedProducts, { ...product, bulkQuantity: 50 }]);
                     }
                   }}
                 >
@@ -435,12 +436,12 @@ const BulkOrderScreen = ({ navigation }) => {
                     <Text style={styles.productName}>{product.name}</Text>
                     <Text style={styles.productPrice}>₹{product.price}/kg</Text>
                     {selectedProducts.some(p => p._id === product._id) && (
-                      <Icon name="check-circle" size={24} color="#4CAF50" />
+                      <MaterialIcons name="check-circle" size={24} color="#4CAF50" />
                     )}
                   </Card.Content>
-                   key={order._id} 
-  style={styles.orderCard}
-  onPress={() => navigation.navigate('BulkOrderDetail', { orderId: order._id })}
+                  key={order._id}
+                  style={styles.orderCard}
+                  onPress={() => navigation.navigate('BulkOrderDetail', { orderId: order._id })}
 
                 </Card>
               ))}
@@ -448,7 +449,7 @@ const BulkOrderScreen = ({ navigation }) => {
           </Dialog.Content>
           <Dialog.Actions>
             <Button onPress={() => setShowProductModal(false)}>Cancel</Button>
-            <Button 
+            <Button
               onPress={() => {
                 setShowProductModal(false);
               }}
@@ -462,16 +463,16 @@ const BulkOrderScreen = ({ navigation }) => {
 
       {/* Action Dialog */}
       <Portal>
-        <Dialog 
-          visible={showActionDialog} 
+        <Dialog
+          visible={showActionDialog}
           onDismiss={() => setShowActionDialog(false)}
         >
           <Dialog.Title>
-            {action === 'send_quote' ? 'Send Quote' : 
-             action === 'accept_quote' ? 'Accept Quote' : 
-             action === 'negotiate' ? 'Negotiate Price' : 
-             action === 'update_quote' ? 'Update Quote' : 
-             'Confirm Action'}
+            {action === 'send_quote' ? 'Send Quote' :
+              action === 'accept_quote' ? 'Accept Quote' :
+                action === 'negotiate' ? 'Negotiate Price' :
+                  action === 'update_quote' ? 'Update Quote' :
+                    'Confirm Action'}
           </Dialog.Title>
           <Dialog.Content>
             {action === 'send_quote' && (
@@ -510,7 +511,7 @@ const BulkOrderScreen = ({ navigation }) => {
           </Dialog.Content>
           <Dialog.Actions>
             <Button onPress={() => setShowActionDialog(false)}>Cancel</Button>
-            <Button 
+            <Button
               onPress={handleUpdateOrder}
               loading={updateLoading}
             >
@@ -535,39 +536,41 @@ const handleNegotiatePrice = (productId, price) => {
 };
 
 // Add to the render
-{negotiationMode && (
-  <View style={styles.negotiationContainer}>
-    {currentOrder.items.map(item => (
-      <View key={item.product._id} style={styles.negotiationItem}>
-        <Text>{item.product.name}</Text>
-        <TextInput
-          value={String(priceOffers[item.product._id] || '')}
-          onChangeText={text => handleNegotiatePrice(
-            item.product._id, 
-            parseFloat(text) || 0
-          )}
-          keyboardType="numeric"
-          placeholder="Your offer"
-          style={styles.negotiationInput}
-        />
-      </View>
-    ))}
-    <Button 
-      onPress={() => {
-        setNegotiationMode(false);
-        handleUpdateOrder({
-          action: 'negotiate',
-          negotiatedPrices: Object.entries(priceOffers).map(([productId, price]) => ({
-            productId,
-            price
-          }))
-        });
-      }}
-    >
-      Submit Offer
-    </Button>
-  </View>
-)}
+{
+  negotiationMode && (
+    <View style={styles.negotiationContainer}>
+      {currentOrder.items.map(item => (
+        <View key={item.product._id} style={styles.negotiationItem}>
+          <Text>{item.product.name}</Text>
+          <TextInput
+            value={String(priceOffers[item.product._id] || '')}
+            onChangeText={text => handleNegotiatePrice(
+              item.product._id,
+              parseFloat(text) || 0
+            )}
+            keyboardType="numeric"
+            placeholder="Your offer"
+            style={styles.negotiationInput}
+          />
+        </View>
+      ))}
+      <Button
+        onPress={() => {
+          setNegotiationMode(false);
+          handleUpdateOrder({
+            action: 'negotiate',
+            negotiatedPrices: Object.entries(priceOffers).map(([productId, price]) => ({
+              productId,
+              price
+            }))
+          });
+        }}
+      >
+        Submit Offer
+      </Button>
+    </View>
+  )
+}
 
 const styles = StyleSheet.create({
   container: {

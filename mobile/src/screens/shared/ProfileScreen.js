@@ -7,6 +7,7 @@ import {
     ScrollView,
     Alert,
 } from 'react-native';
+console.log('👤 ProfileScreen loading...');
 import { useDispatch, useSelector } from 'react-redux';
 import { MaterialIcons } from '@expo/vector-icons';
 import { logout } from '../../redux/slices/authSlice';

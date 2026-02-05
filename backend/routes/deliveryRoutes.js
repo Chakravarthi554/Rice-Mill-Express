@@ -51,4 +51,9 @@ router.post('/orders/:orderId/start', protect, role('deliveryPartner'), startDel
 router.post('/orders/:orderId/confirm', protect, role('deliveryPartner'), upload.single('deliveryPhoto'), confirmDelivery);
 router.post('/orders/:orderId/replacement', protect, role('deliveryPartner'), upload.single('replacementPhoto'), requestReplacement);
 
+// Replacement Management (Seller/Admin)
+const { reviewReplacement, redispatchReplacement } = require('../controllers/deliveryController.js');
+router.put('/orders/:orderId/replacement-review', protect, role('seller', 'admin'), reviewReplacement);
+router.post('/orders/:orderId/redispatch', protect, role('seller', 'admin'), redispatchReplacement);
+
 module.exports = router;

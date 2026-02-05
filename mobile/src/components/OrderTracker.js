@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { ProgressBar, Colors } from 'react-native-paper';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { MaterialIcons } from '@expo/vector-icons';
 import OrderTrackingSocket from '../utils/socket';
 
 const statusSteps = [
@@ -19,7 +19,7 @@ const OrderTracker = ({ order, userId }) => {
 
   useEffect(() => {
     updateActiveStep(currentOrder.orderStatus);
-    
+
     const orderSocket = new OrderTrackingSocket(userId);
     orderSocket.connect();
     setSocket(orderSocket);
@@ -59,22 +59,22 @@ const OrderTracker = ({ order, userId }) => {
 
   return (
     <View style={styles.container}>
-      <ProgressBar 
-        progress={calculateProgress()} 
+      <ProgressBar
+        progress={calculateProgress()}
         color={getStatusColor()}
         style={styles.progressBar}
       />
-      
+
       {activeStep === -1 ? (
         <View style={styles.statusContainer}>
-          <Icon name="cancel" size={24} color={Colors.red500} />
+          <MaterialIcons name="cancel" size={24} color={Colors.red500} />
           <Text style={[styles.statusText, { color: Colors.red500 }]}>
             Order Cancelled
           </Text>
         </View>
       ) : activeStep === -2 ? (
         <View style={styles.statusContainer}>
-          <Icon name="assignment-return" size={24} color={Colors.red500} />
+          <MaterialIcons name="assignment-return" size={24} color={Colors.red500} />
           <Text style={[styles.statusText, { color: Colors.red500 }]}>
             Order Returned
           </Text>
@@ -82,19 +82,19 @@ const OrderTracker = ({ order, userId }) => {
       ) : (
         <View style={styles.stepsContainer}>
           {statusSteps.map((step, index) => (
-            <View 
-              key={step.value} 
+            <View
+              key={step.value}
               style={[
-                styles.step, 
+                styles.step,
                 index <= activeStep && styles.activeStep
               ]}
             >
-              <Icon 
-                name={step.icon} 
-                size={20} 
+              <Icon
+                name={step.icon}
+                size={20}
                 color={index <= activeStep ? Colors.green500 : Colors.grey500}
               />
-              <Text 
+              <Text
                 style={[
                   styles.stepText,
                   index <= activeStep && styles.activeStepText
@@ -109,7 +109,7 @@ const OrderTracker = ({ order, userId }) => {
           ))}
         </View>
       )}
-      
+
       <Text style={styles.updateText}>
         Last updated: {new Date(currentOrder.updatedAt).toLocaleString()}
       </Text>

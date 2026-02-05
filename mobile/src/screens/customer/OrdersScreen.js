@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+console.log('📦 OrdersScreen loading...');
 import {
     View,
     Text,
@@ -80,7 +81,7 @@ export default function OrdersScreen({ navigation }) {
     const renderOrder = ({ item }) => (
         <TouchableOpacity
             style={styles.orderCard}
-            onPress={() => navigation.navigate('OrderDetail', { orderId: item._id })}
+            onPress={() => navigation.navigate('OrderDetail', { id: item._id })}
         >
             <View style={styles.orderHeader}>
                 <Text style={styles.orderId}>Order #{item._id.slice(-8)}</Text>

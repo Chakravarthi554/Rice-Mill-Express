@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+console.log('🛍️ ProductScreen loading...');
 import {
   View,
   Text,
@@ -6,14 +7,14 @@ import {
   StyleSheet,
   ScrollView,
   Button,
+  TouchableOpacity,
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { addToCart } from '../redux/actions/cartActions';
 import { listProductDetails } from '../redux/actions/productActions';
 import Loader from '../components/Loader';
 import Message from '../components/Message';
-import NumericInput from 'react-native-numeric-input';
-import { Rating } from 'react-native-ratings';
+import { MaterialIcons } from '@expo/vector-icons';
 
 const ProductScreen = ({ route, navigation }) => {
   const [qty, setQty] = useState(1);
@@ -29,7 +30,28 @@ const ProductScreen = ({ route, navigation }) => {
 
   const addToCartHandler = () => {
     dispatch(addToCart(product._id, qty));
-    navigation.navigate('Cart');
+    navigation.navigate('CustomerTabs', { screen: 'Cart' });
+  };
+
+  const renderRating = (value) => {
+    return (
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        {[1, 2, 3, 4, 5].map((i) => (
+          <MaterialIcons
+            key={i}
+            name={
+              value >= i
+                ? 'star'
+                : value >= i - 0.5
+                  ? 'star-half'
+                  : 'star-border'
+            }
+            size={20}
+            color="#FFC107"
+          />
+        ))}
+      </View>
+    );
   };
 
   return (
@@ -47,37 +69,36 @@ const ProductScreen = ({ route, navigation }) => {
           />
           <View style={styles.details}>
             <Text style={styles.name}>{product.name}</Text>
-            <Rating
-              type="star"
-              ratingCount={5}
-              imageSize={20}
-              readonly
-              startingValue={product.rating}
-              style={styles.rating}
-            />
+
+            <View style={styles.rating}>
+              {renderRating(product.rating)}
+            </View>
+
             <Text style={styles.price}>₹{product.price}</Text>
             <Text style={styles.description}>{product.description}</Text>
-            
+
             {product.countInStock > 0 && (
               <>
                 <View style={styles.qtyContainer}>
                   <Text style={styles.qtyText}>Quantity:</Text>
-                  <NumericInput
-                    value={qty}
-                    onChange={setQty}
-                    minValue={1}
-                    maxValue={product.countInStock}
-                    totalWidth={120}
-                    totalHeight={40}
-                    iconSize={25}
-                    step={1}
-                    valueType="integer"
-                    rounded
-                    textColor="#000"
-                    iconStyle={{ color: 'white' }}
-                    rightButtonBackgroundColor="#4CAF50"
-                    leftButtonBackgroundColor="#FF5252"
-                  />
+
+                  <View style={styles.qtyControl}>
+                    <TouchableOpacity
+                      onPress={() => setQty(Math.max(1, qty - 1))}
+                      style={[styles.qtyBtn, { backgroundColor: '#FF5252' }]}
+                    >
+                      <MaterialIcons name="remove" size={20} color="white" />
+                    </TouchableOpacity>
+
+                    <Text style={styles.qtyValue}>{qty}</Text>
+
+                    <TouchableOpacity
+                      onPress={() => setQty(Math.min(product.countInStock, qty + 1))}
+                      style={[styles.qtyBtn, { backgroundColor: '#4CAF50' }]}
+                    >
+                      <MaterialIcons name="add" size={20} color="white" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
                 <Button
                   title="Add to Cart"
@@ -131,6 +152,27 @@ const styles = StyleSheet.create({
   },
   rating: {
     marginVertical: 10,
+  },
+  qtyControl: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 25,
+  },
+  qtyBtn: {
+    padding: 8,
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  qtyValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    paddingHorizontal: 15,
+    minWidth: 40,
+    textAlign: 'center',
   },
 });
 

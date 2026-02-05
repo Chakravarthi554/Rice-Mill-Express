@@ -322,7 +322,7 @@ const orderSchema = new mongoose.Schema({
   },
   replacementStatus: {
     type: String,
-    enum: ['none', 'requested', 'approved', 'rejected'],
+    enum: ['none', 'requested', 'approved', 'rejected', 'delivered', 'refund_approved'],
     default: 'none'
   },
   replacementReason: {
@@ -354,6 +354,28 @@ const orderSchema = new mongoose.Schema({
   },
   replacementReviewNotes: {
     type: String
+  },
+  // Decision tracking
+  replacementDecisionBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  replacementDecisionAt: {
+    type: Date
+  },
+  replacementDecisionNotes: {
+    type: String
+  },
+  // Replacement Delivery Confirmation
+  replacementDeliveryConfirmation: {
+    photoProofUrl: { type: String },
+    deliveredAt: { type: Date },
+    location: {
+      latitude: Number,
+      longitude: Number,
+      timestamp: Date
+    },
+    deliveredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
   },
 
   // Auto-Status Update History
