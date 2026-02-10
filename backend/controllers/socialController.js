@@ -132,143 +132,31 @@ const addComment = asyncHandler(async (req, res) => {
     throw new Error('Comment text is required');
   }
 
-  let Model;
   let targetType;
   switch (type) {
-    case 'products': Model = Product; targetType = 'Product'; break;
-    case 'recipes': Model = Recipe; targetType = 'Recipe'; break;
-    case 'forum': Model = ForumPost; targetType = 'ForumPost'; break;
+    case 'products': targetType = 'Product'; break;
+    case 'recipes': targetType = 'Recipe'; break;
+    case 'forum': targetType = 'ForumPost'; break;
     default:
       res.status(400);
       throw new Error('Invalid type');
   }
 
-  // Check for verified purchase if it's a product
-  let isVerified = false;
-  if (type === 'products') {
-    const hasOrdered = await Order.findOne({
-      user: userId,
-      'orderItems.product': id,
-      isPaid: true
-    });
-    if (hasOrdered) isVerified = true;
-  }
-
-  // Create the comment first
   const comment = await Comment.create({
     targetId: id,
     targetType,
     userId,
     content: text.trim(),
     parentCommentId: parentCommentId || null,
-    approved: true, // Auto-approve for real-time interaction
-    isVerified
+    approved: true
   });
 
-  try {
-    const updatedItem = await updateEngagementCount(Model, id, 'commentsCount', 1);
+  const populatedComment = await Comment.findById(comment._id).populate('userId', 'name profilePic');
 
-    if (!updatedItem) {
-      // If item creation failed or item doesn't exist, allow the comment but warn
-      // Or rollback? Better to rollback if item doesn't exist.
-      await Comment.findByIdAndDelete(comment._id);
-      res.status(404);
-      throw new Error('Target item not found');
-    }
-
-    // Populate user for the response and socket
-    const populatedComment = await Comment.findById(comment._id).populate('userId', 'name profilePic');
-
-    // Create notification for item owner
-    // --- Item Owner & Notification Fix ---
-    const itemOwnerId = updatedItem.sellerId || updatedItem.seller || updatedItem.userId;
-
-    if (itemOwnerId && itemOwnerId.toString() !== userId.toString()) {
-      await Notification.create({
-        user: itemOwnerId,
-        type: parentCommentId ? 'SOCIAL_REPLY' : 'SOCIAL_COMMENT',
-        message: `${req.user.name} ${parentCommentId ? 'replied' : 'commented'} on your ${targetType.toLowerCase()}`,
-        relatedEntity: id,
-        entityModel: targetType
-      });
-    }
-
-    // Notify admin for moderation purposes
-    if (req.user.role !== 'admin') {
-      const adminUsers = await User.find({ role: 'admin' }).select('_id');
-      for (const admin of adminUsers) {
-        await Notification.create({
-          user: admin._id,
-          type: 'COMMENT_APPROVAL',
-          message: `New comment from ${req.user.name} posted`,
-          relatedEntity: id,
-          entityModel: 'Comment'
-        });
-      }
-    }
-
-    // 🔥 Real-time socket events
-    if (req.io) {
-      const prefix = type.endsWith('s') ? type.slice(0, -1) : type;
-      const room = `${prefix.toLowerCase()}_${id}`;
-
-      req.io.to(room).emit('SOCIAL_UPDATE', {
-        type: 'COMMENT_ADDED',
-        itemType: targetType,
-        itemId: id,
-        comment: populatedComment,
-        commentsCount: updatedItem.commentsCount
-      });
-
-      // Global emission for dashboard sync
-      req.io.emit('SOCIAL_UPDATE', {
-        type: 'COMMENT_ADDED',
-        itemType: targetType,
-        itemId: id,
-        comment: populatedComment,
-        commentsCount: updatedItem.commentsCount
-      });
-
-      // Seller specific notification
-      if (itemOwnerId) {
-        req.io.to(`seller_${itemOwnerId}`).emit('ENGAGEMENT_UPDATE', {
-          type: 'NEW_ENGAGEMENT',
-          engagementType: 'comment',
-          itemType: targetType,
-          itemId: id,
-          comment: populatedComment,
-          userName: req.user.name,
-          userProfilePic: req.user.profilePic,
-          createdAt: new Date(),
-          counts: {
-            likes: updatedItem.likesCount,
-            comments: updatedItem.commentsCount,
-            shares: updatedItem.sharesCount,
-            rating: updatedItem.averageRating || updatedItem.rating
-          }
-        });
-      }
-    }
-
-    res.status(201).json({
-      success: true,
-      comment: populatedComment,
-      commentsCount: updatedItem.commentsCount
-    });
-
-  } catch (error) {
-    // If we crash after creating comment but before response, try to cleanup
-    console.error('Error in addComment post-creation:', error);
-    if (!res.headersSent) {
-      // If it was our own 404 throw
-      if (error.message === 'Target item not found') {
-        res.status(404);
-        throw error;
-      }
-      res.status(500);
-      throw new Error('Server error adding comment');
-    }
-  }
+  res.status(201).json({
+    success: true,
+    comment: populatedComment
+  });
 });
 
 // @desc    Get comments for an item
@@ -1134,6 +1022,37 @@ const getSocialStats = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc    Get reviews for a product
+// @route   GET /api/products/:id/reviews
+// @access  Public
+const getProductReviews = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const skip = (page - 1) * limit;
+
+  const query = { targetId: id, targetType: 'Product' };
+  if (req.user?.role !== 'admin') {
+    query.approved = true;
+  }
+
+  const reviews = await Rating.find(query)
+    .populate('userId', 'name profilePic')
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit);
+
+  const total = await Rating.countDocuments(query);
+
+  res.json({
+    success: true,
+    reviews,
+    total,
+    page: Number(page),
+    pages: Math.ceil(total / Number(limit))
+  });
+});
+
 module.exports = {
   likeItem,
   addComment,
@@ -1153,5 +1072,6 @@ module.exports = {
   trackShare,
   getSocialAnalytics,
   replyToComment,
-  rateItem
+  rateItem,
+  getProductReviews
 };

@@ -19,7 +19,7 @@ const {
   filterProducts,
 } = require("../controllers/productController");
 
-const { likeItem, addComment, getComments, trackShare, rateItem } = require('../controllers/socialController');
+const { likeItem, addComment, getComments, trackShare, rateItem, getProductReviews } = require('../controllers/socialController');
 
 // ===== PUBLIC ROUTES =====
 // Static routes MUST come BEFORE dynamic /:id routes
@@ -62,6 +62,11 @@ router.get('/:id/comments', (req, res, next) => {
   req.params.type = 'products';
   next();
 }, getComments);
+
+router.get('/:id/reviews', (req, res, next) => {
+  req.params.type = 'products';
+  next();
+}, getProductReviews);
 
 router.post('/:id/share', auth.protect, (req, res, next) => {
   req.params.type = 'products';

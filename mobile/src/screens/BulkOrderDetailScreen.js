@@ -28,7 +28,8 @@ const BulkOrderDetailScreen = ({ route, navigation }) => {
 
   const { bulkOrder, loading: orderLoading, error } = useSelector(state => state.bulkOrderDetails);
   const { success: updateSuccess } = useSelector(state => state.bulkOrderUpdate);
-  const { userInfo } = useSelector(state => state.userLogin);
+  const auth = useSelector(state => state.auth || {});
+  const { user: userInfo } = auth;
 
   useEffect(() => {
     dispatch(getBulkOrderDetails(orderId));
@@ -177,7 +178,7 @@ const BulkOrderDetailScreen = ({ route, navigation }) => {
             </View>
           )}
 
-          {userInfo.role === 'seller' && bulkOrder.status === 'confirmed' && (
+          {userInfo?.role === 'seller' && bulkOrder.status === 'confirmed' && (
             <Button
               mode="contained"
               onPress={handleFulfillOrder}

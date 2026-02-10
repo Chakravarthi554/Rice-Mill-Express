@@ -1,5 +1,4 @@
-import React, { useEffect, useState } from 'react';
-console.log('🛒 CartScreen loading...');
+import React, { useEffect } from 'react';
 import {
     View,
     Text,
@@ -8,55 +7,35 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     Alert,
+    Image,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { apiService } from '../../services/api';
+import { useDispatch, useSelector } from 'react-redux';
+import { getCart, removeFromCart, updateCartItem } from '../../redux/actions/cartActions';
 
 export default function CartScreen({ navigation }) {
-    const [cartItems, setCartItems] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const dispatch = useDispatch();
+    const cart = useSelector((state) => state.cart);
+    const { cartItems = [], loading, error } = cart || {};
 
     useEffect(() => {
-        fetchCart();
-    }, []);
+        dispatch(getCart());
+    }, [dispatch]);
 
-    const fetchCart = async () => {
-        try {
-            setLoading(true);
-            const response = await apiService.getCart();
-            setCartItems(response.data.items || []);
-        } catch (error) {
-            console.error('Error fetching cart:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const updateQuantity = async (productId, newQuantity) => {
+    const handleUpdateQuantity = (productId, newQuantity) => {
         if (newQuantity < 1) {
-            removeItem(productId);
+            handleRemoveItem(productId);
             return;
         }
-
-        try {
-            await apiService.updateCartItem(productId, newQuantity);
-            fetchCart();
-        } catch (error) {
-            Alert.alert('Error', 'Failed to update quantity');
-        }
+        dispatch(updateCartItem(productId, newQuantity));
     };
 
-    const removeItem = async (productId) => {
-        try {
-            await apiService.removeFromCart(productId);
-            fetchCart();
-        } catch (error) {
-            Alert.alert('Error', 'Failed to remove item');
-        }
+    const handleRemoveItem = (productId) => {
+        dispatch(removeFromCart(productId));
     };
 
     const calculateTotal = () => {
-        return cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
+        return cartItems.reduce((total, item) => total + (item.product?.price || 0) * (item.quantity || 1), 0);
     };
 
     const handleCheckout = () => {
@@ -67,46 +46,70 @@ export default function CartScreen({ navigation }) {
         navigation.navigate('Checkout');
     };
 
-    const renderCartItem = ({ item }) => (
-        <View style={styles.cartItem}>
-            <View style={styles.itemInfo}>
-                <Text style={styles.itemName}>{item.name}</Text>
-                <Text style={styles.itemPrice}>₹{item.price}</Text>
+    const renderCartItem = ({ item }) => {
+        const product = item.product || {};
+        const firstImage = product.images?.[0];
+        const imageUri = firstImage?.startsWith('http')
+            ? firstImage
+            : firstImage
+                ? `${process.env.EXPO_PUBLIC_API_URL}${firstImage}`
+                : 'https://via.placeholder.com/150';
+
+        return (
+            <View style={styles.cartItem}>
+                <Image source={{ uri: imageUri }} style={styles.itemImage} resizeMode="cover" />
+                <View style={styles.itemMainInfo}>
+                    <View style={styles.itemHeader}>
+                        <Text style={styles.itemName} numberOfLines={2}>{product.name || 'Product'}</Text>
+                        <TouchableOpacity
+                            onPress={() => handleRemoveItem(product._id)}
+                            style={styles.deleteButton}
+                        >
+                            <MaterialIcons name="close" size={20} color="#999" />
+                        </TouchableOpacity>
+                    </View>
+
+                    <Text style={styles.itemPrice}>₹{product.price || 0}</Text>
+
+                    <View style={styles.quantityRow}>
+                        <View style={styles.quantityControl}>
+                            <TouchableOpacity
+                                style={styles.qtyBtn}
+                                onPress={() => handleUpdateQuantity(product._id, (item.quantity || 1) - 1)}
+                            >
+                                <MaterialIcons name="remove" size={16} color="#666" />
+                            </TouchableOpacity>
+                            <Text style={styles.quantityText}>{item.quantity || 1}</Text>
+                            <TouchableOpacity
+                                style={styles.qtyBtn}
+                                onPress={() => handleUpdateQuantity(product._id, (item.quantity || 1) + 1)}
+                            >
+                                <MaterialIcons name="add" size={16} color="#4CAF50" />
+                            </TouchableOpacity>
+                        </View>
+                        <Text style={styles.itemSubtotal}>₹{(product.price || 0) * (item.quantity || 1)}</Text>
+                    </View>
+                </View>
             </View>
+        );
+    };
 
-            <View style={styles.quantityContainer}>
-                <TouchableOpacity
-                    style={styles.quantityButton}
-                    onPress={() => updateQuantity(item.productId, item.quantity - 1)}
-                >
-                    <MaterialIcons name="remove" size={20} color="#fff" />
-                </TouchableOpacity>
-
-                <Text style={styles.quantity}>{item.quantity}</Text>
-
-                <TouchableOpacity
-                    style={styles.quantityButton}
-                    onPress={() => updateQuantity(item.productId, item.quantity + 1)}
-                >
-                    <MaterialIcons name="add" size={20} color="#fff" />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={styles.deleteButton}
-                    onPress={() => removeItem(item.productId)}
-                >
-                    <MaterialIcons name="delete" size={24} color="#f44336" />
-                </TouchableOpacity>
-            </View>
-
-            <Text style={styles.itemTotal}>₹{item.price * item.quantity}</Text>
-        </View>
-    );
-
-    if (loading) {
+    if (loading && cartItems.length === 0) {
         return (
             <View style={styles.centerContainer}>
                 <ActivityIndicator size="large" color="#4CAF50" />
+            </View>
+        );
+    }
+
+    if (error) {
+        return (
+            <View style={styles.centerContainer}>
+                <MaterialIcons name="error-outline" size={48} color="#f44336" />
+                <Text style={styles.errorText}>{error}</Text>
+                <TouchableOpacity style={styles.retryButton} onPress={() => dispatch(getCart())}>
+                    <Text style={styles.retryText}>Retry</Text>
+                </TouchableOpacity>
             </View>
         );
     }
@@ -115,7 +118,7 @@ export default function CartScreen({ navigation }) {
         <View style={styles.container}>
             {cartItems.length === 0 ? (
                 <View style={styles.emptyContainer}>
-                    <MaterialIcons name="shopping-cart" size={100} color="#ccc" />
+                    <MaterialIcons name="shopping-cart-checkout" size={100} color="#ccc" />
                     <Text style={styles.emptyText}>Your cart is empty</Text>
                     <TouchableOpacity
                         style={styles.shopButton}
@@ -129,14 +132,26 @@ export default function CartScreen({ navigation }) {
                     <FlatList
                         data={cartItems}
                         renderItem={renderCartItem}
-                        keyExtractor={(item) => item.productId}
+                        keyExtractor={(item) => item.product?._id || Math.random().toString()}
                         contentContainerStyle={styles.cartList}
+                        refreshing={loading}
+                        onRefresh={() => dispatch(getCart())}
                     />
 
                     <View style={styles.footer}>
-                        <View style={styles.totalContainer}>
-                            <Text style={styles.totalLabel}>Total:</Text>
-                            <Text style={styles.totalAmount}>₹{calculateTotal()}</Text>
+                        <View style={styles.summaryContainer}>
+                            <View style={styles.summaryRow}>
+                                <Text style={styles.summaryLabel}>Subtotal</Text>
+                                <Text style={styles.summaryValue}>₹{calculateTotal()}</Text>
+                            </View>
+                            <View style={styles.summaryRow}>
+                                <Text style={styles.summaryLabel}>Delivery</Text>
+                                <Text style={styles.summaryValue}>Free</Text>
+                            </View>
+                            <View style={[styles.summaryRow, styles.totalRow]}>
+                                <Text style={styles.totalLabel}>Grand Total</Text>
+                                <Text style={styles.totalValue}>₹{calculateTotal()}</Text>
+                            </View>
                         </View>
 
                         <TouchableOpacity style={styles.checkoutButton} onPress={handleCheckout}>
@@ -153,12 +168,13 @@ export default function CartScreen({ navigation }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f5f5f5',
+        backgroundColor: '#f8f9fa',
     },
     centerContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+        padding: 20,
     },
     emptyContainer: {
         flex: 1,
@@ -177,6 +193,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 30,
         paddingVertical: 15,
         borderRadius: 8,
+        elevation: 2,
     },
     shopButtonText: {
         color: '#fff',
@@ -188,70 +205,120 @@ const styles = StyleSheet.create({
     },
     cartItem: {
         backgroundColor: '#fff',
-        padding: 15,
-        borderRadius: 8,
-        marginBottom: 10,
-        elevation: 2,
+        borderRadius: 12,
+        marginBottom: 15,
+        flexDirection: 'row',
+        padding: 12,
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
     },
-    itemInfo: {
-        marginBottom: 10,
+    itemImage: {
+        width: 90,
+        height: 90,
+        borderRadius: 8,
+        backgroundColor: '#f0f0f0',
+    },
+    itemMainInfo: {
+        flex: 1,
+        marginLeft: 12,
+        justifyContent: 'space-between',
+    },
+    itemHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
     },
     itemName: {
         fontSize: 16,
-        fontWeight: '600',
+        fontWeight: 'bold',
         color: '#333',
+        flex: 1,
+        marginRight: 8,
     },
     itemPrice: {
         fontSize: 14,
         color: '#666',
-        marginTop: 4,
+        marginTop: 2,
     },
-    quantityContainer: {
+    quantityRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: 10,
+    },
+    quantityControl: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginTop: 10,
+        backgroundColor: '#f1f3f5',
+        borderRadius: 20,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
     },
-    quantityButton: {
-        backgroundColor: '#4CAF50',
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+    qtyBtn: {
+        width: 28,
+        height: 28,
         justifyContent: 'center',
         alignItems: 'center',
+        backgroundColor: '#fff',
+        borderRadius: 14,
+        elevation: 1,
     },
-    quantity: {
-        fontSize: 18,
+    quantityText: {
+        fontSize: 16,
         fontWeight: 'bold',
-        marginHorizontal: 15,
-        minWidth: 30,
+        marginHorizontal: 12,
+        minWidth: 20,
         textAlign: 'center',
     },
-    deleteButton: {
-        marginLeft: 'auto',
-    },
-    itemTotal: {
-        fontSize: 18,
+    itemSubtotal: {
+        fontSize: 16,
         fontWeight: 'bold',
         color: '#4CAF50',
-        marginTop: 10,
     },
     footer: {
         backgroundColor: '#fff',
-        padding: 15,
-        borderTopWidth: 1,
-        borderTopColor: '#ddd',
+        padding: 20,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        elevation: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -3 },
+        shadowOpacity: 0.1,
+        shadowRadius: 5,
     },
-    totalContainer: {
+    summaryContainer: {
+        marginBottom: 20,
+    },
+    summaryRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: 15,
+        marginBottom: 8,
+    },
+    summaryLabel: {
+        color: '#666',
+        fontSize: 14,
+    },
+    summaryValue: {
+        color: '#333',
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    totalRow: {
+        borderTopWidth: 1,
+        borderTopColor: '#eee',
+        paddingTop: 12,
+        marginTop: 4,
     },
     totalLabel: {
         fontSize: 18,
-        fontWeight: '600',
+        fontWeight: 'bold',
+        color: '#333',
     },
-    totalAmount: {
-        fontSize: 24,
+    totalValue: {
+        fontSize: 22,
         fontWeight: 'bold',
         color: '#4CAF50',
     },
@@ -260,13 +327,29 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        padding: 15,
-        borderRadius: 8,
+        padding: 16,
+        borderRadius: 12,
+        elevation: 3,
     },
     checkoutButtonText: {
         color: '#fff',
         fontSize: 18,
         fontWeight: 'bold',
         marginRight: 10,
+    },
+    errorText: {
+        color: '#f44336',
+        marginTop: 10,
+        textAlign: 'center',
+    },
+    retryButton: {
+        marginTop: 20,
+        padding: 10,
+        backgroundColor: '#4CAF50',
+        borderRadius: 8,
+    },
+    retryText: {
+        color: '#fff',
+        fontWeight: 'bold',
     },
 });

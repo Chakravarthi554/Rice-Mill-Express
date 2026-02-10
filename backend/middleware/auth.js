@@ -45,9 +45,20 @@ const protect = asyncHandler(async (req, res, next) => {
 
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     try {
-      // Get token from header
       token = req.headers.authorization.split(' ')[1];
-      console.log('🔄 Auth Middleware: Token found in Authorization header');
+    } catch (error) {
+      console.error('Auth header parse error', error);
+    }
+  } else if (req.query && req.query.token) {
+    // Allow token via query param for downloads
+    token = req.query.token;
+    console.log('🔄 Auth Middleware: Token found in query params');
+  }
+
+  if (token) {
+    try {
+      // Validate token
+      console.log('🔄 Auth Middleware: Token found (source: ' + (req.query.token ? 'query' : 'header') + ')');
 
       let decoded;
       let user;

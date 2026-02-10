@@ -3,42 +3,70 @@ import {
     CART_ADD_ITEM,
     CART_REMOVE_ITEM,
     CART_FAIL,
+    CART_FETCH_REQUEST,
+    CART_FETCH_SUCCESS,
+    CART_FETCH_FAIL,
+    CART_UPDATE_ITEM_SUCCESS,
+    CART_CLEAR_ITEMS,
 } from '../../constants/cartConstants';
 
-export const addToCart = (id, qty) => async (dispatch, getState) => {
+export const getCart = () => async (dispatch) => {
     try {
-        const { data } = await apiService.getProductById(id);
+        dispatch({ type: CART_FETCH_REQUEST });
 
-        let image = data.product.image;
-        if (!image && data.product.images && data.product.images.length > 0) {
-            image = data.product.images[0];
-        }
+        const response = await apiService.getCart();
 
         dispatch({
-            type: CART_ADD_ITEM,
-            payload: {
-                product: data.product._id,
-                name: data.product.name,
-                image: image,
-                price: data.product.price,
-                countInStock: data.product.countInStock,
-                qty,
-            },
+            type: CART_FETCH_SUCCESS,
+            payload: response.data || [],
         });
+    } catch (error) {
+        dispatch({
+            type: CART_FETCH_FAIL,
+            payload: error.response && error.response.data.message
+                ? error.response.data.message
+                : error.message,
+        });
+    }
+};
 
-        await apiService.addToCart(id, qty);
+export const addToCart = (productId, qty) => async (dispatch) => {
+    try {
+        // optimistically add to cart or just wait for API
+        await apiService.addToCart(productId, qty);
+
+        // Refresh full cart state from server after adding
+        dispatch(getCart());
     } catch (error) {
         console.error('Add to cart error:', error);
         dispatch({
             type: CART_FAIL,
             payload: 'Failed to add item to cart'
-        })
+        });
     }
 };
 
-export const removeFromCart = (id) => (dispatch, getState) => {
-    dispatch({
-        type: CART_REMOVE_ITEM,
-        payload: id,
-    });
+export const removeFromCart = (productId) => async (dispatch) => {
+    try {
+        dispatch({ type: CART_REMOVE_ITEM, payload: productId });
+        await apiService.removeFromCart(productId);
+        // Sync with server
+        dispatch(getCart());
+    } catch (error) {
+        console.error('Remove from cart error:', error);
+    }
+};
+
+export const updateCartItem = (productId, qty) => async (dispatch) => {
+    try {
+        await apiService.updateCartItem(productId, qty);
+        dispatch({ type: CART_UPDATE_ITEM_SUCCESS });
+        dispatch(getCart());
+    } catch (error) {
+        console.error('Update cart error:', error);
+    }
+};
+
+export const clearCart = () => (dispatch) => {
+    dispatch({ type: CART_CLEAR_ITEMS });
 };

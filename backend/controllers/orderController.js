@@ -12,7 +12,6 @@ const NotificationService = require('../services/NotificationService');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const Razorpay = require('razorpay');
-const { emitOrderUpdate } = require('../utils/socketNotifications');
 
 let razorpayInstance = null;
 if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
@@ -54,12 +53,16 @@ exports.createOrder = asyncHandler(async (req, res) => {
   if (!shippingAddressId || !mongoose.Types.ObjectId.isValid(shippingAddressId)) {
     res.status(400); throw new Error('Valid shipping address ID is required');
   }
-  if (!paymentMethod || !['cod', 'razorpay'].includes(paymentMethod)) {
+  if (!paymentMethod || !['cod', 'razorpay', 'online'].includes(paymentMethod)) {
     res.status(400); throw new Error('Invalid payment method');
   }
-  if (paymentMethod === 'razorpay' && (!razorpayPaymentId || !razorpayOrderId || !razorpaySignature)) {
-    res.status(400); throw new Error('Missing Razorpay payment details');
-  }
+
+  // Normalize payment method
+  const finalPaymentMethod = paymentMethod === 'online' ? 'razorpay' : paymentMethod;
+
+  // Razorpay details are only required if payment is being confirmed immediately (e.g., Desktop Flow)
+  // For Mobile Flow, we create the order first, then redirect to a payment page.
+  const isImmediatePayment = finalPaymentMethod === 'razorpay' && razorpayPaymentId && razorpayOrderId && razorpaySignature;
 
   const user = await User.findById(req.user._id).populate('addresses');
   if (!user) { res.status(404); throw new Error('User not found'); }
@@ -111,9 +114,9 @@ exports.createOrder = asyncHandler(async (req, res) => {
     }
   }
 
-  // Razorpay Verification
-  let isPaymentVerified = paymentMethod === 'cod';
-  if (paymentMethod === 'razorpay') {
+  // Payment Verification logic
+  let isPaymentVerified = finalPaymentMethod === 'cod' || !isImmediatePayment;
+  if (isImmediatePayment) {
     if (!razorpayInstance) {
       res.status(500); throw new Error("Razorpay not configured");
     }
@@ -159,15 +162,15 @@ exports.createOrder = asyncHandler(async (req, res) => {
           city: selectedAddress.city, state: selectedAddress.state, pinCode: selectedAddress.pinCode,
           country: selectedAddress.country, addressType: selectedAddress.type || selectedAddress.addressType,
         },
-        paymentMethod,
+        paymentMethod: finalPaymentMethod,
         totalPrice: data.totalPrice,
         commissionRate, commissionAmount, sellerEarnings,
         orderStatus: 'placed',
-        isPaid: paymentMethod === 'razorpay',
-        paidAt: paymentMethod === 'razorpay' ? Date.now() : null,
-        paymentStatus: paymentMethod === 'razorpay' ? 'completed' : 'pending',
-        razorpayOrderId: paymentMethod === 'razorpay' ? razorpayOrderId : null,
-        paymentResult: paymentMethod === 'razorpay' ? { id: razorpayPaymentId, status: 'completed', update_time: new Date() } : null,
+        isPaid: isImmediatePayment,
+        paidAt: isImmediatePayment ? Date.now() : null,
+        paymentStatus: isImmediatePayment ? 'completed' : 'pending',
+        razorpayOrderId: isImmediatePayment ? razorpayOrderId : null,
+        paymentResult: isImmediatePayment ? { id: razorpayPaymentId, status: 'completed', update_time: new Date() } : null,
       });
 
       const savedOrder = await order.save({ session });
@@ -175,8 +178,8 @@ exports.createOrder = asyncHandler(async (req, res) => {
         order: savedOrder._id, user: savedOrder.user, seller: savedOrder.seller,
         amount: savedOrder.totalPrice, currency: 'INR', method: savedOrder.paymentMethod,
         status: savedOrder.paymentStatus, razorpayOrderId: savedOrder.razorpayOrderId,
-        razorpayPaymentId: paymentMethod === 'razorpay' ? razorpayPaymentId : null,
-        razorpaySignature: paymentMethod === 'razorpay' ? razorpaySignature : null,
+        razorpayPaymentId: isImmediatePayment ? razorpayPaymentId : null,
+        razorpaySignature: isImmediatePayment ? razorpaySignature : null,
         commissionAmount: savedOrder.commissionAmount, sellerPayoutAmount: savedOrder.sellerEarnings,
         payoutStatus: 'pending',
       }], { session });
@@ -199,11 +202,14 @@ exports.createOrder = asyncHandler(async (req, res) => {
 
     // ✅ FIXED: Post-commit operations (non-critical, won't rollback)
     try {
+      if (req.broadcastOrderUpdate) {
+        createdOrders.forEach(order => {
+          req.broadcastOrderUpdate(order._id);
+        });
+      }
       const io = req.app.get('io');
       if (io) {
         createdOrders.forEach(order => {
-          emitOrderUpdate(io, order.user.toString(), order._id, { status: 'placed', isPaid: order.isPaid });
-          emitOrderUpdate(io, order.seller.toString(), order._id, { status: 'placed', isPaid: order.isPaid });
           io.to('admin').emit('NEW_ORDER', { type: 'NEW_ORDER', data: { orderId: order._id } });
         });
       }
@@ -377,12 +383,12 @@ exports.cancelOrder = asyncHandler(async (req, res) => {
     entityModel: 'Order'
   });
   // Emit socket events
+  if (req.broadcastOrderUpdate) {
+    req.broadcastOrderUpdate(order._id);
+  }
   const io = req.app.get('io');
   if (io) {
-    const updateDataEmit = { status: 'cancelled' };
-    emitOrderUpdate(io, order.user.toString(), order._id, updateDataEmit);
-    emitOrderUpdate(io, order.seller.toString(), order._id, updateDataEmit);
-    io.to('admin').emit('ORDER_UPDATE', { type: 'ORDER_UPDATE', data: { orderId: order._id, ...updateDataEmit } });
+    io.to('admin').emit('ORDER_UPDATE', { type: 'ORDER_UPDATE', data: { orderId: order._id, status: 'cancelled' } });
     io.to(`seller_${order.seller.toString()}`).emit('REFRESH_ANALYTICS', { sellerId: order.seller.toString() });
   }
 

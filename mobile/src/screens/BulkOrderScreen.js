@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-console.log('📋 BulkOrderScreen loading...');
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import {
@@ -29,27 +28,29 @@ const BulkOrderScreen = ({ navigation }) => {
   const [action, setAction] = useState('');
   const [discount, setDiscount] = useState(0);
 
-  const { bulkOrders, loading: ordersLoading } = useSelector(state => state.bulkOrderList);
-  const { loading: createLoading } = useSelector(state => state.bulkOrderCreate);
-  const { loading: updateLoading } = useSelector(state => state.bulkOrderUpdate);
-  const { products } = useSelector(state => state.productList);
-  const { userInfo } = useSelector(state => state.userLogin);
+  const { bulkOrders = [], loading: ordersLoading } = useSelector(state => state.bulkOrderList || {});
+  const { loading: createLoading } = useSelector(state => state.bulkOrderCreate || {});
+  const { loading: updateLoading } = useSelector(state => state.bulkOrderUpdate || {});
+  const { products = [] } = useSelector(state => state.productList || {});
+  const auth = useSelector(state => state.auth || {});
+  const { user: userInfo } = auth;
 
   useEffect(() => {
     dispatch(getBulkOrders());
     dispatch(listProducts({}));
   }, [dispatch]);
 
-  const filteredOrders = bulkOrders.filter(order => {
+  const filteredOrders = Array.isArray(bulkOrders) ? bulkOrders.filter(order => {
+    if (!userInfo) return false;
     if (userInfo.role === 'seller') {
-      return order.seller._id === userInfo._id;
+      return order.seller?._id === userInfo._id;
     }
-    return order.buyer._id === userInfo._id;
-  });
+    return order.buyer?._id === userInfo._id;
+  }) : [];
 
   const requestedOrders = filteredOrders.filter(o => o.status === 'requested');
   const activeOrders = filteredOrders.filter(o =>
-    ['quote_sent', 'negotiating', 'confirmed'].includes(o.status));
+    ['quote_sent', 'negotiating', 'confirmed', (userInfo.role === 'customer' ? 'requested' : null)].filter(Boolean).includes(o.status));
   const completedOrders = filteredOrders.filter(o =>
     ['fulfilled', 'cancelled'].includes(o.status));
 
@@ -118,9 +119,6 @@ const BulkOrderScreen = ({ navigation }) => {
             {selectedProducts.length > 0 && (
               <Card style={styles.card}>
                 <Card.Title title="Order Summary" />
-                key={order._id}
-                style={styles.orderCard}
-                onPress={() => navigation.navigate('BulkOrderDetail', { orderId: order._id })}
 
                 <Card.Content>
                   <DataTable>
@@ -246,13 +244,13 @@ const BulkOrderScreen = ({ navigation }) => {
               Active Orders
             </Text>
           </TouchableOpacity>
-          {userInfo.role === 'seller' && (
+          {(userInfo.role === 'seller' || requestedOrders.length > 0) && (
             <TouchableOpacity
               style={[styles.tab, activeTab === 'requests' && styles.activeTab]}
               onPress={() => setActiveTab('requests')}
             >
               <Text style={activeTab === 'requests' ? styles.activeTabText : styles.tabText}>
-                New Requests
+                {userInfo.role === 'seller' ? 'New Requests' : 'My Requests'}
               </Text>
             </TouchableOpacity>
           )}
@@ -439,9 +437,6 @@ const BulkOrderScreen = ({ navigation }) => {
                       <MaterialIcons name="check-circle" size={24} color="#4CAF50" />
                     )}
                   </Card.Content>
-                  key={order._id}
-                  style={styles.orderCard}
-                  onPress={() => navigation.navigate('BulkOrderDetail', { orderId: order._id })}
 
                 </Card>
               ))}
@@ -523,54 +518,6 @@ const BulkOrderScreen = ({ navigation }) => {
     </PaperProvider>
   );
 };
-// Add these state variables
-const [negotiationMode, setNegotiationMode] = useState(false);
-const [priceOffers, setPriceOffers] = useState({});
-
-// Add negotiation handler
-const handleNegotiatePrice = (productId, price) => {
-  setPriceOffers(prev => ({
-    ...prev,
-    [productId]: price
-  }));
-};
-
-// Add to the render
-{
-  negotiationMode && (
-    <View style={styles.negotiationContainer}>
-      {currentOrder.items.map(item => (
-        <View key={item.product._id} style={styles.negotiationItem}>
-          <Text>{item.product.name}</Text>
-          <TextInput
-            value={String(priceOffers[item.product._id] || '')}
-            onChangeText={text => handleNegotiatePrice(
-              item.product._id,
-              parseFloat(text) || 0
-            )}
-            keyboardType="numeric"
-            placeholder="Your offer"
-            style={styles.negotiationInput}
-          />
-        </View>
-      ))}
-      <Button
-        onPress={() => {
-          setNegotiationMode(false);
-          handleUpdateOrder({
-            action: 'negotiate',
-            negotiatedPrices: Object.entries(priceOffers).map(([productId, price]) => ({
-              productId,
-              price
-            }))
-          });
-        }}
-      >
-        Submit Offer
-      </Button>
-    </View>
-  )
-}
 
 const styles = StyleSheet.create({
   container: {

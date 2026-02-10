@@ -2,34 +2,34 @@ import {
     CART_ADD_ITEM,
     CART_REMOVE_ITEM,
     CART_FAIL,
+    CART_FETCH_REQUEST,
+    CART_FETCH_SUCCESS,
+    CART_FETCH_FAIL,
+    CART_UPDATE_ITEM_SUCCESS,
+    CART_CLEAR_ITEMS,
 } from '../../constants/cartConstants';
 
-export const cartReducer = (state = { cartItems: [] }, action) => {
+export const cartReducer = (state = { cartItems: [], loading: false }, action) => {
     switch (action.type) {
+        case CART_FETCH_REQUEST:
+            return { ...state, loading: true };
+        case CART_FETCH_SUCCESS:
+            return { loading: false, cartItems: action.payload };
+        case CART_FETCH_FAIL:
+            return { ...state, loading: false, error: action.payload };
         case CART_ADD_ITEM:
-            const item = action.payload;
-            const existItem = state.cartItems.find((x) => x.product === item.product);
-
-            if (existItem) {
-                return {
-                    ...state,
-                    cartItems: state.cartItems.map((x) =>
-                        x.product === existItem.product ? item : x
-                    ),
-                };
-            } else {
-                return {
-                    ...state,
-                    cartItems: [...state.cartItems, item],
-                };
-            }
+            return { ...state, loading: false }; // Handled by refresh
+        case CART_UPDATE_ITEM_SUCCESS:
+            return { ...state, loading: false }; // Handled by refresh
         case CART_REMOVE_ITEM:
             return {
                 ...state,
-                cartItems: state.cartItems.filter((x) => x.product !== action.payload),
+                cartItems: state.cartItems.filter((x) => (x.product?._id || x.product) !== action.payload),
             };
         case CART_FAIL:
-            return { ...state, error: action.payload };
+            return { ...state, loading: false, error: action.payload };
+        case CART_CLEAR_ITEMS:
+            return { ...state, cartItems: [] };
         default:
             return state;
     }

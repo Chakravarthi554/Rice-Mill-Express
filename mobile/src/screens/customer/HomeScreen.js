@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-console.log('📱 HomeScreen loading...');
 import {
     View,
     Text,
@@ -12,7 +11,9 @@ import {
     TextInput,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useDispatch, useSelector } from 'react-redux';
 import { apiService } from '../../services/api';
+import { addToWishlist, removeFromWishlist, getWishlist } from '../../redux/actions/wishlistActions';
 
 export default function HomeScreen({ navigation }) {
     const [products, setProducts] = useState([]);
@@ -22,7 +23,8 @@ export default function HomeScreen({ navigation }) {
 
     useEffect(() => {
         fetchProducts();
-    }, []);
+        dispatch(getWishlist());
+    }, [dispatch]);
 
     const fetchProducts = async () => {
         try {
@@ -46,34 +48,82 @@ export default function HomeScreen({ navigation }) {
         product.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    const renderProduct = ({ item }) => (
-        <TouchableOpacity
-            style={styles.productCard}
-            onPress={() => navigation.navigate('ProductDetail', { productId: item._id })}
-        >
-            <Image
-                source={{ uri: item.image || 'https://via.placeholder.com/150' }}
-                style={styles.productImage}
-            />
-            <View style={styles.productInfo}>
-                <Text style={styles.productName} numberOfLines={2}>
-                    {item.name}
-                </Text>
-                <Text style={styles.productPrice}>₹{item.price}</Text>
-                <View style={styles.productFooter}>
-                    <View style={styles.ratingContainer}>
-                        <MaterialIcons name="star" size={16} color="#FFC107" />
-                        <Text style={styles.ratingText}>{item.rating || '4.5'}</Text>
-                    </View>
-                    {item.stock > 0 ? (
-                        <Text style={styles.inStock}>In Stock</Text>
-                    ) : (
-                        <Text style={styles.outOfStock}>Out of Stock</Text>
+    const wishlist = useSelector((state) => state.wishlist);
+    const { wishlistItems = [] } = wishlist || {};
+    const dispatch = useDispatch();
+
+    const isWishlisted = (id) => wishlistItems.some((x) => (x._id || x) === id);
+
+    const toggleWishlist = (product) => {
+        if (isWishlisted(product._id)) {
+            dispatch(removeFromWishlist(product._id));
+        } else {
+            dispatch(addToWishlist(product._id));
+        }
+    };
+
+    const renderProduct = ({ item }) => {
+        const imageUri = item.images?.[0]?.startsWith('http')
+            ? item.images[0]
+            : item.images?.[0]
+                ? `${process.env.EXPO_PUBLIC_API_URL}${item.images[0]}`
+                : 'https://via.placeholder.com/150';
+
+        const favorited = isWishlisted(item._id);
+        const hasOffer = typeof item.offerPrice === 'number' && item.offerPrice > 0 && item.offerPrice < item.price;
+        const displayPrice = hasOffer ? item.offerPrice : item.price;
+
+        return (
+            <TouchableOpacity
+                style={styles.productCard}
+                onPress={() => navigation.navigate('ProductDetail', { productId: item._id })}
+            >
+                <View style={styles.imageContainer}>
+                    <Image
+                        source={{ uri: imageUri }}
+                        style={styles.productImage}
+                    />
+                    {hasOffer && (
+                        <View style={styles.offerBadge}>
+                            <Text style={styles.offerText}>OFFER</Text>
+                        </View>
                     )}
+                    <TouchableOpacity
+                        style={styles.wishlistIcon}
+                        onPress={() => toggleWishlist(item)}
+                    >
+                        <MaterialIcons
+                            name={favorited ? 'favorite' : 'favorite-border'}
+                            size={24}
+                            color={favorited ? '#f44336' : '#666'}
+                        />
+                    </TouchableOpacity>
                 </View>
-            </View>
-        </TouchableOpacity>
-    );
+                <View style={styles.productInfo}>
+                    <Text style={styles.productName} numberOfLines={2}>
+                        {item.name}
+                    </Text>
+                    <View style={styles.priceRow}>
+                        <Text style={styles.productPrice}>₹{displayPrice}</Text>
+                        {hasOffer && (
+                            <Text style={styles.originalPrice}>₹{item.price}</Text>
+                        )}
+                    </View>
+                    <View style={styles.productFooter}>
+                        <View style={styles.ratingContainer}>
+                            <MaterialIcons name="star" size={16} color="#FFC107" />
+                            <Text style={styles.ratingText}>{item.rating || '4.5'}</Text>
+                        </View>
+                        {item.stock > 0 || item.countInStock > 0 ? (
+                            <Text style={styles.inStock}>In Stock</Text>
+                        ) : (
+                            <Text style={styles.outOfStock}>Out of Stock</Text>
+                        )}
+                    </View>
+                </View>
+            </TouchableOpacity>
+        );
+    };
 
     if (loading) {
         return (
@@ -104,6 +154,41 @@ export default function HomeScreen({ navigation }) {
                 contentContainerStyle={styles.productList}
                 refreshControl={
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#4CAF50']} />
+                }
+                ListHeaderComponent={
+                    <View>
+                        <View style={styles.quickActions}>
+                            <TouchableOpacity
+                                style={styles.actionButton}
+                                onPress={() => navigation.navigate('BulkOrders')}
+                            >
+                                <MaterialIcons name="shopping-bag" size={24} color="#fff" />
+                                <Text style={styles.actionButtonText}>Bulk Order</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.actionButton, { backgroundColor: '#FF9800' }]}
+                                onPress={() => navigation.navigate('Cart')}
+                            >
+                                <MaterialIcons name="shopping-cart" size={24} color="#fff" />
+                                <Text style={styles.actionButtonText}>My Cart</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>Recommended For You</Text>
+                        </View>
+                        <FlatList
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            data={products.slice(0, 5)}
+                            keyExtractor={(item) => `rec-${item._id}`}
+                            renderItem={renderProduct}
+                            contentContainerStyle={{ paddingBottom: 15 }}
+                        />
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>All Products</Text>
+                        </View>
+                    </View>
                 }
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
@@ -171,6 +256,17 @@ const styles = StyleSheet.create({
         height: 150,
         resizeMode: 'cover',
     },
+    imageContainer: {
+        position: 'relative',
+    },
+    wishlistIcon: {
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        backgroundColor: 'rgba(255,255,255,0.7)',
+        padding: 5,
+        borderRadius: 20,
+    },
     productInfo: {
         padding: 12,
     },
@@ -180,11 +276,56 @@ const styles = StyleSheet.create({
         color: '#333',
         marginBottom: 5,
     },
+    priceRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
     productPrice: {
         fontSize: 18,
         fontWeight: 'bold',
         color: '#4CAF50',
-        marginBottom: 8,
+    },
+    originalPrice: {
+        fontSize: 14,
+        color: '#999',
+        textDecorationLine: 'line-through',
+        marginLeft: 8,
+    },
+    offerBadge: {
+        position: 'absolute',
+        top: 10,
+        left: 10,
+        backgroundColor: '#f44336',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 4,
+    },
+    offerText: {
+        color: '#fff',
+        fontSize: 10,
+        fontWeight: 'bold',
+    },
+    quickActions: {
+        flexDirection: 'row',
+        padding: 15,
+        justifyContent: 'space-between',
+    },
+    actionButton: {
+        flex: 1,
+        backgroundColor: '#4CAF50',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        borderRadius: 10,
+        marginHorizontal: 5,
+        elevation: 2,
+    },
+    actionButtonText: {
+        color: '#fff',
+        fontWeight: 'bold',
+        marginLeft: 8,
     },
     productFooter: {
         flexDirection: 'row',
@@ -218,5 +359,14 @@ const styles = StyleSheet.create({
         marginTop: 15,
         fontSize: 18,
         color: '#999',
+    },
+    sectionHeader: {
+        paddingHorizontal: 15,
+        paddingVertical: 10,
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#333',
     },
 });

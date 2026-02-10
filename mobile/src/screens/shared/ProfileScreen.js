@@ -7,14 +7,31 @@ import {
     ScrollView,
     Alert,
 } from 'react-native';
-console.log('👤 ProfileScreen loading...');
 import { useDispatch, useSelector } from 'react-redux';
 import { MaterialIcons } from '@expo/vector-icons';
-import { logout } from '../../redux/slices/authSlice';
+import { logout, setUser } from '../../redux/slices/authSlice';
+import { useFocusEffect } from '@react-navigation/native';
+import { apiService } from '../../services/api';
 
 export default function ProfileScreen({ navigation }) {
     const dispatch = useDispatch();
     const { user } = useSelector((state) => state.auth);
+
+    useFocusEffect(
+        React.useCallback(() => {
+            const fetchProfile = async () => {
+                try {
+                    const { data } = await apiService.getUserProfile();
+                    dispatch(setUser(data));
+                } catch (error) {
+                    console.error('Failed to sync profile:', error);
+                }
+            };
+            if (user) {
+                fetchProfile();
+            }
+        }, [dispatch, user?.token]) // Dependency on token or just dispatch
+    );
 
     const handleLogout = () => {
         Alert.alert(
@@ -32,6 +49,11 @@ export default function ProfileScreen({ navigation }) {
     };
 
     const menuItems = [
+        { icon: 'restaurant-menu', label: 'Recipes', screen: 'Recipes' },
+        { icon: 'forum', label: 'Forum', screen: 'Forum' },
+        { icon: 'stars', label: 'My Rewards', screen: 'Rewards' },
+        { icon: 'rate-review', label: 'My Reviews', screen: 'MyReviews' },
+        { icon: 'settings', label: 'Settings', screen: 'Settings' },
         { icon: 'person', label: 'Edit Profile', screen: 'EditProfile' },
         { icon: 'location-on', label: 'Addresses', screen: 'Addresses' },
         { icon: 'notifications', label: 'Notifications', screen: 'Notifications' },

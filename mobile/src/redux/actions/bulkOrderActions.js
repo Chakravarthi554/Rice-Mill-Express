@@ -1,4 +1,4 @@
-import axios from 'axios';
+import { apiService } from '../../services/api';
 import {
   BULK_ORDER_CREATE_REQUEST,
   BULK_ORDER_CREATE_SUCCESS,
@@ -9,110 +9,61 @@ import {
   BULK_ORDER_UPDATE_REQUEST,
   BULK_ORDER_UPDATE_SUCCESS,
   BULK_ORDER_UPDATE_FAIL,
+  BULK_ORDER_DETAILS_REQUEST,
+  BULK_ORDER_DETAILS_SUCCESS,
+  BULK_ORDER_DETAILS_FAIL,
 } from '../../constants/bulkOrderConstants';
 
-export const createBulkOrder = (orderData) => async (dispatch, getState) => {
+export const createBulkOrder = (orderData) => async (dispatch) => {
   try {
-    dispatch({
-      type: BULK_ORDER_CREATE_REQUEST,
-    });
-
-    const {
-      userLogin: { userInfo },
-    } = getState();
-
-    const config = {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${userInfo.token}`,
-      },
-    };
-
-    const { data } = await axios.post('/api/bulkorders', orderData, config);
-
-    dispatch({
-      type: BULK_ORDER_CREATE_SUCCESS,
-      payload: data,
-    });
-
+    dispatch({ type: BULK_ORDER_CREATE_REQUEST });
+    const { data } = await apiService.createBulkOrder(orderData);
+    dispatch({ type: BULK_ORDER_CREATE_SUCCESS, payload: data });
   } catch (error) {
     dispatch({
       type: BULK_ORDER_CREATE_FAIL,
-      payload:
-        error.response && error.response.data.message
-          ? error.response.data.message
-          : error.message,
+      payload: error.response?.data?.message || error.message,
     });
   }
 };
 
-export const getBulkOrders = () => async (dispatch, getState) => {
+export const getBulkOrders = () => async (dispatch) => {
   try {
-    dispatch({
-      type: BULK_ORDER_LIST_REQUEST,
-    });
-
-    const {
-      userLogin: { userInfo },
-    } = getState();
-
-    const config = {
-      headers: {
-        Authorization: `Bearer ${userInfo.token}`,
-      },
-    };
-
-    const { data } = await axios.get('/api/bulkorders', config);
-
-    dispatch({
-      type: BULK_ORDER_LIST_SUCCESS,
-      payload: data,
-    });
+    dispatch({ type: BULK_ORDER_LIST_REQUEST });
+    const { data } = await apiService.getBulkOrders();
+    dispatch({ type: BULK_ORDER_LIST_SUCCESS, payload: data });
   } catch (error) {
     dispatch({
       type: BULK_ORDER_LIST_FAIL,
-      payload:
-        error.response && error.response.data.message
-          ? error.response.data.message
-          : error.message,
+      payload: error.response?.data?.message || error.message,
     });
   }
 };
 
-export const updateBulkOrder = (id, updateData) => async (dispatch, getState) => {
+export const getBulkOrderDetails = (id) => async (dispatch) => {
   try {
+    dispatch({ type: BULK_ORDER_DETAILS_REQUEST });
+    const { data } = await apiService.getBulkOrderById(id);
+    dispatch({ type: BULK_ORDER_DETAILS_SUCCESS, payload: data });
+  } catch (error) {
     dispatch({
-      type: BULK_ORDER_UPDATE_REQUEST,
+      type: BULK_ORDER_DETAILS_FAIL,
+      payload: error.response?.data?.message || error.message,
     });
+  }
+};
 
-    const {
-      userLogin: { userInfo },
-    } = getState();
-
-    const config = {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${userInfo.token}`,
-      },
-    };
-
-    const { data } = await axios.put(`/api/bulkorders/${id}`, updateData, config);
-
-    dispatch({
-      type: BULK_ORDER_UPDATE_SUCCESS,
-      payload: data,
-    });
-
-    // Refresh the orders list after update
+export const updateBulkOrder = (id, updateData) => async (dispatch) => {
+  try {
+    dispatch({ type: BULK_ORDER_UPDATE_REQUEST });
+    // Assuming updateBulkOrder exists in apiService, if not we'll add it
+    const { data } = await apiService.updateBulkOrder(id, updateData);
+    dispatch({ type: BULK_ORDER_UPDATE_SUCCESS, payload: data });
     dispatch(getBulkOrders());
-
   } catch (error) {
     dispatch({
       type: BULK_ORDER_UPDATE_FAIL,
-      payload:
-        error.response && error.response.data.message
-          ? error.response.data.message
-          : error.message,
+      payload: error.response?.data?.message || error.message,
     });
   }
 };

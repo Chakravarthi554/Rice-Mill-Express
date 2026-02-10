@@ -3,7 +3,7 @@ import { View, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform } f
 import { TextInput, Button, Card, Title } from 'react-native-paper';
 import { useDispatch, useSelector } from 'react-redux';
 import { apiService } from '../../services/api';
-import { setCredentials } from '../../redux/slices/authSlice';
+import { setCredentials, setUser } from '../../redux/slices/authSlice';
 
 const EditProfileScreen = ({ navigation }) => {
     const { user } = useSelector((state) => state.auth);
@@ -21,9 +21,8 @@ const EditProfileScreen = ({ navigation }) => {
             setLoading(true);
             const { data } = await apiService.updateUserProfile({ name, email });
             // Update Redux state with new user info (keeping token same)
-            dispatch(setCredentials({ user: data.user, token: null })); // null token means keep existing? Check authSlice.
-            // Actually authSlice usually expects both. Let's assume response gives updated user.
-            // We might need to handle token if backend rotates it, but usually profile update doesn't change token.
+            // Update Redux state with new user info safely
+            dispatch(setUser(data.user));
 
             // Let's reload user from storage or just update user object if authSlice supports partial update.
             // Assuming setCredentials overrides.

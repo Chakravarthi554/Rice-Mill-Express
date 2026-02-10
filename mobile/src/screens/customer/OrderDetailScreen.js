@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Alert, Button } from 'react-native';
-import { Card, Divider } from 'react-native-paper';
+import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Alert, TouchableOpacity, Linking } from 'react-native';
+import { Card, Divider, Button } from 'react-native-paper';
 import { MaterialIcons } from '@expo/vector-icons';
 import { apiService } from '../../services/api';
 
@@ -8,6 +8,7 @@ const OrderDetailScreen = ({ route, navigation }) => {
     const { id } = route.params;
     const [order, setOrder] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [downloading, setDownloading] = useState(false);
 
     useEffect(() => {
         fetchOrderDetails();
@@ -27,6 +28,30 @@ const OrderDetailScreen = ({ route, navigation }) => {
         }
     };
 
+    const handleDownloadInvoice = async () => {
+        try {
+            setDownloading(true);
+            const auth = await apiService.getAuthToken(); // If I can get it
+            // Construct authenticated URL
+            const invoiceUrl = `${process.env.EXPO_PUBLIC_API_URL}/api/orders/${id}/invoice?token=${auth}`;
+            await Linking.openURL(invoiceUrl);
+        } catch (error) {
+            console.error('Error downloading invoice:', error);
+            Alert.alert('Error', 'Could not download invoice. Please try again later.');
+        } finally {
+            setDownloading(false);
+        }
+    };
+
+    const handleRefundRequest = () => {
+        navigation.navigate('Refunds', { orderId: id });
+    };
+
+    const handleTrackOrder = () => {
+        // Navigate to a dedicated tracking screen or map if implemented
+        Alert.alert('Tracking', 'Order tracking feature coming soon!');
+    };
+
     if (loading) {
         return (
             <View style={styles.centerContainer}>
@@ -41,14 +66,60 @@ const OrderDetailScreen = ({ route, navigation }) => {
         <ScrollView style={styles.container}>
             <Card style={styles.card}>
                 <Card.Content>
-                    <Text style={styles.orderId}>Order #{order._id.slice(-6).toUpperCase()}</Text>
-                    <Text style={styles.date}>Placed on {new Date(order.createdAt).toLocaleDateString()}</Text>
-
-                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.orderStatus) }]}>
-                        <Text style={styles.statusText}>{order.orderStatus.toUpperCase()}</Text>
+                    <View style={styles.headerRow}>
+                        <View>
+                            <Text style={styles.orderId}>Order #{order._id.slice(-6).toUpperCase()}</Text>
+                            <Text style={styles.date}>Placed on {new Date(order.createdAt).toLocaleDateString()}</Text>
+                        </View>
+                        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.orderStatus) }]}>
+                            <Text style={styles.statusText}>{order.orderStatus.toUpperCase()}</Text>
+                        </View>
                     </View>
+
+                    {order.orderStatus === 'delivered' && (
+                        <Button
+                            mode="outlined"
+                            onPress={handleRefundRequest}
+                            style={styles.refundButton}
+                            icon="undo"
+                        >
+                            Request Refund / Return
+                        </Button>
+                    )}
                 </Card.Content>
             </Card>
+
+            {/* Delivery Partner Details */}
+            {order.deliveryPartner && (
+                <Card style={styles.card}>
+                    <Card.Title
+                        title="Delivery Partner"
+                        left={(props) => <MaterialIcons {...props} name="delivery-dining" />}
+                    />
+                    <Card.Content>
+                        <View style={styles.partnerRow}>
+                            <MaterialIcons name="person" size={40} color="#666" />
+                            <View style={styles.partnerInfo}>
+                                <Text style={styles.partnerName}>{order.deliveryPartner.name}</Text>
+                                <Text style={styles.partnerPhone}>Phone: {order.deliveryPartner.phone}</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => Linking.openURL(`tel:${order.deliveryPartner.phone}`)}>
+                                <MaterialIcons name="call" size={30} color="#4CAF50" />
+                            </TouchableOpacity>
+                        </View>
+                        {order.orderStatus === 'out_for_delivery' && (
+                            <Button
+                                mode="contained"
+                                onPress={handleTrackOrder}
+                                style={styles.trackButton}
+                                icon="map"
+                            >
+                                Track Current Location
+                            </Button>
+                        )}
+                    </Card.Content>
+                </Card>
+            )}
 
             <Card style={styles.card}>
                 <Card.Title title="Items" left={(props) => <MaterialIcons {...props} name="shopping-bag" />} />
@@ -73,30 +144,74 @@ const OrderDetailScreen = ({ route, navigation }) => {
             <Card style={styles.card}>
                 <Card.Title title="Shipping Address" left={(props) => <MaterialIcons {...props} name="location-on" />} />
                 <Card.Content>
-                    <Text>{order.shippingAddress.street}</Text>
-                    <Text>{order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.pinCode}</Text>
-                    <Text>Phone: {order.shippingAddress.phone}</Text>
+                    <Text style={styles.addressText}>{order.shippingAddress.street}</Text>
+                    <Text style={styles.addressText}>{order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.pinCode}</Text>
+                    <Text style={styles.addressText}>Phone: {order.shippingAddress.phone}</Text>
                 </Card.Content>
             </Card>
 
             <Card style={styles.card}>
-                <Card.Title title="Payment" left={(props) => <MaterialIcons {...props} name="payment" />} />
+                <Card.Title title="Order Timeline" left={(props) => <MaterialIcons {...props} name="history" />} />
                 <Card.Content>
-                    <Text>Method: {order.paymentMethod}</Text>
-                    <Text>Status: {order.isPaid ? 'Paid' : 'Pending'}</Text>
+                    <Timeline order={order} />
                 </Card.Content>
             </Card>
 
-            {/* Assuming invoice download is a web feature mostly, but could add button here if URL available */}
-            {/* <Button title="Download Invoice" onPress={() => ...} /> */}
+            <View style={styles.actionContainer}>
+                <Button
+                    mode="contained"
+                    onPress={handleDownloadInvoice}
+                    loading={downloading}
+                    disabled={downloading}
+                    style={styles.invoiceButton}
+                    icon="file-download"
+                >
+                    Download Invoice
+                </Button>
+            </View>
 
         </ScrollView>
+    );
+};
+
+const Timeline = ({ order }) => {
+    const statuses = [
+        { key: 'placed', label: 'Order Placed', icon: 'check-circle' },
+        { key: 'processing', label: 'Processing', icon: 'settings' },
+        { key: 'shipped', label: 'Shipped', icon: 'local-shipping' },
+        { key: 'out_for_delivery', label: 'Out for Delivery', icon: 'delivery-dining' },
+        { key: 'delivered', label: 'Delivered', icon: 'home' },
+    ];
+
+    const currentStatusIndex = statuses.findIndex(s => s.key === order.orderStatus.toLowerCase());
+
+    return (
+        <View style={styles.timelineContainer}>
+            {statuses.map((status, index) => (
+                <View key={status.key} style={styles.timelineItem}>
+                    <View style={styles.timelineLeft}>
+                        <MaterialIcons
+                            name={status.icon}
+                            size={24}
+                            color={index <= currentStatusIndex ? '#4CAF50' : '#ccc'}
+                        />
+                        {index < statuses.length - 1 && (
+                            <View style={[styles.timelineLine, { backgroundColor: index < currentStatusIndex ? '#4CAF50' : '#ccc' }]} />
+                        )}
+                    </View>
+                    <Text style={[styles.timelineText, { color: index <= currentStatusIndex ? '#333' : '#999' }]}>
+                        {status.label}
+                    </Text>
+                </View>
+            ))}
+        </View>
     );
 };
 
 const getStatusColor = (status) => {
     switch (status.toLowerCase()) {
         case 'delivered': return '#4CAF50';
+        case 'out_for_delivery': return '#FFC107';
         case 'shipped': return '#2196F3';
         case 'processing': return '#FF9800';
         case 'cancelled': return '#F44336';
@@ -108,41 +223,69 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#f5f5f5',
-        padding: 16,
     },
     centerContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
     },
+    headerRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+    },
     card: {
-        marginBottom: 16,
+        margin: 16,
+        marginBottom: 0,
+        elevation: 2,
     },
     orderId: {
         fontSize: 18,
         fontWeight: 'bold',
+        color: '#333',
     },
     date: {
         color: '#666',
-        marginBottom: 10,
+        fontSize: 14,
     },
     statusBadge: {
-        alignSelf: 'flex-start',
         paddingHorizontal: 12,
         paddingVertical: 4,
         borderRadius: 4,
-        marginTop: 8,
     },
     statusText: {
         color: 'white',
         fontSize: 12,
         fontWeight: 'bold',
     },
+    refundButton: {
+        marginTop: 16,
+        borderColor: '#F44336',
+    },
+    partnerRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    partnerInfo: {
+        flex: 1,
+        marginLeft: 16,
+    },
+    partnerName: {
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    partnerPhone: {
+        color: '#666',
+    },
+    trackButton: {
+        backgroundColor: '#2196F3',
+    },
     itemRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 8,
+        marginBottom: 12,
     },
     itemName: {
         fontSize: 16,
@@ -153,6 +296,7 @@ const styles = StyleSheet.create({
     },
     itemTotal: {
         fontWeight: 'bold',
+        fontSize: 16,
     },
     totalRow: {
         flexDirection: 'row',
@@ -168,6 +312,41 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#4CAF50',
     },
+    addressText: {
+        fontSize: 14,
+        color: '#333',
+        marginBottom: 4,
+    },
+    actionContainer: {
+        padding: 16,
+        paddingBottom: 32,
+    },
+    invoiceButton: {
+        backgroundColor: '#4CAF50',
+    },
+    timelineContainer: {
+        marginTop: 8,
+    },
+    timelineItem: {
+        flexDirection: 'row',
+        height: 50,
+        alignItems: 'flex-start',
+    },
+    timelineLeft: {
+        alignItems: 'center',
+        width: 30,
+        marginRight: 16,
+    },
+    timelineLine: {
+        width: 2,
+        flex: 1,
+        marginVertical: 4,
+    },
+    timelineText: {
+        fontSize: 14,
+        fontWeight: '500',
+    },
 });
 
 export default OrderDetailScreen;
+

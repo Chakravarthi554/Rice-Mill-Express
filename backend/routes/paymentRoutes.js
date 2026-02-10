@@ -51,6 +51,7 @@ router.delete('/cards/:id', validateController(userController, 'deletePaymentMet
 const paymentController = require('../controllers/paymentController');
 router.post('/razorpay/order', paymentController.createRazorpayOrder);
 router.post('/razorpay/verify', paymentController.verifyRazorpayPayment);
+router.get('/razorpay/pay/:orderId', paymentController.renderRazorpayCheckout);
 
 // Admin Routes (Apply admin check to all subsequent routes or individually)
 router.use(authorize('admin'));
