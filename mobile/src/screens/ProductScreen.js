@@ -23,6 +23,13 @@ import Loader from '../components/Loader';
 import Message from '../components/Message';
 import { MaterialIcons } from '@expo/vector-icons';
 import { apiService } from '../services/api';
+import { getImageUrl } from '../utils/url';
+import {
+  subscribeToSocialUpdates,
+  unsubscribeFromSocialUpdates,
+  joinRoom,
+  leaveRoom
+} from '../services/socket';
 
 const { width } = Dimensions.get('window');
 
@@ -76,6 +83,25 @@ const ProductScreen = ({ route, navigation }) => {
     dispatch(listProductDetails(productId));
     dispatch(listProducts()); // Fetch for "Related Products"
     fetchData();
+
+    // Join the product room for real-time updates
+    const roomName = `product_${productId}`;
+    joinRoom(roomName);
+
+    // Subscribe to real-time updates
+    subscribeToSocialUpdates((data) => {
+      if (data.itemId === productId) {
+        console.log('🔥 Product Social Update Received:', data.type);
+        // Refresh details to get latest stats
+        dispatch(listProductDetails(productId));
+        fetchData();
+      }
+    });
+
+    return () => {
+      unsubscribeFromSocialUpdates();
+      leaveRoom(roomName);
+    };
   }, [dispatch, productId, successProductReview]);
 
   const fetchData = async () => {
@@ -99,12 +125,6 @@ const ProductScreen = ({ route, navigation }) => {
 
   const favorited = wishlistItems && wishlistItems.some(x => (x._id || x) === productId);
   const hasOffer = typeof product?.offerPrice === 'number' && product?.offerPrice > 0 && product?.offerPrice < product?.price;
-
-  const getImageUrl = (imagePath) => {
-    if (!imagePath) return 'https://via.placeholder.com/300';
-    if (imagePath.startsWith('http')) return imagePath;
-    return `${process.env.EXPO_PUBLIC_API_URL}${imagePath}`;
-  };
 
   const toggleWishlist = () => {
     if (favorited) {

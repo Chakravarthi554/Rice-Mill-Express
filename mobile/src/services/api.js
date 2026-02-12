@@ -192,7 +192,11 @@ export const apiService = {
     getRecipes: (params = {}) => api.get('/api/recipes', { params }),
     getRecipeById: (id) => api.get(`/api/recipes/${id}`),
     rateRecipe: (id, rating) => api.post(`/api/social/recipes/${id}/rate`, { rating }),
-    commentOnRecipe: (id, comment) => api.post(`/api/social/recipes/${id}/comment`, { content: comment }),
+    commentOnRecipe: (id, comment) => api.post(`/api/social/recipes/${id}/comment`, { text: comment }),
+    likeRecipe: (id) => api.post(`/api/social/recipes/${id}/like`),
+    shareRecipe: (id) => api.post(`/api/social/recipes/${id}/share`, {}),
+    likeRecipeComment: (recipeId, commentId) => api.post(`/api/social/recipes/${recipeId}/comments/${commentId}/like`),
+    replyToRecipeComment: (recipeId, commentId, comment) => api.post(`/api/social/recipes/${recipeId}/comments/${commentId}/reply`, { text: comment }),
 
     // ============ Forum ============
     getForumPosts: (params = {}) => api.get('/api/forum', { params }),
@@ -200,6 +204,9 @@ export const apiService = {
     createForumPost: (postData) => api.post('/api/forum', postData),
     likeForumPost: (id) => api.post(`/api/forum/${id}/like`),
     commentOnForumPost: (id, comment) => api.post(`/api/forum/${id}/reply`, { content: comment }),
+    likeForumComment: (postId, commentId) => api.post(`/api/social/forum/${postId}/comments/${commentId}/like`),
+    replyToForumComment: (postId, commentId, comment) => api.post(`/api/social/forum/${postId}/comments/${commentId}/reply`, { text: comment }),
+    getCommentReplies: (postId, commentId) => api.get(`/api/social/forum/${postId}/comments/${commentId}/replies`),
 
     // ============ Rewards & Wallet ============
     getRewards: () => api.get('/api/users/rewards'),

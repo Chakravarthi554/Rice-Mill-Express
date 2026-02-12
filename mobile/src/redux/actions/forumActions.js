@@ -11,6 +11,8 @@ import {
   FORUM_POST_CREATE_RESET,
   FORUM_POST_LIKE_SUCCESS,
   FORUM_POST_COMMENT_SUCCESS,
+  FORUM_COMMENT_LIKE_SUCCESS,
+  FORUM_COMMENT_REPLY_SUCCESS,
 } from '../../constants/forumConstants';
 import { apiService } from '../../services/api';
 
@@ -76,10 +78,10 @@ export const likeForumPost = (id) => async (dispatch) => {
   try {
     const response = await apiService.likeForumPost(id);
 
-    // Dispatch success with updated post data for real-time list/detail update
+    // Dispatch success with structured payload
     dispatch({
       type: FORUM_POST_LIKE_SUCCESS,
-      payload: response.data,
+      payload: { postId: id, ...response.data },
     });
   } catch (error) {
     console.error('Error liking post:', error);
@@ -90,13 +92,39 @@ export const commentOnForumPost = (id, comment) => async (dispatch) => {
   try {
     const response = await apiService.commentOnForumPost(id, comment);
 
-    // Dispatch success with updated post data
+    // Dispatch success with new comment and postId
     dispatch({
       type: FORUM_POST_COMMENT_SUCCESS,
-      payload: response.data,
+      payload: { postId: id, comment: response.data },
     });
   } catch (error) {
     console.error('Error commenting on post:', error);
+  }
+};
+
+export const likeForumComment = (postId, commentId) => async (dispatch) => {
+  try {
+    const response = await apiService.likeForumComment(postId, commentId);
+
+    dispatch({
+      type: FORUM_COMMENT_LIKE_SUCCESS,
+      payload: { postId, commentId, ...response.data },
+    });
+  } catch (error) {
+    console.error('Error liking comment:', error);
+  }
+};
+
+export const replyToForumComment = (postId, commentId, comment) => async (dispatch) => {
+  try {
+    const response = await apiService.replyToForumComment(postId, commentId, comment);
+
+    dispatch({
+      type: FORUM_COMMENT_REPLY_SUCCESS,
+      payload: { postId, commentId, comment: response.data.comment },
+    });
+  } catch (error) {
+    console.error('Error replying to comment:', error);
   }
 };
 

@@ -37,7 +37,11 @@ const notificationSchema = new mongoose.Schema(
         'BULK_ORDER_CANCELLED',
         'BULK_ORDER_QUOTE_SENT',
         'BULK_ORDER_CONFIRMED',
-        'BULK_ORDER_PLACED'  // ← THIS WAS MISSING — NOW FIXED!
+        'BULK_ORDER_PLACED',  // ← THIS WAS MISSING — NOW FIXED!
+        'SOCIAL_LIKE',
+        'SOCIAL_COMMENT',
+        'SOCIAL_SHARE',
+        'SOCIAL_RATE'
       ],
       required: true
     },

@@ -7,30 +7,35 @@ import {
     TouchableOpacity,
     TextInput,
     Image,
+    ScrollView,
     ActivityIndicator,
     RefreshControl,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { MaterialIcons } from '@expo/vector-icons';
 import { getRecipes } from '../../redux/actions/recipeActions';
+import { getImageUrl } from '../../utils/url';
 
 const RecipesScreen = ({ navigation }) => {
     const dispatch = useDispatch();
     const { recipes, loading, error } = useSelector((state) => state.recipeList);
     const [searchQuery, setSearchQuery] = useState('');
+    const [riceType, setRiceType] = useState('');
     const [refreshing, setRefreshing] = useState(false);
 
+    const riceTypes = ['Basmati', 'Jasmine', 'Brown Rice', 'Arborio', 'Sushi Rice', 'Wild Rice', 'Other'];
+
     useEffect(() => {
-        dispatch(getRecipes());
-    }, [dispatch]);
+        dispatch(getRecipes(searchQuery, '', riceType));
+    }, [dispatch, riceType]);
 
     const handleRefresh = () => {
         setRefreshing(true);
-        dispatch(getRecipes(searchQuery)).finally(() => setRefreshing(false));
+        dispatch(getRecipes(searchQuery, '', riceType)).finally(() => setRefreshing(false));
     };
 
     const handleSearch = () => {
-        dispatch(getRecipes(searchQuery));
+        dispatch(getRecipes(searchQuery, '', riceType));
     };
 
     const renderRecipeCard = ({ item }) => (
@@ -39,7 +44,7 @@ const RecipesScreen = ({ navigation }) => {
             onPress={() => navigation.navigate('RecipeDetail', { recipeId: item._id })}
         >
             {item.image && (
-                <Image source={{ uri: item.image }} style={styles.recipeImage} />
+                <Image source={{ uri: getImageUrl(item.image) }} style={styles.recipeImage} />
             )}
             <View style={styles.cardContent}>
                 <Text style={styles.recipeTitle}>{item.title}</Text>
@@ -47,16 +52,31 @@ const RecipesScreen = ({ navigation }) => {
                     {item.description}
                 </Text>
                 <View style={styles.recipeFooter}>
+                    <View style={styles.badgeContainer}>
+                        <View style={[styles.badge, { backgroundColor: '#E8F5E9' }]}>
+                            <Text style={[styles.badgeText, { color: '#2E7D32' }]}>{item.riceType}</Text>
+                        </View>
+                        {item.linkedProducts?.length > 0 && (
+                            <View style={[styles.badge, { backgroundColor: '#FFF3E0' }]}>
+                                <Text style={[styles.badgeText, { color: '#EF6C00' }]}>
+                                    Uses: {item.linkedProducts[0].name}{item.linkedProducts.length > 1 ? '...' : ''}
+                                </Text>
+                            </View>
+                        )}
+                    </View>
+                    <View style={styles.authorContainer}>
+                        <MaterialIcons name="person" size={14} color="#666" />
+                        <Text style={styles.authorText}>{item.sellerId?.name || 'Unknown'}</Text>
+                    </View>
+                </View>
+                <View style={styles.cardActions}>
                     <View style={styles.ratingContainer}>
                         <MaterialIcons name="star" size={16} color="#FFD700" />
                         <Text style={styles.ratingText}>
-                            {item.averageRating?.toFixed(1) || '0.0'} ({item.numReviews || 0})
+                            {(item.averageRating || item.rating || 0).toFixed(1)}
                         </Text>
                     </View>
-                    <View style={styles.authorContainer}>
-                        <MaterialIcons name="person" size={16} color="#666" />
-                        <Text style={styles.authorText}>{item.seller?.name || 'Unknown'}</Text>
-                    </View>
+                    <Text style={styles.viewLink}>VIEW RECIPE</Text>
                 </View>
             </View>
         </TouchableOpacity>
@@ -84,6 +104,27 @@ const RecipesScreen = ({ navigation }) => {
                 <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
                     <MaterialIcons name="search" size={24} color="#fff" />
                 </TouchableOpacity>
+            </View>
+
+            {/* Rice Type Filter */}
+            <View style={styles.filterContainer}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <TouchableOpacity
+                        style={[styles.filterChip, riceType === '' && styles.filterChipActive]}
+                        onPress={() => setRiceType('')}
+                    >
+                        <Text style={[styles.filterText, riceType === '' && styles.filterTextActive]}>All Types</Text>
+                    </TouchableOpacity>
+                    {riceTypes.map((type) => (
+                        <TouchableOpacity
+                            key={type}
+                            style={[styles.filterChip, riceType === type && styles.filterChipActive]}
+                            onPress={() => setRiceType(type)}
+                        >
+                            <Text style={[styles.filterText, riceType === type && styles.filterTextActive]}>{type}</Text>
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
             </View>
 
             {error && (
@@ -208,8 +249,61 @@ const styles = StyleSheet.create({
     },
     authorText: {
         marginLeft: 4,
+        fontSize: 12,
+        color: '#666',
+    },
+    filterContainer: {
+        backgroundColor: '#fff',
+        paddingVertical: 12,
+        paddingHorizontal: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#eee',
+    },
+    filterChip: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: '#f0f0f0',
+        marginHorizontal: 4,
+    },
+    filterChipActive: {
+        backgroundColor: '#4CAF50',
+    },
+    filterText: {
         fontSize: 14,
         color: '#666',
+    },
+    filterTextActive: {
+        color: '#fff',
+        fontWeight: 'bold',
+    },
+    badgeContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    badge: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 4,
+    },
+    badgeText: {
+        fontSize: 10,
+        fontWeight: 'bold',
+    },
+    cardActions: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: 12,
+        paddingTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: '#f0f0f0',
+    },
+    viewLink: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: '#4CAF50',
     },
     emptyContainer: {
         alignItems: 'center',

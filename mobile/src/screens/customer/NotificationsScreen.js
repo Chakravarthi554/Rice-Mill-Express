@@ -1,80 +1,74 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, RefreshControl } from 'react-native';
+import { useDispatch, useSelector } from 'react-redux';
 import { MaterialIcons } from '@expo/vector-icons';
 import { apiService } from '../../services/api';
 
 const NotificationsScreen = () => {
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
 
     useEffect(() => {
-        fetchNotifications();
+        loadNotifications();
     }, []);
 
-    const fetchNotifications = async () => {
+    const loadNotifications = async () => {
         try {
-            setLoading(true);
             const response = await apiService.getNotifications();
-            // Assuming response.data is array or { notifications: [] }
-            setNotifications(response.data.notifications || response.data || []);
+            // Ensure we handle the array correctly
+            const data = Array.isArray(response.data) ? response.data : response.data.notifications || [];
+            setNotifications(data);
         } catch (error) {
             console.error('Error fetching notifications:', error);
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
     };
 
-    const markAsRead = async (id) => {
+    const handleRefresh = () => {
+        setRefreshing(true);
+        loadNotifications();
+    };
+
+    const handleMarkAsRead = async (id, isRead) => {
+        if (isRead) return;
         try {
             await apiService.markNotificationRead(id);
-            setNotifications(notifications.map(n =>
-                n._id === id ? { ...n, read: true } : n
-            ));
+            // Optimistic update
+            setNotifications(prev =>
+                prev.map(n => n._id === id ? { ...n, isRead: true } : n)
+            );
         } catch (error) {
-            console.error('Error marking as read:', error);
-        }
-    };
-
-    const deleteNotification = async (id) => {
-        try {
-            await apiService.deleteNotification(id);
-            setNotifications(notifications.filter(n => n._id !== id));
-        } catch (error) {
-            console.error('Error deleting notification:', error);
-        }
-    };
-
-    const markAllAsRead = async () => {
-        try {
-            await apiService.markAllNotificationsRead();
-            setNotifications(notifications.map(n => ({ ...n, read: true })));
-        } catch (error) {
-            Alert.alert('Error', 'Failed to mark all as read');
+            console.error('Error marking notification as read:', error);
         }
     };
 
     const renderItem = ({ item }) => (
-        <View style={[styles.card, !item.read && styles.unreadCard]}>
+        <TouchableOpacity
+            style={[styles.notificationItem, !item.isRead && styles.unreadItem]}
+            onPress={() => handleMarkAsRead(item._id, item.isRead)}
+        >
+            <View style={styles.iconContainer}>
+                <MaterialIcons
+                    name={item.type === 'ORDER' ? 'local-shipping' : (item.type === 'SYSTEM' ? 'info' : 'notifications')}
+                    size={24}
+                    color={item.isRead ? '#999' : '#4CAF50'}
+                />
+            </View>
             <View style={styles.content}>
-                <Text style={[styles.message, !item.read && styles.unreadText]}>{item.message}</Text>
-                <Text style={styles.date}>{new Date(item.createdAt).toLocaleDateString()}</Text>
+                <Text style={[styles.title, !item.isRead && styles.unreadText]}>{item.title || 'Notification'}</Text>
+                <Text style={styles.message} numberOfLines={2}>{item.message}</Text>
+                <Text style={styles.time}>{new Date(item.createdAt).toLocaleDateString()}</Text>
             </View>
-            <View style={styles.actions}>
-                {!item.read && (
-                    <TouchableOpacity onPress={() => markAsRead(item._id)} style={styles.actionButton}>
-                        <MaterialIcons name="done" size={24} color="#4CAF50" />
-                    </TouchableOpacity>
-                )}
-                <TouchableOpacity onPress={() => deleteNotification(item._id)} style={styles.actionButton}>
-                    <MaterialIcons name="delete" size={24} color="#F44336" />
-                </TouchableOpacity>
-            </View>
-        </View>
+            {!item.isRead && <View style={styles.dot} />}
+        </TouchableOpacity>
     );
 
-    if (loading) {
+    if (loading && !refreshing) {
         return (
-            <View style={styles.centerContainer}>
+            <View style={styles.center}>
                 <ActivityIndicator size="large" color="#4CAF50" />
             </View>
         );
@@ -82,26 +76,20 @@ const NotificationsScreen = () => {
 
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
-                <Text style={styles.title}>{notifications.length} Notifications</Text>
-                {notifications.length > 0 && (
-                    <TouchableOpacity onPress={markAllAsRead}>
-                        <Text style={styles.markAll}>Mark all as read</Text>
-                    </TouchableOpacity>
-                )}
-            </View>
-
             {notifications.length === 0 ? (
-                <View style={styles.centerContainer}>
-                    <MaterialIcons name="notifications-none" size={64} color="#ccc" />
-                    <Text style={styles.emptyText}>No notifications</Text>
+                <View style={[styles.center, { opacity: 0.7 }]}>
+                    <MaterialIcons name="notifications-none" size={80} color="#ccc" />
+                    <Text style={styles.emptyText}>No notifications yet</Text>
                 </View>
             ) : (
                 <FlatList
                     data={notifications}
                     renderItem={renderItem}
-                    keyExtractor={(item) => item._id}
+                    keyExtractor={item => item._id}
                     contentContainerStyle={styles.list}
+                    refreshControl={
+                        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={['#4CAF50']} />
+                    }
                 />
             )}
         </View>
@@ -113,71 +101,72 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#f5f5f5',
     },
-    centerContainer: {
+    center: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
     },
-    header: {
-        padding: 16,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        backgroundColor: 'white',
-        elevation: 2,
-    },
-    title: {
-        fontSize: 18,
-        fontWeight: 'bold',
-    },
-    markAll: {
-        color: '#4CAF50',
-        fontWeight: '600',
-    },
     list: {
         padding: 16,
     },
-    card: {
+    notificationItem: {
         flexDirection: 'row',
-        backgroundColor: 'white',
-        borderRadius: 8,
-        marginBottom: 12,
+        alignItems: 'center',
+        backgroundColor: '#fff',
         padding: 16,
-        elevation: 1,
+        marginBottom: 12,
+        borderRadius: 12,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
     },
-    unreadCard: {
-        backgroundColor: '#E8F5E9', // Light green
+    unreadItem: {
+        backgroundColor: '#fff',
         borderLeftWidth: 4,
         borderLeftColor: '#4CAF50',
+    },
+    iconContainer: {
+        marginRight: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     content: {
         flex: 1,
     },
-    message: {
+    title: {
         fontSize: 16,
+        fontWeight: '600',
         color: '#333',
         marginBottom: 4,
     },
     unreadText: {
         fontWeight: 'bold',
+        color: '#000',
     },
-    date: {
+    message: {
+        fontSize: 14,
+        color: '#666',
+        marginBottom: 6,
+        lineHeight: 20,
+    },
+    time: {
         fontSize: 12,
-        color: '#888',
+        color: '#999',
     },
-    actions: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginLeft: 8,
-    },
-    actionButton: {
-        padding: 4,
+    dot: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: '#4CAF50',
         marginLeft: 8,
     },
     emptyText: {
+        fontSize: 18,
+        fontWeight: '500',
+        color: '#999',
         marginTop: 16,
-        fontSize: 16,
-        color: '#888',
     },
 });
 

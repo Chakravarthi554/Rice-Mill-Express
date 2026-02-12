@@ -290,8 +290,19 @@ const getPostById = asyncHandler(async (req, res) => {
       currentViewCount = updated.viewCount;
     }
 
+    // Fetch comments for this post
+    const comments = await require('../models/Comment').find({
+      targetId: post._id,
+      targetType: 'ForumPost',
+      approved: true,
+      parentCommentId: null
+    })
+      .populate('userId', 'name profilePic')
+      .sort({ createdAt: -1 });
+
     res.json({
       ...post.toObject(),
+      replies: comments, // Map comments to 'replies' field expected by frontend
       userLiked: !!userLiked,
       isBookmarked,
       viewCount: currentViewCount

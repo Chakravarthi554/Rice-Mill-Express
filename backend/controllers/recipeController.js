@@ -2,6 +2,8 @@ const asyncHandler = require('express-async-handler');
 const Recipe = require('../models/Recipe');
 const Product = require('../models/Product');
 const Notification = require('../models/Notification');
+const Comment = require('../models/Comment');
+const Like = require('../models/Like');
 const mongoose = require('mongoose');
 
 let badWordsFilter;
@@ -192,7 +194,29 @@ const getRecipeById = asyncHandler(async (req, res) => {
     .populate('sellerId', 'name email');
 
   if (recipe) {
-    res.json(recipe);
+    // 🔥 Fetch comments from standalone collection
+    const comments = await Comment.find({
+      targetId: recipe._id,
+      targetType: 'Recipe',
+      approved: true
+    }).populate('userId', 'name profilePic').sort({ createdAt: -1 });
+
+    // 🔥 Check if current user has liked this recipe
+    let userLiked = false;
+    if (req.user) {
+      const like = await Like.findOne({
+        targetId: recipe._id,
+        targetType: 'Recipe',
+        userId: req.user._id
+      });
+      userLiked = !!like;
+    }
+
+    res.json({
+      ...recipe.toObject(),
+      comments,
+      userLiked
+    });
   } else {
     res.status(404);
     throw new Error('Recipe not found');

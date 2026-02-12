@@ -12,16 +12,69 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import { MaterialIcons } from '@expo/vector-icons';
 import { getForumPosts } from '../../redux/actions/forumActions';
+import { getSocket, connectSocket } from '../../services/socket';
 
 const ForumScreen = ({ navigation }) => {
     const dispatch = useDispatch();
     const { posts, loading, error } = useSelector((state) => state.forumPostList);
+    const { userInfo } = useSelector((state) => state.auth);
     const [searchQuery, setSearchQuery] = useState('');
     const [refreshing, setRefreshing] = useState(false);
 
     useEffect(() => {
         dispatch(getForumPosts());
-    }, [dispatch]);
+
+        let socket = getSocket();
+        if (!socket) {
+            connectSocket().then(s => {
+                socket = s;
+                setupListeners(s);
+            });
+        } else {
+            setupListeners(socket);
+            if (!socket.connected) socket.connect();
+        }
+
+        function setupListeners(s) {
+            if (!s) return;
+            console.log('🔌 Setting up Forum Socket Listeners');
+
+            s.on('NEW_FORUM_POST', () => {
+                console.log('🔔 New post received via socket, refreshing...');
+                dispatch(getForumPosts());
+            });
+
+            s.on('SOCIAL_UPDATE', (data) => {
+                // Ignore updates from self to prevent overwriting optimistic updates
+                if (userInfo && data.userId === userInfo._id) {
+                    console.log('Skipping self-triggered update');
+                    return;
+                }
+
+                if (data.itemType === 'forum' || data.type === 'LIKE' || data.type === 'COMMENT_ADDED') {
+                    // Refresh to update counts
+                    dispatch(getForumPosts());
+                }
+            });
+
+            s.on('POST_DELETED', () => {
+                dispatch(getForumPosts());
+            });
+
+            s.on('POST_STATUS_CHANGED', () => {
+                dispatch(getForumPosts());
+            });
+        }
+
+        return () => {
+            if (socket) {
+                socket.off('NEW_FORUM_POST');
+                socket.off('SOCIAL_UPDATE');
+                socket.off('POST_DELETED');
+                socket.off('POST_STATUS_CHANGED');
+            }
+        };
+    }, [dispatch, userInfo]);
 
     const handleRefresh = () => {
         setRefreshing(true);
@@ -66,11 +119,11 @@ const ForumScreen = ({ navigation }) => {
             <View style={styles.cardFooter}>
                 <View style={styles.statItem}>
                     <MaterialIcons name="thumb-up" size={16} color="#666" />
-                    <Text style={styles.statText}>{item.likes?.length || 0}</Text>
+                    <Text style={styles.statText}>{item.likesCount || 0}</Text>
                 </View>
                 <View style={styles.statItem}>
                     <MaterialIcons name="comment" size={16} color="#666" />
-                    <Text style={styles.statText}>{item.replies?.length || 0}</Text>
+                    <Text style={styles.statText}>{item.commentsCount || 0}</Text>
                 </View>
             </View>
         </TouchableOpacity>

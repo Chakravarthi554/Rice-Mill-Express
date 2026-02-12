@@ -57,12 +57,12 @@ const likeItem = asyncHandler(async (req, res) => {
         itemType: targetType,
         itemId: id,
         likesCount: updatedItem.likesCount,
-        hasLiked: false,
+        userLiked: false,
         userId
       });
     }
 
-    return res.json({ success: true, likes: updatedItem.likesCount, hasLiked: false });
+    return res.json({ success: true, likesCount: updatedItem.likesCount, userLiked: false });
   } else {
     // Like
     await Like.create({ targetId: id, targetType, userId });
@@ -91,7 +91,7 @@ const likeItem = asyncHandler(async (req, res) => {
         itemType: targetType,
         itemId: id,
         likesCount: updatedItem.likesCount,
-        hasLiked: true,
+        userLiked: true,
         userId
       });
 
@@ -115,7 +115,7 @@ const likeItem = asyncHandler(async (req, res) => {
       }
     }
 
-    return res.json({ success: true, likes: updatedItem.likesCount, hasLiked: true });
+    return res.json({ success: true, likesCount: updatedItem.likesCount, userLiked: true });
   }
 });
 
@@ -133,10 +133,11 @@ const addComment = asyncHandler(async (req, res) => {
   }
 
   let targetType;
+  let Model;
   switch (type) {
-    case 'products': targetType = 'Product'; break;
-    case 'recipes': targetType = 'Recipe'; break;
-    case 'forum': targetType = 'ForumPost'; break;
+    case 'products': Model = Product; targetType = 'Product'; break;
+    case 'recipes': Model = Recipe; targetType = 'Recipe'; break;
+    case 'forum': Model = ForumPost; targetType = 'ForumPost'; break;
     default:
       res.status(400);
       throw new Error('Invalid type');
@@ -151,11 +152,57 @@ const addComment = asyncHandler(async (req, res) => {
     approved: true
   });
 
+  const updatedItem = await updateEngagementCount(Model, id, 'commentsCount', 1);
+
   const populatedComment = await Comment.findById(comment._id).populate('userId', 'name profilePic');
+
+  // Notify owner
+  const itemOwnerId = updatedItem.sellerId || updatedItem.seller || updatedItem.userId;
+  if (itemOwnerId && itemOwnerId.toString() !== userId.toString()) {
+    await Notification.create({
+      user: itemOwnerId,
+      type: 'SOCIAL_COMMENT',
+      message: `${req.user.name} commented on your ${targetType.toLowerCase()}`,
+      relatedEntity: id,
+      entityModel: targetType
+    });
+  }
+
+  // 🔥 Real-time socket events
+  if (req.io) {
+    const itemRoom = `${type.slice(0, -1)}_${id}`;
+    req.io.to(itemRoom).emit('SOCIAL_UPDATE', {
+      type: 'COMMENT_ADDED',
+      itemType: targetType,
+      itemId: id,
+      comment: populatedComment,
+      commentsCount: updatedItem.commentsCount
+    });
+
+    // Seller specific update
+    if (itemOwnerId) {
+      req.io.to(`seller_${itemOwnerId}`).emit('ENGAGEMENT_UPDATE', {
+        type: 'NEW_ENGAGEMENT',
+        engagementType: 'comment',
+        itemType: targetType,
+        itemId: id,
+        userName: req.user.name,
+        userProfilePic: req.user.profilePic,
+        createdAt: new Date(),
+        counts: {
+          likes: updatedItem.likesCount,
+          comments: updatedItem.commentsCount,
+          shares: updatedItem.sharesCount,
+          rating: updatedItem.averageRating || updatedItem.rating
+        }
+      });
+    }
+  }
 
   res.status(201).json({
     success: true,
-    comment: populatedComment
+    comment: populatedComment,
+    commentsCount: updatedItem.commentsCount
   });
 });
 
@@ -299,7 +346,7 @@ const deleteComment = asyncHandler(async (req, res) => {
 // @access  Private
 const trackShare = asyncHandler(async (req, res) => {
   const { type, id } = req.params;
-  const { platform } = req.body;
+  const { platform } = req.body || {}; // Fallback if body is missing
   const userId = req.user._id;
 
   let Model;
@@ -425,11 +472,18 @@ const rateItem = asyncHandler(async (req, res) => {
 
     const averageRating = totalCount > 0 ? totalSum / totalCount : 0;
 
-    const item = await Model.findByIdAndUpdate(id, {
-      rating: averageRating,
+    const updateData = {
       numReviews: totalCount,
       ratingDistribution: distribution
-    }, { new: true });
+    };
+
+    if (targetType === 'Recipe') {
+      updateData.averageRating = averageRating;
+    } else {
+      updateData.rating = averageRating;
+    }
+
+    const item = await Model.findByIdAndUpdate(id, updateData, { new: true });
 
     if (!item) {
       res.status(404);
@@ -444,13 +498,25 @@ const rateItem = asyncHandler(async (req, res) => {
       req.io.to(`${type.slice(0, -1)}_${id}`).emit('SOCIAL_UPDATE', {
         type: 'RATING_UPDATED',
         itemId: id,
-        rating: item.rating,
+        rating: item.averageRating || item.rating,
         numReviews: item.numReviews,
         distribution: item.ratingDistribution
       });
 
       // Seller specific notification
       const itemOwnerId = item.sellerId || item.seller || item.userId;
+
+      // Add persistent Notification
+      if (itemOwnerId && itemOwnerId.toString() !== userId.toString()) {
+        await Notification.create({
+          user: itemOwnerId,
+          type: 'SOCIAL_RATE',
+          message: `${req.user.name} rated your ${targetType.toLowerCase()} ${rating} stars`,
+          relatedEntity: id,
+          entityModel: targetType
+        });
+      }
+
       if (itemOwnerId) {
         req.io.to(`seller_${itemOwnerId}`).emit('ENGAGEMENT_UPDATE', {
           type: 'NEW_ENGAGEMENT',

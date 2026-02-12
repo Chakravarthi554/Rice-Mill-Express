@@ -48,6 +48,20 @@ export const disconnectSocket = () => {
     }
 };
 
+export const joinRoom = (room) => {
+    if (socket) {
+        socket.emit('join', room);
+        console.log(`📡 Joined room: ${room}`);
+    }
+};
+
+export const leaveRoom = (room) => {
+    if (socket) {
+        socket.emit('leave', room);
+        console.log(`📡 Left room: ${room}`);
+    }
+};
+
 export const subscribeToOrderUpdates = (callback) => {
     if (!socket) {
         console.warn('Socket not connected');
@@ -88,6 +102,22 @@ export const subscribeToDeliveryCompleted = (callback) => {
     socket.on('DELIVERY_COMPLETED', callback);
 };
 
+export const subscribeToSocialUpdates = (callback) => {
+    if (!socket) {
+        console.warn('Socket not connected');
+        return;
+    }
+    socket.on('SOCIAL_UPDATE', callback);
+};
+
+export const subscribeToEngagementUpdates = (callback) => {
+    if (!socket) {
+        console.warn('Socket not connected');
+        return;
+    }
+    socket.on('ENGAGEMENT_UPDATE', callback);
+};
+
 export const unsubscribeFromOrderUpdates = () => {
     if (socket) {
         socket.off('ORDER_UPDATE');
@@ -97,6 +127,18 @@ export const unsubscribeFromOrderUpdates = () => {
 export const unsubscribeFromDeliveryAssignment = () => {
     if (socket) {
         socket.off('ORDER_ASSIGNED');
+    }
+};
+
+export const unsubscribeFromSocialUpdates = () => {
+    if (socket) {
+        socket.off('SOCIAL_UPDATE');
+    }
+};
+
+export const unsubscribeFromEngagementUpdates = () => {
+    if (socket) {
+        socket.off('ENGAGEMENT_UPDATE');
     }
 };
 
@@ -110,7 +152,9 @@ export default {
     subscribeToDeliveryPickup,
     subscribeToNavigationStarted,
     subscribeToDeliveryCompleted,
-    unsubscribeFromOrderUpdates,
-    unsubscribeFromDeliveryAssignment,
+    unsubscribeFromSocialUpdates,
+    unsubscribeFromEngagementUpdates,
+    joinRoom,
+    leaveRoom,
     getSocket,
 };
