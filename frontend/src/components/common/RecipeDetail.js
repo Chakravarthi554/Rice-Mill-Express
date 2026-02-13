@@ -84,6 +84,36 @@ const RecipeDetail = () => {
     }
   }, [dispatch, recipeId]);
 
+  // ✅ Listen for real-time social updates
+  useEffect(() => {
+    const socket = getCurrentSocket();
+    if (!socket) return;
+
+    const handleSocialUpdate = (data) => {
+      console.log('📡 Desktop: SOCIAL_UPDATE received:', data);
+      if (data.itemId === recipeId) {
+        // Refresh recipe data to get updated counts
+        dispatch(getRecipeDetails(recipeId));
+      }
+    };
+
+    const handleEngagementUpdate = (data) => {
+      console.log('📡 Desktop: ENGAGEMENT_UPDATE received:', data);
+      if (data.itemId === recipeId) {
+        // Refresh recipe data to get updated counts
+        dispatch(getRecipeDetails(recipeId));
+      }
+    };
+
+    socket.on('SOCIAL_UPDATE', handleSocialUpdate);
+    socket.on('ENGAGEMENT_UPDATE', handleEngagementUpdate);
+
+    return () => {
+      socket.off('SOCIAL_UPDATE', handleSocialUpdate);
+      socket.off('ENGAGEMENT_UPDATE', handleEngagementUpdate);
+    };
+  }, [dispatch, recipeId]);
+
   const handleLike = () => {
     if (!userInfo) {
       setSnackbar({ open: true, message: 'Please log in to like this recipe.', severity: 'warning' });

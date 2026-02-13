@@ -40,17 +40,58 @@ const AccountManagement = () => {
     setCacheMessage(null);
 
     try {
-      localStorage.clear();
-      sessionStorage.clear();
+      // ✅ PRESERVE critical user data
+      const preservedData = {
+        userInfo: localStorage.getItem('userInfo'),
+        token: localStorage.getItem('token'),
+        refreshToken: localStorage.getItem('refreshToken'),
+        // Preserve cart for better UX
+        cartItems: localStorage.getItem('cartItems'),
+        shippingAddress: localStorage.getItem('shippingAddress')
+      };
 
+      // ✅ Clear only temporary/cache data
+      const cacheKeys = [
+        'recentSearches',
+        'browseHistory', 
+        'tempImages',
+        'cachedRecipes',
+        'tempFormData',
+        'uiPreferences_temp', // Temporary UI settings only
+        'analytics_pending',
+        'offline_data'
+      ];
+
+      // Clear specific cache keys
+      cacheKeys.forEach(key => {
+        localStorage.removeItem(key);
+        sessionStorage.removeItem(key);
+      });
+
+      // Clear browser caches
       if ('caches' in window) {
         caches.keys().then((names) => {
-          names.forEach((name) => caches.delete(name));
+          names.forEach((name) => {
+            // Only clear non-critical caches
+            if (name.includes('cache') || name.includes('temp') || name.includes('offline')) {
+              caches.delete(name);
+            }
+          });
         });
       }
 
-      setCacheMessage('Cache cleared! Reloading...');
-      setTimeout(() => window.location.reload(), 1500);
+      // Restore preserved data
+      Object.entries(preservedData).forEach(([key, value]) => {
+        if (value) {
+          localStorage.setItem(key, value);
+        }
+      });
+
+      setCacheMessage('Cache cleared successfully! User data preserved.');
+      setTimeout(() => {
+        setCacheMessage(null);
+        setClearingCache(false);
+      }, 2000);
     } catch (err) {
       setCacheMessage('Failed to clear cache.');
       setClearingCache(false);

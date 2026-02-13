@@ -234,14 +234,27 @@ const changePassword = asyncHandler(async (req, res) => {
     throw new Error('Invalid current password');
   }
 
+  // 🔐 UPDATE PASSWORD AND INVALIDATE SESSIONS
   user.password = newPassword;
+  
+  // ✅ Invalidate refresh token to force re-authentication
+  user.refreshToken = undefined;
+  
+  // ✅ Clear any cached Firebase tokens (will be regenerated on next login)
+  user.firebaseUid = user.firebaseUid; // Keep existing UID
+  
   await user.save();
-  res.status(200).json({ message: 'Password changed successfully' });
+  
+  // ✅ Send success response with instruction to re-login
+  res.status(200).json({ 
+    message: 'Password changed successfully. Please login again with your new password.',
+    requiresReauth: true 
+  });
 });
 
 // ✅ FIXED: Add updatePreferences function
 const updatePreferences = asyncHandler(async (req, res) => {
-  const { language, theme, recommendationsEnabled } = req.body;
+  const { language, theme, recommendationsEnabled, region, currency } = req.body;
 
   const user = await User.findById(req.user._id);
   if (!user) return res.status(404).json({ message: 'User not found' });
@@ -250,11 +263,35 @@ const updatePreferences = asyncHandler(async (req, res) => {
   if (language) updates['preferences.language'] = language;
   if (theme) updates['preferences.theme'] = theme;
   if (recommendationsEnabled !== undefined) updates['preferences.recommendationsEnabled'] = recommendationsEnabled;
+  if (region) updates['preferences.region'] = region;
+  if (currency) updates['preferences.currency'] = currency;
 
-  await User.updateOne({ _id: user._id }, { $set: updates });
-  const updatedUser = await User.findById(user._id).select('-password -refreshToken');
+  // ✅ Update preferences atomically and return updated user
+  const updatedUser = await User.findByIdAndUpdate(
+    req.user._id,
+    { $set: updates },
+    { new: true, projection: { password: 0, refreshToken: 0 } }
+  );
 
-  res.json({ success: true, message: 'Preferences updated', user: updatedUser });
+  // ✅ Emit real-time update to all connected devices
+  if (req.io) {
+    req.io.to(`user_${req.user._id}`).emit('PREFERENCES_UPDATED', {
+      userId: req.user._id,
+      preferences: updatedUser.preferences
+    });
+    
+    // Broadcast to all user's sessions
+    req.io.emit('GLOBAL_PREFERENCES_UPDATE', {
+      userId: req.user._id,
+      preferences: updatedUser.preferences
+    });
+  }
+
+  res.json({ 
+    success: true, 
+    message: 'Preferences updated successfully',
+    preferences: updatedUser.preferences 
+  });
 });
 
 // ✅ FIXED: Add updateNotificationPreferences function

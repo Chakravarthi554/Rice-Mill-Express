@@ -110,10 +110,47 @@ const SettingsScreen = ({ navigation }) => {
             icon: 'delete-sweep',
             description: 'Free up space and clear history',
             onPress: () => {
-                Alert.alert('Clear Cache', 'Are you sure you want to clear the app cache and history?', [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Clear', onPress: () => Alert.alert('Success', 'Cache and history cleared.') }
-                ]);
+                Alert.alert(
+                    'Clear Cache', 
+                    'This will clear temporary data while preserving your account, profile, and rewards.',
+                    [
+                        { text: 'Cancel', style: 'cancel' },
+                        { 
+                            text: 'Clear', 
+                            onPress: async () => {
+                                try {
+                                    // ✅ Preserve critical user data
+                                    const userData = await AsyncStorage.getItem('userInfo');
+                                    const userToken = await AsyncStorage.getItem('userToken');
+                                    const rewardsData = await AsyncStorage.getItem('rewards');
+                                    
+                                    // ✅ Clear only temporary/cache data
+                                    const cacheKeys = [
+                                        'recentSearches',
+                                        'browseHistory',
+                                        'tempImages', 
+                                        'cachedRecipes',
+                                        'tempFormData',
+                                        'uiPreferences_temp'
+                                    ];
+                                    
+                                    await Promise.all(
+                                        cacheKeys.map(key => AsyncStorage.removeItem(key))
+                                    );
+                                    
+                                    // ✅ Restore preserved data
+                                    if (userData) await AsyncStorage.setItem('userInfo', userData);
+                                    if (userToken) await AsyncStorage.setItem('userToken', userToken);
+                                    if (rewardsData) await AsyncStorage.setItem('rewards', rewardsData);
+                                    
+                                    Alert.alert('Success', 'Temporary cache cleared. Your account data is preserved.');
+                                } catch (error) {
+                                    Alert.alert('Error', 'Failed to clear cache.');
+                                }
+                            }
+                        }
+                    ]
+                );
             },
         },
         {

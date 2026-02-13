@@ -3,7 +3,7 @@ import { View, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform } f
 import { TextInput, Button, Card, Title } from 'react-native-paper';
 import { useDispatch, useSelector } from 'react-redux';
 import { apiService } from '../../services/api';
-import { setCredentials, setUser } from '../../redux/slices/authSlice';
+import { setCredentials, setUser, logout } from '../../redux/slices/authSlice';
 
 const EditProfileScreen = ({ navigation }) => {
     const { user } = useSelector((state) => state.auth);
@@ -43,14 +43,19 @@ const EditProfileScreen = ({ navigation }) => {
 
         try {
             setLoading(true);
-            // Assuming apiService has changePassword, if not I might need to add it or use updateUserProfile if it handles password.
-            // api.js check: It does NOT have changePassword explicit, but maybe updateUserProfile handles it?
-            // Usually separate. backend/routes/userRoutes.js has `router.put('/change-password', ...)`
-            // I need to add changePassword to api.js or use axios directly.
-            // Let's assume I'll add it to api.js in next step if missing.
-            await apiService.changePassword({ currentPassword, newPassword });
+            const response = await apiService.changePassword({ currentPassword, newPassword });
 
-            Alert.alert('Success', 'Password changed successfully');
+            Alert.alert('Success', response.data.message || 'Password changed successfully');
+            
+            // ✅ Force logout after password change to ensure security
+            if (response.data.requiresReauth) {
+                dispatch(logout());
+                navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'Login' }],
+                });
+            }
+            
             setCurrentPassword('');
             setNewPassword('');
             setConfirmPassword('');

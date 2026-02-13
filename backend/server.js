@@ -151,6 +151,7 @@ const loadRoutes = () => {
     { path: "/api/admin/chat", name: "Admin Chat", file: "./routes/adminChatRoutes" },
     { path: "/api/recipes", name: "Recipes", file: "./routes/recipeRoutes" },
     { path: "/api/legal", name: "Legal", file: "./routes/legalRoutes" },
+    { path: "/api/rewards", name: "Rewards", file: "./routes/rewardsRoutes" },
     { path: "/api/forum", name: "Forum", file: "./routes/forumRoutes" },
     { path: "/api/social", name: "Social", file: "./routes/socialRoutes" },
     { path: "/api/admin/settings", name: "Admin Settings", file: "./routes/adminSettings" },

@@ -20,7 +20,7 @@ import {
   InputAdornment
 } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
-import { changeUserPassword } from '../../redux/actions/userActions';
+import { changeUserPassword, logoutUser } from '../../redux/actions/userActions';
 import { USER_CHANGE_PASSWORD_RESET } from '../../redux/constants/userConstants';
 
 const SecuritySettings = () => {
@@ -36,16 +36,29 @@ const SecuritySettings = () => {
 
   const [localMessage, setLocalMessage] = useState(null);
 
-  const { loading, error, success } = useSelector((state) => state.userChangePassword);
+  const { loading, error, success, message } = useSelector((state) => state.userChangePassword);
 
   useEffect(() => {
     if (success) {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      setLocalMessage({ type: 'success', text: 'Password changed successfully!' });
+      
+      // ✅ Handle forced re-authentication requirement
+      if (message && message.includes('Please login again')) {
+        setLocalMessage({ type: 'success', text: message });
+        // Auto-logout after delay to allow user to read message
+        setTimeout(() => {
+          dispatch(logoutUser());
+          window.location.href = '/login';
+        }, 3000);
+      } else {
+        setLocalMessage({ type: 'success', text: 'Password changed successfully!' });
+      }
+    } else if (error) {
+      setLocalMessage({ type: 'error', text: error });
     }
-  }, [success]);
+  }, [success, error, message, dispatch]);
 
   // Clear state on component unmount
   useEffect(() => {

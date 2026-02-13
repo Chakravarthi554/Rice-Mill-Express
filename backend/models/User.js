@@ -98,12 +98,22 @@ const userSchema = mongoose.Schema(
     rewardsBalance: { type: Number, default: 0 },
     rewardsHistory: [{
       amount: { type: Number, required: true },
-      type: { type: String, enum: ['earned', 'redeemed'], required: true },
+      type: { type: String, enum: ['earned', 'redeemed', 'expired', 'referral'], required: true },
       description: { type: String },
-      date: { type: Date, default: Date.now }
+      date: { type: Date, default: Date.now },
+      referenceId: { type: mongoose.Schema.Types.ObjectId }, // Order ID, Campaign ID, etc.
+      status: { type: String, enum: ['pending', 'completed', 'cancelled', 'expired'], default: 'completed' }
     }],
     referredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     isReferralRewardClaimed: { type: Boolean, default: false },
+    
+    // ✅ ENHANCED: Better referral tracking
+    referralStats: {
+      referredUsers: { type: Number, default: 0 },
+      earnedCredits: { type: Number, default: 0 },
+      pendingCredits: { type: Number, default: 0 },
+      totalReferrals: { type: Number, default: 0 }
+    },
 
     // ✅ ADDED: Forum bookmarks
     bookmarks: [{

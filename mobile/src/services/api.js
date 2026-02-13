@@ -158,6 +158,12 @@ export const apiService = {
     updatePrivacySettings: (data) => api.put('/api/users/privacy', data),
     deleteAccount: () => api.delete('/api/users/me'),
 
+    // ============ Rewards & Referral ============
+    getUserRewards: () => api.get('/api/rewards'),
+    redeemRewards: (points) => api.post('/api/rewards/redeem', { points }),
+    getReferralInfo: () => api.get('/api/rewards/referral'),
+    syncRewards: () => api.get('/api/rewards/sync'),
+    
     // ============ Wishlist ============
     getWishlist: () => api.get('/api/users/wishlist'),
     addToWishlist: (productId) => api.post('/api/users/wishlist', { productId }),

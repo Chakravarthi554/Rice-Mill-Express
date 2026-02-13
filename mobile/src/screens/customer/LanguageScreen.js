@@ -3,10 +3,13 @@ import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { Card, Title, RadioButton, Divider, Button } from 'react-native-paper';
 import { useDispatch, useSelector } from 'react-redux';
 import { updatePreferences, resetSettingsStatus } from '../../redux/slices/settingsSlice';
+import io from 'socket.io-client';
+import { API_URL } from '../../config/env';
 
 const LanguageScreen = () => {
     const dispatch = useDispatch();
     const { preferences = {}, loading, success, error } = useSelector((state) => state.settings);
+    const { user } = useSelector((state) => state.auth);
 
     const [localLang, setLocalLang] = useState(preferences?.language || 'english');
     const [localCurrency, setLocalCurrency] = useState(preferences?.currency || 'INR');
@@ -18,6 +21,41 @@ const LanguageScreen = () => {
             dispatch(resetSettingsStatus());
         }
     }, [success, dispatch]);
+
+    // ✅ Listen for real-time preference updates from other devices
+    useEffect(() => {
+        const handlePreferenceUpdate = (data) => {
+            if (data.userId === user?._id) {
+                // Update local state to match backend
+                setLocalLang(data.preferences?.language || localLang);
+                setLocalCurrency(data.preferences?.currency || localCurrency);
+                setLocalRegion(data.preferences?.region || localRegion);
+                
+                // Update Redux store
+                dispatch({
+                    type: 'SETTINGS_UPDATE_RECEIVED',
+                    payload: data.preferences
+                });
+            }
+        };
+
+        // Listen for preference updates
+        const socket = io(API_URL, {
+            transports: ['websocket'],
+            auth: {
+                token: user?.token
+            }
+        });
+
+        socket.on('PREFERENCES_UPDATED', handlePreferenceUpdate);
+        socket.on('GLOBAL_PREFERENCES_UPDATE', handlePreferenceUpdate);
+
+        return () => {
+            socket.off('PREFERENCES_UPDATED', handlePreferenceUpdate);
+            socket.off('GLOBAL_PREFERENCES_UPDATE', handlePreferenceUpdate);
+            socket.disconnect();
+        };
+    }, [user?._id, user?.token, localLang, localCurrency, localRegion, dispatch]);
 
     const handleSave = () => {
         dispatch(updatePreferences({

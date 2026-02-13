@@ -1,12 +1,16 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, Alert } from 'react-native';
 import { Card, Button, Divider, Title, Paragraph } from 'react-native-paper';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { getRewards, getRewardTransactions, redeemReward, getActiveCampaigns } from '../../redux/actions/rewardsActions';
+import io from 'socket.io-client';
+import { API_URL } from '../../config/env';
+import { apiService } from '../../services/api';
 
 const RewardsScreen = () => {
     const dispatch = useDispatch();
+    const { user } = useSelector((state) => state.auth);
 
     const rewardsState = useSelector((state) => state.rewards);
     const { loading: rewardsLoading, rewards } = rewardsState;
@@ -20,11 +24,46 @@ const RewardsScreen = () => {
     const campaignsState = useSelector((state) => state.campaigns);
     const { loading: campaignsLoading, campaigns } = campaignsState;
 
+    const [syncing, setSyncing] = useState(false);
+
     useEffect(() => {
         dispatch(getRewards());
         dispatch(getRewardTransactions());
         dispatch(getActiveCampaigns());
     }, [dispatch]);
+
+    // ✅ Real-time rewards synchronization
+    useEffect(() => {
+        const handleRewardsUpdate = async (data) => {
+            if (data.userId === user?._id) {
+                setSyncing(true);
+                try {
+                    // Sync with backend to get latest data
+                    await apiService.syncRewards();
+                    dispatch(getRewards());
+                    dispatch(getRewardTransactions());
+                } catch (error) {
+                    console.error('Failed to sync rewards:', error);
+                } finally {
+                    setSyncing(false);
+                }
+            }
+        };
+
+        const socket = io(API_URL, {
+            transports: ['websocket'],
+            auth: {
+                token: user?.token
+            }
+        });
+
+        socket.on('REWARDS_UPDATED', handleRewardsUpdate);
+
+        return () => {
+            socket.off('REWARDS_UPDATED', handleRewardsUpdate);
+            socket.disconnect();
+        };
+    }, [user?._id, user?.token, dispatch]);
 
     useEffect(() => {
         if (redeemSuccess) {
@@ -75,6 +114,14 @@ const RewardsScreen = () => {
 
     return (
         <View style={styles.container}>
+            {/* Sync Indicator */}
+            {syncing && (
+                <View style={styles.syncBanner}>
+                    <ActivityIndicator size="small" color="#fff" />
+                    <Text style={styles.syncText}>Syncing rewards data...</Text>
+                </View>
+            )}
+            
             <View style={styles.header}>
                 <Card style={styles.balanceCard}>
                     <Card.Content style={styles.balanceContent}>
@@ -128,6 +175,20 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    syncBanner: {
+        backgroundColor: '#4CAF50',
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    syncText: {
+        color: 'white',
+        marginLeft: 8,
+        fontSize: 14,
+        fontWeight: '500',
     },
     header: {
         padding: 16,

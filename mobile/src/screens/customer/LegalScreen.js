@@ -1,8 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import { List, Divider } from 'react-native-paper';
+import { List, Divider, Button } from 'react-native-paper';
 
-const LegalScreen = () => {
+const LegalScreen = ({ navigation }) => {
     return (
         <ScrollView style={styles.container}>
             <List.Section>
@@ -33,7 +33,29 @@ const LegalScreen = () => {
                     left={props => <List.Icon {...props} icon="cookie-outline" />}
                     onPress={() => alert('Viewing Cookie Policy')}
                 />
+                <Divider />
+                <List.Item
+                    title="Contact Us"
+                    description="Get help or send us a message"
+                    left={props => <List.Icon {...props} icon="email-outline" />}
+                    onPress={() => navigation.navigate('Contact')}
+                />
             </List.Section>
+
+            <View style={styles.helpSection}>
+                <Text style={styles.helpTitle}>Need Help?</Text>
+                <Text style={styles.helpText}>
+                    If you have any questions about our policies or need assistance, 
+                    please don't hesitate to contact our support team.
+                </Text>
+                <Button
+                    mode="contained"
+                    onPress={() => navigation.navigate('Contact')}
+                    style={styles.contactButton}
+                >
+                    Contact Support
+                </Button>
+            </View>
 
             <View style={styles.footer}>
                 <Text style={styles.footerText}>Last Updated: June 2024</Text>
@@ -48,10 +70,35 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#fff',
     },
+    helpSection: {
+        padding: 20,
+        backgroundColor: '#f8f9fa',
+        margin: 16,
+        borderRadius: 8,
+        elevation: 1,
+    },
+    helpTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom: 8,
+        color: '#333',
+        textAlign: 'center',
+    },
+    helpText: {
+        fontSize: 14,
+        color: '#666',
+        textAlign: 'center',
+        marginBottom: 16,
+        lineHeight: 20,
+    },
+    contactButton: {
+        backgroundColor: '#4CAF50',
+    },
     footer: {
         padding: 20,
         alignItems: 'center',
-        marginTop: 40,
+        marginTop: 20,
+        marginBottom: 20,
     },
     footerText: {
         color: '#999',

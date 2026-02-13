@@ -14,9 +14,14 @@ import {
 } from '@mui/material';
 import { Language as LanguageIcon, Public as PublicIcon } from '@mui/icons-material';
 import { useI18n } from '../../context/i18nContext';
+import { useDispatch, useSelector } from 'react-redux';
+import { getSocket } from '../../utils/socket';
+import { updateUserProfile } from '../../redux/actions/userActions';
 
 const LanguageSettings = () => {
     const { language, region, currency, changeLanguage, changeRegion, changeCurrency, availableLanguages, t } = useI18n();
+    const dispatch = useDispatch();
+    const { userInfo } = useSelector(state => state.userLogin);
 
     // Local state for deferred saving
     const [localLanguage, setLocalLanguage] = React.useState(language);
@@ -24,10 +29,56 @@ const LanguageSettings = () => {
     const [localCurrency, setLocalCurrency] = React.useState(currency);
     const [saved, setSaved] = React.useState(false);
 
+    // ✅ Listen for real-time preference updates from other devices
+    React.useEffect(() => {
+        const socket = getSocket(userInfo?._id, userInfo?.role, userInfo?.token);
+        
+        if (socket) {
+            const handlePreferenceUpdate = (data) => {
+                if (data.userId === userInfo?._id) {
+                    // Update local state to match backend
+                    setLocalLanguage(data.preferences?.language || language);
+                    setLocalRegion(data.preferences?.region || region);
+                    setLocalCurrency(data.preferences?.currency || currency);
+                    
+                    // Update global context
+                    if (data.preferences?.language && data.preferences.language !== language) {
+                        changeLanguage(data.preferences.language);
+                    }
+                    if (data.preferences?.region && data.preferences.region !== region) {
+                        changeRegion(data.preferences.region);
+                    }
+                    if (data.preferences?.currency && data.preferences.currency !== currency) {
+                        changeCurrency(data.preferences.currency);
+                    }
+                }
+            };
+
+            socket.on('PREFERENCES_UPDATED', handlePreferenceUpdate);
+            socket.on('GLOBAL_PREFERENCES_UPDATE', handlePreferenceUpdate);
+
+            return () => {
+                socket.off('PREFERENCES_UPDATED', handlePreferenceUpdate);
+                socket.off('GLOBAL_PREFERENCES_UPDATE', handlePreferenceUpdate);
+            };
+        }
+    }, [userInfo?._id, userInfo?.token, language, region, currency, changeLanguage, changeRegion, changeCurrency]);
+
     const handleSave = () => {
+        // Update backend
+        dispatch(updateUserProfile({
+            preferences: { 
+                language: localLanguage, 
+                region: localRegion, 
+                currency: localCurrency 
+            }
+        }));
+        
+        // Update context
         changeLanguage(localLanguage);
         changeRegion(localRegion);
         changeCurrency(localCurrency);
+        
         setSaved(true);
         setTimeout(() => setSaved(false), 3000);
     };
