@@ -209,6 +209,12 @@ const Header = ({ onSearch }) => {
           <MenuItem onClick={() => { handleMenuClose(); navigate('/settings'); }}>
             <Settings sx={{ mr: 1 }} /> Settings
           </MenuItem>
+          <MenuItem onClick={() => { handleMenuClose(); navigate('/customer/rewards'); }}>
+            <Favorite sx={{ mr: 1 }} /> Rewards
+          </MenuItem>
+          <MenuItem onClick={() => { handleMenuClose(); navigate('/customer/referrals'); }}>
+            <Person sx={{ mr: 1 }} /> Refer & Earn
+          </MenuItem>
           <MenuItem onClick={handleLogout}>
             <Logout sx={{ mr: 1 }} /> Logout
           </MenuItem>

@@ -9,6 +9,9 @@ import {
     REDEEM_REWARD_SUCCESS,
     REDEEM_REWARD_FAIL,
     REDEEM_REWARD_RESET,
+    CAMPAIGNS_REQUEST,
+    CAMPAIGNS_SUCCESS,
+    CAMPAIGNS_FAIL,
 } from '../../constants/rewardsConstants';
 import { apiService } from '../../services/api';
 
@@ -71,4 +74,22 @@ export const redeemReward = (points) => async (dispatch) => {
 
 export const resetRedeemReward = () => (dispatch) => {
     dispatch({ type: REDEEM_REWARD_RESET });
+};
+
+export const getActiveCampaigns = () => async (dispatch) => {
+    try {
+        dispatch({ type: CAMPAIGNS_REQUEST });
+
+        const response = await apiService.getActiveCampaigns();
+
+        dispatch({
+            type: CAMPAIGNS_SUCCESS,
+            payload: response.data,
+        });
+    } catch (error) {
+        dispatch({
+            type: CAMPAIGNS_FAIL,
+            payload: error.response?.data?.message || error.message,
+        });
+    }
 };

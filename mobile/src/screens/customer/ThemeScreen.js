@@ -1,10 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Card, Title, List, Divider } from 'react-native-paper';
 import { MaterialIcons } from '@expo/vector-icons';
 
+import { useDispatch, useSelector } from 'react-redux';
+import { updatePreferences, resetSettingsStatus } from '../../redux/slices/settingsSlice';
+
 const ThemeScreen = () => {
-    const [theme, setTheme] = useState('system');
+    const dispatch = useDispatch();
+    const { preferences = {}, loading, success } = useSelector((state) => state.settings);
+    const [localTheme, setLocalTheme] = useState(preferences?.theme || 'system');
+
+    useEffect(() => {
+        if (success) {
+            dispatch(resetSettingsStatus());
+        }
+    }, [success, dispatch]);
+
+    const handleThemeChange = (themeId) => {
+        setLocalTheme(themeId);
+        dispatch(updatePreferences({
+            ...preferences,
+            theme: themeId
+        }));
+    };
 
     const themes = [
         { id: 'light', label: 'Light Mode', icon: 'light-mode' },
@@ -22,12 +41,12 @@ const ThemeScreen = () => {
                     {themes.map((t) => (
                         <TouchableOpacity
                             key={t.id}
-                            style={[styles.themeOption, theme === t.id && styles.selectedOption]}
-                            onPress={() => setTheme(t.id)}
+                            style={[styles.themeOption, localTheme === t.id && styles.selectedOption]}
+                            onPress={() => handleThemeChange(t.id)}
                         >
-                            <MaterialIcons name={t.icon} size={24} color={theme === t.id ? '#4CAF50' : '#666'} />
-                            <Text style={[styles.themeLabel, theme === t.id && styles.selectedLabel]}>{t.label}</Text>
-                            {theme === t.id && <MaterialIcons name="check" size={24} color="#4CAF50" />}
+                            <MaterialIcons name={t.icon} size={24} color={localTheme === t.id ? '#4CAF50' : '#666'} />
+                            <Text style={[styles.themeLabel, localTheme === t.id && styles.selectedLabel]}>{t.label}</Text>
+                            {localTheme === t.id && <MaterialIcons name="check" size={24} color="#4CAF50" />}
                         </TouchableOpacity>
                     ))}
                 </Card.Content>

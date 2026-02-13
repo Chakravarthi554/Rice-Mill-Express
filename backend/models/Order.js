@@ -120,6 +120,22 @@ const orderSchema = new mongoose.Schema({
     default: 0,
     min: 0
   },
+  // ✅ NEW: Discount Fields
+  discount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  netPrice: {
+    type: Number,
+    // required: true, // Make optional for backward compatibility or set default
+    default: function () { return this.totalPrice; }
+  },
+  appliedReward: {
+    pointsRedeemed: Number,
+    discountAmount: Number,
+    campaignId: { type: mongoose.Schema.Types.ObjectId, ref: 'Campaign' }
+  },
   orderStatus: {
     type: String,
     enum: [

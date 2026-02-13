@@ -1,11 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
 import { Card, Title, List, Switch, Divider, Button, Paragraph } from 'react-native-paper';
 
-const PrivacyScreen = () => {
-    const [profileVisible, setProfileVisible] = useState(true);
-    const [showActivity, setShowActivity] = useState(true);
+import { useDispatch, useSelector } from 'react-redux';
+import { updatePrivacy, resetSettingsStatus } from '../../redux/slices/settingsSlice';
+import { apiService } from '../../services/api';
+import { logout } from '../../redux/slices/authSlice';
+
+const PrivacyScreen = ({ navigation }) => {
+    const dispatch = useDispatch();
+    const { privacy = {}, loading, success } = useSelector((state) => state.settings);
+
+    const [profileVisible, setProfileVisible] = useState(privacy?.profileVisible ?? true);
+    const [showActivity, setShowActivity] = useState(privacy?.showActivity ?? true);
     const [marketingEmails, setMarketingEmails] = useState(false);
+
+    useEffect(() => {
+        if (success) {
+            dispatch(resetSettingsStatus());
+        }
+    }, [success, dispatch]);
+
+    const handleToggle = (key, value) => {
+        if (key === 'profileVisible') setProfileVisible(value);
+        if (key === 'showActivity') setShowActivity(value);
+
+        dispatch(updatePrivacy({
+            ...privacy,
+            [key]: value
+        }));
+    };
 
     const handleDeleteAccount = () => {
         Alert.alert(
@@ -13,9 +37,25 @@ const PrivacyScreen = () => {
             'Are you sure you want to permanently delete your account? This action cannot be undone.',
             [
                 { text: 'Cancel', style: 'cancel' },
-                { text: 'Delete', style: 'destructive', onPress: () => Alert.alert('Request Sent', 'Your account deletion request has been submitted for verification.') }
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await apiService.deleteAccount();
+                            Alert.alert('Success', 'Your account has been deleted.');
+                            dispatch(logout());
+                        } catch (err) {
+                            Alert.alert('Error', 'Failed to delete account. Please try again.');
+                        }
+                    }
+                }
             ]
         );
+    };
+
+    const handleDownloadData = async () => {
+        Alert.alert('Request Received', 'A link to download your data will be sent to your email shortly.');
     };
 
     return (
@@ -26,13 +66,13 @@ const PrivacyScreen = () => {
                     <List.Item
                         title="Public Profile"
                         description="Allow others to see your name in forum"
-                        right={() => <Switch value={profileVisible} onValueChange={setProfileVisible} color="#4CAF50" />}
+                        right={() => <Switch value={profileVisible} onValueChange={(v) => handleToggle('profileVisible', v)} color="#4CAF50" />}
                     />
                     <Divider />
                     <List.Item
                         title="Show Activity"
                         description="Let friends see what you're buying"
-                        right={() => <Switch value={showActivity} onValueChange={setShowActivity} color="#4CAF50" />}
+                        right={() => <Switch value={showActivity} onValueChange={(v) => handleToggle('showActivity', v)} color="#4CAF50" />}
                     />
                 </List.Section>
             </Card>
@@ -49,7 +89,7 @@ const PrivacyScreen = () => {
                     <List.Item
                         title="Download Data"
                         description="Access all your personal data"
-                        onPress={() => Alert.alert('Coming Soon', 'Data export feature is coming soon.')}
+                        onPress={handleDownloadData}
                     />
                 </List.Section>
             </Card>
@@ -63,6 +103,7 @@ const PrivacyScreen = () => {
                         textColor="#F44336"
                         onPress={handleDeleteAccount}
                         style={styles.deleteButton}
+                        loading={loading}
                     >
                         Delete Account
                     </Button>

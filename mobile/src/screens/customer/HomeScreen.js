@@ -11,6 +11,7 @@ import {
     TextInput,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useTheme } from 'react-native-paper';
 import { useDispatch, useSelector } from 'react-redux';
 import { apiService } from '../../services/api';
 import { addToWishlist, removeFromWishlist, getWishlist } from '../../redux/actions/wishlistActions';
@@ -20,6 +21,7 @@ export default function HomeScreen({ navigation }) {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const { colors } = useTheme();
 
     useEffect(() => {
         fetchProducts();
@@ -89,18 +91,18 @@ export default function HomeScreen({ navigation }) {
                         </View>
                     )}
                     <TouchableOpacity
-                        style={styles.wishlistIcon}
+                        style={[styles.wishlistIcon, { backgroundColor: colors.surface + 'B3' }]} // 70% opacity
                         onPress={() => toggleWishlist(item)}
                     >
                         <MaterialIcons
                             name={favorited ? 'favorite' : 'favorite-border'}
                             size={24}
-                            color={favorited ? '#f44336' : '#666'}
+                            color={favorited ? '#f44336' : colors.onSurfaceVariant}
                         />
                     </TouchableOpacity>
                 </View>
                 <View style={styles.productInfo}>
-                    <Text style={styles.productName} numberOfLines={2}>
+                    <Text style={[styles.productName, { color: colors.onSurface }]} numberOfLines={2}>
                         {item.name}
                     </Text>
                     <View style={styles.priceRow}>
@@ -135,12 +137,13 @@ export default function HomeScreen({ navigation }) {
     }
 
     return (
-        <View style={styles.container}>
-            <View style={styles.searchContainer}>
-                <MaterialIcons name="search" size={24} color="#666" style={styles.searchIcon} />
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+            <View style={[styles.searchContainer, { backgroundColor: colors.elevation.level2 }]}>
+                <MaterialIcons name="search" size={24} color={colors.onSurfaceVariant} style={styles.searchIcon} />
                 <TextInput
-                    style={styles.searchInput}
+                    style={[styles.searchInput, { color: colors.onSurface }]}
                     placeholder="Search products..."
+                    placeholderTextColor={colors.onSurfaceVariant}
                     value={searchQuery}
                     onChangeText={setSearchQuery}
                 />
@@ -175,7 +178,7 @@ export default function HomeScreen({ navigation }) {
                         </View>
 
                         <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>Recommended For You</Text>
+                            <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>Recommended For You</Text>
                         </View>
                         <FlatList
                             horizontal
@@ -186,7 +189,7 @@ export default function HomeScreen({ navigation }) {
                             contentContainerStyle={{ paddingBottom: 15 }}
                         />
                         <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>All Products</Text>
+                            <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>All Products</Text>
                         </View>
                     </View>
                 }
@@ -241,7 +244,6 @@ const styles = StyleSheet.create({
     },
     productCard: {
         flex: 1,
-        backgroundColor: '#fff',
         margin: 7,
         borderRadius: 12,
         overflow: 'hidden',

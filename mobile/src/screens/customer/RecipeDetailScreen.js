@@ -14,6 +14,10 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import { MaterialIcons } from '@expo/vector-icons';
 import {
+    getRecipeDetails,
+    rateRecipe,
+    commentOnRecipe,
+    likeRecipe,
     shareRecipe,
     likeRecipeComment,
     replyToRecipeComment,

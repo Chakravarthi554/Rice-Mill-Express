@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useTheme } from 'react-native-paper';
 import { logout, setUser } from '../../redux/slices/authSlice';
 import { useFocusEffect } from '@react-navigation/native';
 import { apiService } from '../../services/api';
@@ -16,6 +17,7 @@ import { apiService } from '../../services/api';
 export default function ProfileScreen({ navigation }) {
     const dispatch = useDispatch();
     const { user } = useSelector((state) => state.auth);
+    const { colors } = useTheme();
 
     useFocusEffect(
         React.useCallback(() => {
@@ -57,35 +59,35 @@ export default function ProfileScreen({ navigation }) {
         { icon: 'person', label: 'Edit Profile', screen: 'EditProfile' },
         { icon: 'location-on', label: 'Addresses', screen: 'Addresses' },
         { icon: 'notifications', label: 'Notifications', screen: 'Notifications' },
-        { icon: 'help', label: 'Help & Support', screen: 'Support' },
+        { icon: 'help', label: 'Help & Support', screen: 'HelpCenter' },
         { icon: 'info', label: 'About', screen: 'About' },
     ];
 
     return (
-        <ScrollView style={styles.container}>
-            <View style={styles.header}>
+        <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+            <View style={[styles.header, { backgroundColor: colors.surface }]}>
                 <View style={styles.avatarContainer}>
-                    <MaterialIcons name="account-circle" size={100} color="#4CAF50" />
+                    <MaterialIcons name="account-circle" size={100} color={colors.primary} />
                 </View>
-                <Text style={styles.name}>{user?.name || 'User'}</Text>
-                <Text style={styles.email}>{user?.email}</Text>
-                <View style={styles.roleBadge}>
+                <Text style={[styles.name, { color: colors.onSurface }]}>{user?.name || 'User'}</Text>
+                <Text style={[styles.email, { color: colors.onSurfaceVariant }]}>{user?.email}</Text>
+                <View style={[styles.roleBadge, { backgroundColor: colors.primary }]}>
                     <Text style={styles.roleText}>{user?.role || 'customer'}</Text>
                 </View>
             </View>
 
-            <View style={styles.menuContainer}>
+            <View style={[styles.menuContainer, { backgroundColor: colors.surface }]}>
                 {menuItems.map((item, index) => (
                     <TouchableOpacity
                         key={index}
-                        style={styles.menuItem}
+                        style={[styles.menuItem, { borderBottomColor: colors.outlineVariant }]}
                         onPress={() => navigation.navigate(item.screen)}
                     >
                         <View style={styles.menuItemLeft}>
-                            <MaterialIcons name={item.icon} size={24} color="#666" />
-                            <Text style={styles.menuItemText}>{item.label}</Text>
+                            <MaterialIcons name={item.icon} size={24} color={colors.onSurfaceVariant} />
+                            <Text style={[styles.menuItemText, { color: colors.onSurface }]}>{item.label}</Text>
                         </View>
-                        <MaterialIcons name="chevron-right" size={24} color="#ccc" />
+                        <MaterialIcons name="chevron-right" size={24} color={colors.onSurfaceVariant} />
                     </TouchableOpacity>
                 ))}
             </View>
@@ -103,10 +105,8 @@ export default function ProfileScreen({ navigation }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f5f5f5',
     },
     header: {
-        backgroundColor: '#fff',
         alignItems: 'center',
         paddingVertical: 30,
         marginBottom: 20,
@@ -117,16 +117,13 @@ const styles = StyleSheet.create({
     name: {
         fontSize: 24,
         fontWeight: 'bold',
-        color: '#333',
         marginBottom: 5,
     },
     email: {
         fontSize: 16,
-        color: '#666',
         marginBottom: 10,
     },
     roleBadge: {
-        backgroundColor: '#4CAF50',
         paddingHorizontal: 15,
         paddingVertical: 5,
         borderRadius: 12,
@@ -138,7 +135,6 @@ const styles = StyleSheet.create({
         textTransform: 'capitalize',
     },
     menuContainer: {
-        backgroundColor: '#fff',
         marginBottom: 20,
     },
     menuItem: {
@@ -147,7 +143,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: 15,
         borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0',
     },
     menuItemLeft: {
         flexDirection: 'row',
@@ -155,7 +150,6 @@ const styles = StyleSheet.create({
     },
     menuItemText: {
         fontSize: 16,
-        color: '#333',
         marginLeft: 15,
     },
     logoutButton: {

@@ -1,7 +1,6 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth } from '../config/firebase';
-import store from '../redux/store';
 import { logout } from '../redux/slices/authSlice';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
@@ -48,52 +47,58 @@ api.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
-// Response interceptor for error handling and automatic retry
-api.interceptors.response.use(
-    (response) => response,
-    async (error) => {
-        const originalRequest = error.config;
+// Export a function to setup response interceptors with store access
+export const setupInterceptors = (store) => {
+    // Response interceptor for error handling and automatic retry
+    api.interceptors.response.use(
+        (response) => response,
+        async (error) => {
+            const originalRequest = error.config;
 
-        // If error is 401 and we haven't retried yet
-        if (error.response?.status === 401 && !originalRequest._retry) {
-            originalRequest._retry = true;
+            // If error is 401 and we haven't retried yet
+            if (error.response?.status === 401 && !originalRequest._retry) {
+                originalRequest._retry = true;
 
-            try {
-                const user = auth.currentUser;
-                if (user) {
-                    // Force refresh the token
-                    console.log('🔄 Token expired, attempting to refresh...');
-                    const newToken = await user.getIdToken(true);
+                try {
+                    const user = auth.currentUser;
+                    if (user) {
+                        // Force refresh the token
+                        console.log('🔄 Token expired, attempting to refresh...');
+                        const newToken = await user.getIdToken(true);
 
-                    // Update AsyncStorage
-                    await AsyncStorage.setItem('userToken', newToken);
+                        // Update AsyncStorage
+                        await AsyncStorage.setItem('userToken', newToken);
 
-                    // Update the header and retry
-                    originalRequest.headers.Authorization = `Bearer ${newToken}`;
-                    console.log('✅ Token refreshed, retrying request...');
-                    return api(originalRequest);
+                        // Update the header and retry
+                        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+                        console.log('✅ Token refreshed, retrying request...');
+                        return api(originalRequest);
 
-                } else {
-                    console.warn('⛔ Session expired and no Firebase user to refresh. Logging out.');
+                    } else {
+                        console.warn('⛔ Session expired and no Firebase user to refresh. Logging out.');
+                        store.dispatch(logout());
+                    }
+                } catch (refreshError) {
+                    console.error('❌ Failed to refresh token:', refreshError);
+                    // Permanent failure, layout to prevent infinite 401s
                     store.dispatch(logout());
                 }
-            } catch (refreshError) {
-                console.error('❌ Failed to refresh token:', refreshError);
-                // Permanent failure, layout to prevent infinite 401s
-                store.dispatch(logout());
             }
-        }
 
-        if (error.response) {
-            console.error('API Error:', error.response.status, error.response.data);
-        } else if (error.request) {
-            console.error('Network Error:', error.message);
-        } else {
-            console.error('Error:', error.message);
+            if (error.response) {
+                // Don't log expected 403 role access errors to reduce console noise
+                if (error.response.status !== 403 || error.response.data?.code !== 'ROLE_ACCESS_DENIED') {
+                    console.error('API Error:', error.response.status, error.response.data);
+                }
+            } else if (error.request) {
+                console.error('Network Error:', error.message);
+            } else {
+                console.error('Error:', error.message);
+            }
+            return Promise.reject(error);
         }
-        return Promise.reject(error);
-    }
-);
+    );
+};
 
 // API service methods
 export const apiService = {
@@ -144,9 +149,14 @@ export const apiService = {
     getSellerStats: () => api.get('/api/seller/stats'),
     submitKyc: (formData) => api.post('/api/kyc', formData),
 
-    // ============ User Profile ============
+    // ============ User Profile & Settings ============
     getUserProfile: () => api.get('/api/users/profile'),
     updateUserProfile: (data) => api.put('/api/users/profile', data),
+    changePassword: (data) => api.put('/api/users/change-password', data),
+    updatePreferences: (data) => api.put('/api/users/preferences', data),
+    getPrivacySettings: () => api.get('/api/users/privacy'),
+    updatePrivacySettings: (data) => api.put('/api/users/privacy', data),
+    deleteAccount: () => api.delete('/api/users/me'),
 
     // ============ Wishlist ============
     getWishlist: () => api.get('/api/users/wishlist'),
@@ -212,6 +222,7 @@ export const apiService = {
     getRewards: () => api.get('/api/users/rewards'),
     getRewardTransactions: () => api.get('/api/users/rewards/transactions'),
     redeemReward: (points) => api.post('/api/users/rewards/redeem', { points }),
+    getActiveCampaigns: () => api.get('/api/campaigns/active'),
 
     // ============ Reviews Management ============
     getUserReviews: () => api.get('/api/users/reviews'),
@@ -241,12 +252,15 @@ export const apiService = {
     trackOrder: (orderId) => api.get(`/api/orders/${orderId}/track`),
     getDeliveryLocation: (orderId) => api.get(`/api/orders/${orderId}/delivery-location`),
 
-    // ============ Invoices ============
-    downloadInvoice: (orderId) => api.get(`/api/orders/${orderId}/invoice`, { responseType: 'blob' }),
     getAuthToken: async () => {
-        const user = auth.currentUser;
-        if (user) return await user.getIdToken();
-        return await AsyncStorage.getItem('userToken');
+        try {
+            const user = auth.currentUser;
+            if (user) return await user.getIdToken();
+            return await AsyncStorage.getItem('userToken');
+        } catch (e) {
+            console.error('Error getting auth token', e);
+            return null;
+        }
     }
 };
 

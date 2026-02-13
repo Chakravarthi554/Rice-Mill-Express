@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, ActivityIndicator, Alert } from 'reac
 import { Card, Button, Divider, Title, Paragraph } from 'react-native-paper';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
-import { getRewards, getRewardTransactions, redeemReward } from '../../redux/actions/rewardsActions';
+import { getRewards, getRewardTransactions, redeemReward, getActiveCampaigns } from '../../redux/actions/rewardsActions';
 
 const RewardsScreen = () => {
     const dispatch = useDispatch();
@@ -17,9 +17,13 @@ const RewardsScreen = () => {
     const redeemState = useSelector((state) => state.redeemReward);
     const { loading: redeemLoading, success: redeemSuccess, error: redeemError } = redeemState;
 
+    const campaignsState = useSelector((state) => state.campaigns);
+    const { loading: campaignsLoading, campaigns } = campaignsState;
+
     useEffect(() => {
         dispatch(getRewards());
         dispatch(getRewardTransactions());
+        dispatch(getActiveCampaigns());
     }, [dispatch]);
 
     useEffect(() => {
@@ -154,6 +158,59 @@ const styles = StyleSheet.create({
     },
     redeemButton: {
         borderRadius: 20,
+    },
+    campaignsSection: {
+        marginTop: 10,
+        paddingHorizontal: 16,
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom: 10,
+        color: '#333',
+    },
+    campaignsList: {
+        paddingRight: 16,
+    },
+    campaignCard: {
+        width: 280,
+        marginRight: 16,
+        borderRadius: 12,
+        elevation: 3,
+        marginBottom: 10,
+    },
+    campaignImage: {
+        height: 120,
+        borderTopLeftRadius: 12,
+        borderTopRightRadius: 12,
+    },
+    campaignTitle: {
+        fontSize: 16,
+        marginTop: 5,
+    },
+    campaignDesc: {
+        fontSize: 12,
+        color: '#666',
+        marginTop: 2,
+    },
+    campaignBadge: {
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        backgroundColor: '#FFC107',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 4,
+    },
+    campaignBadgeText: {
+        fontWeight: 'bold',
+        fontSize: 12,
+        color: '#333',
+    },
+    noCampaigns: {
+        fontStyle: 'italic',
+        color: '#999',
+        marginLeft: 4,
     },
     historySection: {
         flex: 1,

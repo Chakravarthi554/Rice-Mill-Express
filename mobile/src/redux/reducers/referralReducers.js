@@ -19,9 +19,14 @@ export const referralReducer = (state = { referrals: [] }, action) => {
         case REFERRAL_REQUEST:
             return { loading: true, referrals: [] };
         case REFERRAL_SUCCESS:
-            return { loading: false, referrals: action.payload };
+            return {
+                loading: false,
+                referrals: action.payload.referrals,
+                code: action.payload.code,
+                stats: action.payload.stats
+            };
         case REFERRAL_FAIL:
-            return { loading: false, error: action.payload };
+            return { loading: false, error: action.payload, referrals: [] };
         default:
             return state;
     }

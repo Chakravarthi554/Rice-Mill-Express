@@ -1,7 +1,12 @@
 const mongoose = require('mongoose');
 
 const ratingSchema = new mongoose.Schema({
-    targetId: { type: mongoose.Schema.Types.ObjectId, required: true, index: true },
+    targetId: {
+        type: mongoose.Schema.Types.ObjectId,
+        required: true,
+        refPath: 'targetType',
+        index: true
+    },
     targetType: {
         type: String,
         required: true,

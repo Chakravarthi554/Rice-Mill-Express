@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Alert, TextInput } from 'react-nati
 import { Card, Button, Title, List, Switch, Divider } from 'react-native-paper';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
+import { apiService } from '../../services/api';
 
 const SecurityScreen = () => {
     const [oldPassword, setOldPassword] = useState('');
@@ -11,7 +12,7 @@ const SecurityScreen = () => {
     const [twoFactor, setTwoFactor] = useState(false);
     const [loading, setLoading] = useState(false);
 
-    const handleChangePassword = () => {
+    const handleChangePassword = async () => {
         if (!oldPassword || !newPassword || !confirmPassword) {
             Alert.alert('Error', 'Please fill all password fields');
             return;
@@ -20,16 +21,23 @@ const SecurityScreen = () => {
             Alert.alert('Error', 'New passwords do not match');
             return;
         }
+        if (newPassword.length < 8) {
+            Alert.alert('Error', 'New password must be at least 8 characters long');
+            return;
+        }
 
         setLoading(true);
-        // Simulate API call
-        setTimeout(() => {
-            setLoading(false);
+        try {
+            await apiService.changePassword({ currentPassword: oldPassword, newPassword });
             Alert.alert('Success', 'Password changed successfully');
             setOldPassword('');
             setNewPassword('');
             setConfirmPassword('');
-        }, 1500);
+        } catch (err) {
+            Alert.alert('Error', err.response?.data?.message || 'Failed to change password');
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (

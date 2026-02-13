@@ -32,6 +32,8 @@ import BulkOrderPage from './pages/customer/BulkOrderPage';
 import CartPage from './pages/customer/CartPage';
 import WishlistPage from './pages/customer/WishlistPage';
 import NotificationsPage from './pages/customer/NotificationsPage';
+import RewardsPage from './pages/customer/RewardsPage';
+import ReferralPage from './pages/customer/ReferralPage';
 import DeliveryKYCApproval from './components/admin/DeliveryKYCApproval';
 import OrderSuccessPage from './pages/customer/OrderSuccessPage';
 import VerifyEmailNotice from './pages/VerifyEmailNotice';
@@ -154,7 +156,10 @@ function App() {
               <Route path="/orders/success" element={<ProtectedRoute><OrderSuccessPage /></ProtectedRoute>} />
               <Route path="/bulk-order" element={<ProtectedRoute><BulkOrderPage /></ProtectedRoute>} />
               <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
+              <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
               <Route path="/verify-email-notice" element={<ProtectedRoute><VerifyEmailNotice /></ProtectedRoute>} />
+              <Route path="/customer/rewards" element={<ProtectedRoute><RewardsPage /></ProtectedRoute>} />
+              <Route path="/customer/referrals" element={<ProtectedRoute><ReferralPage /></ProtectedRoute>} />
 
               {/* --- SELLER --- */}
               <Route

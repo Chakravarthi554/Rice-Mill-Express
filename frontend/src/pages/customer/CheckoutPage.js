@@ -10,6 +10,7 @@ import PaymentMethodSelector from '../../components/common/PaymentMethodSelector
 import Loader from '../../components/common/Loader';
 import { createOrder } from '../../redux/actions/orderActions';
 import { listMyCart, addToCart } from '../../redux/actions/cartActions';
+import { getRewards } from '../../redux/actions/rewardsActions';
 import { createRazorpayOrder } from '../../redux/actions/paymentActions';
 import { loadScript } from '../../utils/loadScript';
 import { ORDER_CREATE_RESET } from '../../redux/constants/orderConstants';
@@ -44,9 +45,14 @@ const CheckoutPage = () => {
   // -----------------------------------------------------------------
   useEffect(() => {
     dispatch(listMyCart());               // <-- always get the latest cart from DB
+    dispatch(getRewards());               // Fetch user rewards
     dispatch({ type: ORDER_CREATE_RESET });
     dispatch({ type: RAZORPAY_ORDER_CREATE_RESET });
   }, [dispatch]);
+
+  const rewardsState = useSelector(s => s.rewards);
+  const { rewards } = rewardsState;
+  const [useRewards, setUseRewards] = useState(false);
 
   // ✅ Select all items by default when cart loads
   useEffect(() => {
@@ -99,6 +105,14 @@ const CheckoutPage = () => {
   }, [totalAmount]);
 
   const grandTotal = totalAmount + deliveryCharge;
+
+  // Reward Discount Calculation
+  let discount = 0;
+  if (useRewards && rewards && rewards.points > 0) {
+    discount = Math.min(rewards.points, grandTotal);
+  }
+  const finalTotal = grandTotal - discount;
+
   const isMinOrderMet = totalAmount >= 1500;
 
   // -----------------------------------------------------------------
@@ -137,6 +151,7 @@ const CheckoutPage = () => {
       })),
       shippingAddressId: selectedAddress._id,
       paymentMethod: 'cod',
+      useRewards // Pass flag to backend
     };
     await dispatch(createOrder(payload));
   };
@@ -147,7 +162,7 @@ const CheckoutPage = () => {
   const initiateRazorpay = async () => {
     setRzpInitiating(true);
     const payload = {
-      amount: totalAmount * 100,
+      amount: Math.round(finalTotal * 100), // Use finalTotal
       currency: 'INR',
       receipt: `rcpt_${userInfo._id}_${Date.now()}`.slice(0, 40)
     };
@@ -170,6 +185,7 @@ const CheckoutPage = () => {
           })),
           shippingAddressId: selectedAddress._id,
           paymentMethod: 'razorpay',
+          useRewards, // Pass flag to backend
           razorpayPaymentId: response.razorpay_payment_id,
           razorpayOrderId: response.razorpay_order_id,
           razorpaySignature: response.razorpay_signature,
@@ -303,13 +319,36 @@ const CheckoutPage = () => {
                 <Typography>₹{deliveryCharge.toFixed(2)}</Typography>
               )}
             </Box>
+
+            {/* Rewards Toggle */}
+            {rewards && rewards.points > 0 && (
+              <Box sx={{ mb: 2, p: 1, bgcolor: '#f1f8e9', borderRadius: 1 }}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={useRewards}
+                      onChange={(e) => setUseRewards(e.target.checked)}
+                      color="success"
+                    />
+                  }
+                  label={`Use Rewards (${rewards.points} pts)`}
+                />
+                {useRewards && (
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0 }}>
+                    <Typography variant="body2" color="success.main">Discount Applied:</Typography>
+                    <Typography variant="body2" color="success.main">-₹{discount.toFixed(2)}</Typography>
+                  </Box>
+                )}
+              </Box>
+            )}
+
             {freeDelivery && (
               <Typography variant="caption" color="success.main" sx={{ mb: 1, display: 'block' }}>
                 🎉 Free delivery on orders ≥ ₹1000
               </Typography>
             )}
             <Divider sx={{ my: 1 }} />
-            <Typography variant="h6">Grand Total: ₹{grandTotal.toFixed(2)}</Typography>
+            <Typography variant="h6">Grand Total: ₹{finalTotal.toFixed(2)}</Typography>
 
             <Button
               fullWidth

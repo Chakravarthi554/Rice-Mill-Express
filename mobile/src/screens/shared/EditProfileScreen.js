@@ -48,7 +48,7 @@ const EditProfileScreen = ({ navigation }) => {
             // Usually separate. backend/routes/userRoutes.js has `router.put('/change-password', ...)`
             // I need to add changePassword to api.js or use axios directly.
             // Let's assume I'll add it to api.js in next step if missing.
-            await apiService.api.put('/api/users/change-password', { currentPassword, newPassword });
+            await apiService.changePassword({ currentPassword, newPassword });
 
             Alert.alert('Success', 'Password changed successfully');
             setCurrentPassword('');

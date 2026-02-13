@@ -34,13 +34,13 @@ import {
 const { width } = Dimensions.get('window');
 
 const ProductScreen = ({ route, navigation }) => {
-  const { productId } = route.params;
+  const { productId, editReview, initialRating, initialComment } = route.params;
   const dispatch = useDispatch();
 
   const [qty, setQty] = useState(1);
-  const [rating, setRating] = useState(0);
-  const [comment, setComment] = useState('');
-  const [modalVisible, setModalVisible] = useState(false);
+  const [rating, setRating] = useState(initialRating || 0);
+  const [comment, setComment] = useState(initialComment || '');
+  const [modalVisible, setModalVisible] = useState(editReview || false);
   const [addingToCart, setAddingToCart] = useState(false);
 
   const [reviews, setReviews] = useState([]);

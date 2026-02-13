@@ -8,10 +8,11 @@ import { getReferrals, getReferralCode } from '../../redux/actions/referralActio
 const ReferralScreen = () => {
     const dispatch = useDispatch();
 
-    const referralState = useSelector((state) => state.referral);
+    const referralState = useSelector((state) => state.referral || { referrals: [] });
     const { loading: refLoading, referrals } = referralState;
+    const safeReferrals = Array.isArray(referrals) ? referrals : [];
 
-    const referralCodeState = useSelector((state) => state.referralCode);
+    const referralCodeState = useSelector((state) => state.referralCode || { code: null });
     const { loading: codeLoading, code } = referralCodeState;
 
     useEffect(() => {
@@ -61,13 +62,13 @@ const ReferralScreen = () => {
             </Card>
 
             <View style={styles.section}>
-                <Title style={styles.sectionTitle}>My Referrals ({referrals?.length || 0})</Title>
+                <Title style={styles.sectionTitle}>My Referrals ({safeReferrals.length})</Title>
                 <Divider />
 
                 {refLoading ? (
                     <ActivityIndicator style={{ marginTop: 20 }} color="#4CAF50" />
                 ) : (
-                    referrals?.map((ref, index) => (
+                    safeReferrals.map((ref, index) => (
                         <List.Item
                             key={index}
                             title={ref.referredUser?.name || 'User'}
@@ -82,7 +83,7 @@ const ReferralScreen = () => {
                     ))
                 )}
 
-                {!refLoading && referrals?.length === 0 && (
+                {!refLoading && safeReferrals.length === 0 && (
                     <View style={styles.emptyContainer}>
                         <MaterialIcons name="people-outline" size={48} color="#ccc" />
                         <Text style={styles.emptyText}>No referrals yet. Start inviting!</Text>

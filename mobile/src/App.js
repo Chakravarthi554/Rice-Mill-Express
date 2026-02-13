@@ -1,15 +1,34 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import { MaterialIcons } from '@expo/vector-icons';
+import {
+  Provider as PaperProvider,
+  MD3LightTheme,
+  MD3DarkTheme,
+  adaptNavigationTheme
+} from 'react-native-paper';
+import {
+  DefaultTheme as NavigationDefaultTheme,
+  DarkTheme as NavigationDarkTheme,
+} from '@react-navigation/native';
 import store from './redux/store';
+import { setupInterceptors } from './services/api';
 import { loadUserFromStorage, setCredentials, setAuthReady } from './redux/slices/authSlice';
+import { fetchSettings } from './redux/slices/settingsSlice';
 import { auth } from './config/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+const { LightTheme, DarkTheme } = adaptNavigationTheme({
+  reactNavigationLight: NavigationDefaultTheme,
+  reactNavigationDark: NavigationDarkTheme,
+});
+
+// Initialize API interceptors with store
+setupInterceptors(store);
 
 // Auth Screens
 import LoginScreen from './screens/auth/LoginScreen';
@@ -394,12 +413,62 @@ function AppNavigator() {
   return <CustomerStack />;
 }
 
+function MainContent() {
+  const dispatch = useDispatch();
+  const systemColorScheme = useColorScheme();
+  const { accessibility, preferences } = useSelector((state) => state.settings);
+  const { isAuthReady } = useSelector((state) => state.auth);
+
+  useEffect(() => {
+    if (isAuthReady) {
+      dispatch(fetchSettings());
+    }
+  }, [isAuthReady, dispatch]);
+
+  // Determine base theme based on preference
+  const themePreference = preferences?.theme || 'system';
+  const isDark = themePreference === 'dark' || (themePreference === 'system' && systemColorScheme === 'dark');
+  const baseTheme = isDark ? MD3DarkTheme : MD3LightTheme;
+  const navigationTheme = isDark ? DarkTheme : LightTheme;
+
+  // Create dynamic theme with accessibility scaling
+  const baseTextSize = 16;
+  const scale = (accessibility?.textSize || baseTextSize) / baseTextSize;
+
+  const theme = {
+    ...baseTheme,
+    colors: {
+      ...baseTheme.colors,
+      primary: '#4CAF50',
+      // Simple high contrast implementation
+      ...(accessibility?.highContrast > 50 ? {
+        surface: isDark ? '#121212' : '#ffffff',
+        onSurface: isDark ? '#ffffff' : '#000000',
+        outline: isDark ? '#ffffff' : '#000000',
+        background: isDark ? '#000000' : '#ffffff',
+      } : {})
+    },
+    fonts: Object.fromEntries(
+      Object.entries(baseTheme.fonts).map(([key, font]) => [
+        key,
+        { ...font, fontSize: Math.round(font.fontSize * scale) }
+      ])
+    )
+  };
+
+  return (
+    <PaperProvider theme={theme}>
+      <NavigationContainer theme={navigationTheme}>
+        <AppNavigator />
+      </NavigationContainer>
+    </PaperProvider>
+  );
+}
+
 export default function App() {
   return (
     <Provider store={store}>
-      <NavigationContainer>
-        <AppNavigator />
-      </NavigationContainer>
+      <MainContent />
     </Provider>
   );
 }

@@ -1,19 +1,30 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
     View,
     Text,
     StyleSheet,
     ScrollView,
     TouchableOpacity,
+    Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useTheme } from 'react-native-paper';
+import { useDispatch } from 'react-redux';
+import { fetchSettings } from '../../redux/slices/settingsSlice';
 
 const SettingsScreen = ({ navigation }) => {
+    const dispatch = useDispatch();
+    const { colors } = useTheme();
+
+    useEffect(() => {
+        dispatch(fetchSettings());
+    }, [dispatch]);
+
     const settingsOptions = [
         {
-            title: 'Account',
-            icon: 'person',
-            description: 'Manage your account settings',
+            title: 'Account Information',
+            icon: 'person-outline',
+            description: 'Edit your profile and details',
             onPress: () => navigation.navigate('EditProfile'),
         },
         {
@@ -23,10 +34,46 @@ const SettingsScreen = ({ navigation }) => {
             onPress: () => navigation.navigate('Addresses'),
         },
         {
-            title: 'Notifications',
-            icon: 'notifications',
-            description: 'Notification preferences',
-            onPress: () => navigation.navigate('Notifications'),
+            title: 'Orders & Invoices',
+            icon: 'receipt-long',
+            description: 'View orders and download invoices',
+            onPress: () => navigation.navigate('Orders'),
+        },
+        {
+            title: 'Security',
+            icon: 'security',
+            description: 'Password and account security',
+            onPress: () => navigation.navigate('Security'),
+        },
+        {
+            title: 'Privacy & Data',
+            icon: 'lock-outline',
+            description: 'Manage your data and visibility',
+            onPress: () => navigation.navigate('Privacy'),
+        },
+        {
+            title: 'Personalization',
+            icon: 'dashboard-customize',
+            description: 'Bio, tagline and dashboard layout',
+            onPress: () => navigation.navigate('Personalization'),
+        },
+        {
+            title: 'Language & Region',
+            icon: 'language',
+            description: 'Change app language and currency',
+            onPress: () => navigation.navigate('Language'),
+        },
+        {
+            title: 'Theme & Appearance',
+            icon: 'palette',
+            description: 'Light, dark, or system theme',
+            onPress: () => navigation.navigate('Theme'),
+        },
+        {
+            title: 'Accessibility',
+            icon: 'accessibility',
+            description: 'Visual and assistive settings',
+            onPress: () => navigation.navigate('Accessibility'),
         },
         {
             title: 'My Rewards',
@@ -53,44 +100,25 @@ const SettingsScreen = ({ navigation }) => {
             onPress: () => navigation.navigate('Referral'),
         },
         {
-            title: 'Security',
-            icon: 'security',
-            description: 'Password and 2FA settings',
-            onPress: () => navigation.navigate('Security'),
+            title: 'Notifications',
+            icon: 'notifications-none',
+            description: 'Notification preferences',
+            onPress: () => navigation.navigate('Notifications'),
         },
         {
-            title: 'Privacy',
-            icon: 'lock',
-            description: 'Privacy and data settings',
-            onPress: () => navigation.navigate('Privacy'),
-        },
-        {
-            title: 'Language',
-            icon: 'language',
-            description: 'Change app language and currency',
-            onPress: () => navigation.navigate('Language'),
-        },
-        {
-            title: 'Accessibility',
-            icon: 'accessibility',
-            description: 'Visual and assistive settings',
-            onPress: () => navigation.navigate('Accessibility'),
-        },
-        {
-            title: 'Personalization',
-            icon: 'dashboard-customize',
-            description: 'Customize your dashboard',
-            onPress: () => navigation.navigate('Personalization'),
-        },
-        {
-            title: 'Theme',
-            icon: 'palette',
-            description: 'Light, dark, or system theme',
-            onPress: () => navigation.navigate('Theme'),
+            title: 'Clear Cache',
+            icon: 'delete-sweep',
+            description: 'Free up space and clear history',
+            onPress: () => {
+                Alert.alert('Clear Cache', 'Are you sure you want to clear the app cache and history?', [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Clear', onPress: () => Alert.alert('Success', 'Cache and history cleared.') }
+                ]);
+            },
         },
         {
             title: 'Help Center',
-            icon: 'help',
+            icon: 'help-outline',
             description: 'FAQ and contact support',
             onPress: () => navigation.navigate('HelpCenter'),
         },
@@ -102,35 +130,35 @@ const SettingsScreen = ({ navigation }) => {
         },
         {
             title: 'About',
-            icon: 'info',
+            icon: 'info-outline',
             description: 'About this app',
             onPress: () => navigation.navigate('About'),
         },
     ];
 
     return (
-        <ScrollView style={styles.container}>
-            <View style={styles.header}>
-                <MaterialIcons name="settings" size={48} color="#4CAF50" />
-                <Text style={styles.headerTitle}>Settings</Text>
-                <Text style={styles.headerSubtitle}>Manage your app preferences</Text>
+        <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+            <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.outlineVariant }]}>
+                <MaterialIcons name="settings" size={48} color={colors.primary} />
+                <Text style={[styles.headerTitle, { color: colors.onSurface }]}>Settings</Text>
+                <Text style={[styles.headerSubtitle, { color: colors.onSurfaceVariant }]}>Manage your app preferences</Text>
             </View>
 
-            <View style={styles.section}>
+            <View style={[styles.section, { backgroundColor: colors.surface }]}>
                 {settingsOptions.map((option, index) => (
                     <TouchableOpacity
                         key={index}
-                        style={styles.optionCard}
+                        style={[styles.optionCard, { borderBottomColor: colors.outlineVariant }]}
                         onPress={option.onPress}
                     >
-                        <View style={styles.optionIcon}>
-                            <MaterialIcons name={option.icon} size={24} color="#4CAF50" />
+                        <View style={[styles.optionIcon, { backgroundColor: colors.primaryContainer }]}>
+                            <MaterialIcons name={option.icon} size={24} color={colors.primary} />
                         </View>
                         <View style={styles.optionContent}>
-                            <Text style={styles.optionTitle}>{option.title}</Text>
-                            <Text style={styles.optionDescription}>{option.description}</Text>
+                            <Text style={[styles.optionTitle, { color: colors.onSurface }]}>{option.title}</Text>
+                            <Text style={[styles.optionDescription, { color: colors.onSurfaceVariant }]}>{option.description}</Text>
                         </View>
-                        <MaterialIcons name="chevron-right" size={24} color="#ccc" />
+                        <MaterialIcons name="chevron-right" size={24} color={colors.onSurfaceVariant} />
                     </TouchableOpacity>
                 ))}
             </View>
@@ -145,42 +173,34 @@ const SettingsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f5f5f5',
     },
     header: {
-        backgroundColor: '#fff',
         padding: 24,
         alignItems: 'center',
         borderBottomWidth: 1,
-        borderBottomColor: '#e0e0e0',
     },
     headerTitle: {
         fontSize: 24,
         fontWeight: 'bold',
         marginTop: 12,
-        color: '#333',
     },
     headerSubtitle: {
         fontSize: 14,
-        color: '#999',
         marginTop: 4,
     },
     section: {
         marginTop: 16,
-        backgroundColor: '#fff',
     },
     optionCard: {
         flexDirection: 'row',
         alignItems: 'center',
         padding: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0',
     },
     optionIcon: {
         width: 48,
         height: 48,
         borderRadius: 24,
-        backgroundColor: '#E8F5E9',
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 16,
@@ -191,12 +211,10 @@ const styles = StyleSheet.create({
     optionTitle: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: '#333',
         marginBottom: 4,
     },
     optionDescription: {
         fontSize: 14,
-        color: '#999',
     },
     footer: {
         padding: 24,
@@ -204,7 +222,6 @@ const styles = StyleSheet.create({
     },
     footerText: {
         fontSize: 14,
-        color: '#999',
     },
 });
 

@@ -830,18 +830,48 @@ const getReferrals = asyncHandler(async (req, res) => {
 });
 
 const getReviews = asyncHandler(async (req, res) => {
-  const Product = require('../models/Product');
-  // Find all products where this user has a review
-  const reviews = await Product.find({ 'reviews.user': req.user._id })
-    .select('name image reviews.$')
-    .lean();
+  const Rating = require('../models/Rating');
 
-  const userReviews = reviews.map(p => ({
-    productId: p._id,
-    productName: p.name,
-    productImage: p.image,
-    ...p.reviews[0] // The $ projection returns array with single matching element
-  }));
+  // Explicitly ensure the Product model is registered
+  let Product;
+  try {
+    Product = mongoose.model('Product');
+  } catch (e) {
+    Product = require('../models/Product');
+  }
+
+  // Find all ratings/reviews where this user is the author and targetType is Product
+  const ratings = await Rating.find({ userId: req.user._id, targetType: 'Product' })
+    .populate('targetId', 'name images image price')
+    .sort({ createdAt: -1 });
+
+  const userReviews = ratings.map(rating => {
+    // If targetId is not populated or null, we can't show full details
+    const product = rating.targetId;
+
+    // Check if product is actually populated (it should be an object with name)
+    const isPopulated = product && typeof product === 'object' && product.name;
+
+    let image = null;
+    if (isPopulated) {
+      if (product.images && product.images.length > 0) {
+        image = product.images[0];
+      } else if (product.image) {
+        image = product.image;
+      }
+    }
+
+    return {
+      _id: rating._id,
+      product: isPopulated ? product._id : rating.targetId,
+      productId: isPopulated ? product._id : rating.targetId,
+      productName: isPopulated ? product.name : 'Unknown Product',
+      productImage: image,
+      rating: rating.rating,
+      comment: rating.comment,
+      createdAt: rating.createdAt
+    };
+  });
 
   res.json(userReviews);
 });
@@ -989,6 +1019,27 @@ const getBookmarks = asyncHandler(async (req, res) => {
 // Alias functions for backward compatibility
 const updateProfile = updateUserProfile;
 
+const validateReferralCode = asyncHandler(async (req, res) => {
+  const { code } = req.body;
+  if (!code) {
+    res.status(400);
+    throw new Error('Referral code is required');
+  }
+
+  const referrer = await User.findOne({ referralCode: code });
+  if (!referrer) {
+    res.status(404);
+    throw new Error('Invalid referral code');
+  }
+
+  if (referrer._id.toString() === req.user?._id?.toString()) {
+    res.status(400);
+    throw new Error('Cannot use your own referral code');
+  }
+
+  res.json({ valid: true, referrerName: referrer.name });
+});
+
 module.exports = {
   authUser,
   registerUser,
@@ -1019,6 +1070,7 @@ module.exports = {
   getRewards,
   reportProblem,
 
+
   // ✅ NEW: Add all the missing functions
   refreshToken,
   verifyEmail,
@@ -1040,5 +1092,6 @@ module.exports = {
   bookmarkPost,
   unbookmarkPost,
   getBookmarks,
-  getAdmins  // ✅ FIX: Added missing export
+  getAdmins,
+  validateReferralCode
 };

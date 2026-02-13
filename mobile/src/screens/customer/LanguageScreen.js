@@ -1,47 +1,52 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import { Card, Title, RadioButton, Divider } from 'react-native-paper';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Card, Title, RadioButton, Divider, Button } from 'react-native-paper';
+import { useDispatch, useSelector } from 'react-redux';
+import { updatePreferences, resetSettingsStatus } from '../../redux/slices/settingsSlice';
 
 const LanguageScreen = () => {
-    const [language, setLanguage] = useState('en');
-    const [currency, setCurrency] = useState('INR');
+    const dispatch = useDispatch();
+    const { preferences = {}, loading, success, error } = useSelector((state) => state.settings);
+
+    const [localLang, setLocalLang] = useState(preferences?.language || 'english');
+    const [localCurrency, setLocalCurrency] = useState(preferences?.currency || 'INR');
+    const [localRegion, setLocalRegion] = useState(preferences?.region || 'IN');
 
     useEffect(() => {
-        loadSettings();
-    }, []);
-
-    const loadSettings = async () => {
-        try {
-            const savedLang = await AsyncStorage.getItem('appLanguage');
-            const savedCurr = await AsyncStorage.getItem('appCurrency');
-            if (savedLang) setLanguage(savedLang);
-            if (savedCurr) setCurrency(savedCurr);
-        } catch (e) {
-            console.error('Failed to load settings.');
+        if (success) {
+            // Success feedback if needed
+            dispatch(resetSettingsStatus());
         }
-    };
+    }, [success, dispatch]);
 
-    const updateLanguage = async (value) => {
-        setLanguage(value);
-        await AsyncStorage.setItem('appLanguage', value);
-    };
-
-    const updateCurrency = async (value) => {
-        setCurrency(value);
-        await AsyncStorage.setItem('appCurrency', value);
+    const handleSave = () => {
+        dispatch(updatePreferences({
+            ...preferences,
+            language: localLang,
+            currency: localCurrency,
+            region: localRegion
+        }));
     };
 
     const languages = [
-        { label: 'English', value: 'en' },
-        { label: 'Hindi (coming soon)', value: 'hi', disabled: true },
-        { label: 'Telugu (coming soon)', value: 'te', disabled: true },
-        { label: 'Tamil (coming soon)', value: 'ta', disabled: true },
+        { label: 'English', value: 'english' },
+        { label: 'Hindi', value: 'hindi' },
+        { label: 'Telugu', value: 'telugu' },
+        { label: 'Tamil', value: 'tamil' },
+    ];
+
+    const regions = [
+        { label: 'India 🇮🇳', value: 'IN' },
+        { label: 'United States 🇺🇸', value: 'US' },
+        { label: 'United Kingdom 🇬🇧', value: 'GB' },
+        { label: 'Australia 🇦🇺', value: 'AU' }
     ];
 
     const currencies = [
         { label: 'Indian Rupee (₹)', value: 'INR' },
         { label: 'US Dollar ($)', value: 'USD' },
+        { label: 'British Pound (£)', value: 'GBP' },
+        { label: 'Euro (€)', value: 'EUR' }
     ];
 
     return (
@@ -50,11 +55,26 @@ const LanguageScreen = () => {
                 <Card.Content>
                     <Title>App Language</Title>
                     <Divider style={styles.divider} />
-                    <RadioButton.Group onValueChange={updateLanguage} value={language}>
+                    <RadioButton.Group onValueChange={setLocalLang} value={localLang}>
                         {languages.map((lang) => (
                             <View key={lang.value} style={styles.radioRow}>
-                                <RadioButton value={lang.value} color="#4CAF50" disabled={lang.disabled} />
-                                <Text style={[styles.radioLabel, lang.disabled && { color: '#ccc' }]}>{lang.label}</Text>
+                                <RadioButton value={lang.value} color="#4CAF50" />
+                                <Text style={styles.radioLabel}>{lang.label}</Text>
+                            </View>
+                        ))}
+                    </RadioButton.Group>
+                </Card.Content>
+            </Card>
+
+            <Card style={styles.card}>
+                <Card.Content>
+                    <Title>Region & Localization</Title>
+                    <Divider style={styles.divider} />
+                    <RadioButton.Group onValueChange={setLocalRegion} value={localRegion}>
+                        {regions.map((reg) => (
+                            <View key={reg.value} style={styles.radioRow}>
+                                <RadioButton value={reg.value} color="#4CAF50" />
+                                <Text style={styles.radioLabel}>{reg.label}</Text>
                             </View>
                         ))}
                     </RadioButton.Group>
@@ -65,7 +85,7 @@ const LanguageScreen = () => {
                 <Card.Content>
                     <Title>Preferred Currency</Title>
                     <Divider style={styles.divider} />
-                    <RadioButton.Group onValueChange={updateCurrency} value={currency}>
+                    <RadioButton.Group onValueChange={setLocalCurrency} value={localCurrency}>
                         {currencies.map((curr) => (
                             <View key={curr.value} style={styles.radioRow}>
                                 <RadioButton value={curr.value} color="#4CAF50" />
@@ -75,6 +95,17 @@ const LanguageScreen = () => {
                     </RadioButton.Group>
                 </Card.Content>
             </Card>
+
+            <View style={{ padding: 16 }}>
+                <Button
+                    mode="contained"
+                    onPress={handleSave}
+                    loading={loading}
+                    style={{ backgroundColor: '#4CAF50' }}
+                >
+                    Apply Changes
+                </Button>
+            </View>
         </ScrollView>
     );
 };

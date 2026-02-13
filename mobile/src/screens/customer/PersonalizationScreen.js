@@ -1,18 +1,61 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import { Card, Title, List, Switch, Divider, RadioButton } from 'react-native-paper';
+import { Card, Title, List, Switch, Divider, RadioButton, TextInput, Button as PaperButton } from 'react-native-paper';
+import { useDispatch, useSelector } from 'react-redux';
+import { updatePersonalization, resetSettingsStatus } from '../../redux/slices/settingsSlice';
 
 const PersonalizationScreen = () => {
+    const dispatch = useDispatch();
+    const { personalization = {}, loading, success } = useSelector((state) => state.settings);
+
     const [dashboardLayout, setDashboardLayout] = useState('grid');
-    const [showRecommendations, setShowRecommendations] = useState(true);
+    const [bio, setBio] = useState(personalization?.bio || '');
+    const [tagline, setTagline] = useState(personalization?.tagline || '');
+
+    useEffect(() => {
+        if (success) {
+            dispatch(resetSettingsStatus());
+        }
+    }, [success, dispatch]);
+
+    const handleSave = () => {
+        dispatch(updatePersonalization({
+            bio,
+            tagline
+        }));
+    };
 
     return (
         <ScrollView style={styles.container}>
             <Card style={styles.card}>
                 <Card.Content>
+                    <Title>Bio & Tagline</Title>
+                    <Divider style={styles.divider} />
+                    <TextInput
+                        label="Tagline"
+                        value={tagline}
+                        onChangeText={setTagline}
+                        mode="outlined"
+                        placeholder="A short tagline about yourself"
+                        style={{ marginBottom: 16 }}
+                    />
+                    <TextInput
+                        label="Bio"
+                        value={bio}
+                        onChangeText={setBio}
+                        mode="outlined"
+                        multiline
+                        numberOfLines={4}
+                        placeholder="Tell us a bit about yourself"
+                    />
+                </Card.Content>
+            </Card>
+
+            <Card style={styles.card}>
+                <Card.Content>
                     <Title>Dashboard Layout</Title>
                     <Divider style={styles.divider} />
-                    <RadioButton.Group onValueChange={value => setDashboardLayout(value)} value={dashboardLayout}>
+                    <RadioButton.Group onValueChange={setDashboardLayout} value={dashboardLayout}>
                         <View style={styles.radioRow}>
                             <RadioButton value="grid" color="#4CAF50" />
                             <Text>Grid View (Compact)</Text>
@@ -25,16 +68,16 @@ const PersonalizationScreen = () => {
                 </Card.Content>
             </Card>
 
-            <Card style={styles.card}>
-                <List.Section>
-                    <List.Subheader>Discovery</List.Subheader>
-                    <List.Item
-                        title="Personalized Recommendations"
-                        description="Show products based on your activity"
-                        right={() => <Switch value={showRecommendations} onValueChange={setShowRecommendations} color="#4CAF50" />}
-                    />
-                </List.Section>
-            </Card>
+            <View style={{ padding: 16 }}>
+                <PaperButton
+                    mode="contained"
+                    onPress={handleSave}
+                    loading={loading}
+                    style={{ backgroundColor: '#4CAF50' }}
+                >
+                    Save Personalization
+                </PaperButton>
+            </View>
         </ScrollView>
     );
 };

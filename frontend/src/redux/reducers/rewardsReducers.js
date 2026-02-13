@@ -12,12 +12,12 @@ import {
     CAMPAIGNS_REQUEST,
     CAMPAIGNS_SUCCESS,
     CAMPAIGNS_FAIL,
-} from '../../constants/rewardsConstants';
+} from '../constants/rewardsConstants';
 
-export const rewardsReducer = (state = { rewards: null }, action) => {
+export const rewardsReducer = (state = { rewards: {} }, action) => {
     switch (action.type) {
         case REWARDS_REQUEST:
-            return { loading: true };
+            return { loading: true, rewards: {} };
         case REWARDS_SUCCESS:
             return { loading: false, rewards: action.payload };
         case REWARDS_FAIL:
@@ -45,7 +45,7 @@ export const redeemRewardReducer = (state = {}, action) => {
         case REDEEM_REWARD_REQUEST:
             return { loading: true };
         case REDEEM_REWARD_SUCCESS:
-            return { loading: false, success: true, redemption: action.payload };
+            return { loading: false, success: true, reward: action.payload };
         case REDEEM_REWARD_FAIL:
             return { loading: false, error: action.payload };
         case REDEEM_REWARD_RESET:

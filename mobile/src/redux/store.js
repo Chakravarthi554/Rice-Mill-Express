@@ -1,5 +1,6 @@
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from './slices/authSlice';
+import settingsReducer from './slices/settingsSlice';
 import { productListReducer, productDetailsReducer, productCreateReviewReducer } from './reducers/productReducers';
 import { cartReducer } from './reducers/cartReducers';
 import {
@@ -17,7 +18,8 @@ import {
 import {
   rewardsReducer,
   rewardTransactionsReducer,
-  redeemRewardReducer
+  redeemRewardReducer,
+  campaignsReducer
 } from './reducers/rewardsReducers';
 import {
   userReviewsReducer,
@@ -56,6 +58,7 @@ const store = configureStore({
     rewards: rewardsReducer,
     rewardTransactions: rewardTransactionsReducer,
     redeemReward: redeemRewardReducer,
+    campaigns: campaignsReducer,
     userReviews: userReviewsReducer,
     deleteReview: deleteReviewReducer,
     updateReview: updateReviewReducer,
@@ -67,6 +70,7 @@ const store = configureStore({
     subscriptionList: subscriptionListReducer,
     subscriptionCreate: subscriptionCreateReducer,
     wishlist: wishlistReducer,
+    settings: settingsReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

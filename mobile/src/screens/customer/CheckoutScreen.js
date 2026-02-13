@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator, TouchableOpacity, Image, Linking } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Button, Card, RadioButton, Divider } from 'react-native-paper';
+import { Button, Card, RadioButton, Divider, Switch } from 'react-native-paper';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { apiService } from '../../services/api';
 import { clearCart } from '../../redux/actions/cartActions';
+import { getRewards } from '../../redux/actions/rewardsActions';
 
 const CheckoutScreen = ({ navigation }) => {
     const dispatch = useDispatch();
@@ -18,9 +19,16 @@ const CheckoutScreen = ({ navigation }) => {
     const [loading, setLoading] = useState(false);
     const [fetchingAddresses, setFetchingAddresses] = useState(true);
 
+    // Rewards State
+    const [useRewards, setUseRewards] = useState(false);
+    const rewardsState = useSelector((state) => state.rewards);
+    const { rewards } = rewardsState;
+    const rewardsBalance = rewards?.balance || 0; // Ensure backend sends 'balance'
+
     useFocusEffect(
         useCallback(() => {
             fetchAddresses();
+            dispatch(getRewards());
         }, [])
     );
 
@@ -40,8 +48,19 @@ const CheckoutScreen = ({ navigation }) => {
         }
     };
 
-    const calculateTotal = () => {
+    const calculateSubtotal = () => {
         return cartItems.reduce((total, item) => total + (item.product?.price || 0) * (item.quantity || 1), 0);
+    };
+
+    const calculateDiscount = () => {
+        if (!useRewards) return 0;
+        const subtotal = calculateSubtotal();
+        // Logic: 1 Point = ₹1, Max discount = Subtotal
+        return Math.min(rewardsBalance, subtotal);
+    };
+
+    const calculateTotal = () => {
+        return calculateSubtotal() - calculateDiscount();
     };
 
     useEffect(() => {
@@ -94,7 +113,8 @@ const CheckoutScreen = ({ navigation }) => {
                     orderItems: cartItems.map(item => ({
                         product: item.product?._id,
                         qty: item.qty || 1,
-                    }))
+                    })),
+                    useRewards // Pass flag to backend
                 };
                 const response = await apiService.createOrder(orderData);
                 const order = Array.isArray(response.data.orders) ? response.data.orders[0] : (response.data.order || response.data);
@@ -137,7 +157,8 @@ const CheckoutScreen = ({ navigation }) => {
                 orderItems: cartItems.map(item => ({
                     product: item.product?._id,
                     qty: item.quantity || 1,
-                }))
+                })),
+                useRewards // Pass flag to backend
             };
 
             const response = await apiService.createOrder(orderData);
@@ -183,6 +204,14 @@ const CheckoutScreen = ({ navigation }) => {
                             <Text style={styles.itemPrice}>₹{(item.product?.price || 0) * (item.quantity || 1)}</Text>
                         </View>
                     ))}
+
+                    {useRewards && (
+                        <View style={styles.summaryItem}>
+                            <Text style={[styles.itemText, { color: '#4CAF50' }]}>Reward Discount</Text>
+                            <Text style={[styles.itemPrice, { color: '#4CAF50' }]}>- ₹{calculateDiscount()}</Text>
+                        </View>
+                    )}
+
                     <Divider style={styles.divider} />
                     <View style={styles.totalRow}>
                         <Text style={styles.totalLabel}>Total Payable</Text>
@@ -190,6 +219,28 @@ const CheckoutScreen = ({ navigation }) => {
                     </View>
                 </Card.Content>
             </Card>
+
+            {/* Reward Points */}
+            {
+                rewardsBalance > 0 && (
+                    <Card style={styles.card}>
+                        <Card.Content style={styles.rewardContent}>
+                            <View style={styles.rewardInfo}>
+                                <MaterialIcons name="stars" size={24} color="#FFC107" />
+                                <View style={{ marginLeft: 10 }}>
+                                    <Text style={styles.rewardTitle}>Use Reward Points</Text>
+                                    <Text style={styles.rewardSubtitle}>Available: {rewardsBalance} pts</Text>
+                                </View>
+                            </View>
+                            <Switch
+                                value={useRewards}
+                                onValueChange={setUseRewards}
+                                color="#4CAF50"
+                            />
+                        </Card.Content>
+                    </Card>
+                )
+            }
 
             {/* Shipping Address */}
             <Card style={styles.card}>
@@ -267,7 +318,7 @@ const CheckoutScreen = ({ navigation }) => {
                 PLACE ORDER - ₹{calculateTotal()}
             </Button>
             <View style={{ height: 40 }} />
-        </ScrollView>
+        </ScrollView >
     );
 };
 
@@ -393,6 +444,24 @@ const styles = StyleSheet.create({
     },
     btn: {
         backgroundColor: '#4CAF50',
+    },
+    rewardContent: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    rewardInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    rewardTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#333',
+    },
+    rewardSubtitle: {
+        fontSize: 12,
+        color: '#666',
     },
 });
 

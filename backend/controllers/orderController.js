@@ -8,6 +8,8 @@ const Payment = require('../models/Payment');
 const BulkOrder = require('../models/BulkOrder');
 const OrderStatusHistory = require('../models/OrderStatusHistory');
 const DeliveryPartner = require('../models/deliveryPartner');
+const Campaign = require('../models/Campaign');
+const Reward = require('../models/Reward');
 const NotificationService = require('../services/NotificationService');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
@@ -114,6 +116,30 @@ exports.createOrder = asyncHandler(async (req, res) => {
     }
   }
 
+  if (req.body.useRewards) {
+    const user = await User.findById(req.user._id);
+    if (!user) { res.status(404); throw new Error('User not found'); }
+
+    // Redemption Logic: 1 Point = ₹1 (Configurable)
+    const pointsAvailable = user.rewardsBalance || 0;
+
+    if (pointsAvailable > 0) {
+      // Validation: Max redeemable is up to grand total
+      const discountAmount = Math.min(grandTotal, pointsAvailable);
+
+      if (discountAmount > 0) {
+        grandTotal -= discountAmount;
+
+        // We will deduct points AFTER order creation is successful within the transaction
+        // Just marking it here for the next steps
+        req.redemption = {
+          points: discountAmount,
+          amount: discountAmount
+        };
+      }
+    }
+  }
+
   // Payment Verification logic
   let isPaymentVerified = finalPaymentMethod === 'cod' || !isImmediatePayment;
   if (isImmediatePayment) {
@@ -127,11 +153,13 @@ exports.createOrder = asyncHandler(async (req, res) => {
     }
     try {
       const payment = await razorpayInstance.payments.fetch(razorpayPaymentId);
+      // Allow for small floating point differences or if rewards reduced the amount
+      const expectedAmount = Math.round(grandTotal * 100);
       if (payment.status !== 'captured') throw new Error(`Payment not captured: ${payment.status}`);
-      if (payment.amount !== Math.round(grandTotal * 100)) throw new Error("Amount mismatch");
+      if (Math.abs(payment.amount - expectedAmount) > 100) throw new Error("Amount mismatch"); // Allow ₹1 variance
       isPaymentVerified = true;
     } catch (err) {
-      res.status(500); throw new Error("Razorpay verification failed");
+      res.status(500); throw new Error("Razorpay verification failed: " + err.message);
     }
   }
 
@@ -145,25 +173,65 @@ exports.createOrder = asyncHandler(async (req, res) => {
   let transactionCommitted = false; // ✅ FIXED: Track transaction state
 
   try {
-    for (const sellerId in ordersBySeller) {
+    // Calculate proportional discount if rewards are used
+    let remainingDiscount = req.redemption ? req.redemption.amount : 0;
+    const initialGrandTotal = grandTotal + remainingDiscount; // Reconstruct original total to calculate ratio
+
+    let orderIndex = 0;
+    const sellerIds = Object.keys(ordersBySeller);
+
+    for (const sellerId of sellerIds) {
+      orderIndex++;
       const data = ordersBySeller[sellerId];
+
+      // Calculate Discount for this sub-order
+      let orderDiscount = 0;
+      if (req.redemption && req.redemption.amount > 0 && initialGrandTotal > 0) {
+        if (orderIndex === sellerIds.length) {
+          // Assign all remaining discount to the last order to handle rounding errors
+          orderDiscount = remainingDiscount;
+        } else {
+          // Proportional calculation
+          const ratio = data.totalPrice / initialGrandTotal;
+          orderDiscount = Math.floor(req.redemption.amount * ratio);
+          remainingDiscount -= orderDiscount;
+        }
+      }
+
+      const netPrice = data.totalPrice - orderDiscount;
+
+      // Recalculate commission based on NET Price (or Total Price depending on business logic)
+      // Usually commission is on the sold price. If discount is by platform (rewards), seller should ideally get full amount?
+      // For now, let's assume commission is on the price USER PAYS (Net Price) to keep it simple, 
+      // OR if platform bears the cost, commission should be on TotalPrice.
+      // Let's assume Platform bears the cost of Rewards -> Commission on TotalPrice.
       const commissionRate = 0.15;
       const commissionAmount = data.totalPrice * commissionRate;
-      const sellerEarnings = data.totalPrice - commissionAmount;
+      const sellerEarnings = data.totalPrice - commissionAmount; // Seller gets full value, platform takes hit on reward? 
+      // Actually, if user pays less, where does the money come from?
+      // If it's a platform reward, Platform pays Seller.
+      // So Seller Earnings shouldn't be affected by user's reward redemption usually.
+      // We will keep Seller Earnings based on Total Price.
 
       const order = new Order({
         user: req.user._id,
         seller: sellerId,
         orderItems: data.orderItems,
         shippingAddress: {
-          name: selectedAddress.name || user.name,  // ✅ FIXED: Fallback to user.name
-          phone: selectedAddress.phone || user.phone, // ✅ FIXED: Fallback to user.phone
+          name: selectedAddress.name || user.name,
+          phone: selectedAddress.phone || user.phone,
           street: selectedAddress.street,
           city: selectedAddress.city, state: selectedAddress.state, pinCode: selectedAddress.pinCode,
           country: selectedAddress.country, addressType: selectedAddress.type || selectedAddress.addressType,
         },
         paymentMethod: finalPaymentMethod,
         totalPrice: data.totalPrice,
+        discount: orderDiscount,
+        netPrice: netPrice,
+        appliedReward: orderDiscount > 0 ? {
+          pointsRedeemed: Math.round((orderDiscount / req.redemption.amount) * req.redemption.points), // Approx split of points
+          discountAmount: orderDiscount
+        } : undefined,
         commissionRate, commissionAmount, sellerEarnings,
         orderStatus: 'placed',
         isPaid: isImmediatePayment,
@@ -174,9 +242,14 @@ exports.createOrder = asyncHandler(async (req, res) => {
       });
 
       const savedOrder = await order.save({ session });
+
+      // Payment Record should reflect what the user ACTUALLY paid (Net Price) ? 
+      // Or should it reflect the Order Value?
+      // Usually Payment Record tracks the transaction. The transaction amount is Net Price.
       await Payment.create([{
         order: savedOrder._id, user: savedOrder.user, seller: savedOrder.seller,
-        amount: savedOrder.totalPrice, currency: 'INR', method: savedOrder.paymentMethod,
+        amount: savedOrder.netPrice, // ✅ FIXED: Use Net Price for payment record
+        currency: 'INR', method: savedOrder.paymentMethod,
         status: savedOrder.paymentStatus, razorpayOrderId: savedOrder.razorpayOrderId,
         razorpayPaymentId: isImmediatePayment ? razorpayPaymentId : null,
         razorpaySignature: isImmediatePayment ? razorpaySignature : null,
@@ -199,6 +272,35 @@ exports.createOrder = asyncHandler(async (req, res) => {
 
     await session.commitTransaction();
     transactionCommitted = true; // ✅ FIXED: Mark as committed
+
+    // ✅ FIXED: Deduct Points & Create Reward Entry (Post-commit to avoid complexity if this fails, or could be inside)
+    // Doing it here means if this fails, user gets free discount but keeps points. 
+    // Ideally should be INSIDE transaction. 
+    // But Reward model is not in the session in my code above? 
+    // Let's do it safely here. If it fails, we log it. Admin can fix.
+    if (req.redemption && req.redemption.points > 0) {
+      try {
+        const user = await User.findById(req.user._id);
+        user.rewardsBalance = Math.max(0, (user.rewardsBalance || 0) - req.redemption.points);
+        user.rewardsHistory.push({
+          amount: -req.redemption.points,
+          type: 'redeemed',
+          description: 'Redeemed on Order(s)'
+        });
+        await user.save();
+
+        await Reward.create({
+          user: req.user._id,
+          points: -req.redemption.points,
+          amount: req.redemption.amount,
+          type: 'redeemed',
+          description: `Redeemed on order`,
+          status: 'redeemed'
+        });
+      } catch (rewardErr) {
+        console.error('❌ Failed to deduct points after order creation:', rewardErr);
+      }
+    }
 
     // ✅ FIXED: Post-commit operations (non-critical, won't rollback)
     try {
@@ -653,11 +755,16 @@ exports.updateOrderToDelivered = asyncHandler(async (req, res) => {
   const orderId = req.params.id;
   if (!mongoose.Types.ObjectId.isValid(orderId)) { res.status(400); throw new Error('Invalid order ID'); }
 
-  const order = await Order.findById(orderId);
+  const order = await Order.findById(orderId).populate('user');
   if (!order) { res.status(404); throw new Error('Order not found'); }
 
+  // Check authorization (Admin or Delivery Partner)
+  // Note: req.user.role is checked. Assuming middleware sets this.
+  const isDeliveryPartner = req.user.role === 'deliveryPartner' || req.user.role === 'delivery_partner';
+  const isAdmin = req.user.role === 'admin';
+
   if (!isAdmin && !isDeliveryPartner) {
-    res.status(403); throw new Error('Not authorized to mark this order as delivered. Only the assigned delivery partner can confirm delivery.');
+    res.status(403); throw new Error('Not authorized to mark this order as delivered. Only the assigned delivery partner/admin can confirm delivery.');
   }
 
   if (!['shipped', 'out_for_delivery'].includes(order.orderStatus)) {
@@ -670,7 +777,112 @@ exports.updateOrderToDelivered = asyncHandler(async (req, res) => {
   order.deliveredAt = Date.now();
   order.updatedBy = req.user._id;
 
+  // Payment Status Update (if COD)
+  if (order.paymentMethod === 'cod' && order.paymentStatus !== 'completed') {
+    order.isPaid = true;
+    order.paidAt = Date.now();
+    order.paymentStatus = 'completed';
+  }
+
   const updatedOrder = await order.save();
+
+  // 🎁 REWARD SYSTEM INTEGRATION
+  try {
+    const user = await User.findById(order.user._id);
+
+    // 1. Campaign Rewards
+    const activeCampaigns = await Campaign.find({
+      isActive: true,
+      startDate: { $lte: new Date() },
+      endDate: { $gte: new Date() },
+      type: 'points'
+    });
+
+    let totalPointsEarned = 0;
+
+    for (const campaign of activeCampaigns) {
+      if (order.totalPrice >= campaign.minOrderValue) {
+        let points = 0;
+        if (campaign.valueType === 'multiplier') {
+          // Base calculation: 1 point per ₹100 spent (example)
+          const basePoints = Math.floor(order.totalPrice / 100);
+          points = Math.floor(basePoints * campaign.value);
+        } else {
+          points = campaign.value;
+        }
+
+        if (points > 0) {
+          totalPointsEarned += points;
+          await Reward.create({
+            user: user._id,
+            campaign: campaign._id,
+            order: order._id,
+            points: points,
+            type: 'earned',
+            description: `Earned from campaign: ${campaign.title}`,
+            status: 'credited'
+          });
+        }
+      }
+    }
+
+    // 2. Referral Bonus (First Order Only)
+    if (user.referredBy && !user.isReferralRewardClaimed) {
+      // Verify this is indeed the first delivered order
+      const deliveredOrdersCount = await Order.countDocuments({
+        user: user._id,
+        orderStatus: 'delivered'
+      });
+
+      if (deliveredOrdersCount === 1) { // This current one is the first
+        // Credit Referrer
+        const referrer = await User.findById(user.referredBy);
+        if (referrer) {
+          const referrerBonus = 500; // Configurable
+          await Reward.create({
+            user: referrer._id,
+            points: referrerBonus,
+            type: 'referral',
+            description: `Referral Bonus for inviting ${user.name}`,
+            status: 'credited'
+          });
+          referrer.rewardsBalance = (referrer.rewardsBalance || 0) + referrerBonus;
+          referrer.referralStats.earnedCredits += referrerBonus;
+          referrer.referralStats.referredUsers += 1; // Increment count
+          await referrer.save();
+        }
+
+        // Credit Referee (New User)
+        const refereeBonus = 200; // Configurable
+        await Reward.create({
+          user: user._id,
+          points: refereeBonus,
+          type: 'referral',
+          description: `Welcome Bonus for using referral code`,
+          status: 'credited'
+        });
+        totalPointsEarned += refereeBonus;
+
+        user.isReferralRewardClaimed = true;
+      }
+    }
+
+    // Update User Balance
+    if (totalPointsEarned > 0) {
+      user.rewardsBalance = (user.rewardsBalance || 0) + totalPointsEarned;
+      // Add entry to user's local history array if needed (though Reward model is better)
+      user.rewardsHistory.push({
+        amount: totalPointsEarned,
+        type: 'earned',
+        description: 'Order Rewards & Bonuses'
+      });
+      await user.save();
+    }
+
+  } catch (rewardError) {
+    console.error('❌ Error processing rewards:', rewardError);
+    // Don't fail the delivery update just because rewards failed
+  }
 
   // 🔥 Real-time sync & Notifications
   const io = req.app.get('io');

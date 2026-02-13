@@ -162,6 +162,7 @@ const loadRoutes = () => {
     { path: "/api/delivery", name: "Delivery Confirmation", file: "./routes/deliveryConfirmationRoutes" },
     { path: "/api/replacements", name: "Replacements", file: "./routes/replacementRoutes" },
     { path: "/api/dp", name: "Delivery Partner System", file: "./routes/deliveryPartnerNewRoutes" },
+    { path: "/api/campaigns", name: "Campaigns", file: "./routes/campaignRoutes" },
   ];
 
   routes.forEach(route => {

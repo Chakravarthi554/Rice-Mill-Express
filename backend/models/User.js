@@ -102,6 +102,8 @@ const userSchema = mongoose.Schema(
       description: { type: String },
       date: { type: Date, default: Date.now }
     }],
+    referredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    isReferralRewardClaimed: { type: Boolean, default: false },
 
     // ✅ ADDED: Forum bookmarks
     bookmarks: [{

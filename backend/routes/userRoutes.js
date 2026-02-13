@@ -100,7 +100,10 @@ const {
   exportUserData,
   getDashboardStats,
   refreshToken,
-  getAdmins
+  getAdmins,
+  getRewards,
+  getReferrals,
+  validateReferralCode
 } = userController;
 
 // ✅ FIXED: Validate controller functions
@@ -177,9 +180,9 @@ router.delete('/me', validateController(userController, 'deleteAccount'));
 router.get('/dashboard/stats', validateController(userController, 'getDashboardStats'));
 router.get('/referrals', validateController(userController, 'getReferrals'));
 router.get('/rewards', validateController(userController, 'getRewards')); // Added rewards
-router.get('/subscription', validateController(userController, 'getSubscription')); // Added subscription
 router.post('/subscription', validateController(userController, 'subscribe')); // Subscribe
 router.delete('/subscription', validateController(userController, 'unsubscribe')); // Unsubscribe
+router.post('/validate-referral', validateController(userController, 'validateReferralCode')); // Validate Referral Code
 router.route('/privacy').get(validateController(userController, 'getPrivacySettings')).put(validateController(userController, 'updatePrivacySettings'));
 router.route('/linked-accounts').get(validateController(userController, 'getLinkedAccounts')).post(validateController(userController, 'linkAccount')).delete(validateController(userController, 'unlinkAccount'));
 

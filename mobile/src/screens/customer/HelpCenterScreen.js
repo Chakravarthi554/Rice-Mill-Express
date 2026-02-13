@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking } from 'react-native';
-import { Card, Title, List, Searchbar, Button, Paragraph } from 'react-native-paper';
+import { Card, Title, List, Searchbar, Button, Paragraph, Divider } from 'react-native-paper';
 import { MaterialIcons } from '@expo/vector-icons';
 
 const HelpCenterScreen = () => {

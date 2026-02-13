@@ -17,11 +17,17 @@ import {
   userChangePasswordReducer, userForgotPasswordReducer, userResetPasswordReducer,
   userResetPreferencesReducer, userLinkedAccountsReducer,
   userPaymentMethodsReducer,
-  userRewardsReducer,
   userSubscriptionReducer,
   userReportProblemReducer,
   userExportDataReducer,
 } from './reducers/userReducers';
+
+import {
+  rewardsReducer,
+  rewardTransactionsReducer,
+  redeemRewardReducer,
+  campaignsReducer
+} from './reducers/rewardsReducers';
 
 import {
   orderCreateReducer, orderDetailsReducer, orderPayReducer, orderDeliverReducer,
@@ -183,7 +189,13 @@ const rootReducer = combineReducers({
   userResetPreferences: userResetPreferencesReducer,
   userLinkedAccounts: userLinkedAccountsReducer,
   userPaymentMethods: userPaymentMethodsReducer,
-  userRewards: userRewardsReducer,
+
+  // Rewards (New)
+  rewards: rewardsReducer,
+  rewardTransactions: rewardTransactionsReducer,
+  redeemReward: redeemRewardReducer,
+  campaigns: campaignsReducer,
+
   userSubscription: userSubscriptionReducer,
   userReportProblem: userReportProblemReducer,
   userExportData: userExportDataReducer,
