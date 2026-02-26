@@ -10,6 +10,7 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from 'react-native-paper';
+import { useTranslation } from 'react-i18next';
 import { logout, setUser } from '../../redux/slices/authSlice';
 import { useFocusEffect } from '@react-navigation/native';
 import { apiService } from '../../services/api';
@@ -18,6 +19,7 @@ export default function ProfileScreen({ navigation }) {
     const dispatch = useDispatch();
     const { user } = useSelector((state) => state.auth);
     const { colors } = useTheme();
+    const { t } = useTranslation();
 
     useFocusEffect(
         React.useCallback(() => {
@@ -37,12 +39,12 @@ export default function ProfileScreen({ navigation }) {
 
     const handleLogout = () => {
         Alert.alert(
-            'Logout',
-            'Are you sure you want to logout?',
+            t('logout'),
+            t('logoutConfirm'),
             [
-                { text: 'Cancel', style: 'cancel' },
+                { text: t('cancel'), style: 'cancel' },
                 {
-                    text: 'Logout',
+                    text: t('logout'),
                     style: 'destructive',
                     onPress: () => dispatch(logout()),
                 },
@@ -51,16 +53,16 @@ export default function ProfileScreen({ navigation }) {
     };
 
     const menuItems = [
-        { icon: 'restaurant-menu', label: 'Recipes', screen: 'Recipes' },
-        { icon: 'forum', label: 'Forum', screen: 'Forum' },
-        { icon: 'stars', label: 'My Rewards', screen: 'Rewards' },
-        { icon: 'rate-review', label: 'My Reviews', screen: 'MyReviews' },
-        { icon: 'settings', label: 'Settings', screen: 'Settings' },
-        { icon: 'person', label: 'Edit Profile', screen: 'EditProfile' },
-        { icon: 'location-on', label: 'Addresses', screen: 'Addresses' },
-        { icon: 'notifications', label: 'Notifications', screen: 'Notifications' },
-        { icon: 'help', label: 'Help & Support', screen: 'HelpCenter' },
-        { icon: 'info', label: 'About', screen: 'About' },
+        { icon: 'restaurant-menu', label: t('recipes'), screen: 'Recipes' },
+        { icon: 'forum', label: t('forum'), screen: 'Forum' },
+        { icon: 'stars', label: t('rewards'), screen: 'Rewards' },
+        { icon: 'rate-review', label: t('myReviews'), screen: 'MyReviews' },
+        { icon: 'settings', label: t('settings'), screen: 'Settings' },
+        { icon: 'person', label: t('editProfile'), screen: 'EditProfile' },
+        { icon: 'location-on', label: t('addresses'), screen: 'Addresses' },
+        { icon: 'notifications', label: t('notifications'), screen: 'Notifications' },
+        { icon: 'help', label: t('helpCenter'), screen: 'HelpCenter' },
+        { icon: 'info', label: t('about'), screen: 'About' },
     ];
 
     return (
@@ -94,10 +96,10 @@ export default function ProfileScreen({ navigation }) {
 
             <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
                 <MaterialIcons name="logout" size={24} color="#fff" />
-                <Text style={styles.logoutText}>Logout</Text>
+                <Text style={styles.logoutText}>{t('logout')}</Text>
             </TouchableOpacity>
 
-            <Text style={styles.version}>Version 1.0.0</Text>
+            <Text style={styles.version}>{t('version')} 1.0.0</Text>
         </ScrollView>
     );
 }

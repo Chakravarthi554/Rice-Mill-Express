@@ -12,14 +12,14 @@ const Notification = require('../models/Notification');
  */
 exports.createBulkOrder = asyncHandler(async (req, res) => {
   try {
-    const { 
-      items, 
-      shippingAddress, 
+    const {
+      items,
+      shippingAddress,
       paymentMethod = 'advance',
       creditDays = 0,
       advanceAmount = 0,
       notes = '',
-      expectedDeliveryDate 
+      expectedDeliveryDate
     } = req.body;
 
     console.log('🔄 Creating bulk order with data:', {
@@ -36,10 +36,10 @@ exports.createBulkOrder = asyncHandler(async (req, res) => {
       });
     }
 
-    if (!shippingAddress || !shippingAddress.street || !shippingAddress.city) {
+    if (!shippingAddress || !shippingAddress.houseNumber || !shippingAddress.street || !shippingAddress.city) {
       return res.status(400).json({
         success: false,
-        message: 'Complete shipping address is required'
+        message: 'Complete shipping address (including House No) is required'
       });
     }
 
@@ -112,6 +112,8 @@ exports.createBulkOrder = asyncHandler(async (req, res) => {
         const product = products.find(p => p._id.toString() === item.product);
         return {
           product: item.product,
+          name: product.name,
+          image: product.images?.[0] || '/images/default-image.jpg',
           quantity: item.quantity,
           requestedPrice: product.price,
           unit: product.unit || 'kg',
@@ -178,8 +180,7 @@ exports.createBulkOrder = asyncHandler(async (req, res) => {
     // Populate the response
     const populatedOrder = await BulkOrder.findById(bulkOrder._id)
       .populate('buyer', 'name email phone')
-      .populate('seller', 'name businessName phone rating')
-      .populate('items.product', 'name brand images category price unit');
+      .populate('seller', 'name businessName phone rating');
 
     // Create notifications
     await Notification.create({
@@ -263,19 +264,19 @@ exports.createBulkOrder = asyncHandler(async (req, res) => {
  */
 exports.getBulkOrders = asyncHandler(async (req, res) => {
   try {
-    const { 
-      status, 
-      page = 1, 
-      limit = 10, 
+    const {
+      status,
+      page = 1,
+      limit = 10,
       sortBy = 'createdAt',
-      sortOrder = 'desc' 
+      sortOrder = 'desc'
     } = req.query;
 
     const skip = (page - 1) * limit;
     const sort = { [sortBy]: sortOrder === 'desc' ? -1 : 1 };
 
     let query = { isActive: true };
-    
+
     // Role-based filtering
     if (req.user.role === 'customer') {
       query.buyer = req.user.id;
@@ -291,7 +292,6 @@ exports.getBulkOrders = asyncHandler(async (req, res) => {
     const bulkOrders = await BulkOrder.find(query)
       .populate('buyer', 'name email phone')
       .populate('seller', 'name businessName phone rating')
-      .populate('items.product', 'name brand images category price')
       .sort(sort)
       .skip(skip)
       .limit(Number(limit));
@@ -329,7 +329,6 @@ exports.getBulkOrderById = asyncHandler(async (req, res) => {
     })
       .populate('buyer', 'name email phone address')
       .populate('seller', 'name businessName phone address rating')
-      .populate('items.product', 'name brand images category price unit minBulkQuantity')
       .populate('createdBy', 'name')
       .populate('updatedBy', 'name');
 
@@ -384,14 +383,14 @@ exports.getBulkOrderById = asyncHandler(async (req, res) => {
  */
 exports.updateBulkOrder = asyncHandler(async (req, res) => {
   try {
-    const { 
-      action, 
-      discount, 
-      negotiatedPrices, 
+    const {
+      action,
+      discount,
+      negotiatedPrices,
       notes,
       shippingDate,
       trackingNumber,
-      carrier 
+      carrier
     } = req.body;
 
     const bulkOrder = await BulkOrder.findOne({
@@ -504,15 +503,15 @@ exports.updateBulkOrder = asyncHandler(async (req, res) => {
     if (['confirmed', 'processing', 'shipped', 'delivered'].includes(bulkOrder.status)) {
       await Order.updateMany(
         { bulkOrderRef: bulkOrder._id },
-        { 
+        {
           orderStatus: bulkOrder.status,
-          ...(bulkOrder.status === 'shipped' && { 
+          ...(bulkOrder.status === 'shipped' && {
             shippedAt: bulkOrder.shippingDate,
-            trackingNumber: bulkOrder.trackingNumber 
+            trackingNumber: bulkOrder.trackingNumber
           }),
-          ...(bulkOrder.status === 'delivered' && { 
+          ...(bulkOrder.status === 'delivered' && {
             isDelivered: true,
-            deliveredAt: bulkOrder.deliveryDate 
+            deliveredAt: bulkOrder.deliveryDate
           })
         }
       );
@@ -536,8 +535,7 @@ exports.updateBulkOrder = asyncHandler(async (req, res) => {
     // Populate updated order for response
     const updatedOrder = await BulkOrder.findById(bulkOrder._id)
       .populate('buyer', 'name email phone')
-      .populate('seller', 'name businessName phone')
-      .populate('items.product', 'name brand images category price');
+      .populate('seller', 'name businessName phone');
 
     res.json({
       success: true,
@@ -623,7 +621,7 @@ exports.cancelBulkOrder = asyncHandler(async (req, res) => {
     // Sync regular orders
     await Order.updateMany(
       { bulkOrderRef: bulkOrder._id },
-      { 
+      {
         orderStatus: 'cancelled',
         isCancelled: true,
         cancelledAt: new Date()
@@ -669,7 +667,7 @@ exports.cancelBulkOrder = asyncHandler(async (req, res) => {
 exports.getBulkOrderStats = asyncHandler(async (req, res) => {
   try {
     let matchStage = { isActive: true };
-    
+
     // If seller, only show their stats
     if (req.user.role === 'seller') {
       matchStage.seller = req.user.id;
@@ -729,9 +727,9 @@ exports.getSellerBulkOrders = asyncHandler(async (req, res) => {
     const { status, page = 1, limit = 10 } = req.query;
     const skip = (page - 1) * limit;
 
-    let query = { 
-      seller: req.user.id, 
-      isActive: true 
+    let query = {
+      seller: req.user.id,
+      isActive: true
     };
 
     if (status && status !== 'all') {
@@ -810,12 +808,12 @@ exports.addBulkOrderReview = asyncHandler(async (req, res) => {
 
     // Update seller rating (average of all orders)
     const sellerStats = await BulkOrder.aggregate([
-      { 
-        $match: { 
-          seller: bulkOrder.seller, 
+      {
+        $match: {
+          seller: bulkOrder.seller,
           qualityRating: { $exists: true },
           deliveryRating: { $exists: true }
-        } 
+        }
       },
       {
         $group: {

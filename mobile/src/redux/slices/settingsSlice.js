@@ -17,10 +17,7 @@ export const fetchSettings = createAsyncThunk(
                     profileVisible: true,
                     showActivity: true,
                 },
-                personalization: response.data.personalization || {
-                    bio: '',
-                    tagline: '',
-                },
+
             };
 
             // Also load accessibility from AsyncStorage since it's local-only usually
@@ -50,10 +47,7 @@ export const fetchSettings = createAsyncThunk(
                         profileVisible: true,
                         showActivity: true,
                     },
-                    personalization: {
-                        bio: '',
-                        tagline: '',
-                    },
+
                     accessibility: accessibility ? JSON.parse(accessibility) : {
                         highContrast: 0,
                         textSize: 16,
@@ -90,17 +84,7 @@ export const updatePrivacy = createAsyncThunk(
     }
 );
 
-export const updatePersonalization = createAsyncThunk(
-    'settings/updatePersonalization',
-    async (personalization, { rejectWithValue }) => {
-        try {
-            const response = await apiService.updateUserProfile({ personalization });
-            return response.data.user.personalization;
-        } catch (err) {
-            return rejectWithValue(err.response?.data?.message || 'Failed to update personalization');
-        }
-    }
-);
+
 
 export const updateAccessibility = createAsyncThunk(
     'settings/updateAccessibility',
@@ -126,10 +110,7 @@ const settingsSlice = createSlice({
             profileVisible: true,
             showActivity: true,
         },
-        personalization: {
-            bio: '',
-            tagline: '',
-        },
+
         accessibility: {
             highContrast: 0,
             textSize: 16,
@@ -155,7 +136,7 @@ const settingsSlice = createSlice({
                 state.loading = false;
                 state.preferences = action.payload.preferences;
                 state.privacy = action.payload.privacy;
-                state.personalization = action.payload.personalization;
+
                 state.accessibility = action.payload.accessibility;
             })
             .addCase(fetchSettings.rejected, (state, action) => {
@@ -180,11 +161,7 @@ const settingsSlice = createSlice({
                 state.privacy = action.payload;
                 state.success = true;
             })
-            // Update Personalization
-            .addCase(updatePersonalization.fulfilled, (state, action) => {
-                state.personalization = action.payload;
-                state.success = true;
-            })
+
             // Update Accessibility
             .addCase(updateAccessibility.fulfilled, (state, action) => {
                 state.accessibility = action.payload;

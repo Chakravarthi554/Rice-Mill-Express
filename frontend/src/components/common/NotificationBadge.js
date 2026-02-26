@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Badge, 
-  IconButton, 
-  Popover, 
-  Typography, 
-  Box, 
-  List, 
-  ListItem, 
-  ListItemText, 
+import {
+  Badge,
+  IconButton,
+  Popover,
+  Typography,
+  Box,
+  List,
+  ListItem,
+  ListItemText,
   ListItemIcon,
   Button,
   Divider
@@ -40,6 +40,7 @@ const NotificationBadge = () => {
     LOW_STOCK_ALERT: <StockIcon color="warning" />,
     SPAM_REPORT: <WarningIcon color="error" />,
     NEW_CHAT_MESSAGE: <ChatIcon color="info" />,
+    SUPPORT_TICKET: <ChatIcon color="success" />, // Or a dedicated support icon
     REFUND_REQUESTED: <PaymentIcon color="warning" />,
     PAYOUT_READY: <PaymentIcon color="success" />,
     default: <CircleIcon color="action" />
@@ -81,13 +82,13 @@ const NotificationBadge = () => {
   const fetchNotifications = async () => {
     try {
       if (!userInfo?.token) return;
-      
+
       const response = await fetch('/api/notifications?limit=10', {
         headers: {
           'Authorization': `Bearer ${userInfo.token}`
         }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
@@ -114,7 +115,7 @@ const NotificationBadge = () => {
   const markAllAsRead = async () => {
     try {
       if (!userInfo?.token) return;
-      
+
       await fetch('/api/notifications/read-all', {
         method: 'PUT',
         headers: {
@@ -140,8 +141,8 @@ const NotificationBadge = () => {
 
   return (
     <>
-      <IconButton 
-        color="inherit" 
+      <IconButton
+        color="inherit"
         onClick={handleClick}
         component={motion.div}
         whileHover={{ scale: 1.1 }}
@@ -178,10 +179,10 @@ const NotificationBadge = () => {
           <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 1 }}>
             Notifications
             {unreadCount > 0 && (
-              <Typography 
-                component="span" 
-                sx={{ 
-                  ml: 1, 
+              <Typography
+                component="span"
+                sx={{
+                  ml: 1,
                   fontSize: '0.8rem',
                   color: 'primary.main',
                   fontWeight: 'bold'
@@ -191,15 +192,15 @@ const NotificationBadge = () => {
               </Typography>
             )}
           </Typography>
-          
+
           <Divider sx={{ mb: 1 }} />
 
           <List sx={{ maxHeight: 300, overflow: 'auto' }}>
             <AnimatePresence>
               {notifications.length === 0 ? (
                 <ListItem>
-                  <ListItemText 
-                    primary="No notifications" 
+                  <ListItemText
+                    primary="No notifications"
                     secondary="You're all caught up!"
                   />
                 </ListItem>
@@ -212,13 +213,13 @@ const NotificationBadge = () => {
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.2, delay: index * 0.1 }}
                   >
-                    <ListItem 
-                      button 
+                    <ListItem
+                      button
                       onClick={() => handleNotificationClick(notification)}
                       sx={{
                         borderLeft: notification.priority === 'high' ? '4px solid' : '4px solid transparent',
-                        borderLeftColor: notification.priority === 'high' ? 'error.main' : 
-                                        notification.priority === 'medium' ? 'warning.main' : 'transparent',
+                        borderLeftColor: notification.priority === 'high' ? 'error.main' :
+                          notification.priority === 'medium' ? 'warning.main' : 'transparent',
                         mb: 0.5,
                         borderRadius: 1
                       }}
@@ -227,8 +228,10 @@ const NotificationBadge = () => {
                         {iconMap[notification.type] || iconMap.default}
                       </ListItemIcon>
                       <ListItemText
+                        primaryTypographyProps={{ component: 'div' }}
+                        secondaryTypographyProps={{ component: 'div' }}
                         primary={
-                          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 'bold' }} component="span">
                             {notification.title || 'Notification'}
                           </Typography>
                         }
@@ -256,8 +259,8 @@ const NotificationBadge = () => {
 
           {notifications.length > 0 && (
             <Box sx={{ mt: 1, textAlign: 'center' }}>
-              <Button 
-                size="small" 
+              <Button
+                size="small"
                 color="primary"
                 onClick={() => window.location.href = '/notifications'}
               >

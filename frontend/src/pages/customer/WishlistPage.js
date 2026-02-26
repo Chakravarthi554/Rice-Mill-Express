@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Box, Container, Typography, Card, CardContent, CardMedia, Button, IconButton, Grid } from '@mui/material';
 import { Delete as DeleteIcon, ShoppingCart } from '@mui/icons-material';
@@ -14,6 +15,7 @@ import { AddShoppingCart } from '@mui/icons-material';
 const WishlistPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { products = [] } = useSelector((state) => state.productList || {});
   const { wishlistItems, loading, error } = useSelector((state) => state.userWishlist || { wishlistItems: [], loading: false, error: null });
 
@@ -42,7 +44,7 @@ const WishlistPage = () => {
   return (
     <Container sx={{ py: 4 }}>
       <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
-        My Wishlist
+        {t('wishlist')}
       </Typography>
 
       <Wishlist
@@ -58,7 +60,7 @@ const WishlistPage = () => {
       {recommendedProducts.length > 0 && (
         <Box sx={{ mt: 8 }}>
           <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
-            Recommended For You
+            {t('recommendedForYou')}
           </Typography>
           <Grid container spacing={3}>
             {recommendedProducts.slice(0, 8).map(product => (
@@ -95,7 +97,7 @@ const WishlistPage = () => {
                         handleAddToCart(product._id);
                       }}
                     >
-                      Add to Cart
+                      {t('addToCart')}
                     </Button>
                   </CardContent>
                 </Card>

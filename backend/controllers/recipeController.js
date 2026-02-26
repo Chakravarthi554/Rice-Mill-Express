@@ -1,10 +1,12 @@
 const asyncHandler = require('express-async-handler');
+const { syncEngagementCounts } = require('./socialController');
 const Recipe = require('../models/Recipe');
 const Product = require('../models/Product');
 const Notification = require('../models/Notification');
 const Comment = require('../models/Comment');
 const Like = require('../models/Like');
 const mongoose = require('mongoose');
+const { anonymizeUser } = require('../utils/userVisibility');
 
 let badWordsFilter;
 (async () => {
@@ -131,12 +133,18 @@ const getRecipes = asyncHandler(async (req, res) => {
   }
 
   const count = await Recipe.countDocuments(query);
-  const recipes = await Recipe.find(query)
+  const rawRecipes = await Recipe.find(query)
     .populate('linkedProducts', 'name price images')
-    .populate('sellerId', 'name')
+    .populate('sellerId', 'name isProfilePublic privacySettings')
     .limit(pageSize)
     .skip(pageSize * (page - 1))
     .sort({ createdAt: -1 });
+
+  const recipes = rawRecipes.map(recipe => {
+    const recipeObj = recipe.toObject();
+    recipeObj.sellerId = anonymizeUser(recipe.sellerId, req.user);
+    return recipeObj;
+  });
 
   res.json({ recipes, page, pages: Math.ceil(count / pageSize), total: count });
 });
@@ -189,17 +197,26 @@ const getRecipeById = asyncHandler(async (req, res) => {
     throw new Error('Invalid recipe ID');
   }
 
+  // 🔥 Reconcile and synchronize social counts for real-time accuracy
+  await syncEngagementCounts(Recipe, req.params.id).catch(err => console.error('Sync error:', err));
+
   const recipe = await Recipe.findById(req.params.id)
     .populate('linkedProducts', 'name price images seller')
-    .populate('sellerId', 'name email');
+    .populate('sellerId', 'name email isProfilePublic privacySettings');
 
   if (recipe) {
-    // 🔥 Fetch comments from standalone collection
-    const comments = await Comment.find({
+    // 🔥 Fetch and anonymize comments from standalone collection
+    const rawComments = await Comment.find({
       targetId: recipe._id,
       targetType: 'Recipe',
       approved: true
-    }).populate('userId', 'name profilePic').sort({ createdAt: -1 });
+    }).populate('userId', 'name profilePic isProfilePublic privacySettings').sort({ createdAt: -1 });
+
+    const comments = rawComments.map(comment => {
+      const commentObj = comment.toObject();
+      commentObj.userId = anonymizeUser(comment.userId, req.user);
+      return commentObj;
+    });
 
     // 🔥 Check if current user has liked this recipe
     let userLiked = false;
@@ -212,8 +229,11 @@ const getRecipeById = asyncHandler(async (req, res) => {
       userLiked = !!like;
     }
 
+    const recipeObj = recipe.toObject();
+    recipeObj.sellerId = anonymizeUser(recipe.sellerId, req.user);
+
     res.json({
-      ...recipe.toObject(),
+      ...recipeObj,
       comments,
       userLiked
     });

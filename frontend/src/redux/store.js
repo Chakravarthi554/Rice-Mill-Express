@@ -26,7 +26,12 @@ import {
   rewardsReducer,
   rewardTransactionsReducer,
   redeemRewardReducer,
-  campaignsReducer
+  campaignsReducer,
+  walletReducer,
+  withdrawalReducer,
+  withdrawalHistoryReducer,
+  adminWithdrawalListReducer,
+  adminWithdrawalUpdateReducer
 } from './reducers/rewardsReducers';
 
 import {
@@ -173,7 +178,7 @@ const initialState = {
 };
 
 // ==================== ROOT REDUCER ====================
-const rootReducer = combineReducers({
+const combinedReducer = combineReducers({
   // User
   userLogin: userLoginReducer,
   userRegister: userRegisterReducer,
@@ -195,6 +200,11 @@ const rootReducer = combineReducers({
   rewardTransactions: rewardTransactionsReducer,
   redeemReward: redeemRewardReducer,
   campaigns: campaignsReducer,
+  wallet: walletReducer,
+  withdrawal: withdrawalReducer,
+  withdrawalHistory: withdrawalHistoryReducer,
+  adminWithdrawalList: adminWithdrawalListReducer,
+  adminWithdrawalUpdate: adminWithdrawalUpdateReducer,
 
   userSubscription: userSubscriptionReducer,
   userReportProblem: userReportProblemReducer,
@@ -335,6 +345,28 @@ const rootReducer = combineReducers({
   adminPayoutsList: adminPayoutsListReducer,
   adminPaymentExport: adminPaymentExportReducer,
 });
+
+const rootReducer = (state, action) => {
+  if (action.type === 'CLEAR_CACHE_STATE') {
+    // Preserve authentication state but reset everything else to INITIAL values
+    // We explicitly set cart to empty so the user sees a change before re-sync
+    const userInfo = state?.userLogin?.userInfo;
+    state = {
+      userLogin: {
+        userInfo,
+        loading: false,
+        error: null
+      },
+      cart: {
+        cartItems: [],
+        shippingAddress: {},
+        loading: false,
+        error: null
+      }
+    };
+  }
+  return combinedReducer(state, action);
+};
 
 // ==================== MIDDLEWARE ====================
 const middleware = (getDefaultMiddleware) =>

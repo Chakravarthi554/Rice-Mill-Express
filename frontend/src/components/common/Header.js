@@ -19,6 +19,7 @@ import {
 import { styled, alpha } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
 import { listFilteredProducts, listProducts } from '../../redux/actions/productActions';
 import NotificationBadge from './NotificationBadge';
@@ -66,6 +67,7 @@ const Header = ({ onSearch }) => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { logout } = useAuth();
+  const { t } = useTranslation();
   const [anchorEl, setAnchorEl] = useState(null);
   const [keyword, setKeyword] = useState('');
   const searchTimeoutRef = useRef(null);
@@ -143,7 +145,7 @@ const Header = ({ onSearch }) => {
           </SearchIconWrapper>
           <form onSubmit={handleSearch}>
             <StyledInputBase
-              placeholder="Search products..."
+              placeholder={t('searchPlaceholder')}
               inputProps={{ 'aria-label': 'search' }}
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
@@ -154,16 +156,16 @@ const Header = ({ onSearch }) => {
         <Box sx={{ flexGrow: 1 }} />
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <IconButton color="inherit" onClick={() => navigate('/customer/dashboard')} title="Home">
+          <IconButton color="inherit" onClick={() => navigate('/customer/dashboard')} title={t('home')}>
             <Home />
           </IconButton>
-          <IconButton color="inherit" onClick={() => navigate('/settings/order-history')} title="My Orders">
+          <IconButton color="inherit" onClick={() => navigate('/settings/order-history')} title={t('myOrders')}>
             <LocalShipping />
           </IconButton>
-          <IconButton color="inherit" onClick={() => navigate('/recipes')} title="Recipes">
+          <IconButton color="inherit" onClick={() => navigate('/recipes')} title={t('recipes')}>
             <Book />
           </IconButton>
-          <IconButton color="inherit" onClick={() => navigate('/forum')} title="Forum">
+          <IconButton color="inherit" onClick={() => navigate('/forum')} title={t('forum')}>
             <ForumIcon />
           </IconButton>
 
@@ -204,19 +206,13 @@ const Header = ({ onSearch }) => {
           onClose={handleMenuClose}
         >
           <MenuItem onClick={() => { handleMenuClose(); navigate('/settings/profile'); }}>
-            <Person sx={{ mr: 1 }} /> Profile
+            <Person sx={{ mr: 1 }} /> {t('profile')}
           </MenuItem>
           <MenuItem onClick={() => { handleMenuClose(); navigate('/settings'); }}>
-            <Settings sx={{ mr: 1 }} /> Settings
-          </MenuItem>
-          <MenuItem onClick={() => { handleMenuClose(); navigate('/customer/rewards'); }}>
-            <Favorite sx={{ mr: 1 }} /> Rewards
-          </MenuItem>
-          <MenuItem onClick={() => { handleMenuClose(); navigate('/customer/referrals'); }}>
-            <Person sx={{ mr: 1 }} /> Refer & Earn
+            <Settings sx={{ mr: 1 }} /> {t('settings')}
           </MenuItem>
           <MenuItem onClick={handleLogout}>
-            <Logout sx={{ mr: 1 }} /> Logout
+            <Logout sx={{ mr: 1 }} /> {t('logout')}
           </MenuItem>
         </Menu>
       </Toolbar>

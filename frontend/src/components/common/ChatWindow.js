@@ -83,7 +83,7 @@ const MessageBubble = styled(Box)(({ isOwn }) => ({
   wordWrap: 'break-word',
   boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
   alignSelf: isOwn ? 'flex-end' : 'flex-start',
-  background: isOwn 
+  background: isOwn
     ? 'linear-gradient(135deg, #DCF8C6 0%, #B9F6CA 100%)'
     : 'white',
   border: isOwn ? 'none' : '1px solid #e0e0e0',
@@ -209,6 +209,15 @@ const ChatWindow = ({ receiverId, orderId, productId, postId, onClose, receiverN
 
     socketRef.current.on("NEW_MESSAGE", (newMessage) => {
       if (newMessage.sender === receiverId || newMessage.receiver === receiverId) {
+        if (postId) dispatch(getMessages(postId));
+        else dispatch(getChatHistory(receiverId));
+      }
+    });
+
+    // ✅ FIX: Unified socket event for better cross-tab/cross-component sync
+    socketRef.current.on("chat:message", ({ message, conversationId }) => {
+      console.log("Chat window received unified message:", message);
+      if (message.sender === receiverId || message.receiver === receiverId) {
         if (postId) dispatch(getMessages(postId));
         else dispatch(getChatHistory(receiverId));
       }
@@ -386,7 +395,7 @@ const ChatWindow = ({ receiverId, orderId, productId, postId, onClose, receiverN
   // Minimized View
   if (minimized) {
     return (
-      <MinimizedChat 
+      <MinimizedChat
         position={position}
         onClick={() => setMinimized(false)}
       >
@@ -396,10 +405,10 @@ const ChatWindow = ({ receiverId, orderId, productId, postId, onClose, receiverN
           overlap="circular"
           anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
         >
-          <Avatar 
-            sx={{ 
-              width: 32, 
-              height: 32, 
+          <Avatar
+            sx={{
+              width: 32,
+              height: 32,
               bgcolor: 'white',
               color: '#075E54',
               fontWeight: 'bold',
@@ -417,8 +426,8 @@ const ChatWindow = ({ receiverId, orderId, productId, postId, onClose, receiverN
             {isTyping ? "typing..." : lastSeen}
           </Typography>
         </Box>
-        <IconButton 
-          size="small" 
+        <IconButton
+          size="small"
           onClick={(e) => {
             e.stopPropagation();
             onClose();
@@ -437,10 +446,10 @@ const ChatWindow = ({ receiverId, orderId, productId, postId, onClose, receiverN
         {/* Header */}
         <ChatHeader onMouseDown={startDrag}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Avatar 
-              sx={{ 
-                width: 40, 
-                height: 40, 
+            <Avatar
+              sx={{
+                width: 40,
+                height: 40,
                 bgcolor: 'rgba(255,255,255,0.2)',
                 fontWeight: 'bold'
               }}
@@ -463,24 +472,24 @@ const ChatWindow = ({ receiverId, orderId, productId, postId, onClose, receiverN
               </Typography>
             </Box>
           </Box>
-          
+
           <Box sx={{ display: 'flex', gap: 0.5 }}>
-            <IconButton 
-              size="small" 
+            <IconButton
+              size="small"
               onClick={() => setMinimized(true)}
               sx={{ color: 'white' }}
             >
               <Minimize fontSize="small" />
             </IconButton>
-            <IconButton 
-              size="small" 
+            <IconButton
+              size="small"
               onClick={() => setMaximized(!maximized)}
               sx={{ color: 'white' }}
             >
               {maximized ? <CloseFullscreen fontSize="small" /> : <OpenInFull fontSize="small" />}
             </IconButton>
-            <IconButton 
-              size="small" 
+            <IconButton
+              size="small"
               onClick={onClose}
               sx={{ color: 'white' }}
             >
@@ -535,12 +544,12 @@ const ChatWindow = ({ receiverId, orderId, productId, postId, onClose, receiverN
                           />
                         </Box>
                       )}
-                      <Box sx={{ 
-                        display: 'flex', 
-                        justifyContent: 'flex-end', 
-                        alignItems: 'center', 
+                      <Box sx={{
+                        display: 'flex',
+                        justifyContent: 'flex-end',
+                        alignItems: 'center',
                         gap: 0.5,
-                        mt: 0.5 
+                        mt: 0.5
                       }}>
                         <Typography variant="caption" sx={{ color: '#666', fontSize: '10px' }}>
                           {formatTime(msg.createdAt)}
@@ -558,23 +567,23 @@ const ChatWindow = ({ receiverId, orderId, productId, postId, onClose, receiverN
 
         {/* Image Preview */}
         {imagePreview && (
-          <Box sx={{ 
-            p: 2, 
-            backgroundColor: '#f8f9fa', 
+          <Box sx={{
+            p: 2,
+            backgroundColor: '#f8f9fa',
             borderTop: '1px solid #e0e0e0',
             display: 'flex',
             alignItems: 'center',
             gap: 2
           }}>
-            <img 
-              src={imagePreview} 
-              alt="Preview" 
-              style={{ 
-                width: 60, 
-                height: 60, 
+            <img
+              src={imagePreview}
+              alt="Preview"
+              style={{
+                width: 60,
+                height: 60,
                 objectFit: 'cover',
                 borderRadius: '8px'
-              }} 
+              }}
             />
             <Typography variant="body2" sx={{ flex: 1 }}>
               Image ready to send
@@ -587,13 +596,13 @@ const ChatWindow = ({ receiverId, orderId, productId, postId, onClose, receiverN
 
         {/* Input Area */}
         <InputContainer>
-          <IconButton 
+          <IconButton
             onClick={() => fileInputRef.current?.click()}
             sx={{ color: '#666' }}
           >
             <AttachFile />
           </IconButton>
-          
+
           <input
             type="file"
             ref={fileInputRef}
@@ -601,11 +610,11 @@ const ChatWindow = ({ receiverId, orderId, productId, postId, onClose, receiverN
             style={{ display: 'none' }}
             onChange={handleImageUpload}
           />
-          
+
           <IconButton sx={{ color: '#666' }}>
             <EmojiEmotions />
           </IconButton>
-          
+
           <TextField
             value={message}
             onChange={handleTyping}
@@ -632,12 +641,12 @@ const ChatWindow = ({ receiverId, orderId, productId, postId, onClose, receiverN
               },
             }}
           />
-          
+
           {message.trim() || image ? (
-            <IconButton 
+            <IconButton
               onClick={handleSend}
               disabled={loading}
-              sx={{ 
+              sx={{
                 color: 'white',
                 backgroundColor: '#075E54',
                 '&:hover': {
@@ -673,9 +682,9 @@ const ChatWindow = ({ receiverId, orderId, productId, postId, onClose, receiverN
       </ChatContainer>
 
       {/* Snackbar for Errors */}
-      <Snackbar 
-        open={openSnackbar} 
-        autoHideDuration={6000} 
+      <Snackbar
+        open={openSnackbar}
+        autoHideDuration={6000}
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
       >

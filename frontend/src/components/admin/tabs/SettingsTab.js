@@ -51,7 +51,7 @@ const SettingsTab = () => {
   const dispatch = useDispatch();
   const { settings, loading, error } = useSelector(state => state.adminSettings);
   const { recipes } = useSelector(state => state.adminSettings.availableRecipes || {});
-  
+
   const [formData, setFormData] = useState({});
   const [notification, setNotification] = useState({ title: '', message: '' });
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
@@ -73,12 +73,12 @@ const SettingsTab = () => {
     setFormData(prev => {
       const newData = { ...prev };
       let current = newData;
-      
+
       for (let i = 0; i < keys.length - 1; i++) {
         if (!current[keys[i]]) current[keys[i]] = {};
         current = current[keys[i]];
       }
-      
+
       current[keys[keys.length - 1]] = value;
       return newData;
     });
@@ -509,6 +509,71 @@ const SettingsTab = () => {
             </CardContent>
           </Card>
         </Grid>
+
+        {/* Referral & Rewards Settings */}
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                <CardGiftcard sx={{ mr: 1 }} />
+                Referral & Rewards
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={formData.referralCampaignEnabled !== false}
+                    onChange={(e) => handleInputChange('referralCampaignEnabled', e.target.checked)}
+                  />
+                }
+                label="Enable Referral Program"
+                sx={{ mb: 1 }}
+              />
+
+              <TextField
+                fullWidth
+                label="Referrer Reward"
+                type="number"
+                value={formData.referralRewardReferrer || ''}
+                onChange={(e) => handleInputChange('referralRewardReferrer', Number(e.target.value))}
+                InputProps={{
+                  startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                }}
+                margin="normal"
+                helperText="Amount credited to the person who refers a new user"
+                disabled={formData.referralCampaignEnabled === false}
+              />
+
+              <TextField
+                fullWidth
+                label="Referee Reward"
+                type="number"
+                value={formData.referralRewardReferee || ''}
+                onChange={(e) => handleInputChange('referralRewardReferee', Number(e.target.value))}
+                InputProps={{
+                  startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                }}
+                margin="normal"
+                helperText="Welcome bonus for the user who signs up using a code"
+                disabled={formData.referralCampaignEnabled === false}
+              />
+
+              <TextField
+                fullWidth
+                label="Minimum Withdrawal Amount"
+                type="number"
+                value={formData.minWithdrawalAmount || ''}
+                onChange={(e) => handleInputChange('minWithdrawalAmount', Number(e.target.value))}
+                InputProps={{
+                  startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                }}
+                margin="normal"
+                helperText="Minimum wallet balance required to request a withdrawal"
+              />
+            </CardContent>
+          </Card>
+        </Grid>
       </Grid>
 
       {/* Save Button */}
@@ -525,8 +590,8 @@ const SettingsTab = () => {
       </Box>
 
       {/* Notification Dialog */}
-      <Dialog 
-        open={notificationDialog} 
+      <Dialog
+        open={notificationDialog}
         onClose={() => setNotificationDialog(false)}
         maxWidth="sm"
         fullWidth
@@ -539,7 +604,7 @@ const SettingsTab = () => {
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             This notification will be sent to all active users of the app.
           </Typography>
-          
+
           <TextField
             fullWidth
             label="Notification Title"
@@ -548,7 +613,7 @@ const SettingsTab = () => {
             margin="normal"
             placeholder="e.g., Diwali Sale Started!"
           />
-          
+
           <TextField
             fullWidth
             label="Notification Message"
@@ -562,7 +627,7 @@ const SettingsTab = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setNotificationDialog(false)}>Cancel</Button>
-          <Button 
+          <Button
             onClick={handleSendNotification}
             variant="contained"
             startIcon={<SendIcon />}

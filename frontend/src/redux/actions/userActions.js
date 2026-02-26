@@ -750,6 +750,16 @@ export const updatePrivacySettings = (settings) => async (dispatch, getState) =>
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
     const { data } = await axios.put('/api/users/privacy', settings, config);
+
+    // ✅ Update Redux state and localStorage
+    const newUserInfo = { ...userInfo, ...data };
+    if (data.privacySettings) {
+      newUserInfo.privacySettings = data.privacySettings;
+    }
+
+    dispatch({ type: USER_LOGIN_SUCCESS, payload: newUserInfo });
+    localStorage.setItem('userInfo', JSON.stringify(newUserInfo));
+
     return data;
   } catch (error) {
     throw error;

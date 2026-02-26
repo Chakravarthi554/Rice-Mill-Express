@@ -38,10 +38,15 @@ const AddressManager = ({ onSelectAddress, elevation = 2 }) => {
     name: '',
     phone: '',
     type: 'home',
+    houseNumber: '',
+    colony: '',
     street: '',
+    landmark: '',
     city: '',
     state: '',
     pinCode: '',
+    alternativePhone: '',
+    location: null,
     isDefault: false,
   });
 
@@ -70,13 +75,63 @@ const AddressManager = ({ onSelectAddress, elevation = 2 }) => {
       name: '',
       phone: '',
       type: 'home',
+      houseNumber: '',
+      colony: '',
       street: '',
+      landmark: '',
       city: '',
       state: '',
       pinCode: '',
+      alternativePhone: '',
+      location: null,
       isDefault: false,
     });
     setOpenDialog(true);
+  };
+
+  const [locationLoading, setLocationLoading] = useState(false);
+
+  const handleDetectLocation = async () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser');
+      return;
+    }
+
+    setLocationLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`
+          );
+          const data = await response.json();
+
+          if (data && data.address) {
+            const addr = data.address;
+            setNewAddress((prev) => ({
+              ...prev,
+              street: addr.road || addr.suburb || '',
+              city: addr.city || addr.town || addr.village || '',
+              state: addr.state || '',
+              pinCode: addr.postcode || '',
+              location: { type: 'Point', coordinates: [longitude, latitude] },
+            }));
+            alert('Location detected and fields pre-filled!');
+          }
+        } catch (error) {
+          console.error('Geocoding error:', error);
+          alert('Failed to detect address details. Please enter manually.');
+        } finally {
+          setLocationLoading(false);
+        }
+      },
+      (error) => {
+        console.error('Geolocation error:', error);
+        alert('Permission denied or location not found.');
+        setLocationLoading(false);
+      }
+    );
   };
 
   const handleOpenEditDialog = (address) => {
@@ -174,8 +229,14 @@ const AddressManager = ({ onSelectAddress, elevation = 2 }) => {
                         }
                         secondary={
                           <Box component="span">
-                            <Typography component="span" variant="body2">{address.street}</Typography>
-                            <br />
+                            <Typography component="span" variant="body2">
+                              {address.houseNumber}, {address.colony && `${address.colony}, `}{address.street}
+                            </Typography>
+                            {address.landmark && (
+                              <Typography component="span" variant="caption" sx={{ display: 'block', color: 'text.secondary' }}>
+                                Landmark: {address.landmark}
+                              </Typography>
+                            )}
                             <Typography component="span" variant="body2">
                               {address.city}, {address.state} - {address.pinCode}
                             </Typography>
@@ -220,56 +281,102 @@ const AddressManager = ({ onSelectAddress, elevation = 2 }) => {
                 <MenuItem value="other">Other</MenuItem>
               </Select>
             </FormControl>
+            <Button
+              variant="outlined"
+              fullWidth
+              onClick={handleDetectLocation}
+              disabled={locationLoading}
+              sx={{ mb: 3 }}
+            >
+              {locationLoading ? 'Detecting...' : 'Detect My Current Location'}
+            </Button>
             <TextField
               fullWidth
-              label="Recipient Name"
+              label="Recipient Name *"
               name="name"
               value={newAddress.name}
               onChange={handleInputChange}
               sx={{ mb: 2 }}
               required
             />
+            <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+              <TextField
+                fullWidth
+                label="House/Flat No *"
+                name="houseNumber"
+                value={newAddress.houseNumber}
+                onChange={handleInputChange}
+                required
+              />
+              <TextField
+                fullWidth
+                label="Colony/Area"
+                name="colony"
+                value={newAddress.colony}
+                onChange={handleInputChange}
+              />
+            </Box>
             <TextField
               fullWidth
-              label="Phone Number"
-              name="phone"
-              value={newAddress.phone}
+              label="Street Address *"
+              name="street"
+              value={newAddress.street}
               onChange={handleInputChange}
               sx={{ mb: 2 }}
               required
             />
             <TextField
               fullWidth
-              label="Street Address"
-              name="street"
-              value={newAddress.street}
+              label="Landmark (Optional)"
+              name="landmark"
+              value={newAddress.landmark}
               onChange={handleInputChange}
               sx={{ mb: 2 }}
             />
             <TextField
               fullWidth
-              label="City"
+              label="City *"
               name="city"
               value={newAddress.city}
               onChange={handleInputChange}
               sx={{ mb: 2 }}
+              required
             />
-            <TextField
-              fullWidth
-              label="State"
-              name="state"
-              value={newAddress.state}
-              onChange={handleInputChange}
-              sx={{ mb: 2 }}
-            />
-            <TextField
-              fullWidth
-              label="PIN Code"
-              name="pinCode"
-              value={newAddress.pinCode}
-              onChange={handleInputChange}
-              sx={{ mb: 2 }}
-            />
+            <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+              <TextField
+                fullWidth
+                label="State *"
+                name="state"
+                value={newAddress.state}
+                onChange={handleInputChange}
+                required
+              />
+              <TextField
+                fullWidth
+                label="PIN Code *"
+                name="pinCode"
+                value={newAddress.pinCode}
+                onChange={handleInputChange}
+                required
+              />
+            </Box>
+            <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+              <TextField
+                fullWidth
+                label="Phone Number *"
+                name="phone"
+                value={newAddress.phone}
+                onChange={handleInputChange}
+                required
+              />
+              <TextField
+                fullWidth
+                label="Alt Phone (Optional)"
+                name="alternativePhone"
+                value={newAddress.alternativePhone}
+                onChange={handleInputChange}
+              />
+            </Box>
             <FormControlLabel
               control={<Checkbox name="isDefault" checked={newAddress.isDefault} onChange={handleInputChange} />}
               label="Set as default address"
@@ -287,6 +394,7 @@ const AddressManager = ({ onSelectAddress, elevation = 2 }) => {
               loading ||
               !newAddress.name ||
               !newAddress.phone ||
+              !newAddress.houseNumber ||
               !newAddress.street ||
               !newAddress.city ||
               !newAddress.state ||

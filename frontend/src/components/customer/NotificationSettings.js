@@ -6,7 +6,7 @@ import { updateUserProfile } from '../../redux/actions/userActions';
 import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
 
-const NotificationsPage = () => {
+const NotificationSettings = () => {
   const { t, user } = useAuth();
   const dispatch = useDispatch();
   const { loading, success } = useSelector(state => state.userUpdateProfile);
@@ -81,13 +81,13 @@ const NotificationsPage = () => {
           control={<Switch checked={prefs.email} onChange={() => handleToggle('email')} />}
           label={t('email') || 'Email'}
         />
-        <Button size="small" onClick={() => sendTest('email')} disabled={!prefs.email}>Test</Button><br/>
+        <Button size="small" onClick={() => sendTest('email')} disabled={!prefs.email}>Test</Button><br />
 
         <FormControlLabel
           control={<Switch checked={prefs.sms} onChange={() => handleToggle('sms')} />}
           label={t('sms') || 'SMS'}
         />
-        <Button size="small" onClick={() => sendTest('sms')} disabled={!prefs.sms}>Test</Button><br/>
+        <Button size="small" onClick={() => sendTest('sms')} disabled={!prefs.sms}>Test</Button><br />
 
         <FormControlLabel
           control={<Switch checked={prefs.push} onChange={() => handleToggle('push')} />}
@@ -102,12 +102,12 @@ const NotificationsPage = () => {
           control={<Switch checked={prefs.categories.orders} onChange={() => handleToggle('categories.orders')} />}
           label={t('orders') || 'Order Updates'}
         />
-        <br/>
+        <br />
         <FormControlLabel
           control={<Switch checked={prefs.categories.marketing} onChange={() => handleToggle('categories.marketing')} />}
           label={t('marketing') || 'Promotions & Offers'}
         />
-        <br/>
+        <br />
         <FormControlLabel
           control={<Switch checked={prefs.categories.social} onChange={() => handleToggle('categories.social')} />}
           label={t('social') || 'Community & Social'}
@@ -127,4 +127,4 @@ const NotificationsPage = () => {
   );
 };
 
-export default NotificationsPage;
+export default NotificationSettings;

@@ -12,6 +12,9 @@ import {
     CAMPAIGNS_REQUEST,
     CAMPAIGNS_SUCCESS,
     CAMPAIGNS_FAIL,
+    PUBLIC_SETTINGS_REQUEST,
+    PUBLIC_SETTINGS_SUCCESS,
+    PUBLIC_SETTINGS_FAIL,
 } from '../../constants/rewardsConstants';
 
 export const rewardsReducer = (state = { rewards: null }, action) => {
@@ -62,6 +65,19 @@ export const campaignsReducer = (state = { campaigns: [] }, action) => {
         case CAMPAIGNS_SUCCESS:
             return { loading: false, campaigns: action.payload };
         case CAMPAIGNS_FAIL:
+            return { loading: false, error: action.payload };
+        default:
+            return state;
+    }
+};
+
+export const publicSettingsReducer = (state = { publicSettings: null }, action) => {
+    switch (action.type) {
+        case PUBLIC_SETTINGS_REQUEST:
+            return { loading: true };
+        case PUBLIC_SETTINGS_SUCCESS:
+            return { loading: false, publicSettings: action.payload };
+        case PUBLIC_SETTINGS_FAIL:
             return { loading: false, error: action.payload };
         default:
             return state;

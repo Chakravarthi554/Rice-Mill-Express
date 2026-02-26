@@ -14,6 +14,7 @@ import {
   TextInput,
 } from 'react-native';
 import { Button } from 'react-native-paper';
+import { useTranslation } from 'react-i18next';
 import { useSelector, useDispatch } from 'react-redux';
 import { addToCart } from '../redux/actions/cartActions';
 import { listProductDetails, listProducts, createProductReview } from '../redux/actions/productActions';
@@ -36,6 +37,7 @@ const { width } = Dimensions.get('window');
 const ProductScreen = ({ route, navigation }) => {
   const { productId, editReview, initialRating, initialComment } = route.params;
   const dispatch = useDispatch();
+  const { t } = useTranslation();
 
   const [qty, setQty] = useState(1);
   const [rating, setRating] = useState(initialRating || 0);
@@ -72,7 +74,7 @@ const ProductScreen = ({ route, navigation }) => {
   // Effects
   useEffect(() => {
     if (successProductReview) {
-      Alert.alert('Review Submitted!');
+      Alert.alert(t('reviewSubmitted'));
       setRating(0);
       setComment('');
       setModalVisible(false);
@@ -137,21 +139,21 @@ const ProductScreen = ({ route, navigation }) => {
   const addToCartHandler = async (shouldNavigate = true) => {
     console.log(`🛒 Adding to cart: Product ID=${product?._id}, Qty=${qty}`);
     if (!product?._id) {
-      Alert.alert('Error', 'Product details not loaded yet');
+      Alert.alert(t('error'), t('productDetailsNotLoaded'));
       return;
     }
     setAddingToCart(true);
     try {
       await dispatch(addToCart(product._id, qty));
       if (shouldNavigate) {
-        Alert.alert('Success', 'Item added to cart', [
-          { text: 'Continue Shopping', style: 'cancel' },
-          { text: 'Go to Cart', onPress: () => navigation.navigate('Cart') }
+        Alert.alert(t('success'), t('itemAddedToCart'), [
+          { text: t('continueShopping'), style: 'cancel' },
+          { text: t('goToCart'), onPress: () => navigation.navigate('Cart') }
         ]);
       }
     } catch (e) {
       console.error('Add to Cart Error:', e);
-      Alert.alert('Error', 'Failed to add to cart');
+      Alert.alert(t('error'), t('failedToAddToCart'));
     } finally {
       setAddingToCart(false);
     }
@@ -164,7 +166,7 @@ const ProductScreen = ({ route, navigation }) => {
 
   const submitReviewHandler = () => {
     if (rating === 0) {
-      Alert.alert('Error', 'Please select a rating');
+      Alert.alert(t('error'), t('pleaseSelectRating'));
       return;
     }
     dispatch(
@@ -177,16 +179,16 @@ const ProductScreen = ({ route, navigation }) => {
 
   const submitCommentHandler = async () => {
     if (!comment.trim()) {
-      Alert.alert('Error', 'Please enter a comment');
+      Alert.alert(t('error'), t('pleaseEnterComment'));
       return;
     }
     try {
       await apiService.createProductComment(productId, comment);
       setComment('');
-      Alert.alert('Success', 'Comment posted!');
+      Alert.alert(t('success'), t('commentPosted'));
       fetchData(); // Refresh list
     } catch (error) {
-      Alert.alert('Error', error.response?.data?.message || 'Failed to post comment');
+      Alert.alert(t('error'), error.response?.data?.message || t('failedToPostComment'));
     }
   };
 
@@ -217,7 +219,7 @@ const ProductScreen = ({ route, navigation }) => {
 
   if (loading) return <Loader />;
   if (error) return <Message>{error}</Message>;
-  if (!product?._id) return <Message>Product not found.</Message>;
+  if (!product?._id) return <Message>{t('productNotFound')}</Message>;
 
   return (
     <View style={{ flex: 1 }}>
@@ -246,7 +248,7 @@ const ProductScreen = ({ route, navigation }) => {
 
           <View style={styles.ratingRow}>
             {renderRating(product.rating)}
-            <Text style={styles.reviewCount}>({product.numReviews} reviews)</Text>
+            <Text style={styles.reviewCount}>({product.numReviews} {t('reviews')})</Text>
           </View>
 
           <View style={styles.priceRow}>
@@ -256,15 +258,15 @@ const ProductScreen = ({ route, navigation }) => {
                 <View style={styles.offerRow}>
                   <Text style={styles.originalPriceText}>₹{product.price}</Text>
                   <View style={styles.offerBadge}>
-                    <Text style={styles.offerBadgeText}>OFFER</Text>
+                    <Text style={styles.offerBadgeText}>{t('offer')}</Text>
                   </View>
                 </View>
               )}
             </View>
             {product.countInStock > 0 ? (
-              <Text style={styles.stockIn}>In Stock ({product.countInStock})</Text>
+              <Text style={styles.stockIn}>{t('inStock')} ({product.countInStock})</Text>
             ) : (
-              <Text style={styles.stockOut}>Out of Stock</Text>
+              <Text style={styles.stockOut}>{t('outOfStock')}</Text>
             )}
           </View>
 
@@ -272,21 +274,21 @@ const ProductScreen = ({ route, navigation }) => {
 
           {/* Specifications Table */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Specifications</Text>
-            <View style={styles.specRow}><Text style={styles.specLabel}>Brand</Text><Text style={styles.specValue}>{product.brand}</Text></View>
-            <View style={styles.specRow}><Text style={styles.specLabel}>Category</Text><Text style={styles.specValue}>{product.category}</Text></View>
-            <View style={styles.specRow}><Text style={styles.specLabel}>Type</Text><Text style={styles.specValue}>{product.type || 'N/A'}</Text></View>
-            <View style={styles.specRow}><Text style={styles.specLabel}>Quality</Text><Text style={styles.specValue}>{product.quality || 'N/A'}</Text></View>
-            <View style={styles.specRow}><Text style={styles.specLabel}>Origin</Text><Text style={styles.specValue}>{product.origin || 'India'}</Text></View>
-            <View style={styles.specRow}><Text style={styles.specLabel}>Moisture</Text><Text style={styles.specValue}>{product.moisture || '12-14%'}</Text></View>
-            <View style={styles.specRow}><Text style={styles.specLabel}>Grade</Text><Text style={styles.specValue}>{product.grade || 'A++'}</Text></View>
+            <Text style={styles.sectionTitle}>{t('specifications')}</Text>
+            <View style={styles.specRow}><Text style={styles.specLabel}>{t('brand')}</Text><Text style={styles.specValue}>{product.brand}</Text></View>
+            <View style={styles.specRow}><Text style={styles.specLabel}>{t('category')}</Text><Text style={styles.specValue}>{product.category}</Text></View>
+            <View style={styles.specRow}><Text style={styles.specLabel}>{t('type')}</Text><Text style={styles.specValue}>{product.type || 'N/A'}</Text></View>
+            <View style={styles.specRow}><Text style={styles.specLabel}>{t('quality')}</Text><Text style={styles.specValue}>{product.quality || 'N/A'}</Text></View>
+            <View style={styles.specRow}><Text style={styles.specLabel}>{t('origin')}</Text><Text style={styles.specValue}>{product.origin || 'India'}</Text></View>
+            <View style={styles.specRow}><Text style={styles.specLabel}>{t('moisture')}</Text><Text style={styles.specValue}>{product.moisture || '12-14%'}</Text></View>
+            <View style={styles.specRow}><Text style={styles.specLabel}>{t('grade')}</Text><Text style={styles.specValue}>{product.grade || 'A++'}</Text></View>
           </View>
 
           {/* Action Section */}
           {product.countInStock > 0 && (
             <View style={styles.actionSection}>
               <View style={styles.qtyContainer}>
-                <Text style={styles.qtyLabel}>Qty:</Text>
+                <Text style={styles.qtyLabel}>{t('qty')}:</Text>
                 <View style={styles.qtyControl}>
                   <TouchableOpacity onPress={() => setQty(Math.max(1, qty - 1))} style={styles.qtyBtn}>
                     <MaterialIcons name="remove" size={20} color="#333" />
@@ -303,14 +305,14 @@ const ProductScreen = ({ route, navigation }) => {
                   onPress={() => addToCartHandler()}
                   disabled={addingToCart}
                 >
-                  {addingToCart ? <ActivityIndicator color="#fff" /> : <Text style={styles.addToCartText}>Add to Cart</Text>}
+                  {addingToCart ? <ActivityIndicator color="#fff" /> : <Text style={styles.addToCartText}>{t('addToCart')}</Text>}
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.buyNowBtn, addingToCart && { opacity: 0.7 }]}
                   onPress={buyNowHandler}
                   disabled={addingToCart}
                 >
-                  <Text style={styles.buyNowText}>Buy Now</Text>
+                  <Text style={styles.buyNowText}>{t('buyNow')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -319,17 +321,17 @@ const ProductScreen = ({ route, navigation }) => {
           {/* Reviews Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Reviews ({comments.length})</Text>
+              <Text style={styles.sectionTitle}>{t('reviews')} ({comments.length})</Text>
               {userInfo && (
                 <TouchableOpacity onPress={() => setModalVisible(true)}>
-                  <Text style={styles.writeReviewLink}>Write a Review</Text>
+                  <Text style={styles.writeReviewLink}>{t('writeReview')}</Text>
                 </TouchableOpacity>
               )}
             </View>
             {loadingComments ? (
               <ActivityIndicator color="#4CAF50" />
             ) : comments.length === 0 ? (
-              <Text style={styles.noReviews}>No reviews yet</Text>
+              <Text style={styles.noReviews}>{t('noReviewsYet')}</Text>
             ) : (
               comments.slice(0, 5).map((review) => (
                 <View key={review._id} style={styles.reviewItem}>
@@ -346,14 +348,14 @@ const ProductScreen = ({ route, navigation }) => {
             )}
             {comments.length > 5 && (
               <TouchableOpacity onPress={() => navigation.navigate('AllReviews', { productId })}>
-                <Text style={styles.viewAllReviews}>View all {comments.length} reviews</Text>
+                <Text style={styles.viewAllReviews}>{t('viewAll')} {comments.length} {t('reviews')}</Text>
               </TouchableOpacity>
             )}
           </View>
 
           {/* Related Products */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>You May Also Like</Text>
+            <Text style={styles.sectionTitle}>{t('youMayAlsoLike')}</Text>
             <FlatList
               data={relatedProducts?.filter(p => p._id !== productId).slice(0, 5)}
               horizontal
@@ -388,13 +390,13 @@ const ProductScreen = ({ route, navigation }) => {
                 style={[styles.tab, activeTab === 'reviews' && styles.activeTab]}
                 onPress={() => setActiveTab('reviews')}
               >
-                <Text style={[styles.tabText, activeTab === 'reviews' && styles.activeTabText]}>Reviews</Text>
+                <Text style={[styles.tabText, activeTab === 'reviews' && styles.activeTabText]}>{t('reviews')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.tab, activeTab === 'discussion' && styles.activeTab]}
                 onPress={() => setActiveTab('discussion')}
               >
-                <Text style={[styles.tabText, activeTab === 'discussion' && styles.activeTabText]}>Discussion</Text>
+                <Text style={[styles.tabText, activeTab === 'discussion' && styles.activeTabText]}>{t('discussion')}</Text>
               </TouchableOpacity>
             </View>
 
@@ -405,19 +407,19 @@ const ProductScreen = ({ route, navigation }) => {
                     <Text style={styles.ratingBigText}>{product.rating || 0}</Text>
                     <MaterialIcons name="star" size={24} color="#FFC107" />
                   </View>
-                  <Text style={styles.ratingCountText}>{product.numReviews || 0} Ratings</Text>
+                  <Text style={styles.ratingCountText}>{product.numReviews || 0} {t('ratings')}</Text>
                   <Button
                     mode="outlined"
                     onPress={() => setModalVisible(true)}
                     style={{ marginTop: 10 }}
                   >
-                    Write a Review
+                    {t('writeReview')}
                   </Button>
                 </View>
 
                 {loadingReviews ? <ActivityIndicator size="small" color="#4CAF50" /> : (
                   reviews.length === 0 ? (
-                    <Text style={styles.noReviews}>No reviews yet.</Text>
+                    <Text style={styles.noReviews}>{t('noReviewsYet')}</Text>
                   ) : (
                     reviews.map((review, index) => (
                       <View key={index} style={styles.reviewItem}>
@@ -441,19 +443,19 @@ const ProductScreen = ({ route, navigation }) => {
                 <View style={styles.commentInputContainer}>
                   <TextInput
                     style={styles.commentInput}
-                    placeholder="Ask a question or share thoughts..."
+                    placeholder={t('discussionPlaceholder')}
                     value={comment}
                     onChangeText={setComment}
                     multiline
                   />
                   <Button mode="contained" onPress={submitCommentHandler} disabled={!comment.trim()}>
-                    Post
+                    {t('post')}
                   </Button>
                 </View>
 
                 {loadingComments ? <ActivityIndicator size="small" color="#4CAF50" /> : (
                   comments.length === 0 ? (
-                    <Text style={styles.noReviews}>No discussions yet. Be the first!</Text>
+                    <Text style={styles.noReviews}>{t('noDiscussionsYet')}</Text>
                   ) : (
                     comments.map((item, index) => (
                       <View key={index} style={styles.reviewItem}>
@@ -483,7 +485,7 @@ const ProductScreen = ({ route, navigation }) => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Write a Review</Text>
+            <Text style={styles.modalTitle}>{t('writeReview')}</Text>
             {errorProductReview && <Message variant="danger">{errorProductReview}</Message>}
 
             <Text style={styles.label}>Rating</Text>
@@ -506,19 +508,19 @@ const ProductScreen = ({ route, navigation }) => {
               numberOfLines={4}
               value={comment}
               onChangeText={setComment}
-              placeholder="Share your experience..."
+              placeholder={t('reviewPlaceholder')}
             />
 
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
-                <Text style={styles.cancelText}>Cancel</Text>
+                <Text style={styles.cancelText}>{t('cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.submitBtn}
                 onPress={submitReviewHandler}
                 disabled={loadingProductReview}
               >
-                {loadingProductReview ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>Submit</Text>}
+                {loadingProductReview ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>{t('submit')}</Text>}
               </TouchableOpacity>
             </View>
           </View>

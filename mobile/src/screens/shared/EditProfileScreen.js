@@ -11,9 +11,6 @@ const EditProfileScreen = ({ navigation }) => {
 
     const [name, setName] = useState(user?.name || '');
     const [email, setEmail] = useState(user?.email || '');
-    const [currentPassword, setCurrentPassword] = useState('');
-    const [newPassword, setNewPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
     const [loading, setLoading] = useState(false);
 
     const handleUpdateProfile = async () => {
@@ -35,37 +32,6 @@ const EditProfileScreen = ({ navigation }) => {
         }
     };
 
-    const handleChangePassword = async () => {
-        if (newPassword !== confirmPassword) {
-            Alert.alert('Error', 'Passwords do not match');
-            return;
-        }
-
-        try {
-            setLoading(true);
-            const response = await apiService.changePassword({ currentPassword, newPassword });
-
-            Alert.alert('Success', response.data.message || 'Password changed successfully');
-            
-            // ✅ Force logout after password change to ensure security
-            if (response.data.requiresReauth) {
-                dispatch(logout());
-                navigation.reset({
-                    index: 0,
-                    routes: [{ name: 'Login' }],
-                });
-            }
-            
-            setCurrentPassword('');
-            setNewPassword('');
-            setConfirmPassword('');
-        } catch (error) {
-            console.error('Change password error:', error);
-            Alert.alert('Error', error.response?.data?.message || 'Failed to change password');
-        } finally {
-            setLoading(false);
-        }
-    };
 
     return (
         <KeyboardAvoidingView
@@ -102,43 +68,6 @@ const EditProfileScreen = ({ navigation }) => {
                     </Card.Content>
                 </Card>
 
-                <Card style={styles.card}>
-                    <Card.Content>
-                        <Title>Change Password</Title>
-                        <TextInput
-                            label="Current Password"
-                            value={currentPassword}
-                            onChangeText={setCurrentPassword}
-                            secureTextEntry
-                            style={styles.input}
-                            mode="outlined"
-                        />
-                        <TextInput
-                            label="New Password"
-                            value={newPassword}
-                            onChangeText={setNewPassword}
-                            secureTextEntry
-                            style={styles.input}
-                            mode="outlined"
-                        />
-                        <TextInput
-                            label="Confirm New Password"
-                            value={confirmPassword}
-                            onChangeText={setConfirmPassword}
-                            secureTextEntry
-                            style={styles.input}
-                            mode="outlined"
-                        />
-                        <Button
-                            mode="contained"
-                            onPress={handleChangePassword}
-                            loading={loading}
-                            style={styles.button}
-                        >
-                            Change Password
-                        </Button>
-                    </Card.Content>
-                </Card>
             </ScrollView>
         </KeyboardAvoidingView>
     );

@@ -12,6 +12,29 @@ import {
     CAMPAIGNS_REQUEST,
     CAMPAIGNS_SUCCESS,
     CAMPAIGNS_FAIL,
+    REFERRAL_CODE_REQUEST,
+    REFERRAL_CODE_SUCCESS,
+    REFERRAL_CODE_FAIL,
+    REFERRALS_REQUEST,
+    REFERRALS_SUCCESS,
+    REFERRALS_FAIL,
+    WALLET_DATA_REQUEST,
+    WALLET_DATA_SUCCESS,
+    WALLET_DATA_FAIL,
+    WITHDRAW_REQUEST,
+    WITHDRAW_SUCCESS,
+    WITHDRAW_FAIL,
+    WITHDRAW_RESET,
+    WITHDRAWAL_HISTORY_REQUEST,
+    WITHDRAWAL_HISTORY_SUCCESS,
+    WITHDRAWAL_HISTORY_FAIL,
+    ADMIN_WITHDRAWAL_LIST_REQUEST,
+    ADMIN_WITHDRAWAL_LIST_SUCCESS,
+    ADMIN_WITHDRAWAL_LIST_FAIL,
+    ADMIN_WITHDRAWAL_UPDATE_REQUEST,
+    ADMIN_WITHDRAWAL_UPDATE_SUCCESS,
+    ADMIN_WITHDRAWAL_UPDATE_FAIL,
+    ADMIN_WITHDRAWAL_UPDATE_RESET,
 } from '../constants/rewardsConstants';
 
 export const getRewards = () => async (dispatch, getState) => {
@@ -122,6 +145,162 @@ export const getActiveCampaigns = () => async (dispatch, getState) => {
     } catch (error) {
         dispatch({
             type: CAMPAIGNS_FAIL,
+            payload: error.response && error.response.data.message
+                ? error.response.data.message
+                : error.message,
+        });
+    }
+};
+
+export const getReferralCode = () => async (dispatch, getState) => {
+    try {
+        dispatch({ type: REFERRAL_CODE_REQUEST });
+
+        const { userLogin: { userInfo } } = getState();
+        const config = {
+            headers: {
+                Authorization: `Bearer ${userInfo.token}`,
+            },
+        };
+
+        const { data } = await axios.get('/api/users/referral-code', config);
+
+        dispatch({
+            type: REFERRAL_CODE_SUCCESS,
+            payload: data,
+        });
+    } catch (error) {
+        dispatch({
+            type: REFERRAL_CODE_FAIL,
+            payload: error.response && error.response.data.message
+                ? error.response.data.message
+                : error.message,
+        });
+    }
+};
+
+export const getReferrals = () => async (dispatch, getState) => {
+    try {
+        dispatch({ type: REFERRALS_REQUEST });
+
+        const { userLogin: { userInfo } } = getState();
+        const config = {
+            headers: {
+                Authorization: `Bearer ${userInfo.token}`,
+            },
+        };
+
+        const { data } = await axios.get('/api/users/referrals', config);
+
+        dispatch({
+            type: REFERRALS_SUCCESS,
+            payload: data,
+        });
+    } catch (error) {
+        dispatch({
+            type: REFERRALS_FAIL,
+            payload: error.response && error.response.data.message
+                ? error.response.data.message
+                : error.message,
+        });
+    }
+};
+
+export const getWalletData = () => async (dispatch, getState) => {
+    try {
+        dispatch({ type: WALLET_DATA_REQUEST });
+        const { userLogin: { userInfo } } = getState();
+        const config = {
+            headers: { Authorization: `Bearer ${userInfo.token}` },
+        };
+        const { data } = await axios.get('/api/rewards/wallet', config);
+        dispatch({ type: WALLET_DATA_SUCCESS, payload: data });
+    } catch (error) {
+        dispatch({
+            type: WALLET_DATA_FAIL,
+            payload: error.response && error.response.data.message
+                ? error.response.data.message
+                : error.message,
+        });
+    }
+};
+
+export const requestWithdrawal = (withdrawalData) => async (dispatch, getState) => {
+    try {
+        dispatch({ type: WITHDRAW_REQUEST });
+        const { userLogin: { userInfo } } = getState();
+        const config = {
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${userInfo.token}`
+            },
+        };
+        const { data } = await axios.post('/api/rewards/withdraw', withdrawalData, config);
+        dispatch({ type: WITHDRAW_SUCCESS, payload: data });
+        dispatch(getWalletData());
+    } catch (error) {
+        dispatch({
+            type: WITHDRAW_FAIL,
+            payload: error.response && error.response.data.message
+                ? error.response.data.message
+                : error.message,
+        });
+    }
+};
+
+export const getWithdrawalHistory = () => async (dispatch, getState) => {
+    try {
+        dispatch({ type: WITHDRAWAL_HISTORY_REQUEST });
+        const { userLogin: { userInfo } } = getState();
+        const config = {
+            headers: { Authorization: `Bearer ${userInfo.token}` },
+        };
+        const { data } = await axios.get('/api/rewards/withdrawals', config);
+        dispatch({ type: WITHDRAWAL_HISTORY_SUCCESS, payload: data });
+    } catch (error) {
+        dispatch({
+            type: WITHDRAWAL_HISTORY_FAIL,
+            payload: error.response && error.response.data.message
+                ? error.response.data.message
+                : error.message,
+        });
+    }
+};
+
+export const listAdminWithdrawals = () => async (dispatch, getState) => {
+    try {
+        dispatch({ type: ADMIN_WITHDRAWAL_LIST_REQUEST });
+        const { userLogin: { userInfo } } = getState();
+        const config = {
+            headers: { Authorization: `Bearer ${userInfo.token}` },
+        };
+        const { data } = await axios.get('/api/rewards/admin/withdrawals', config);
+        dispatch({ type: ADMIN_WITHDRAWAL_LIST_SUCCESS, payload: data.withdrawals });
+    } catch (error) {
+        dispatch({
+            type: ADMIN_WITHDRAWAL_LIST_FAIL,
+            payload: error.response && error.response.data.message
+                ? error.response.data.message
+                : error.message,
+        });
+    }
+};
+
+export const updateWithdrawalStatus = (id, updateData) => async (dispatch, getState) => {
+    try {
+        dispatch({ type: ADMIN_WITHDRAWAL_UPDATE_REQUEST });
+        const { userLogin: { userInfo } } = getState();
+        const config = {
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${userInfo.token}`
+            },
+        };
+        const { data } = await axios.put(`/api/rewards/admin/withdrawals/${id}`, updateData, config);
+        dispatch({ type: ADMIN_WITHDRAWAL_UPDATE_SUCCESS, payload: data });
+    } catch (error) {
+        dispatch({
+            type: ADMIN_WITHDRAWAL_UPDATE_FAIL,
             payload: error.response && error.response.data.message
                 ? error.response.data.message
                 : error.message,

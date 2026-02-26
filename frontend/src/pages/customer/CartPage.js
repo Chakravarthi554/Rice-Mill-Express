@@ -5,6 +5,7 @@ import {
   Container, Typography, Card, CardContent, CardMedia, Button,
   IconButton, Select, MenuItem, Divider, Box, Grid
 } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import { Delete as DeleteIcon, AddShoppingCart } from '@mui/icons-material';
 import { addToCart, removeFromCart, listMyCart } from '../../redux/actions/cartActions';
 import { listProducts } from '../../redux/actions/productActions';
@@ -14,6 +15,7 @@ import Price from '../../components/common/Price';
 const CartPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { cartItems = [] } = useSelector(s => s.cart);
   const { products = [] } = useSelector(s => s.productList);
 
@@ -34,9 +36,9 @@ const CartPage = () => {
 
   return (
     <Container sx={{ py: 4 }}>
-      <Typography variant="h4" gutterBottom>Shopping Cart</Typography>
+      <Typography variant="h4" gutterBottom>{t('cart')}</Typography>
       {cartItems.length === 0 ? (
-        <Message severity="info">Your cart is empty.</Message>
+        <Message severity="info">{t('emptyCart')}</Message>
       ) : (
         <>
           {cartItems.map(item => (
@@ -81,10 +83,10 @@ const CartPage = () => {
           ))}
           <Card sx={{ p: 2 }}>
             <Typography variant="h6">
-              Total: <Price amount={total} />
+              {t('total')}: <Price amount={total} />
             </Typography>
             <Button fullWidth variant="contained" onClick={proceedToCheckout} sx={{ mt: 2 }}>
-              Proceed to Checkout
+              {t('checkout')}
             </Button>
           </Card>
 
@@ -93,7 +95,7 @@ const CartPage = () => {
             <>
               <Divider sx={{ my: 4 }} />
               <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold' }}>
-                You May Also Like
+                {t('youMayAlsoLike')}
               </Typography>
               <Grid container spacing={2}>
                 {recommendedProducts.slice(0, 8).map(product => (
@@ -131,7 +133,7 @@ const CartPage = () => {
                           }}
                           disabled={product.countInStock === 0}
                         >
-                          Add to Cart
+                          {t('addToCart')}
                         </Button>
                       </Box>
                     </Card>

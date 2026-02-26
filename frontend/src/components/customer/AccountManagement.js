@@ -40,24 +40,28 @@ const AccountManagement = () => {
     setCacheMessage(null);
 
     try {
-      // ✅ PRESERVE critical user data
+      // ✅ 1. Clear Redux Transient State
+      dispatch({ type: 'CLEAR_CACHE_STATE' });
+
+      // ✅ 2. PRESERVE critical authentication and session data
       const preservedData = {
         userInfo: localStorage.getItem('userInfo'),
         token: localStorage.getItem('token'),
         refreshToken: localStorage.getItem('refreshToken'),
-        // Preserve cart for better UX
-        cartItems: localStorage.getItem('cartItems'),
-        shippingAddress: localStorage.getItem('shippingAddress')
       };
 
-      // ✅ Clear only temporary/cache data
+      // ✅ 3. Clear only temporary/cache data (Blacklist approach)
       const cacheKeys = [
+        'cartItems',
+        'shippingAddress',
+        'paymentMethod',
+        'wishlistItems',
         'recentSearches',
-        'browseHistory', 
+        'browseHistory',
         'tempImages',
         'cachedRecipes',
         'tempFormData',
-        'uiPreferences_temp', // Temporary UI settings only
+        'uiPreferences_temp',
         'analytics_pending',
         'offline_data'
       ];
@@ -68,11 +72,10 @@ const AccountManagement = () => {
         sessionStorage.removeItem(key);
       });
 
-      // Clear browser caches
+      // Clear browser caches (Service Worker / PWA caches)
       if ('caches' in window) {
         caches.keys().then((names) => {
           names.forEach((name) => {
-            // Only clear non-critical caches
             if (name.includes('cache') || name.includes('temp') || name.includes('offline')) {
               caches.delete(name);
             }
@@ -80,19 +83,19 @@ const AccountManagement = () => {
         });
       }
 
-      // Restore preserved data
+      // 4. Restore preserved data (Just in case they were in the list or to be safe)
       Object.entries(preservedData).forEach(([key, value]) => {
         if (value) {
           localStorage.setItem(key, value);
         }
       });
 
-      setCacheMessage('Cache cleared successfully! User data preserved.');
+      setCacheMessage('Temporary cache and storage cleared successfully! Account and rewards preserved. Reloading...');
       setTimeout(() => {
-        setCacheMessage(null);
-        setClearingCache(false);
-      }, 2000);
+        window.location.reload();
+      }, 1500);
     } catch (err) {
+      console.error('Clear Cache Error:', err);
       setCacheMessage('Failed to clear cache.');
       setClearingCache(false);
     }

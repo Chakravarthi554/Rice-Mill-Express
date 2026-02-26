@@ -5,6 +5,7 @@ const Comment = require('../models/Comment');
 const Notification = require('../models/Notification');
 const rateLimit = require('express-rate-limit');
 const mongoose = require('mongoose');
+const { anonymizeUser } = require('../utils/userVisibility');
 
 const customerLimiter = rateLimit({
   windowMs: 24 * 60 * 60 * 1000,
@@ -65,7 +66,7 @@ const createPost = asyncHandler(async (req, res) => {
 
     const post = await ForumPost.create(postData);
     const populatedPost = await ForumPost.findById(post._id)
-      .populate('userId', 'name profilePic')
+      .populate('userId', 'name profilePic isProfilePublic privacySettings')
       .populate('linkedRecipe', 'name')
       .populate('linkedProduct', 'name');
 
@@ -128,7 +129,7 @@ const getPosts = asyncHandler(async (req, res) => {
 
     const skip = (page - 1) * limit;
     const posts = await ForumPost.find(query)
-      .populate('userId', 'name profilePic')
+      .populate('userId', 'name profilePic isProfilePublic privacySettings')
       .populate('linkedRecipe', 'name image')
       .populate('linkedProduct', 'name images')
       .sort({ pinned: -1, createdAt: -1 })
@@ -136,13 +137,19 @@ const getPosts = asyncHandler(async (req, res) => {
       .limit(parseInt(limit))
       .lean();
 
+    // Anonymize posts
+    const anonymizedPosts = posts.map(post => {
+      post.userId = anonymizeUser(post.userId, req.user);
+      return post;
+    });
+
     // Map user-specific status if logged in
-    const processedPosts = req.user ? await Promise.all(posts.map(async post => {
+    const processedPosts = req.user ? await Promise.all(anonymizedPosts.map(async post => {
       const Like = require('../models/Like');
       const hasLiked = await Like.exists({ targetId: post._id, userId: req.user._id });
       const isBookmarked = post.bookmarkedBy?.some(id => id.toString() === req.user._id.toString());
       return { ...post, userLiked: !!hasLiked, isBookmarked };
-    })) : posts;
+    })) : anonymizedPosts;
 
     const total = await ForumPost.countDocuments(query);
 
@@ -195,7 +202,7 @@ const getPendingPosts = asyncHandler(async (req, res) => {
 
     const skip = (page - 1) * limit;
     const posts = await ForumPost.find(query)
-      .populate('userId', 'name profilePic email')
+      .populate('userId', 'name profilePic email isProfilePublic privacySettings')
       .populate('linkedRecipe', 'name')
       .populate('linkedProduct', 'name')
       .sort({ createdAt: -1 })
@@ -239,7 +246,7 @@ const getPostById = asyncHandler(async (req, res) => {
     }
 
     const post = await ForumPost.findById(id)
-      .populate('userId', 'name profilePic')
+      .populate('userId', 'name profilePic isProfilePublic privacySettings')
       .populate('linkedRecipe', 'name image ingredients')
       .populate('linkedProduct', 'name images price');
 
@@ -297,12 +304,21 @@ const getPostById = asyncHandler(async (req, res) => {
       approved: true,
       parentCommentId: null
     })
-      .populate('userId', 'name profilePic')
+      .populate('userId', 'name profilePic isProfilePublic privacySettings')
       .sort({ createdAt: -1 });
 
+    const anonymizedComments = comments.map(comment => {
+      const commentObj = comment.toObject();
+      commentObj.userId = anonymizeUser(comment.userId, req.user);
+      return commentObj;
+    });
+
+    const postObj = post.toObject();
+    postObj.userId = anonymizeUser(post.userId, req.user);
+
     res.json({
-      ...post.toObject(),
-      replies: comments, // Map comments to 'replies' field expected by frontend
+      ...postObj,
+      replies: anonymizedComments, // Map comments to 'replies' field expected by frontend
       userLiked: !!userLiked,
       isBookmarked,
       viewCount: currentViewCount
@@ -341,7 +357,7 @@ const replyToPost = asyncHandler(async (req, res) => {
     post.commentsCount = (post.commentsCount || 0) + 1;
     await post.save();
 
-    const populatedComment = await Comment.findById(comment._id).populate('userId', 'name profilePic');
+    const populatedComment = await Comment.findById(comment._id).populate('userId', 'name profilePic isProfilePublic privacySettings');
 
     // 🔥 ENHANCED:    // 🔥 Real-time socket events
     if (req.io) {

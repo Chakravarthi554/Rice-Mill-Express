@@ -32,8 +32,6 @@ import BulkOrderPage from './pages/customer/BulkOrderPage';
 import CartPage from './pages/customer/CartPage';
 import WishlistPage from './pages/customer/WishlistPage';
 import NotificationsPage from './pages/customer/NotificationsPage';
-import RewardsPage from './pages/customer/RewardsPage';
-import ReferralPage from './pages/customer/ReferralPage';
 import DeliveryKYCApproval from './components/admin/DeliveryKYCApproval';
 import OrderSuccessPage from './pages/customer/OrderSuccessPage';
 import VerifyEmailNotice from './pages/VerifyEmailNotice';
@@ -70,8 +68,7 @@ import Profile from './components/customer/Profile';
 import AddressManager from './components/customer/AddressManager';
 import SecuritySettings from './components/customer/SecuritySettings';
 import PreferencesSettings from './components/customer/PreferencesSettings';
-import PersonalizationSettings from './components/customer/PersonalizationSettings';
-import ReferralKycSettings from './components/customer/ReferralKycSettings';
+
 
 // REAL Components (NOT placeholders)
 import LanguageSettings from './components/customer/LanguageSettings';
@@ -81,11 +78,15 @@ import OrderHistory from './components/customer/OrderHistory';
 import RefundsReturns from './components/customer/RefundsReturns';
 import DownloadInvoices from './components/customer/DownloadInvoices';
 import RewardsWallet from './components/customer/RewardsWallet';
-import Subscription from './components/customer/Subscription';
 import Recommendations from './components/customer/Recommendations';
 import PrivacySettings from './components/customer/PrivacySettings';
 import HelpCenter from './components/customer/HelpCenter';
 import LegalPolicies from './components/customer/LegalPolicies';
+import ContactForm from './components/customer/ContactForm';
+import NotificationSettings from './components/customer/NotificationSettings';
+import Reviews from './components/customer/Reviews';
+import About from './components/customer/About';
+import Bookmarks from './components/customer/Bookmarks';
 
 // Placeholder for future
 import SettingsPlaceholder from './components/customer/SettingsPlaceholder';
@@ -156,10 +157,8 @@ function App() {
               <Route path="/orders/success" element={<ProtectedRoute><OrderSuccessPage /></ProtectedRoute>} />
               <Route path="/bulk-order" element={<ProtectedRoute><BulkOrderPage /></ProtectedRoute>} />
               <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
-              <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
+              <Route path="/contact" element={<ProtectedRoute><ContactForm /></ProtectedRoute>} />
               <Route path="/verify-email-notice" element={<ProtectedRoute><VerifyEmailNotice /></ProtectedRoute>} />
-              <Route path="/customer/rewards" element={<ProtectedRoute><RewardsPage /></ProtectedRoute>} />
-              <Route path="/customer/referrals" element={<ProtectedRoute><ReferralPage /></ProtectedRoute>} />
 
               {/* --- SELLER --- */}
               <Route
@@ -258,22 +257,23 @@ function App() {
                 <Route path="addresses" element={<AddressManager />} />
                 <Route path="security" element={<SecuritySettings />} />
                 <Route path="preferences" element={<PreferencesSettings />} />
-                <Route path="personalization" element={<PersonalizationSettings />} />
-                <Route path="referrals-kyc" element={<ReferralKycSettings />} />
-                <Route path="notifications" element={<NotificationsPage />} />
+
+                <Route path="notifications" element={<NotificationSettings />} />
 
                 <Route path="language" element={<LanguageSettings />} />
                 <Route path="theme" element={<ThemeMode />} />
                 <Route path="accessibility" element={<AccessibilitySettings />} />
                 <Route path="order-history" element={<OrderHistory />} />
+                <Route path="reviews" element={<Reviews />} />
+                <Route path="bookmarks" element={<Bookmarks />} />
                 <Route path="refunds" element={<RefundsReturns />} />
                 <Route path="invoices" element={<DownloadInvoices />} />
                 <Route path="rewards" element={<RewardsWallet />} />
-                <Route path="subscription" element={<Subscription />} />
                 <Route path="recommendations" element={<Recommendations />} />
                 <Route path="privacy" element={<PrivacySettings />} />
                 <Route path="help-center" element={<HelpCenter />} />
                 <Route path="legal" element={<LegalPolicies />} />
+                <Route path="about" element={<About />} />
 
                 {/* --- Account Management --- */}
                 <Route path="clear-cache" element={<AccountManagement />} />

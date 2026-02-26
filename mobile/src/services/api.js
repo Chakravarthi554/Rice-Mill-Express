@@ -2,8 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth } from '../config/firebase';
 import { logout } from '../redux/slices/authSlice';
-
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
+import { API_URL } from '../config/env';
 
 // Create axios instance
 const api = axios.create({
@@ -156,14 +155,25 @@ export const apiService = {
     updatePreferences: (data) => api.put('/api/users/preferences', data),
     getPrivacySettings: () => api.get('/api/users/privacy'),
     updatePrivacySettings: (data) => api.put('/api/users/privacy', data),
-    deleteAccount: () => api.delete('/api/users/me'),
+    toggleTwoFactor: (enabled) => api.put('/api/users/two-factor', { enabled }),
+    getLoginHistory: () => api.get('/api/users/login-history'),
+    verify2FA: (data) => api.post('/api/auth/verify-2fa', data),
+    exportUserData: () => api.post('/api/users/export-data'),
+    deleteAccount: (password) => api.delete('/api/users/me', { data: { password } }),
+    getLegalPolicy: (type) => api.get(`/api/legal/${type}`),
 
     // ============ Rewards & Referral ============
-    getUserRewards: () => api.get('/api/rewards'),
-    redeemRewards: (points) => api.post('/api/rewards/redeem', { points }),
+    // ============ Rewards & Referral ============
+    getRewards: () => api.get('/api/rewards'),
+    getRewardTransactions: () => api.get('/api/rewards'), // History is part of rewards response
+    redeemReward: (points) => api.post('/api/rewards/redeem', { points }),
     getReferralInfo: () => api.get('/api/rewards/referral'),
     syncRewards: () => api.get('/api/rewards/sync'),
-    
+    getWalletData: () => api.get('/api/rewards/wallet'),
+    requestWithdrawal: (data) => api.post('/api/rewards/withdraw', data),
+    getWithdrawalHistory: () => api.get('/api/rewards/withdrawals'),
+    getPublicSettings: () => api.get('/api/settings/public'),
+
     // ============ Wishlist ============
     getWishlist: () => api.get('/api/users/wishlist'),
     addToWishlist: (productId) => api.post('/api/users/wishlist', { productId }),
@@ -174,18 +184,6 @@ export const apiService = {
     markNotificationRead: (id) => api.put(`/api/notifications/${id}/read`),
     markAllNotificationsRead: () => api.put('/api/notifications/read-all'),
     deleteNotification: (id) => api.delete(`/api/notifications/${id}`),
-
-    // ============ Utils ============
-    getAuthToken: async () => {
-        try {
-            const user = auth.currentUser;
-            if (user) return await user.getIdToken();
-            return await AsyncStorage.getItem('userToken');
-        } catch (e) {
-            console.error('Error getting auth token', e);
-            return null;
-        }
-    },
 
     // ============ Bookmarks ============
     getBookmarks: () => api.get('/api/users/bookmarks'),
@@ -224,10 +222,7 @@ export const apiService = {
     replyToForumComment: (postId, commentId, comment) => api.post(`/api/social/forum/${postId}/comments/${commentId}/reply`, { text: comment }),
     getCommentReplies: (postId, commentId) => api.get(`/api/social/forum/${postId}/comments/${commentId}/replies`),
 
-    // ============ Rewards & Wallet ============
-    getRewards: () => api.get('/api/users/rewards'),
-    getRewardTransactions: () => api.get('/api/users/rewards/transactions'),
-    redeemReward: (points) => api.post('/api/users/rewards/redeem', { points }),
+    // ============ Active Campaigns ============
     getActiveCampaigns: () => api.get('/api/campaigns/active'),
 
     // ============ Reviews Management ============
@@ -257,6 +252,12 @@ export const apiService = {
     // ============ Order Tracking ============
     trackOrder: (orderId) => api.get(`/api/orders/${orderId}/track`),
     getDeliveryLocation: (orderId) => api.get(`/api/orders/${orderId}/delivery-location`),
+
+    // ============ Support & Chat ============
+    createSupportTicket: (data) => api.post('/api/support/tickets', data),
+    getChatMessageHistory: (conversationId) => api.get(`/api/chat/messages/${conversationId}`),
+    sendMessage: (data) => api.post('/api/chat/send', data),
+    getConversations: () => api.get('/api/chat/conversations'),
 
     getAuthToken: async () => {
         try {

@@ -16,9 +16,10 @@ import {
   DefaultTheme as NavigationDefaultTheme,
   DarkTheme as NavigationDarkTheme,
 } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import store from './redux/store';
 import { setupInterceptors } from './services/api';
-import { loadUserFromStorage, setCredentials, setAuthReady } from './redux/slices/authSlice';
+import { loadUserFromStorage, setCredentials, setAuthReady, logout } from './redux/slices/authSlice';
 import { fetchSettings } from './redux/slices/settingsSlice';
 import { auth } from './config/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -33,6 +34,11 @@ setupInterceptors(store);
 // Auth Screens
 import LoginScreen from './screens/auth/LoginScreen';
 import RegisterScreen from './screens/auth/RegisterScreen';
+// import ForgotPasswordScreen from './screens/auth/ForgotPasswordScreen'; // File missing
+import TwoFactorVerifyScreen from './screens/auth/TwoFactorVerifyScreen';
+
+// Customer Screens
+import PolicyDetailScreen from './screens/customer/PolicyDetailScreen';
 
 // Customer Screens
 import CustomerHomeScreen from './screens/customer/HomeScreen';
@@ -48,15 +54,17 @@ import RewardsScreen from './screens/customer/RewardsScreen';
 import MyReviewsScreen from './screens/customer/MyReviewsScreen';
 import RefundsScreen from './screens/customer/RefundsScreen';
 import ReferralScreen from './screens/customer/ReferralScreen';
-import SubscriptionsScreen from './screens/customer/SubscriptionsScreen';
 import SecurityScreen from './screens/customer/SecurityScreen';
 import PrivacyScreen from './screens/customer/PrivacyScreen';
 import LanguageScreen from './screens/customer/LanguageScreen';
 import AccessibilityScreen from './screens/customer/AccessibilityScreen';
-import PersonalizationScreen from './screens/customer/PersonalizationScreen';
+
 import ThemeScreen from './screens/customer/ThemeScreen';
+import WithdrawalScreen from './screens/customer/WithdrawalScreen';
 import HelpCenterScreen from './screens/customer/HelpCenterScreen';
 import LegalScreen from './screens/customer/LegalScreen';
+import ContactScreen from './screens/customer/ContactScreen';
+import SupportChatScreen from './screens/customer/SupportChatScreen';
 
 // Seller Screens (existing)
 import SellerScreen from './screens/SellerScreen';
@@ -100,12 +108,16 @@ function AuthStack() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
+      {/* <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} /> */}
+      <Stack.Screen name="TwoFactorVerify" component={TwoFactorVerifyScreen} />
     </Stack.Navigator>
   );
 }
 
 // Customer Tab Navigator
 function CustomerTabs() {
+  const { t } = useTranslation();
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -125,18 +137,20 @@ function CustomerTabs() {
       <Tab.Screen
         name="Home"
         component={CustomerHomeScreen}
-        options={{ title: 'Products' }}
+        options={{ title: t('products') }}
       />
-      <Tab.Screen name="Cart" component={CartScreen} />
-      <Tab.Screen name="WishlistTab" component={WishlistScreen} options={{ title: 'Wishlist' }} />
-      <Tab.Screen name="Orders" component={OrdersScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen name="Cart" component={CartScreen} options={{ title: t('cart') }} />
+      <Tab.Screen name="WishlistTab" component={WishlistScreen} options={{ title: t('wishlist') }} />
+      <Tab.Screen name="Orders" component={OrdersScreen} options={{ title: t('myOrders') }} />
+      <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: t('profile') }} />
     </Tab.Navigator>
   );
 }
 
 // Customer Stack Navigator (Includes Tabs + Detail Screens)
 function CustomerStack() {
+  const { t } = useTranslation();
+
   return (
     <Stack.Navigator>
       <Stack.Screen
@@ -147,37 +161,37 @@ function CustomerStack() {
       <Stack.Screen
         name="ProductDetail"
         component={ProductScreen}
-        options={{ title: 'Product Details' }}
+        options={{ title: t('products') }}
       />
       <Stack.Screen
         name="BulkOrders"
         component={BulkOrderScreen}
-        options={{ title: 'Bulk Orders' }}
+        options={{ title: t('bulkOrder') }}
       />
       <Stack.Screen
         name="BulkOrderDetail"
         component={BulkOrderDetailScreen}
-        options={{ title: 'Bulk Order Details' }}
+        options={{ title: t('orderStatus') }}
       />
       <Stack.Screen
         name="Checkout"
         component={CheckoutScreen}
-        options={{ title: 'Checkout' }}
+        options={{ title: t('cart') }}
       />
       <Stack.Screen
         name="Wishlist"
         component={WishlistScreen}
-        options={{ title: 'My Wishlist' }}
+        options={{ title: t('myWishlist') }}
       />
       <Stack.Screen
         name="Notifications"
         component={NotificationsScreen}
-        options={{ title: 'Notifications' }}
+        options={{ title: t('notifications') }}
       />
       <Stack.Screen
         name="OrderDetail"
         component={OrderDetailScreen}
-        options={{ title: 'Order Details' }}
+        options={{ title: t('orderStatus') }}
       />
       <Stack.Screen
         name="OrderSuccess"
@@ -187,60 +201,63 @@ function CustomerStack() {
       <Stack.Screen
         name="Bookmarks"
         component={BookmarksScreen}
-        options={{ title: 'My Bookmarks' }}
+        options={{ title: t('myBookmarks') }}
       />
       <Stack.Screen
         name="Recipes"
         component={RecipesScreen}
-        options={{ title: 'Recipes' }}
+        options={{ title: t('recipes') }}
       />
       <Stack.Screen
         name="RecipeDetail"
         component={RecipeDetailScreen}
-        options={{ title: 'Recipe Details' }}
+        options={{ title: t('recipes') }}
       />
       <Stack.Screen
         name="Forum"
         component={ForumScreen}
-        options={{ title: 'Community Forum' }}
+        options={{ title: t('forum') }}
       />
       <Stack.Screen
         name="ForumPostDetail"
         component={ForumPostDetailScreen}
-        options={{ title: 'Post Details' }}
+        options={{ title: t('forum') }}
       />
       <Stack.Screen
         name="CreateForumPost"
         component={CreateForumPostScreen}
-        options={{ title: 'Create Post' }}
+        options={{ title: t('forum') }}
       />
       <Stack.Screen
         name="Settings"
         component={SettingsScreen}
-        options={{ title: 'Settings' }}
+        options={{ title: t('settings') }}
       />
       <Stack.Screen
         name="EditProfile"
         component={EditProfileScreen}
-        options={{ title: 'Edit Profile' }}
+        options={{ title: t('editProfile') }}
       />
-      <Stack.Screen name="Addresses" component={AddressesScreen} options={{ title: 'My Addresses' }} />
-      <Stack.Screen name="AddEditAddress" component={AddEditAddressScreen} options={{ title: 'Manage Address' }} />
-      <Stack.Screen name="Support" component={SupportScreen} options={{ title: 'Help & Support' }} />
-      <Stack.Screen name="About" component={AboutScreen} options={{ title: 'About Us' }} />
-      <Stack.Screen name="Rewards" component={RewardsScreen} options={{ title: 'My Rewards' }} />
-      <Stack.Screen name="MyReviews" component={MyReviewsScreen} options={{ title: 'My Reviews' }} />
-      <Stack.Screen name="Refunds" component={RefundsScreen} options={{ title: 'Request Refund' }} />
-      <Stack.Screen name="Referral" component={ReferralScreen} options={{ title: 'Refer & Earn' }} />
-      <Stack.Screen name="Subscriptions" component={SubscriptionsScreen} options={{ title: 'My Subscriptions' }} />
-      <Stack.Screen name="Security" component={SecurityScreen} options={{ title: 'Security' }} />
-      <Stack.Screen name="Privacy" component={PrivacyScreen} options={{ title: 'Privacy' }} />
-      <Stack.Screen name="Language" component={LanguageScreen} options={{ title: 'Language' }} />
-      <Stack.Screen name="Accessibility" component={AccessibilityScreen} options={{ title: 'Accessibility' }} />
-      <Stack.Screen name="Personalization" component={PersonalizationScreen} options={{ title: 'Personalization' }} />
-      <Stack.Screen name="Theme" component={ThemeScreen} options={{ title: 'Theme' }} />
-      <Stack.Screen name="HelpCenter" component={HelpCenterScreen} options={{ title: 'Help Center' }} />
-      <Stack.Screen name="Legal" component={LegalScreen} options={{ title: 'Legal & Policies' }} />
+      <Stack.Screen name="Addresses" component={AddressesScreen} options={{ title: t('addresses') }} />
+      <Stack.Screen name="AddEditAddress" component={AddEditAddressScreen} options={{ title: t('addresses') }} />
+      <Stack.Screen name="Support" component={SupportScreen} options={{ title: t('helpCenter') }} />
+      <Stack.Screen name="About" component={AboutScreen} options={{ title: t('about') }} />
+      <Stack.Screen name="Rewards" component={RewardsScreen} options={{ title: t('rewards') }} />
+      <Stack.Screen name="MyReviews" component={MyReviewsScreen} options={{ title: t('myReviews') }} />
+      <Stack.Screen name="Refunds" component={RefundsScreen} options={{ title: t('orderStatus') }} />
+      <Stack.Screen name="Referral" component={ReferralScreen} options={{ title: t('referEarn') }} />
+      <Stack.Screen name="Security" component={SecurityScreen} options={{ title: t('security') }} />
+      <Stack.Screen name="Privacy" component={PrivacyScreen} options={{ title: t('privacy') }} />
+      <Stack.Screen name="Language" component={LanguageScreen} options={{ title: t('language') }} />
+      <Stack.Screen name="Accessibility" component={AccessibilityScreen} options={{ title: t('accessibility') }} />
+      <Stack.Screen name="Withdraw" component={WithdrawalScreen} options={{ title: t('withdraw') }} />
+
+      <Stack.Screen name="Theme" component={ThemeScreen} options={{ title: t('theme') }} />
+      <Stack.Screen name="HelpCenter" component={HelpCenterScreen} options={{ title: t('helpCenter') }} />
+      <Stack.Screen name="Legal" component={LegalScreen} options={{ title: t('legalPolicies') }} />
+      <Stack.Screen name="Contact" component={ContactScreen} options={{ title: t('helpCenter') }} />
+      <Stack.Screen name="PolicyDetail" component={PolicyDetailScreen} />
+      <Stack.Screen name="SupportChat" component={SupportChatScreen} options={{ title: t('helpCenter') }} />
     </Stack.Navigator>
   );
 }
@@ -351,37 +368,44 @@ function AppNavigator() {
   const dispatch = useDispatch();
 
   useEffect(() => {
-    // Load user from AsyncStorage
+    // 1. Load user from AsyncStorage ONCE at startup
     dispatch(loadUserFromStorage());
 
-    // Listen to Firebase auth state changes
+    // 2. Listen to Firebase auth state changes
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        // Firebase user is signed in, sync with Redux to ensure fresh token
-        console.log('✅ Firebase auth state: User signed in');
-        try {
+      try {
+        if (firebaseUser) {
+          console.log('✅ Firebase auth state: User signed in');
           const token = await firebaseUser.getIdToken();
           const storedUserInfo = await AsyncStorage.getItem('userInfo');
 
           if (storedUserInfo) {
             const user = JSON.parse(storedUserInfo);
-            // Dispatch fresh credentials to Redux
             dispatch(setCredentials({ user, token }));
             console.log('🔄 Redux state updated with fresh Firebase token');
           }
-        } catch (error) {
-          console.error('Failed to sync Firebase state with Redux:', error);
+        } else {
+          console.log('ℹ️ Firebase auth state: User signed out');
+          // Note: We handle sync/logout in a separate useEffect to avoid race conditions
         }
-      } else {
-        // Firebase user is signed out
-        console.log('ℹ️ Firebase auth state: User signed out');
+      } catch (error) {
+        console.error('❌ Auth listener error:', error);
+      } finally {
+        // ESSENTIAL: Always set auth ready to prevent stuck loading screen
+        dispatch(setAuthReady(true));
       }
-      // Set auth ready after first check
-      dispatch(setAuthReady(true));
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [dispatch]); // Removed isAuthenticated dependency
+
+  // 3. Keep Redux in sync with Firebase sign-out
+  useEffect(() => {
+    if (isAuthReady && !auth.currentUser && isAuthenticated) {
+      console.log('🔄 Syncing Redux state: User signed out in Firebase, logging out of Redux...');
+      dispatch(logout());
+    }
+  }, [isAuthReady, isAuthenticated, dispatch]);
 
   if (loading || !isAuthReady) {
     return (
@@ -417,13 +441,13 @@ function MainContent() {
   const dispatch = useDispatch();
   const systemColorScheme = useColorScheme();
   const { accessibility, preferences } = useSelector((state) => state.settings);
-  const { isAuthReady } = useSelector((state) => state.auth);
+  const { isAuthReady, isAuthenticated } = useSelector((state) => state.auth);
 
   useEffect(() => {
-    if (isAuthReady) {
+    if (isAuthReady && isAuthenticated) {
       dispatch(fetchSettings());
     }
-  }, [isAuthReady, dispatch]);
+  }, [isAuthReady, isAuthenticated, dispatch]);
 
   // Determine base theme based on preference
   const themePreference = preferences?.theme || 'system';

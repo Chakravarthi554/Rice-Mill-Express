@@ -11,7 +11,8 @@ const {
   resendOtp,
   logoutUser,
   loginWithGoogle,
-  firebaseLogin
+  firebaseLogin,
+  verify2FA
 } = require('../controllers/authController');
 
 // Registration route
@@ -22,6 +23,9 @@ router.post('/login', asyncHandler(loginUser));
 
 // Unified Firebase login route (Email/Google/Phone)
 router.post('/firebase-login', asyncHandler(firebaseLogin));
+
+// 2FA Verification route
+router.post('/verify-2fa', asyncHandler(verify2FA));
 
 // Phone login route (Firebase)
 router.post('/phone-login', loginWithPhone);

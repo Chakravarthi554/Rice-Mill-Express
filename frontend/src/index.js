@@ -5,7 +5,8 @@ import { Provider } from 'react-redux';
 import store from './redux/store';
 import { AuthProvider } from './context/AuthContext';
 import App from './App';
-import  {io}  from 'socket.io-client';
+import './i18n';
+import { io } from 'socket.io-client';
 
 // Polyfills
 import { Buffer } from 'buffer';

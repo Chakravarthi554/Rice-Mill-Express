@@ -190,6 +190,13 @@ const setupSocketServer = (server) => {
       }
     });
 
+    socket.on('join', (room) => {
+      if (room) {
+        socket.join(room);
+        logger.info(`✅ Socket ${socket.id} joined room: ${room}`);
+      }
+    });
+
     socket.on('joinNotifications', (userId) => {
       if (userId && userId === socket.userId) {
         socket.join(`notifications_${userId}`);

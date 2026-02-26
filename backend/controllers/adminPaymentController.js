@@ -4,6 +4,8 @@ const Order = require('../models/Order');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
 const Payout = require('../models/payoutModel');
+const WithdrawalRequest = require('../models/WithdrawalRequest');
+const WalletTransaction = require('../models/WalletTransaction');
 
 /**
  * ========================================
@@ -1282,6 +1284,115 @@ exports.refundPayment = asyncHandler(async (req, res) => {
       success: false,
       message: 'Failed to process refund'
     });
+  }
+});
+
+/**
+ * @desc Get customer withdrawal requests for admin
+ * @route GET /api/admin/payments/withdrawals
+ * @access Private/Admin
+ */
+exports.getCustomerWithdrawals = asyncHandler(async (req, res) => {
+  try {
+    const { status, page = 1, limit = 10 } = req.query;
+    const skip = (page - 1) * limit;
+    const query = {};
+    if (status && status !== 'all') query.status = status;
+
+    const withdrawals = await WithdrawalRequest.find(query)
+      .populate('user', 'name email phone')
+      .sort('-createdAt')
+      .skip(skip)
+      .limit(Number(limit));
+
+    const total = await WithdrawalRequest.countDocuments(query);
+
+    res.json({
+      success: true,
+      withdrawals,
+      total,
+      totalPages: Math.ceil(total / limit),
+      page: Number(page)
+    });
+  } catch (error) {
+    console.error('Get customer withdrawals error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch withdrawals' });
+  }
+});
+
+/**
+ * @desc Moderate customer withdrawal request
+ * @route PUT /api/admin/payments/withdrawals/:id
+ * @access Private/Admin
+ */
+exports.moderateCustomerWithdrawal = asyncHandler(async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, adminNotes } = req.body;
+
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid status' });
+    }
+
+    const withdrawal = await WithdrawalRequest.findById(id);
+    if (!withdrawal) {
+      return res.status(404).json({ success: false, message: 'Withdrawal request not found' });
+    }
+
+    if (withdrawal.status !== 'pending') {
+      return res.status(400).json({ success: false, message: `Withdrawal already ${withdrawal.status}` });
+    }
+
+    const user = await User.findById(withdrawal.user);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    withdrawal.status = status;
+    withdrawal.adminNotes = adminNotes;
+    withdrawal.processedAt = new Date();
+    withdrawal.processedBy = req.user._id;
+    await withdrawal.save();
+
+    if (status === 'rejected') {
+      // Refund the wallet balance
+      user.walletBalance += withdrawal.amount;
+      await user.save();
+
+      // Create refund transaction
+      await WalletTransaction.create({
+        user: user._id,
+        amount: withdrawal.amount,
+        type: 'referral_award',
+        status: 'completed',
+        description: `Withdrawal rejected: ${adminNotes || 'No reason provided'}. Balance refunded.`,
+        referenceId: withdrawal._id,
+        referenceType: 'WithdrawalRequest',
+        balanceAfter: user.walletBalance
+      });
+    } else {
+      // If approved, update the original transaction status
+      await WalletTransaction.updateOne(
+        { referenceId: withdrawal._id, type: 'withdrawal' },
+        { $set: { status: 'completed', description: 'Withdrawal approved and processed' } }
+      );
+    }
+
+    await Notification.create({
+      user: withdrawal.user,
+      type: status === 'approved' ? 'WITHDRAWAL_APPROVED' : 'WITHDRAWAL_REJECTED',
+      title: `Withdrawal ${status.charAt(0).toUpperCase() + status.slice(1)}`,
+      message: status === 'approved'
+        ? `Your withdrawal request for ₹${withdrawal.amount} has been approved.`
+        : `Your withdrawal request for ₹${withdrawal.amount} was rejected. ${adminNotes || ''}`,
+      relatedEntity: withdrawal._id,
+      entityModel: 'WithdrawalRequest'
+    });
+
+    res.json({ success: true, message: `Withdrawal ${status} successfully`, withdrawal });
+  } catch (error) {
+    console.error('Moderate withdrawal error:', error);
+    res.status(500).json({ success: false, message: 'Failed to moderate withdrawal' });
   }
 });
 

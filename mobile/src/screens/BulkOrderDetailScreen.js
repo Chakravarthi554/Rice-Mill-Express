@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, Linking } from 'react-native';
 console.log('📄 BulkOrderDetailScreen loading...');
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import {
   Card,
@@ -18,6 +18,7 @@ import {
   BULK_ORDER_DETAILS_SUCCESS,
   BULK_ORDER_DETAILS_FAIL,
 } from '../constants/bulkOrderConstants';
+import { API_URL } from '../config/env';
 
 const BulkOrderDetailScreen = ({ route, navigation }) => {
   const { orderId } = route.params;
@@ -108,8 +109,20 @@ const BulkOrderDetailScreen = ({ route, navigation }) => {
             </DataTable.Header>
 
             {bulkOrder.items.map((item, index) => (
-              <DataTable.Row key={index}>
-                <DataTable.Cell>{item.name}</DataTable.Cell>
+              <DataTable.Row key={index} style={styles.dataRow}>
+                <DataTable.Cell style={styles.productCell}>
+                  <View style={styles.productInfo}>
+                    <Image
+                      source={{
+                        uri: item.image?.startsWith('http')
+                          ? item.image
+                          : `${API_URL}${item.image}`
+                      }}
+                      style={styles.productImage}
+                    />
+                    <Text style={styles.productName}>{item.name}</Text>
+                  </View>
+                </DataTable.Cell>
                 <DataTable.Cell numeric>{item.quantity}</DataTable.Cell>
                 <DataTable.Cell numeric>
                   ₹{(item.negotiatedPrice || (item.price * (1 - (bulkOrder.discount || 0) / 100))).toFixed(2)}
@@ -157,10 +170,59 @@ const BulkOrderDetailScreen = ({ route, navigation }) => {
             <Text style={styles.sectionTitle}>Shipping Address</Text>
             <Text style={styles.infoText}>{bulkOrder.shippingAddress.name}</Text>
             <Text style={styles.infoText}>{bulkOrder.shippingAddress.phone}</Text>
-            <Text style={styles.infoText}>{bulkOrder.shippingAddress.street}</Text>
+            <Text style={styles.infoText}>
+              {bulkOrder.shippingAddress.houseNumber}, {bulkOrder.shippingAddress.colony && `${bulkOrder.shippingAddress.colony}, `}
+              {bulkOrder.shippingAddress.street}
+            </Text>
+            {bulkOrder.shippingAddress.landmark && (
+              <Text style={styles.landmarkText}>Landmark: {bulkOrder.shippingAddress.landmark}</Text>
+            )}
             <Text style={styles.infoText}>
               {bulkOrder.shippingAddress.city}, {bulkOrder.shippingAddress.state} - {bulkOrder.shippingAddress.pinCode}
             </Text>
+
+            {bulkOrder.shippingAddress && (
+              <Button
+                icon="map"
+                mode="contained"
+                onPress={() => {
+                  const { houseNumber, street, city, state, pinCode, location } = bulkOrder.shippingAddress;
+                  const coordinates = location?.coordinates;
+                  const [lng, lat] = Array.isArray(coordinates) && coordinates.length === 2 ? coordinates : [null, null];
+
+                  // Construct address string for fallback
+                  const addressString = `${houseNumber || ''} ${street || ''}, ${city || ''}, ${state || ''} ${pinCode || ''}`.trim();
+
+                  let url = '';
+                  if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
+                    // Use coordinates if available
+                    url = Platform.select({
+                      ios: `maps:0,0?q=${lat},${lng}`,
+                      android: `geo:0,0?q=${lat},${lng}`
+                    });
+                  } else if (addressString) {
+                    // Fallback to address string
+                    const encodedAddress = encodeURIComponent(addressString);
+                    url = Platform.select({
+                      ios: `maps:0,0?q=${encodedAddress}`,
+                      android: `geo:0,0?q=${encodedAddress}`
+                    });
+                  }
+
+                  if (url) {
+                    Linking.openURL(url).catch(() => {
+                      Alert.alert('Error', 'Could not open maps application');
+                    });
+                  } else {
+                    Alert.alert('Error', 'No valid address or coordinates available for navigation');
+                  }
+                }}
+                style={styles.navigateButton}
+                buttonColor="#2196F3"
+              >
+                Navigate to Customer
+              </Button>
+            )}
           </View>
 
           <View style={styles.section}>
@@ -242,11 +304,41 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     color: '#555',
   },
+  landmarkText: {
+    fontSize: 12,
+    color: '#777',
+    fontStyle: 'italic',
+    marginBottom: 4,
+  },
+  navigateButton: {
+    marginTop: 10,
+    borderRadius: 8,
+  },
   divider: {
     marginVertical: 16,
   },
   totalRow: {
     backgroundColor: '#f5f5f5',
+  },
+  dataRow: {
+    height: 70,
+  },
+  productCell: {
+    flex: 2,
+  },
+  productInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  productImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  productName: {
+    fontSize: 12,
+    flexShrink: 1,
   },
   actionButton: {
     marginTop: 16,

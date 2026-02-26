@@ -11,12 +11,14 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
+import { useTranslation } from 'react-i18next';
 import { getCart, removeFromCart, updateCartItem } from '../../redux/actions/cartActions';
 
 export default function CartScreen({ navigation }) {
     const dispatch = useDispatch();
     const cart = useSelector((state) => state.cart);
     const { cartItems = [], loading, error } = cart || {};
+    const { t } = useTranslation();
 
     useEffect(() => {
         dispatch(getCart());
@@ -40,7 +42,7 @@ export default function CartScreen({ navigation }) {
 
     const handleCheckout = () => {
         if (cartItems.length === 0) {
-            Alert.alert('Empty Cart', 'Please add items to cart before checkout');
+            Alert.alert(t('cart'), t('emptyCartMessage'));
             return;
         }
         navigation.navigate('Checkout');
@@ -108,7 +110,7 @@ export default function CartScreen({ navigation }) {
                 <MaterialIcons name="error-outline" size={48} color="#f44336" />
                 <Text style={styles.errorText}>{error}</Text>
                 <TouchableOpacity style={styles.retryButton} onPress={() => dispatch(getCart())}>
-                    <Text style={styles.retryText}>Retry</Text>
+                    <Text style={styles.retryText}>{t('retry')}</Text>
                 </TouchableOpacity>
             </View>
         );
@@ -119,12 +121,12 @@ export default function CartScreen({ navigation }) {
             {cartItems.length === 0 ? (
                 <View style={styles.emptyContainer}>
                     <MaterialIcons name="shopping-cart-checkout" size={100} color="#ccc" />
-                    <Text style={styles.emptyText}>Your cart is empty</Text>
+                    <Text style={styles.emptyText}>{t('emptyCart')}</Text>
                     <TouchableOpacity
                         style={styles.shopButton}
                         onPress={() => navigation.navigate('Home')}
                     >
-                        <Text style={styles.shopButtonText}>Start Shopping</Text>
+                        <Text style={styles.shopButtonText}>{t('startShopping')}</Text>
                     </TouchableOpacity>
                 </View>
             ) : (
@@ -141,21 +143,21 @@ export default function CartScreen({ navigation }) {
                     <View style={styles.footer}>
                         <View style={styles.summaryContainer}>
                             <View style={styles.summaryRow}>
-                                <Text style={styles.summaryLabel}>Subtotal</Text>
+                                <Text style={styles.summaryLabel}>{t('subtotal')}</Text>
                                 <Text style={styles.summaryValue}>₹{calculateTotal()}</Text>
                             </View>
                             <View style={styles.summaryRow}>
-                                <Text style={styles.summaryLabel}>Delivery</Text>
-                                <Text style={styles.summaryValue}>Free</Text>
+                                <Text style={styles.summaryLabel}>{t('delivery')}</Text>
+                                <Text style={styles.summaryValue}>{t('free')}</Text>
                             </View>
                             <View style={[styles.summaryRow, styles.totalRow]}>
-                                <Text style={styles.totalLabel}>Grand Total</Text>
+                                <Text style={styles.totalLabel}>{t('grandTotal')}</Text>
                                 <Text style={styles.totalValue}>₹{calculateTotal()}</Text>
                             </View>
                         </View>
 
                         <TouchableOpacity style={styles.checkoutButton} onPress={handleCheckout}>
-                            <Text style={styles.checkoutButtonText}>Proceed to Checkout</Text>
+                            <Text style={styles.checkoutButtonText}>{t('checkout')}</Text>
                             <MaterialIcons name="arrow-forward" size={24} color="#fff" />
                         </TouchableOpacity>
                     </View>

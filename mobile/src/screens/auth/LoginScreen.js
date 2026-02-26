@@ -31,7 +31,13 @@ export default function LoginScreen({ navigation }) {
 
         try {
             const result = await dispatch(login({ email, password })).unwrap();
-            // Navigation handled by App.js based on auth state
+
+            // Check if 2FA is required
+            if (result && result.requires2FA) {
+                navigation.navigate('TwoFactorVerify', { userId: result.userId });
+                return;
+            }
+            // Navigation to main app handled by App.js based on auth state
         } catch (error) {
             Alert.alert('Login Failed', error || 'An error occurred during login');
         }

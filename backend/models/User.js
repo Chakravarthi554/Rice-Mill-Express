@@ -38,7 +38,20 @@ const userSchema = mongoose.Schema(
       licenseNumber: String,
       businessType: String,
       panNumber: String,
-      address: { street: String, city: String, state: String, pinCode: String, country: { type: String, default: 'India' } },
+      address: {
+        houseNumber: String,
+        colony: String,
+        street: String,
+        city: String,
+        state: String,
+        pinCode: String,
+        landmark: String,
+        country: { type: String, default: 'India' },
+        location: {
+          type: { type: String, enum: ['Point'], default: 'Point' },
+          coordinates: { type: [Number], default: [0, 0] }
+        }
+      },
       bankAccount: { accountNumber: String, ifscCode: String, accountHolderName: String },
     },
     location: {
@@ -71,12 +84,17 @@ const userSchema = mongoose.Schema(
         social: { type: Boolean, default: true },
       },
     },
-    personalization: { bio: { type: String, maxlength: 250 }, tagline: { type: String, maxlength: 100 } },
+
     referralCode: { type: String, unique: true, sparse: true },
     referralStats: {
       referredUsers: { type: Number, default: 0 },
       earnedCredits: { type: Number, default: 0 },
+      pendingCredits: { type: Number, default: 0 },
+      totalEarnings: { type: Number, default: 0 },
     },
+    walletBalance: { type: Number, default: 0 },
+    referredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    isReferralRewardClaimed: { type: Boolean, default: false },
     paymentMethods: [{
       _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
       cardNumber: { type: String, required: true },
@@ -106,7 +124,7 @@ const userSchema = mongoose.Schema(
     }],
     referredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     isReferralRewardClaimed: { type: Boolean, default: false },
-    
+
     // ✅ ENHANCED: Better referral tracking
     referralStats: {
       referredUsers: { type: Number, default: 0 },
@@ -115,13 +133,31 @@ const userSchema = mongoose.Schema(
       totalReferrals: { type: Number, default: 0 }
     },
 
-    // ✅ ADDED: Forum bookmarks
     bookmarks: [{
       postId: { type: mongoose.Schema.Types.ObjectId, ref: 'ForumPost', required: true },
       bookmarkedAt: { type: Date, default: Date.now }
     }],
     defaultAddress: { type: mongoose.Schema.Types.ObjectId, ref: 'Address' },
-    defaultPayment: { type: String }
+    defaultPayment: { type: String },
+
+    // SECURITY FEATURES
+    twoFactorEnabled: { type: Boolean, default: false },
+    loginHistory: [{
+      ip: String,
+      device: String,
+      browser: String,
+      os: String,
+      location: String,
+      timestamp: { type: Date, default: Date.now },
+      status: { type: String, enum: ['success', 'failed'], default: 'success' }
+    }],
+    privacySettings: {
+      profileVisible: { type: Boolean, default: true },
+      showActivity: { type: Boolean, default: true },
+      marketingEmails: { type: Boolean, default: false }
+    },
+    isProfilePublic: { type: Boolean, default: true },
+    registrationDevice: { type: String, select: false }, // Store Device ID for anti-abuse
   },
   { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );
@@ -168,6 +204,14 @@ userSchema.pre('save', async function (next) {
     }
     this.referralCode = exists ? `${code}-${Date.now().toString().slice(-4)}` : code;
   }
+
+  // ✅ SYNC: isProfilePublic and privacySettings.profileVisible
+  if (this.isModified('isProfilePublic')) {
+    this.privacySettings.profileVisible = this.isProfilePublic;
+  } else if (this.isModified('privacySettings.profileVisible')) {
+    this.isProfilePublic = this.privacySettings.profileVisible;
+  }
+
   next();
 });
 
@@ -216,7 +260,17 @@ userSchema.pre('save', function (next) {
 });
 
 userSchema.methods.matchPassword = async function (pass) {
-  return await bcrypt.compare(pass, this.password);
+  console.log(`🔐 matchPassword check: pass provided? ${!!pass}, hash exists? ${!!this.password}`);
+  if (!this.password || !pass) {
+    console.warn('⚠️ matchPassword returning false due to missing pass or hash');
+    return false;
+  }
+  try {
+    return await bcrypt.compare(String(pass), this.password);
+  } catch (error) {
+    console.error('❌ bcrypt.compare error:', error.message);
+    return false;
+  }
 };
 
 userSchema.methods.getPasswordResetToken = function () {

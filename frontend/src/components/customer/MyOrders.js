@@ -7,16 +7,18 @@ import OrderTracker from '../customer/OrderTracker';
 import Price from '../common/Price';
 import { addToCart } from '../../redux/actions/cartActions';
 import { addToWishlist } from '../../redux/actions/userActions';
+import { useTranslation } from 'react-i18next';
 
 const MyOrders = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { t } = useTranslation();
   const { loading: ordersLoading, error: ordersError, orders = [] } = useSelector((state) => state.orderListMy || {});
 
   return (
     <div>
       <Typography variant="h5" gutterBottom sx={{ mb: 3, fontWeight: 'medium' }}>
-        My Orders
+        {t('myOrders')}
       </Typography>
       {ordersLoading ? (
         <Loader />
@@ -28,7 +30,7 @@ const MyOrders = () => {
             <Paper key={order._id} sx={{ mb: 3, p: 3, backgroundColor: '#FAFAFA', borderLeft: `4px solid ${order.orderStatus === 'delivered' ? '#4CAF50' : order.orderStatus === 'cancelled' ? '#F44336' : '#2196F3'}` }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#212121' }}>
-                  Order #{order._id?.substring(18, 24).toUpperCase() || 'N/A'}
+                  {t('order')} #{order._id?.substring(18, 24).toUpperCase() || 'N/A'}
                 </Typography>
                 <span
                   style={{
@@ -42,18 +44,18 @@ const MyOrders = () => {
                     borderRadius: 12,
                   }}
                 >
-                  {order.orderStatus || 'placed'}
+                  {t(order.orderStatus || 'placed')}
                 </span>
               </Box>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Placed on: {new Date(order.createdAt).toLocaleString()}
+                {t('placedOn')}: {new Date(order.createdAt).toLocaleString()}
               </Typography>
               <Typography variant="body1" sx={{ mb: 2, color: '#2E7D32' }}>
-                Total: ₹{(order.totalPrice || 0).toFixed(2)}
+                {t('total')}: ₹{(order.totalPrice || 0).toFixed(2)}
               </Typography>
               <OrderTracker order={order} />
               <Typography variant="h6" sx={{ mt: 3, mb: 2, fontWeight: 'bold', color: '#212121' }}>
-                Order Items
+                {t('orderItems')}
               </Typography>
               <Grid container spacing={2}>
                 {order.orderItems.map((item) => (
@@ -69,13 +71,13 @@ const MyOrders = () => {
                           {item.product.name}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          Price: <Price amount={item.price} />
+                          {t('price')}: <Price amount={item.price} />
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          Quantity: {item.qty}
+                          {t('quantity')}: {item.qty}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          Order Date: {new Date(order.createdAt).toLocaleDateString()}
+                          {t('orderDate')}: {new Date(order.createdAt).toLocaleDateString()}
                         </Typography>
                       </div>
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, ml: 2 }}>
@@ -87,7 +89,7 @@ const MyOrders = () => {
                             navigate('/cart');
                           }}
                         >
-                          Buy Again
+                          {t('buyAgain')}
                         </Button>
                         <Button
                           variant="text"
@@ -95,20 +97,20 @@ const MyOrders = () => {
                           onClick={async () => {
                             try {
                               await dispatch(addToWishlist(item.product._id));
-                              alert('Added to wishlist');
+                              alert(t('addedToWishlist'));
                             } catch (error) {
-                              alert('Failed to add to wishlist: ' + (error.message || 'Unknown error'));
+                              alert(t('failedToAddToWishlist') + ' ' + (error.message || 'Unknown error'));
                             }
                           }}
                         >
-                          Wishlist
+                          {t('wishlist')}
                         </Button>
                         <Button
                           variant="text"
                           size="small"
                           onClick={() => navigate(`/products/${item.product._id}#reviews`)}
                         >
-                          Review
+                          {t('review')}
                         </Button>
                       </Box>
                     </div>
@@ -121,7 +123,7 @@ const MyOrders = () => {
                 onClick={() => navigate(`/orders/${order._id}`)}
                 sx={{ mt: 2, backgroundColor: '#4CAF50', '&:hover': { backgroundColor: '#45A049' } }}
               >
-                View Full Details
+                {t('viewFullDetails')}
               </Button>
 
             </Paper>
@@ -129,7 +131,7 @@ const MyOrders = () => {
         </Box>
       ) : (
         <Typography variant="body1" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
-          No orders found
+          {t('noOrdersFound')}
         </Typography>
       )}
     </div>

@@ -12,10 +12,12 @@ import {
   Divider,
   List,
   ListItem,
+  ListItemButton,
   ListItemText,
   ListItemIcon,
   CircularProgress
 } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import {
   Notifications as NotificationsIcon,
   Circle as CircleIcon,
@@ -35,6 +37,7 @@ const NotificationCenter = () => {
   const [notifications, setNotifications] = useState([]);
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
   const { userInfo } = useSelector((state) => state.userLogin);
 
   const iconMap = {
@@ -44,6 +47,7 @@ const NotificationCenter = () => {
     LOW_STOCK_ALERT: <StockIcon color="warning" />,
     SPAM_REPORT: <WarningIcon color="error" />,
     NEW_CHAT_MESSAGE: <ChatIcon color="info" />,
+    SUPPORT_TICKET: <ChatIcon color="success" />,
     REFUND_REQUESTED: <PaymentIcon color="warning" />,
     PAYOUT_READY: <PaymentIcon color="success" />,
     ORDER_PLACED: <PaymentIcon color="info" />,
@@ -64,10 +68,10 @@ const NotificationCenter = () => {
   const fetchNotifications = async () => {
     setLoading(true);
     try {
-      const url = filter === 'all' 
+      const url = filter === 'all'
         ? '/api/notifications?limit=50'
         : `/api/notifications?type=${filter}&limit=50`;
-      
+
       const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${userInfo.token}`
@@ -98,7 +102,7 @@ const NotificationCenter = () => {
         }
       });
       // Update local state
-      setNotifications(prev => prev.map(n => 
+      setNotifications(prev => prev.map(n =>
         n._id === notificationId ? { ...n, read: true } : n
       ));
     } catch (error) {
@@ -153,8 +157,19 @@ const NotificationCenter = () => {
 
   const handleNotificationAction = (notification) => {
     if (notification.actionUrl) {
-      window.location.href = notification.actionUrl;
+      if (notification.actionUrl.startsWith('http')) {
+        window.location.href = notification.actionUrl;
+      } else {
+        navigate(notification.actionUrl);
+      }
     }
+  };
+
+  const handleNotificationClick = async (notification) => {
+    if (!notification.read) {
+      await markAsRead(notification._id);
+    }
+    handleNotificationAction(notification);
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -169,7 +184,7 @@ const NotificationCenter = () => {
             </Typography>
             <Box sx={{ display: 'flex', gap: 1 }}>
               {unreadCount > 0 && (
-                <Button 
+                <Button
                   startIcon={<CheckIcon />}
                   onClick={markAllAsRead}
                   variant="outlined"
@@ -178,7 +193,7 @@ const NotificationCenter = () => {
                   Mark All Read
                 </Button>
               )}
-              <Button 
+              <Button
                 startIcon={<DeleteIcon />}
                 onClick={clearAllNotifications}
                 variant="outlined"
@@ -190,8 +205,8 @@ const NotificationCenter = () => {
             </Box>
           </Box>
 
-          <Tabs 
-            value={filter} 
+          <Tabs
+            value={filter}
             onChange={handleFilterChange}
             sx={{ mb: 3 }}
           >
@@ -211,7 +226,7 @@ const NotificationCenter = () => {
             <List>
               {notifications.length === 0 ? (
                 <ListItem>
-                  <ListItemText 
+                  <ListItemText
                     primary="No notifications found"
                     secondary="You're all caught up with your notifications!"
                     sx={{ textAlign: 'center', py: 4 }}
@@ -220,14 +235,15 @@ const NotificationCenter = () => {
               ) : (
                 notifications.map((notification, index) => (
                   <React.Fragment key={notification._id}>
-                    <ListItem 
+                    <ListItemButton
+                      onClick={() => handleNotificationClick(notification)}
                       sx={{
-                        borderLeft: notification.priority === 'high' || notification.priority === 'critical' 
-                          ? '4px solid' 
+                        borderLeft: notification.priority === 'high' || notification.priority === 'critical'
+                          ? '4px solid'
                           : '1px solid',
                         borderLeftColor: notification.priority === 'critical' ? 'error.main' :
-                                        notification.priority === 'high' ? 'warning.main' :
-                                        notification.priority === 'medium' ? 'primary.main' : 'grey.300',
+                          notification.priority === 'high' ? 'warning.main' :
+                            notification.priority === 'medium' ? 'primary.main' : 'grey.300',
                         mb: 1,
                         borderRadius: 1,
                         backgroundColor: notification.read ? 'transparent' : 'action.hover'
@@ -237,21 +253,23 @@ const NotificationCenter = () => {
                         {iconMap[notification.type] || iconMap.default}
                       </ListItemIcon>
                       <ListItemText
+                        primaryTypographyProps={{ component: 'div' }}
+                        secondaryTypographyProps={{ component: 'div' }}
                         primary={
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                            <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }} component="span">
                               {notification.title}
                             </Typography>
-                            <Chip 
-                              label={notification.priority} 
+                            <Chip
+                              label={notification.priority}
                               size="small"
                               color={priorityColors[notification.priority] || 'default'}
                             />
                             {!notification.read && (
-                              <Chip 
-                                label="New" 
-                                size="small" 
-                                color="primary" 
+                              <Chip
+                                label="New"
+                                size="small"
+                                color="primary"
                                 variant="outlined"
                               />
                             )}
@@ -270,24 +288,24 @@ const NotificationCenter = () => {
                       />
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                         {!notification.read && (
-                          <IconButton 
-                            size="small" 
+                          <IconButton
+                            size="small"
                             onClick={() => markAsRead(notification._id)}
                             color="primary"
                           >
                             <CheckIcon />
                           </IconButton>
                         )}
-                        <IconButton 
-                          size="small" 
+                        <IconButton
+                          size="small"
                           onClick={() => deleteNotification(notification._id)}
                           color="error"
                         >
                           <DeleteIcon />
                         </IconButton>
                         {notification.actionUrl && (
-                          <Button 
-                            size="small" 
+                          <Button
+                            size="small"
                             variant="outlined"
                             onClick={() => handleNotificationAction(notification)}
                           >
@@ -295,7 +313,7 @@ const NotificationCenter = () => {
                           </Button>
                         )}
                       </Box>
-                    </ListItem>
+                    </ListItemButton>
                     {index < notifications.length - 1 && <Divider />}
                   </React.Fragment>
                 ))

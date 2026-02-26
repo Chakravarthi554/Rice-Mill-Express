@@ -100,7 +100,9 @@ const {
   getPayoutsList = (req, res) => res.status(501).json({ message: 'Function not available' }),
   flagPayment = (req, res) => res.status(501).json({ message: 'Function not available' }),
   exportPaymentReport = (req, res) => res.status(501).json({ message: 'Function not available' }),
-  getSellerPaymentHistory = (req, res) => res.status(501).json({ message: 'Function not available' })
+  getSellerPaymentHistory = (req, res) => res.status(501).json({ message: 'Function not available' }),
+  getCustomerWithdrawals = (req, res) => res.status(501).json({ message: 'Function not available' }),
+  moderateCustomerWithdrawal = (req, res) => res.status(501).json({ message: 'Function not available' })
 } = adminPaymentController;
 
 // ✅ FIXED: Health check for admin API
@@ -168,6 +170,8 @@ router.get('/payments/payouts', protect, admin, getPayoutsList);
 router.post('/payments/flag/:paymentId', protect, admin, flagPayment);
 router.get('/payments/export', protect, admin, exportPaymentReport);
 router.get('/payments/seller/:sellerId', protect, admin, getSellerPaymentHistory);
+router.get('/payments/withdrawals', protect, admin, getCustomerWithdrawals);
+router.put('/payments/withdrawals/:id', protect, admin, moderateCustomerWithdrawal);
 
 console.log('✅ Admin routes loaded successfully');
 

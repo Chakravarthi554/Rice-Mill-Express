@@ -10,28 +10,21 @@ const LegalScreen = ({ navigation }) => {
                     title="Terms of Service"
                     description="Read our terms and conditions"
                     left={props => <List.Icon {...props} icon="file-document-outline" />}
-                    onPress={() => alert('Viewing Terms of Service')}
+                    onPress={() => navigation.navigate('PolicyDetail', { type: 'terms', title: 'Terms of Service' })}
                 />
                 <Divider />
                 <List.Item
                     title="Privacy Policy"
                     description="How we handle your personal data"
                     left={props => <List.Icon {...props} icon="shield-check-outline" />}
-                    onPress={() => alert('Viewing Privacy Policy')}
+                    onPress={() => navigation.navigate('PolicyDetail', { type: 'privacy', title: 'Privacy Policy' })}
                 />
                 <Divider />
                 <List.Item
                     title="Refund & Cancellation Policy"
                     description="Rules for returns and cancellations"
                     left={props => <List.Icon {...props} icon="undo" />}
-                    onPress={() => alert('Viewing Refund Policy')}
-                />
-                <Divider />
-                <List.Item
-                    title="Cookie Policy"
-                    description="How we use cookies"
-                    left={props => <List.Icon {...props} icon="cookie-outline" />}
-                    onPress={() => alert('Viewing Cookie Policy')}
+                    onPress={() => navigation.navigate('PolicyDetail', { type: 'refund', title: 'Refund & Cancellation Policy' })}
                 />
                 <Divider />
                 <List.Item
@@ -45,7 +38,7 @@ const LegalScreen = ({ navigation }) => {
             <View style={styles.helpSection}>
                 <Text style={styles.helpTitle}>Need Help?</Text>
                 <Text style={styles.helpText}>
-                    If you have any questions about our policies or need assistance, 
+                    If you have any questions about our policies or need assistance,
                     please don't hesitate to contact our support team.
                 </Text>
                 <Button

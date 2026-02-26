@@ -12,6 +12,9 @@ import {
     CAMPAIGNS_REQUEST,
     CAMPAIGNS_SUCCESS,
     CAMPAIGNS_FAIL,
+    PUBLIC_SETTINGS_REQUEST,
+    PUBLIC_SETTINGS_SUCCESS,
+    PUBLIC_SETTINGS_FAIL,
 } from '../../constants/rewardsConstants';
 import { apiService } from '../../services/api';
 
@@ -89,6 +92,24 @@ export const getActiveCampaigns = () => async (dispatch) => {
     } catch (error) {
         dispatch({
             type: CAMPAIGNS_FAIL,
+            payload: error.response?.data?.message || error.message,
+        });
+    }
+};
+
+export const getPublicSettings = () => async (dispatch) => {
+    try {
+        dispatch({ type: PUBLIC_SETTINGS_REQUEST });
+
+        const response = await apiService.getPublicSettings();
+
+        dispatch({
+            type: PUBLIC_SETTINGS_SUCCESS,
+            payload: response.data,
+        });
+    } catch (error) {
+        dispatch({
+            type: PUBLIC_SETTINGS_FAIL,
             payload: error.response?.data?.message || error.message,
         });
     }

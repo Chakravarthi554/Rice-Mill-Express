@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
+import { useTranslation } from 'react-i18next';
 import { getOrderDetails, cancelOrder, downloadInvoice } from '../../redux/actions/orderActions';
 import {
   Button,
@@ -42,6 +43,7 @@ const OrderDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { order, loading, error } = useSelector(s => s.orderDetails || {});
   const { loading: cancelLoading, error: cancelError, success: cancelSuccess } = useSelector(s => s.orderCancel || {});
@@ -139,7 +141,7 @@ const OrderDetailPage = () => {
         {/* Progress */}
         <Grid item xs={12} md={order?.orderStatus === 'shipped' || order?.orderStatus === 'out_for_delivery' ? 12 : 12}>
           <Card><CardContent>
-            <Typography variant="h6" gutterBottom>Tracking History</Typography>
+            <Typography variant="h6" gutterBottom>{t('tracking')}</Typography>
             <OrderTimeline
               history={order.statusHistory || []}
               currentStatus={order.orderStatus}
@@ -162,13 +164,13 @@ const OrderDetailPage = () => {
         {/* Items */}
         <Grid item xs={12} md={8}>
           <Card><CardContent>
-            <Typography variant="h6" gutterBottom>Items</Typography>
+            <Typography variant="h6" gutterBottom>{t('orderItems')}</Typography>
             <TableContainer><Table>
               <TableHead><TableRow>
                 <TableCell>Product</TableCell>
-                <TableCell align="right">Qty</TableCell>
-                <TableCell align="right">Price</TableCell>
-                <TableCell align="right">Total</TableCell>
+                <TableCell align="right">{t('quantity')}</TableCell>
+                <TableCell align="right">{t('price')}</TableCell>
+                <TableCell align="right">{t('total')}</TableCell>
               </TableRow></TableHead>
               <TableBody>
                 {(order.orderItems || []).map((it, i) => (
@@ -186,11 +188,11 @@ const OrderDetailPage = () => {
             </Table></TableContainer>
 
             <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-              <Box display="flex" justifyContent="space-between" mb={1}><Typography>Items:</Typography><Typography>₹{Number(order.itemsPrice || 0).toFixed(2)}</Typography></Box>
-              <Box display="flex" justifyContent="space-between" mb={1}><Typography>Shipping:</Typography><Typography>₹{Number(order.shippingPrice || 0).toFixed(2)}</Typography></Box>
-              <Box display="flex" justifyContent="space-between" mb={1}><Typography>Tax:</Typography><Typography>₹{Number(order.taxPrice || 0).toFixed(2)}</Typography></Box>
+              <Box display="flex" justifyContent="space-between" mb={1}><Typography>{t('orderItems')}:</Typography><Typography>₹{Number(order.itemsPrice || 0).toFixed(2)}</Typography></Box>
+              <Box display="flex" justifyContent="space-between" mb={1}><Typography>{t('delivery')}:</Typography><Typography>₹{Number(order.shippingPrice || 0).toFixed(2)}</Typography></Box>
+              <Box display="flex" justifyContent="space-between" mb={1}><Typography>{t('tax') || 'Tax'}:</Typography><Typography>₹{Number(order.taxPrice || 0).toFixed(2)}</Typography></Box>
               <Divider sx={{ my: 1 }} />
-              <Box display="flex" justifyContent="space-between"><Typography variant="h6">Total:</Typography><Typography variant="h6">₹{Number(order.totalPrice || 0).toFixed(2)}</Typography></Box>
+              <Box display="flex" justifyContent="space-between"><Typography variant="h6">{t('total')}:</Typography><Typography variant="h6">₹{Number(order.totalPrice || 0).toFixed(2)}</Typography></Box>
             </Box>
           </CardContent></Card>
         </Grid>
@@ -198,7 +200,7 @@ const OrderDetailPage = () => {
         {/* Actions */}
         <Grid item xs={12} md={4}>
           <Card><CardContent>
-            <Typography variant="h6" gutterBottom>Actions</Typography>
+            <Typography variant="h6" gutterBottom>{t('actions')}</Typography>
             <Box display="flex" flexDirection="column" gap={2}>
               <Button
                 variant="contained"
@@ -244,9 +246,9 @@ const OrderDetailPage = () => {
           {cancelError && <Alert severity="error" sx={{ mt: 2 }}>{cancelError}</Alert>}
         </DialogContent>
         <DialogActions>
-          <Button onClick={closeCancel}>Keep</Button>
+          <Button onClick={closeCancel}>{t('cancel')}</Button>
           <Button onClick={handleCancel} color="error" variant="contained" disabled={cancelLoading}>
-            {cancelLoading ? <CircularProgress size={24} /> : 'Cancel'}
+            {cancelLoading ? <CircularProgress size={24} /> : t('confirm')}
           </Button>
         </DialogActions>
       </Dialog>

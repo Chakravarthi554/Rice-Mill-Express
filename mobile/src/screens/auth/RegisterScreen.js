@@ -11,6 +11,7 @@ import {
     Platform,
     ScrollView,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
 import { useDispatch, useSelector } from 'react-redux';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -24,6 +25,7 @@ export default function RegisterScreen({ navigation }) {
         confirmPassword: '',
         phone: '',
         role: 'customer',
+        referralCode: '',
     });
     const [showPassword, setShowPassword] = useState(false);
 
@@ -31,7 +33,7 @@ export default function RegisterScreen({ navigation }) {
     const { loading, error } = useSelector((state) => state.auth);
 
     const handleRegister = async () => {
-        const { name, email, password, confirmPassword, phone, role } = formData;
+        const { name, email, password, confirmPassword, phone, role, referralCode } = formData;
 
         // Validation
         if (!name || !email || !password || !phone) {
@@ -50,7 +52,16 @@ export default function RegisterScreen({ navigation }) {
         }
 
         try {
-            await dispatch(register({ name, email, password, phone, role })).unwrap();
+            // ✅ Anti-abuse: Identify device
+            // In a real production app, use expo-device or Application.getAndroidId()
+            // Here we'll check if we have a stored fingerprint or create one
+            let deviceId = await AsyncStorage.getItem('deviceFingerprint');
+            if (!deviceId) {
+                deviceId = `mobile-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                await AsyncStorage.setItem('deviceFingerprint', deviceId);
+            }
+
+            await dispatch(register({ name, email, password, phone, role, referralCode, deviceId })).unwrap();
             Alert.alert(
                 'Success',
                 'Account created successfully! Please login.',
@@ -138,6 +149,17 @@ export default function RegisterScreen({ navigation }) {
                             value={formData.confirmPassword}
                             onChangeText={(value) => updateFormData('confirmPassword', value)}
                             secureTextEntry={!showPassword}
+                        />
+                    </View>
+
+                    <View style={styles.inputContainer}>
+                        <MaterialIcons name="card-giftcard" size={24} color="#666" style={styles.icon} />
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Referral Code (Optional)"
+                            value={formData.referralCode}
+                            onChangeText={(value) => updateFormData('referralCode', value)}
+                            autoCapitalize="characters"
                         />
                     </View>
 

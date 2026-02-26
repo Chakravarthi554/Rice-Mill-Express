@@ -2,8 +2,10 @@ const asyncHandler = require('express-async-handler');
 const Message = require('../models/Message');
 const User = require('../models/User');
 const Order = require('../models/Order');
+const Conversation = require('../models/Conversation');
 const KycApplication = require('../models/KycApplication');
-const { sendPushNotification } = require('../utils/socketNotifications');
+const Notification = require('../models/Notification');
+const { sendPushNotification } = require('../utils/pushNotifications');
 
 // @desc    Get all conversations for admin (grouped by user)
 // @route   GET /api/admin/messages/conversations
@@ -211,6 +213,7 @@ const getConversationWithUser = asyncHandler(async (req, res) => {
 const adminSendMessage = asyncHandler(async (req, res) => {
   try {
     const { userId, content, orderId, image } = req.body;
+    const adminId = req.user._id;
 
     if (!userId) {
       return res.status(400).json({ message: 'User ID is required' });
@@ -226,15 +229,36 @@ const adminSendMessage = asyncHandler(async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    // 1. Find or create conversation
+    let conversation = await Conversation.findOne({
+      participants: { $all: [adminId, userId] }
+    });
+
+    if (!conversation) {
+      conversation = await Conversation.create({
+        participants: [adminId, userId],
+        startedBy: adminId,
+        unreadCounts: { [adminId]: 0, [userId]: 0 }
+      });
+    }
+
     const message = await Message.create({
-      sender: req.user._id,
+      sender: adminId,
       receiver: userId,
+      conversationId: conversation._id,
       content: content || '',
       orderId,
       image,
-      sentBy: req.user._id,
+      sentBy: adminId,
       status: 'sent'
     });
+
+    // 3. Update conversation last message
+    conversation.lastMessage = message._id;
+    conversation.isActive = true;
+    const currentUnread = conversation.unreadCounts.get(userId.toString()) || 0;
+    conversation.unreadCounts.set(userId.toString(), currentUnread + 1);
+    await conversation.save();
 
     const populatedMessage = await Message.findById(message._id)
       .populate('sender', 'name email role profileImage')
@@ -243,17 +267,21 @@ const adminSendMessage = asyncHandler(async (req, res) => {
 
     // Send real-time notification
     const io = req.app.get('io');
+    // UNIFY SOCKET EVENTS
+    io.to(`user_${userId}`).emit('chat:message', { message: populatedMessage, conversationId: conversation._id });
+    io.to(`user_${adminId}`).emit('chat:message', { message: populatedMessage, conversationId: conversation._id });
     io.to(`user_${userId}`).emit('NEW_MESSAGE', populatedMessage);
     io.to('admin').emit('ADMIN_MESSAGE_SENT', populatedMessage);
+    io.to('admin_room').emit('chat:message', { message: populatedMessage, conversationId: conversation._id });
 
     // Send push notification to user
     await sendPushNotification([userId], {
       title: 'Admin Message',
       message: content || 'You have a new message from admin',
-      type: 'admin_message',
+      type: 'NEW_CHAT_MESSAGE',
       data: {
         messageId: message._id,
-        adminId: req.user._id
+        adminId: adminId
       }
     });
 
@@ -297,11 +325,32 @@ const markConversationResolved = asyncHandler(async (req, res) => {
     // Notify user
     const io = req.app.get('io');
     io.to(`user_${userId}`).emit('CONVERSATION_RESOLVED', {
-      userId,
-      adminId: req.user._id,
       resolvedAt: new Date(),
       resolutionNotes
     });
+
+    // Create Database Notification for the user
+    const notificationData = {
+      title: 'Support Conversation Resolved',
+      message: resolutionNotes || 'Your support conversation has been marked as resolved by an admin.',
+      type: 'SUPPORT_TICKET',
+      data: {
+        userId,
+        adminId: req.user._id,
+        resolvedAt: new Date()
+      },
+      priority: 'medium'
+    };
+
+    await Notification.create({
+      user: userId,
+      ...notificationData,
+      entityModel: 'User', // Re-routing to User as we don't have a specific ticketId here usually
+      relatedEntity: userId
+    });
+
+    // Send Push Notification
+    await sendPushNotification(userId, notificationData, io);
 
     res.json({
       message: 'Conversation marked as resolved',

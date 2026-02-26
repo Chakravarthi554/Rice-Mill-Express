@@ -6,6 +6,7 @@ import {
   Typography,
   List,
   ListItem,
+  ListItemButton,
   ListItemText,
   IconButton,
   Divider,
@@ -15,6 +16,12 @@ import {
 import { Delete as DeleteIcon, Done as DoneIcon } from '@mui/icons-material';
 import Message from '../../components/common/Message';
 import NotificationCenter from '../../components/common/NotificationCenter';
+import {
+  listNotifications,
+  markNotificationAsRead,
+  deleteNotification,
+  markAllNotificationsAsRead
+} from '../../redux/actions/notificationActions';
 
 // ======================
 // ERROR BOUNDARY
@@ -42,24 +49,32 @@ const NotificationsPage = () => {
   const navigate = useNavigate();
 
   const { notifications = [], loading, error } =
-    useSelector((state) => state.notificationList) || {};
+    useSelector((state) => state.notification) || {};
 
   const { userInfo } = useSelector((state) => state.userLogin) || {};
 
   // Fetch notifications on load
   useEffect(() => {
     if (userInfo) {
-      dispatch({ type: 'NOTIFICATION_LIST_REQUEST' }); 
-      // You can hook your action here later
+      dispatch(listNotifications());
     }
   }, [dispatch, userInfo]);
 
   const handleMarkAsRead = (id) => {
-    dispatch({ type: 'MARK_NOTIFICATIONS_AS_READ', payload: [id] });
+    dispatch(markNotificationAsRead(id));
+  };
+
+  const handleNotificationClick = (notification) => {
+    if (!notification.read) {
+      handleMarkAsRead(notification._id);
+    }
+    if (notification.actionUrl) {
+      navigate(notification.actionUrl);
+    }
   };
 
   const handleDelete = (id) => {
-    dispatch({ type: 'DELETE_NOTIFICATION', payload: id });
+    dispatch(deleteNotification(id));
   };
 
   if (!userInfo) {
@@ -101,7 +116,8 @@ const NotificationsPage = () => {
             <List>
               {notifications.map((notification) => (
                 <React.Fragment key={notification._id}>
-                  <ListItem
+                  <ListItemButton
+                    onClick={() => handleNotificationClick(notification)}
                     secondaryAction={
                       <>
                         <IconButton
@@ -130,7 +146,7 @@ const NotificationsPage = () => {
                         textDecoration: notification.read ? 'none' : 'underline',
                       }}
                     />
-                  </ListItem>
+                  </ListItemButton>
                   <Divider />
                 </React.Fragment>
               ))}
@@ -139,12 +155,7 @@ const NotificationsPage = () => {
             {/* Mark All as Read Button */}
             <Button
               variant="contained"
-              onClick={() =>
-                dispatch({
-                  type: 'MARK_ALL_NOTIFICATIONS_AS_READ',
-                  payload: notifications.filter((n) => !n.read).map((n) => n._id),
-                })
-              }
+              onClick={() => dispatch(markAllNotificationsAsRead())}
               disabled={notifications.every((n) => n.read)}
               sx={{ mt: 2 }}
             >

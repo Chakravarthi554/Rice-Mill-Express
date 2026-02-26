@@ -5,6 +5,34 @@ const jwt = require('jsonwebtoken');
 const firebaseUserSync = require('../services/firebaseUserSync');
 const admin = require('firebase-admin'); // Import firebase-admin
 
+// Record login activity helper
+const recordLoginHistory = async (user, req, status = 'success') => {
+  try {
+    const loginEntry = {
+      ip: req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress,
+      device: req.headers['user-agent']?.slice(0, 100) || 'Unknown',
+      status,
+      timestamp: new Date()
+    };
+
+    // Keep only last 10 entries
+    await User.updateOne(
+      { _id: user._id },
+      {
+        $push: {
+          loginHistory: {
+            $each: [loginEntry],
+            $position: 0,
+            $slice: 10
+          }
+        }
+      }
+    );
+  } catch (err) {
+    console.error('⚠️ Failed to record login history:', err.message);
+  }
+};
+
 // 🔥 CRITICAL FIX: Check JWT secrets
 const checkJWTSecrets = () => {
   if (!process.env.JWT_SECRET) {
@@ -22,7 +50,7 @@ const checkJWTSecrets = () => {
 const registerUser = asyncHandler(async (req, res) => {
   checkJWTSecrets();
 
-  const { name, email, password, phone, role, firebaseUid } = req.body;
+  const { name, email, password, phone, role, firebaseUid, referralCode } = req.body;
 
   // ✅ FIX: Sanitise phone to exactly 10 digits for MongoDB validation
   let sanitisedPhone = phone || '';
@@ -36,6 +64,15 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new Error('User already exists');
   }
 
+  // Handle Referral
+  let referrerId = null;
+  if (referralCode) {
+    const referrer = await User.findOne({ referralCode: referralCode.toUpperCase() });
+    if (referrer) {
+      referrerId = referrer._id;
+    }
+  }
+
   const user = await User.create({
     name,
     email,
@@ -43,6 +80,7 @@ const registerUser = asyncHandler(async (req, res) => {
     phone: sanitisedPhone || undefined,
     role: role || 'customer',
     firebaseUid,
+    referredBy: referrerId,
     kycStatus: role === 'seller' ? 'not_submitted' : 'not_required',
   });
 
@@ -105,6 +143,30 @@ const loginUser = asyncHandler(async (req, res) => {
     await firebaseUserSync.syncUser(user).catch(err =>
       console.error('⚠️  Firestore sync failed (non-critical):', err.message)
     );
+
+    // ✅ 2FA CHECK
+    if (user.twoFactorEnabled) {
+      // Generate OTP
+      const otp = Math.floor(1000 + Math.random() * 9000).toString();
+      const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+
+      await User.updateOne(
+        { _id: user._id },
+        { $set: { otp, otpExpires } }
+      );
+
+      console.log(`🔐 2FA OTP ${otp} generated for user ${user._id}`);
+      // In a real app, send via Email/SMS here.
+
+      return res.json({
+        requires2FA: true,
+        userId: user._id,
+        message: 'Two-factor authentication required. Please enter the OTP sent to your registered contact.'
+      });
+    }
+
+    // Record Success
+    await recordLoginHistory(user, req, 'success');
 
     const accessToken = generateToken(user._id, 'access');
     const refreshToken = generateRefreshToken(user._id);
@@ -214,7 +276,7 @@ const loginWithPhone = asyncHandler(async (req, res) => {
 // @route   POST /api/auth/firebase-login
 // @access  Public
 const firebaseLogin = asyncHandler(async (req, res) => {
-  const { idToken } = req.body;
+  const { idToken, referralCode } = req.body;
 
   if (!idToken) {
     res.status(400);
@@ -228,55 +290,117 @@ const firebaseLogin = asyncHandler(async (req, res) => {
 
     console.log('🔐 Firebase Login: UID:', uid, 'Email:', email, 'Phone:', phone_number);
 
-    // 2. Find user in MongoDB by Firebase UID
-    let user = await User.findOne({ firebaseUid: uid });
+    // 2. Find user in MongoDB by Firebase UID, Email, OR Phone
+    // Normalize phone for lookup
+    let sanitisedPhone = '';
+    if (phone_number) {
+      sanitisedPhone = phone_number.replace(/\D/g, '').slice(-10);
+    }
+
+    const lookupCriteria = [{ firebaseUid: uid }];
+    if (email) lookupCriteria.push({ email });
+    if (sanitisedPhone && sanitisedPhone.length === 10) {
+      lookupCriteria.push({ phone: sanitisedPhone });
+    }
+
+    let user = await User.findOne({ $or: lookupCriteria });
+
+    // Handle Referral for new user if code provided
+    let referrerId = null;
+    if (!user && referralCode) {
+      const referrer = await User.findOne({ referralCode: referralCode.toUpperCase() });
+      if (referrer) {
+        referrerId = referrer._id;
+      }
+    }
 
     if (!user) {
-      // 🔥 BUG FIX #1: Auto-create user for Google/Phone first-time logins
+      // 🔥 BUG FIX: Auto-create user only if NOT found by email/phone either
       console.log('🆕 Firebase Login: Creating new user for UID:', uid);
 
       user = await User.create({
         name: name || email?.split('@')[0] || phone_number || 'User',
         email: email || null,
-        phone: phone_number ? phone_number.replace(/^\+91/, '') : null,
+        phone: sanitisedPhone || null,
         firebaseUid: uid,
         role: 'customer', // Default role - ALWAYS from MongoDB
         isVerified: email_verified || false,
-        profileImage: picture || '/uploads/default_avatar.jpg'
+        profileImage: picture || '/uploads/default_avatar.jpg',
+        referredBy: referrerId
       });
 
       console.log('✅ User created in MongoDB:', user._id, 'Role:', user.role);
+    } else {
+      // Link Firebase UID if existing user found by Email/Phone but missing UID
+      if (!user.firebaseUid || user.firebaseUid !== uid) {
+        console.log(`🔗 Firebase Login: Linking UID ${uid} to existing user ${user.email || user.phone}`);
+        user.firebaseUid = uid;
+        // Optimization: Handle update in the update section below
+      }
     }
 
-    // 3. Update user info if needed (for Google/Phone logins)
+    // 3. Update user info if needed (for Google/Phone logins or Linking)
     let needsUpdate = false;
-    if (email && !user.email) {
+    const updateData = {};
+
+    if (user.firebaseUid === uid && !user.dbFirebaseUidLinked) {
+      // Logic mark if UID was just set above
+      updateData.firebaseUid = uid;
+      needsUpdate = true;
+    }
+
+    // Ensure email is set if Firebase provides it
+    if (email && user.email !== email) {
       user.email = email;
+      updateData.email = email;
       needsUpdate = true;
     }
-    if (phone_number && !user.phone) {
-      user.phone = phone_number.replace(/^\+91/, ''); // Remove country code
+
+    // Ensure phone is set (sanitised) if Firebase provides it
+    if (sanitisedPhone && user.phone !== sanitisedPhone) {
+      user.phone = sanitisedPhone;
+      updateData.phone = sanitisedPhone;
       needsUpdate = true;
     }
-    if (picture && !user.profileImage) {
+
+    // Profile Image
+    if (picture && user.profileImage !== picture) {
       user.profileImage = picture;
+      updateData.profileImage = picture;
       needsUpdate = true;
     }
 
     if (needsUpdate) {
-      await User.updateOne({ _id: user._id }, {
-        $set: {
-          email: user.email,
-          phone: user.phone,
-          profileImage: user.profileImage
-        }
-      });
+      console.log('📝 Firebase Login: Updating user record with Firebase info...');
+      await User.updateOne({ _id: user._id }, { $set: updateData });
     }
 
     // 4. Sync to Firestore (non-blocking - fire and forget)
     firebaseUserSync.syncUser(user).catch(err =>
       console.error('⚠️ Firestore sync failed (non-critical):', err.message)
     );
+
+    // ✅ 2FA CHECK
+    if (user.twoFactorEnabled) {
+      const otp = Math.floor(1000 + Math.random() * 9000).toString();
+      const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+
+      await User.updateOne(
+        { _id: user._id },
+        { $set: { otp, otpExpires } }
+      );
+
+      console.log(`🔐 2FA OTP ${otp} generated for Firebase user ${user._id}`);
+
+      return res.json({
+        requires2FA: true,
+        userId: user._id,
+        message: 'Two-factor authentication required.'
+      });
+    }
+
+    // Record Success
+    await recordLoginHistory(user, req, 'success');
 
     // 5. Generate backend tokens for legacy compatibility
     const accessToken = generateToken(user._id, 'access');
@@ -499,6 +623,52 @@ const verifyOtp = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'OTP verified successfully' });
 });
 
+// @desc    Verify 2FA OTP and complete login
+// @route   POST /api/auth/verify-2fa
+// @access  Public
+const verify2FA = asyncHandler(async (req, res) => {
+  const { userId, otp } = req.body;
+
+  const user = await User.findById(userId).select('+otp +otpExpires');
+  if (!user) {
+    res.status(404);
+    throw new Error('User not found');
+  }
+
+  if (user.otp !== otp || new Date() > user.otpExpires) {
+    res.status(400);
+    throw new Error('Invalid or expired OTP');
+  }
+
+  // Record SUCCESS and record login history
+  await recordLoginHistory(user, req, 'success');
+
+  // Clear OTP
+  await User.updateOne(
+    { _id: user._id },
+    { $unset: { otp: "", otpExpires: "" } }
+  );
+
+  const accessToken = generateToken(user._id, 'access');
+  const refreshToken = generateRefreshToken(user._id);
+  await User.updateOne({ _id: user._id }, { $set: { refreshToken } });
+
+  res.cookie('refreshToken', refreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+
+  res.json({
+    _id: user._id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    accessToken,
+  });
+});
+
 const logoutUser = asyncHandler(async (req, res) => {
   res.clearCookie('refreshToken');
   res.json({ message: 'Logged out successfully' });
@@ -514,5 +684,6 @@ module.exports = {
   verifyOtp,
   logoutUser,
   loginWithGoogle,
-  firebaseLogin
+  firebaseLogin,
+  verify2FA
 };

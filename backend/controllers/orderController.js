@@ -1,8 +1,9 @@
 const asyncHandler = require('express-async-handler');
 const mongoose = require('mongoose');
 const Order = require('../models/Order');
-const User = require('../models/User');
 const Product = require('../models/Product');
+const User = require('../models/User');
+const { processReferralRewards } = require('./rewardsController');
 const Notification = require('../models/Notification');
 const Payment = require('../models/Payment');
 const BulkOrder = require('../models/BulkOrder');
@@ -98,6 +99,7 @@ exports.createOrder = asyncHandler(async (req, res) => {
       name: product.name,
       qty: item.qty,
       price: itemPrice,
+      subtotal: itemPrice * item.qty,
       image: product.images?.[0] || '/images/default-image.jpg',
       seller: sellerId,
     });
@@ -220,9 +222,17 @@ exports.createOrder = asyncHandler(async (req, res) => {
         shippingAddress: {
           name: selectedAddress.name || user.name,
           phone: selectedAddress.phone || user.phone,
+          houseNumber: selectedAddress.houseNumber,
+          colony: selectedAddress.colony,
+          landmark: selectedAddress.landmark,
           street: selectedAddress.street,
-          city: selectedAddress.city, state: selectedAddress.state, pinCode: selectedAddress.pinCode,
-          country: selectedAddress.country, addressType: selectedAddress.type || selectedAddress.addressType,
+          city: selectedAddress.city,
+          state: selectedAddress.state,
+          pinCode: selectedAddress.pinCode,
+          country: selectedAddress.country,
+          alternativePhone: selectedAddress.alternativePhone,
+          location: selectedAddress.location,
+          addressType: selectedAddress.type || selectedAddress.addressType || 'home',
         },
         paymentMethod: finalPaymentMethod,
         totalPrice: data.totalPrice,
@@ -348,7 +358,6 @@ exports.getOrderById = asyncHandler(async (req, res) => {
     const order = await Order.findById(req.params.id)
       .populate('user', 'name phone email')
       .populate('seller', 'name businessDetails.businessName phone email')
-      .populate('orderItems.product', 'name price images')
       .populate('deliveryPartner', 'name phone');
 
     if (!order) {
@@ -415,6 +424,8 @@ exports.updateOrderStatus = asyncHandler(async (req, res) => {
   if (status === 'delivered') {
     order.isDelivered = true;
     order.deliveredAt = Date.now();
+    // Trigger referral rewards
+    processReferralRewards(order._id);
   }
 
   if (status === 'cancelled') {
@@ -501,7 +512,6 @@ exports.getMyOrders = asyncHandler(async (req, res) => {
   try {
     const orders = await Order.find({ user: req.user._id })
       .populate('seller', 'name businessDetails.businessName')
-      .populate('orderItems.product', 'name images')
       .sort({ createdAt: -1 })
       .lean();
 
@@ -622,7 +632,6 @@ exports.getSellerOrders = asyncHandler(async (req, res) => {
       Order.countDocuments(query),
       Order.find(query)
         .populate('user', 'name phone')
-        .populate('orderItems.product', 'name price')
         .populate('deliveryPartner', 'name phone')
         .sort(sort)
         .limit(pageSize)
@@ -826,46 +835,8 @@ exports.updateOrderToDelivered = asyncHandler(async (req, res) => {
       }
     }
 
-    // 2. Referral Bonus (First Order Only)
-    if (user.referredBy && !user.isReferralRewardClaimed) {
-      // Verify this is indeed the first delivered order
-      const deliveredOrdersCount = await Order.countDocuments({
-        user: user._id,
-        orderStatus: 'delivered'
-      });
-
-      if (deliveredOrdersCount === 1) { // This current one is the first
-        // Credit Referrer
-        const referrer = await User.findById(user.referredBy);
-        if (referrer) {
-          const referrerBonus = 500; // Configurable
-          await Reward.create({
-            user: referrer._id,
-            points: referrerBonus,
-            type: 'referral',
-            description: `Referral Bonus for inviting ${user.name}`,
-            status: 'credited'
-          });
-          referrer.rewardsBalance = (referrer.rewardsBalance || 0) + referrerBonus;
-          referrer.referralStats.earnedCredits += referrerBonus;
-          referrer.referralStats.referredUsers += 1; // Increment count
-          await referrer.save();
-        }
-
-        // Credit Referee (New User)
-        const refereeBonus = 200; // Configurable
-        await Reward.create({
-          user: user._id,
-          points: refereeBonus,
-          type: 'referral',
-          description: `Welcome Bonus for using referral code`,
-          status: 'credited'
-        });
-        totalPointsEarned += refereeBonus;
-
-        user.isReferralRewardClaimed = true;
-      }
-    }
+    // 2. Referral Bonus (Handled by processReferralRewards)
+    await processReferralRewards(order._id);
 
     // Update User Balance
     if (totalPointsEarned > 0) {

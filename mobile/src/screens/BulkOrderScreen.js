@@ -12,16 +12,32 @@ import {
   Provider as PaperProvider
 } from 'react-native-paper';
 import { MaterialIcons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
+import axios from 'axios';
 import { getBulkOrders, createBulkOrder, updateBulkOrder } from '../redux/actions/bulkOrderActions';
 import { listProducts } from '../redux/actions/productActions';
+import { listMyAddresses } from '../redux/actions/addressActions';
 
 const BulkOrderScreen = ({ navigation }) => {
   const dispatch = useDispatch();
   const [activeTab, setActiveTab] = useState('active');
   const [selectedProducts, setSelectedProducts] = useState([]);
-  const [shippingInfo, setShippingInfo] = useState({});
+  const [shippingInfo, setShippingInfo] = useState({
+    name: '',
+    phone: '',
+    houseNumber: '',
+    colony: '',
+    street: '',
+    landmark: '',
+    city: '',
+    state: '',
+    pinCode: '',
+    location: null
+  });
   const [paymentTerms, setPaymentTerms] = useState('advance');
   const [notes, setNotes] = useState('');
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [showAddressPicker, setShowAddressPicker] = useState(false);
   const [showProductModal, setShowProductModal] = useState(false);
   const [showActionDialog, setShowActionDialog] = useState(false);
   const [currentOrder, setCurrentOrder] = useState(null);
@@ -35,10 +51,66 @@ const BulkOrderScreen = ({ navigation }) => {
   const auth = useSelector(state => state.auth || {});
   const { user: userInfo } = auth;
 
+  const { addresses = [] } = useSelector(state => state.addressList || {});
+
   useEffect(() => {
     dispatch(getBulkOrders());
     dispatch(listProducts({}));
-  }, [dispatch]);
+    if (userInfo?.role === 'customer') {
+      dispatch(listMyAddresses());
+    }
+  }, [dispatch, userInfo]);
+
+  const handleGetCurrentLocation = async () => {
+    try {
+      setLocationLoading(true);
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        alert('Permission to access location was denied');
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({});
+      const { latitude, longitude } = location.coords;
+
+      const response = await axios.get(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`
+      );
+      const data = response.data;
+
+      if (data && data.address) {
+        setShippingInfo({
+          ...shippingInfo,
+          street: data.address.road || data.address.suburb || '',
+          city: data.address.city || data.address.town || data.address.village || '',
+          state: data.address.state || '',
+          pinCode: data.address.postcode || '',
+          location: { type: 'Point', coordinates: [longitude, latitude] }
+        });
+      }
+    } catch (error) {
+      console.error('Location error:', error);
+      alert('Failed to get current location');
+    } finally {
+      setLocationLoading(false);
+    }
+  };
+
+  const handleSelectAddress = (address) => {
+    setShippingInfo({
+      name: address.name,
+      phone: address.phone,
+      houseNumber: address.houseNumber || '',
+      colony: address.colony || '',
+      street: address.street,
+      landmark: address.landmark || '',
+      city: address.city,
+      state: address.state,
+      pinCode: address.pinCode,
+      location: address.location || null
+    });
+    setShowAddressPicker(false);
+  };
 
   const filteredOrders = Array.isArray(bulkOrders) ? bulkOrders.filter(order => {
     if (!userInfo) return false;
@@ -156,41 +228,82 @@ const BulkOrderScreen = ({ navigation }) => {
                   </DataTable>
 
                   <Text style={styles.sectionTitle}>Shipping Information</Text>
+
+                  <View style={styles.addressActions}>
+                    <Button
+                      mode="outlined"
+                      onPress={() => setShowAddressPicker(true)}
+                      style={styles.addressBtn}
+                    >
+                      Select Saved Address
+                    </Button>
+                    <Button
+                      mode="outlined"
+                      onPress={handleGetCurrentLocation}
+                      loading={locationLoading}
+                      style={styles.addressBtn}
+                    >
+                      Auto-Detect Location
+                    </Button>
+                  </View>
+
                   <TextInput
-                    label="Name"
+                    label="Recipient Name *"
                     value={shippingInfo.name || ''}
                     onChangeText={(text) => setShippingInfo({ ...shippingInfo, name: text })}
                     style={styles.input}
                   />
+                  <View style={styles.row}>
+                    <TextInput
+                      label="House/Flat No *"
+                      value={shippingInfo.houseNumber || ''}
+                      onChangeText={(text) => setShippingInfo({ ...shippingInfo, houseNumber: text })}
+                      style={[styles.input, { flex: 1, marginRight: 8 }]}
+                    />
+                    <TextInput
+                      label="Colony/Area"
+                      value={shippingInfo.colony || ''}
+                      onChangeText={(text) => setShippingInfo({ ...shippingInfo, colony: text })}
+                      style={[styles.input, { flex: 1 }]}
+                    />
+                  </View>
                   <TextInput
-                    label="Phone"
-                    value={shippingInfo.phone || ''}
-                    onChangeText={(text) => setShippingInfo({ ...shippingInfo, phone: text })}
-                    style={styles.input}
-                  />
-                  <TextInput
-                    label="Address"
+                    label="Street Address *"
                     value={shippingInfo.street || ''}
                     onChangeText={(text) => setShippingInfo({ ...shippingInfo, street: text })}
                     multiline
                     style={styles.input}
                   />
                   <TextInput
-                    label="City"
+                    label="Landmark (Optional)"
+                    value={shippingInfo.landmark || ''}
+                    onChangeText={(text) => setShippingInfo({ ...shippingInfo, landmark: text })}
+                    style={styles.input}
+                  />
+                  <TextInput
+                    label="City *"
                     value={shippingInfo.city || ''}
                     onChangeText={(text) => setShippingInfo({ ...shippingInfo, city: text })}
                     style={styles.input}
                   />
+                  <View style={styles.row}>
+                    <TextInput
+                      label="State *"
+                      value={shippingInfo.state || ''}
+                      onChangeText={(text) => setShippingInfo({ ...shippingInfo, state: text })}
+                      style={[styles.input, { flex: 1, marginRight: 8 }]}
+                    />
+                    <TextInput
+                      label="PIN Code *"
+                      value={shippingInfo.pinCode || ''}
+                      onChangeText={(text) => setShippingInfo({ ...shippingInfo, pinCode: text })}
+                      style={[styles.input, { flex: 1 }]}
+                    />
+                  </View>
                   <TextInput
-                    label="State"
-                    value={shippingInfo.state || ''}
-                    onChangeText={(text) => setShippingInfo({ ...shippingInfo, state: text })}
-                    style={styles.input}
-                  />
-                  <TextInput
-                    label="PIN Code"
-                    value={shippingInfo.pinCode || ''}
-                    onChangeText={(text) => setShippingInfo({ ...shippingInfo, pinCode: text })}
+                    label="Phone Number *"
+                    value={shippingInfo.phone || ''}
+                    onChangeText={(text) => setShippingInfo({ ...shippingInfo, phone: text })}
                     style={styles.input}
                   />
 
@@ -515,6 +628,44 @@ const BulkOrderScreen = ({ navigation }) => {
           </Dialog.Actions>
         </Dialog>
       </Portal>
+      {/* Address Picker Modal */}
+      <Portal>
+        <Dialog
+          visible={showAddressPicker}
+          onDismiss={() => setShowAddressPicker(false)}
+          style={styles.modal}
+        >
+          <Dialog.Title>Select Shipping Address</Dialog.Title>
+          <Dialog.Content>
+            <ScrollView style={styles.modalContent}>
+              {addresses.length === 0 ? (
+                <Text>No saved addresses found. Please enter manually.</Text>
+              ) : (
+                addresses.map(addr => (
+                  <Card
+                    key={addr._id}
+                    style={styles.addressCard}
+                    onPress={() => handleSelectAddress(addr)}
+                  >
+                    <Card.Content>
+                      <Text style={styles.addressName}>{addr.name}</Text>
+                      <Text style={styles.addressText}>
+                        {addr.houseNumber}, {addr.colony && `${addr.colony}, `}{addr.street}
+                      </Text>
+                      <Text style={styles.addressText}>
+                        {addr.city}, {addr.state} - {addr.pinCode}
+                      </Text>
+                    </Card.Content>
+                  </Card>
+                ))
+              )}
+            </ScrollView>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setShowAddressPicker(false)}>Cancel</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </PaperProvider>
   );
 };
@@ -549,6 +700,19 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginVertical: 12,
     color: '#333',
+  },
+  addressActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  addressBtn: {
+    flex: 1,
+    marginHorizontal: 4,
+  },
+  row: {
+    flexDirection: 'row',
+    marginBottom: 0,
   },
   input: {
     marginBottom: 12,
@@ -670,6 +834,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   productName: {
+    fontSize: 14,
     flex: 1,
     marginRight: 8,
   },
@@ -680,6 +845,18 @@ const styles = StyleSheet.create({
   discountInput: {
     marginTop: 12,
     backgroundColor: 'white',
+  },
+  addressCard: {
+    marginBottom: 8,
+    elevation: 1,
+  },
+  addressName: {
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  addressText: {
+    fontSize: 12,
+    color: '#666',
   },
 });
 

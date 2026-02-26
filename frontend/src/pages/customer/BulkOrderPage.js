@@ -51,12 +51,17 @@ const BulkOrderPage = () => {
   const [shippingAddress, setShippingAddress] = useState({
     name: '',
     phone: '',
+    houseNumber: '',
+    colony: '',
     street: '',
     city: '',
     state: '',
     pinCode: '',
+    landmark: '',
+    location: null,
   });
   const [paymentTerms, setPaymentTerms] = useState('advance');
+  const [locationLoading, setLocationLoading] = useState(false);
   const [creditDays, setCreditDays] = useState(15);
   const [notes, setNotes] = useState('');
   const [openActionDialog, setOpenActionDialog] = useState(false);
@@ -86,9 +91,48 @@ const BulkOrderPage = () => {
     }
   }, [dispatch, createSuccess, updateSuccess, userInfo]);
 
+  const handleDetectLocation = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser');
+      return;
+    }
+
+    setLocationLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`
+          );
+          const data = await response.json();
+          if (data && data.address) {
+            setShippingAddress((prev) => ({
+              ...prev,
+              street: data.address.road || data.address.suburb || prev.street,
+              city: data.address.city || data.address.town || data.address.village || prev.city,
+              state: data.address.state || prev.state,
+              pinCode: data.address.postcode || prev.pinCode,
+              location: { type: 'Point', coordinates: [longitude, latitude] },
+            }));
+          }
+        } catch (error) {
+          console.error('Reverse geocoding error:', error);
+        } finally {
+          setLocationLoading(false);
+        }
+      },
+      (error) => {
+        console.error('Geolocation error:', error);
+        alert('Unable to retrieve your location');
+        setLocationLoading(false);
+      }
+    );
+  };
+
   const handleCreateOrder = async () => {
-    if (!shippingAddress.street || !shippingAddress.city || !shippingAddress.state || !shippingAddress.pinCode) {
-      alert('Please fill all required shipping address fields');
+    if (!shippingAddress.houseNumber || !shippingAddress.street || !shippingAddress.city || !shippingAddress.state || !shippingAddress.pinCode) {
+      alert('Please fill all required shipping address fields (including House No)');
       return;
     }
     if (selectedProducts.length === 0) {
@@ -118,10 +162,14 @@ const BulkOrderPage = () => {
       setShippingAddress({
         name: userInfo?.name || '',
         phone: '',
+        houseNumber: '',
+        colony: '',
         street: '',
         city: '',
         state: '',
         pinCode: '',
+        landmark: '',
+        location: null,
       });
       setPaymentTerms('advance');
       setNotes('');
@@ -198,9 +246,9 @@ const BulkOrderPage = () => {
   // Filter orders by role
   const filteredOrders = userInfo
     ? bulkOrders.filter((order) => {
-        if (userInfo.role === 'seller') return order.seller?._id === userInfo._id;
-        return order.buyer?._id === userInfo._id;
-      })
+      if (userInfo.role === 'seller') return order.seller?._id === userInfo._id;
+      return order.buyer?._id === userInfo._id;
+    })
     : [];
 
   const requestedOrders = filteredOrders.filter((o) => o.status === 'requested');
@@ -350,14 +398,93 @@ const BulkOrderPage = () => {
 
               {/* Shipping Address */}
               <Box sx={{ mt: 3 }}>
-                <Typography variant="h6" gutterBottom>Shipping Information</Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="h6">Shipping Information</Typography>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={handleDetectLocation}
+                    disabled={locationLoading}
+                    startIcon={locationLoading ? <CircularProgress size={16} /> : <span style={{ fontSize: '18px' }}>📍</span>}
+                  >
+                    {locationLoading ? 'Detecting...' : 'Detect My Current Location'}
+                  </Button>
+                </Box>
                 <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6}><TextField fullWidth label="Full Name *" value={shippingAddress.name} onChange={(e) => setShippingAddress({ ...shippingAddress, name: e.target.value })} /></Grid>
-                  <Grid item xs={12} sm={6}><TextField fullWidth label="Phone Number *" value={shippingAddress.phone} onChange={(e) => setShippingAddress({ ...shippingAddress, phone: e.target.value })} /></Grid>
-                  <Grid item xs={12}><TextField fullWidth label="Street Address *" value={shippingAddress.street} onChange={(e) => setShippingAddress({ ...shippingAddress, street: e.target.value })} /></Grid>
-                  <Grid item xs={12} sm={4}><TextField fullWidth label="City *" value={shippingAddress.city} onChange={(e) => setShippingAddress({ ...shippingAddress, city: e.target.value })} /></Grid>
-                  <Grid item xs={12} sm={4}><TextField fullWidth label="State *" value={shippingAddress.state} onChange={(e) => setShippingAddress({ ...shippingAddress, state: e.target.value })} /></Grid>
-                  <Grid item xs={12} sm={4}><TextField fullWidth label="PIN Code *" value={shippingAddress.pinCode} onChange={(e) => setShippingAddress({ ...shippingAddress, pinCode: e.target.value })} /></Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Recipient Full Name *"
+                      value={shippingAddress.name}
+                      onChange={(e) => setShippingAddress({ ...shippingAddress, name: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Contact Number *"
+                      value={shippingAddress.phone}
+                      onChange={(e) => setShippingAddress({ ...shippingAddress, phone: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="House/Flat No *"
+                      value={shippingAddress.houseNumber}
+                      onChange={(e) => setShippingAddress({ ...shippingAddress, houseNumber: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Colony/Area/Society"
+                      value={shippingAddress.colony}
+                      onChange={(e) => setShippingAddress({ ...shippingAddress, colony: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Street Address *"
+                      value={shippingAddress.street}
+                      multiline
+                      rows={2}
+                      onChange={(e) => setShippingAddress({ ...shippingAddress, street: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Landmark (Optional)"
+                      value={shippingAddress.landmark}
+                      onChange={(e) => setShippingAddress({ ...shippingAddress, landmark: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <TextField
+                      fullWidth
+                      label="City *"
+                      value={shippingAddress.city}
+                      onChange={(e) => setShippingAddress({ ...shippingAddress, city: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <TextField
+                      fullWidth
+                      label="State *"
+                      value={shippingAddress.state}
+                      onChange={(e) => setShippingAddress({ ...shippingAddress, state: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <TextField
+                      fullWidth
+                      label="PIN Code *"
+                      value={shippingAddress.pinCode}
+                      onChange={(e) => setShippingAddress({ ...shippingAddress, pinCode: e.target.value })}
+                    />
+                  </Grid>
                 </Grid>
               </Box>
 
@@ -505,6 +632,45 @@ const BulkOrderPage = () => {
                   <Step key={label}><StepLabel>{label}</StepLabel></Step>
                 ))}
               </Stepper>
+
+              <Grid container spacing={3} sx={{ mt: 1, mb: 3 }}>
+                <Grid item xs={12} md={6}>
+                  <Paper variant="outlined" sx={{ p: 2 }}>
+                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>Shipping Address</Typography>
+                    <Typography variant="body1" fontWeight="medium">{currentOrder.shippingAddress?.name}</Typography>
+                    <Typography variant="body2">{currentOrder.shippingAddress?.houseNumber}, {currentOrder.shippingAddress?.colony && `${currentOrder.shippingAddress?.colony}, `}{currentOrder.shippingAddress?.street}</Typography>
+                    {currentOrder.shippingAddress?.landmark && (
+                      <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>Landmark: {currentOrder.shippingAddress?.landmark}</Typography>
+                    )}
+                    <Typography variant="body2">{currentOrder.shippingAddress?.city}, {currentOrder.shippingAddress?.state} - {currentOrder.shippingAddress?.pinCode}</Typography>
+                    <Typography variant="body2">Phone: {currentOrder.shippingAddress?.phone}</Typography>
+                    {currentOrder.shippingAddress?.location?.coordinates && (
+                      <Button
+                        size="small"
+                        variant="contained"
+                        sx={{ mt: 1 }}
+                        startIcon={<span>📍</span>}
+                        onClick={() => {
+                          const [lng, lat] = currentOrder.shippingAddress.location.coordinates;
+                          window.open(`https://www.google.com/maps?q=${lat},${lng}`, '_blank');
+                        }}
+                      >
+                        Navigate on Map
+                      </Button>
+                    )}
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Paper variant="outlined" sx={{ p: 2, height: '100%' }}>
+                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>Order Info</Typography>
+                    <Typography variant="body2"><strong>Payment:</strong> {currentOrder.paymentDetails?.paymentMethod?.toUpperCase()}</Typography>
+                    <Typography variant="body2"><strong>Placed On:</strong> {new Date(currentOrder.createdAt).toLocaleDateString()}</Typography>
+                    {currentOrder.notes && (
+                      <Typography variant="body2" sx={{ mt: 1 }}><strong>Notes:</strong> {currentOrder.notes}</Typography>
+                    )}
+                  </Paper>
+                </Grid>
+              </Grid>
 
               <TableContainer sx={{ mt: 2 }}>
                 <Table size="small">

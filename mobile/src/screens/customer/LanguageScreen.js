@@ -2,18 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { Card, Title, RadioButton, Divider, Button } from 'react-native-paper';
 import { useDispatch, useSelector } from 'react-redux';
+import { useTranslation } from 'react-i18next';
 import { updatePreferences, resetSettingsStatus } from '../../redux/slices/settingsSlice';
 import io from 'socket.io-client';
 import { API_URL } from '../../config/env';
 
 const LanguageScreen = () => {
+    const { t, i18n } = useTranslation();
     const dispatch = useDispatch();
     const { preferences = {}, loading, success, error } = useSelector((state) => state.settings);
     const { user } = useSelector((state) => state.auth);
 
-    const [localLang, setLocalLang] = useState(preferences?.language || 'english');
-    const [localCurrency, setLocalCurrency] = useState(preferences?.currency || 'INR');
-    const [localRegion, setLocalRegion] = useState(preferences?.region || 'IN');
+    const [localLang, setLocalLang] = useState(i18n.language || 'english');
 
     useEffect(() => {
         if (success) {
@@ -28,9 +28,10 @@ const LanguageScreen = () => {
             if (data.userId === user?._id) {
                 // Update local state to match backend
                 setLocalLang(data.preferences?.language || localLang);
-                setLocalCurrency(data.preferences?.currency || localCurrency);
-                setLocalRegion(data.preferences?.region || localRegion);
-                
+                if (data.preferences?.language) {
+                    i18n.changeLanguage(data.preferences.language);
+                }
+
                 // Update Redux store
                 dispatch({
                     type: 'SETTINGS_UPDATE_RECEIVED',
@@ -55,14 +56,13 @@ const LanguageScreen = () => {
             socket.off('GLOBAL_PREFERENCES_UPDATE', handlePreferenceUpdate);
             socket.disconnect();
         };
-    }, [user?._id, user?.token, localLang, localCurrency, localRegion, dispatch]);
+    }, [user?._id, user?.token, dispatch, i18n]);
 
     const handleSave = () => {
+        i18n.changeLanguage(localLang);
         dispatch(updatePreferences({
             ...preferences,
-            language: localLang,
-            currency: localCurrency,
-            region: localRegion
+            language: localLang
         }));
     };
 
@@ -73,25 +73,35 @@ const LanguageScreen = () => {
         { label: 'Tamil', value: 'tamil' },
     ];
 
-    const regions = [
-        { label: 'India 🇮🇳', value: 'IN' },
-        { label: 'United States 🇺🇸', value: 'US' },
-        { label: 'United Kingdom 🇬🇧', value: 'GB' },
-        { label: 'Australia 🇦🇺', value: 'AU' }
-    ];
+    // Task List:
+    // - [x] Planning & Research
+    //     - [x] Analyze existing mobile settings and navigation
+    //     - [x] Create implementation plan and walkthrough summary
+    //     - [x] Get user approval
+    // - [x] Cleanup & Removals
+    //     - [x] Mobile: Remove "My Subscriptions" feature (Screen, Route, Navigation, Logic)
+    //     - [x] Mobile: Remove "Region & Localization" and "Preferred Currency" blocks
+    //     - [x] Desktop: Remove "Subscription" feature (Component, Side Nav, Route)
+    //     - [x] Desktop: Remove "Region" block from settings
+    //     - [x] Clean up related state and unused imports on both platforms
+    // - [x] i18n Implementation (Common)
+    //     - [x] Set up i18next and react-i18next in both projects
+    //     - [x] Create shared translation files or platform-specific ones (en.json, hi.json, te.json, ta.json)
+    //     - [x] Move static strings into translation files
+    //     - [x] Implement persistent language storage (AsyncStorage/localStorage)
+    //     - [x] Refactor Language switcher components in both apps
+    // - [x] Verification & Bug Fixes
+    //     - [x] Fixed `ReferenceError: useDispatch` in `LanguageScreen.js`
+    //     - [x] Verified instant language switching on all screens
+    //     - [x] Verify persistence across restarts
+    //     - [x] Ensure no regressions in auth, payments, or rewards
 
-    const currencies = [
-        { label: 'Indian Rupee (₹)', value: 'INR' },
-        { label: 'US Dollar ($)', value: 'USD' },
-        { label: 'British Pound (£)', value: 'GBP' },
-        { label: 'Euro (€)', value: 'EUR' }
-    ];
 
     return (
         <ScrollView style={styles.container}>
             <Card style={styles.card}>
                 <Card.Content>
-                    <Title>App Language</Title>
+                    <Title>{t('appLanguage')}</Title>
                     <Divider style={styles.divider} />
                     <RadioButton.Group onValueChange={setLocalLang} value={localLang}>
                         {languages.map((lang) => (
@@ -104,35 +114,6 @@ const LanguageScreen = () => {
                 </Card.Content>
             </Card>
 
-            <Card style={styles.card}>
-                <Card.Content>
-                    <Title>Region & Localization</Title>
-                    <Divider style={styles.divider} />
-                    <RadioButton.Group onValueChange={setLocalRegion} value={localRegion}>
-                        {regions.map((reg) => (
-                            <View key={reg.value} style={styles.radioRow}>
-                                <RadioButton value={reg.value} color="#4CAF50" />
-                                <Text style={styles.radioLabel}>{reg.label}</Text>
-                            </View>
-                        ))}
-                    </RadioButton.Group>
-                </Card.Content>
-            </Card>
-
-            <Card style={styles.card}>
-                <Card.Content>
-                    <Title>Preferred Currency</Title>
-                    <Divider style={styles.divider} />
-                    <RadioButton.Group onValueChange={setLocalCurrency} value={localCurrency}>
-                        {currencies.map((curr) => (
-                            <View key={curr.value} style={styles.radioRow}>
-                                <RadioButton value={curr.value} color="#4CAF50" />
-                                <Text style={styles.radioLabel}>{curr.label}</Text>
-                            </View>
-                        ))}
-                    </RadioButton.Group>
-                </Card.Content>
-            </Card>
 
             <View style={{ padding: 16 }}>
                 <Button
@@ -141,7 +122,7 @@ const LanguageScreen = () => {
                     loading={loading}
                     style={{ backgroundColor: '#4CAF50' }}
                 >
-                    Apply Changes
+                    {t('applyChanges')}
                 </Button>
             </View>
         </ScrollView>

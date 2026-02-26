@@ -13,6 +13,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from 'react-native-paper';
 import { useDispatch, useSelector } from 'react-redux';
+import { useTranslation } from 'react-i18next';
 import { apiService } from '../../services/api';
 import { addToWishlist, removeFromWishlist, getWishlist } from '../../redux/actions/wishlistActions';
 
@@ -22,6 +23,7 @@ export default function HomeScreen({ navigation }) {
     const [refreshing, setRefreshing] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const { colors } = useTheme();
+    const { t } = useTranslation();
 
     useEffect(() => {
         fetchProducts();
@@ -87,7 +89,7 @@ export default function HomeScreen({ navigation }) {
                     />
                     {hasOffer && (
                         <View style={styles.offerBadge}>
-                            <Text style={styles.offerText}>OFFER</Text>
+                            <Text style={styles.offerText}>{t('featuredProducts').toUpperCase()}</Text>
                         </View>
                     )}
                     <TouchableOpacity
@@ -117,9 +119,9 @@ export default function HomeScreen({ navigation }) {
                             <Text style={styles.ratingText}>{item.rating || '4.5'}</Text>
                         </View>
                         {item.stock > 0 || item.countInStock > 0 ? (
-                            <Text style={styles.inStock}>In Stock</Text>
+                            <Text style={styles.inStock}>{t('inStock')}</Text>
                         ) : (
-                            <Text style={styles.outOfStock}>Out of Stock</Text>
+                            <Text style={styles.outOfStock}>{t('outOfStock')}</Text>
                         )}
                     </View>
                 </View>
@@ -131,7 +133,7 @@ export default function HomeScreen({ navigation }) {
         return (
             <View style={styles.centerContainer}>
                 <ActivityIndicator size="large" color="#4CAF50" />
-                <Text style={styles.loadingText}>Loading products...</Text>
+                <Text style={styles.loadingText}>{t('products')}...</Text>
             </View>
         );
     }
@@ -142,7 +144,7 @@ export default function HomeScreen({ navigation }) {
                 <MaterialIcons name="search" size={24} color={colors.onSurfaceVariant} style={styles.searchIcon} />
                 <TextInput
                     style={[styles.searchInput, { color: colors.onSurface }]}
-                    placeholder="Search products..."
+                    placeholder={t('searchPlaceholder')}
                     placeholderTextColor={colors.onSurfaceVariant}
                     value={searchQuery}
                     onChangeText={setSearchQuery}
@@ -166,19 +168,19 @@ export default function HomeScreen({ navigation }) {
                                 onPress={() => navigation.navigate('BulkOrders')}
                             >
                                 <MaterialIcons name="shopping-bag" size={24} color="#fff" />
-                                <Text style={styles.actionButtonText}>Bulk Order</Text>
+                                <Text style={styles.actionButtonText}>{t('bulkOrder')}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={[styles.actionButton, { backgroundColor: '#FF9800' }]}
                                 onPress={() => navigation.navigate('Cart')}
                             >
                                 <MaterialIcons name="shopping-cart" size={24} color="#fff" />
-                                <Text style={styles.actionButtonText}>My Cart</Text>
+                                <Text style={styles.actionButtonText}>{t('myCart')}</Text>
                             </TouchableOpacity>
                         </View>
 
                         <View style={styles.sectionHeader}>
-                            <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>Recommended For You</Text>
+                            <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>{t('recommendedForYou')}</Text>
                         </View>
                         <FlatList
                             horizontal
@@ -189,14 +191,14 @@ export default function HomeScreen({ navigation }) {
                             contentContainerStyle={{ paddingBottom: 15 }}
                         />
                         <View style={styles.sectionHeader}>
-                            <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>All Products</Text>
+                            <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>{t('allProducts')}</Text>
                         </View>
                     </View>
                 }
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
                         <MaterialIcons name="shopping-bag" size={80} color="#ccc" />
-                        <Text style={styles.emptyText}>No products found</Text>
+                        <Text style={styles.emptyText}>{t('noProductsFound')}</Text>
                     </View>
                 }
             />

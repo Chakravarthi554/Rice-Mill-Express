@@ -1,6 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const Message = require('../models/Message');
 const User = require('../models/User');
+const Conversation = require('../models/Conversation');
 const nodemailer = require('nodemailer');
 const path = require('path');
 const fs = require('fs');
@@ -49,15 +50,38 @@ const sendMessage = asyncHandler(async (req, res) => {
     if (!content && !image) return res.status(400).json({ message: 'Either content or image is required' });
 
     try {
+      // 1. Find or create conversation
+      let conversation = await Conversation.findOne({
+        participants: { $all: [senderId, receiverId] }
+      });
+
+      if (!conversation) {
+        conversation = await Conversation.create({
+          participants: [senderId, receiverId],
+          startedBy: senderId,
+          unreadCounts: { [senderId]: 0, [receiverId]: 0 }
+        });
+      }
+
+      // 2. Create message with conversationId
       const message = await Message.create({
         sender: senderId,
         receiver: receiverId,
+        conversationId: conversation._id,
         content: content || '',
         orderId,
         productId,
         image,
         sentBy: senderId,
+        status: 'sent'
       });
+
+      // 3. Update conversation last message
+      conversation.lastMessage = message._id;
+      conversation.isActive = true;
+      const currentUnread = conversation.unreadCounts.get(receiverId.toString()) || 0;
+      conversation.unreadCounts.set(receiverId.toString(), currentUnread + 1);
+      await conversation.save();
 
       const populatedMessage = await Message.findById(message._id)
         .populate('sender', 'name email _id')
@@ -68,17 +92,24 @@ const sendMessage = asyncHandler(async (req, res) => {
       }
 
       const io = req.app.get('io');
-      io.to(`user_${receiverId}`).emit('NEW_MESSAGE', populatedMessage);
+      // UNIFY SOCKET EVENTS
+      io.to(`user_${receiverId}`).emit('chat:message', { message: populatedMessage, conversationId: conversation._id });
+      io.to(`user_${senderId}`).emit('chat:message', { message: populatedMessage, conversationId: conversation._id });
       io.to('admin').emit('NEW_MESSAGE_ADMIN', populatedMessage);
+      io.to('admin_room').emit('chat:message', { message: populatedMessage, conversationId: conversation._id });
 
       const receiver = await User.findById(receiverId);
-      if (!receiver.isOnline) {
-        await transporter.sendMail({
-          from: process.env.EMAIL_USER,
-          to: receiver.email,
-          subject: 'New Message in Rice Mill App',
-          text: `You have a new message from ${req.user.name}: ${content || 'Image/PDF message'}\n\nReply at: ${process.env.FRONTEND_URL}`,
-        });
+      if (receiver && !receiver.isOnline) {
+        try {
+          await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: receiver.email,
+            subject: 'New Message in Rice Mill App',
+            text: `You have a new message from ${req.user.name}: ${content || 'Image/PDF message'}\n\nReply at: ${process.env.FRONTEND_URL}`,
+          });
+        } catch (mailErr) {
+          console.error('Email sending failed:', mailErr.message);
+        }
       }
 
       res.status(201).json(populatedMessage);

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Container, Typography, Button, Grid, Paper, Box, Alert, IconButton, Divider, CircularProgress, Checkbox, FormControlLabel
 } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import { Remove, Add } from '@mui/icons-material';
 import AddressManager from '../../components/customer/AddressManager';
 import PaymentMethodSelector from '../../components/common/PaymentMethodSelector';
@@ -19,6 +20,7 @@ import { RAZORPAY_ORDER_CREATE_RESET } from '../../redux/constants/paymentConsta
 const CheckoutPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const cart = useSelector(s => s.cart);
   const cartItems = cart?.cartItems || [];
@@ -231,7 +233,7 @@ const CheckoutPage = () => {
   return (
     <Container sx={{ py: 4 }}>
       <Typography variant="h4" gutterBottom sx={{ fontWeight: 600, color: 'green' }}>
-        Checkout
+        {t('checkout')}
       </Typography>
 
       {isLoading && <Loader />}
@@ -243,9 +245,9 @@ const CheckoutPage = () => {
         <Grid item xs={12} md={8}>
           {/* Address */}
           <Paper sx={{ p: 3, mb: 3 }}>
-            <Typography variant="h6" gutterBottom>Delivery Address</Typography>
+            <Typography variant="h6" gutterBottom>{t('addresses')}</Typography>
             <AddressManager onSelectAddress={setSelectedAddress} />
-            {!selectedAddress && <Alert severity="info" sx={{ mt: 2 }}>Please select an address</Alert>}
+            {!selectedAddress && <Alert severity="info" sx={{ mt: 2 }}>{t('selectLanguage')}</Alert>}
           </Paper>
 
           {/* Payment */}
@@ -262,7 +264,7 @@ const CheckoutPage = () => {
         {/* ---------- RIGHT COLUMN (SUMMARY) ---------- */}
         <Grid item xs={12} md={4}>
           <Paper sx={{ p: 3, position: 'sticky', top: 20 }}>
-            <Typography variant="h6" gutterBottom>Order Summary</Typography>
+            <Typography variant="h6" gutterBottom>{t('orderSummary') || 'Order Summary'}</Typography>
 
             {cartItems.map((item, idx) => (
               <Box key={item.product._id} sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
@@ -308,11 +310,11 @@ const CheckoutPage = () => {
 
             {/* Delivery Charge */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-              <Typography>Subtotal:</Typography>
+              <Typography>{t('subtotal')}:</Typography>
               <Typography>₹{totalAmount.toFixed(2)}</Typography>
             </Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-              <Typography>Delivery Charge:</Typography>
+              <Typography>{t('delivery')}:</Typography>
               {freeDelivery ? (
                 <Typography color="success.main" fontWeight="bold">FREE</Typography>
               ) : (
@@ -348,7 +350,7 @@ const CheckoutPage = () => {
               </Typography>
             )}
             <Divider sx={{ my: 1 }} />
-            <Typography variant="h6">Grand Total: ₹{finalTotal.toFixed(2)}</Typography>
+            <Typography variant="h6">{t('grandTotal')}: ₹{finalTotal.toFixed(2)}</Typography>
 
             <Button
               fullWidth

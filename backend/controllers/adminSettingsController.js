@@ -45,6 +45,10 @@ const updateAdminSettings = asyncHandler(async (req, res) => {
       sellerCommission,
       autoApproveRecipes,
       autoApproveForumPosts,
+      referralRewardReferrer,
+      referralRewardReferee,
+      minWithdrawalAmount,
+      referralCampaignEnabled,
       appVersion
     } = req.body;
 
@@ -66,6 +70,10 @@ const updateAdminSettings = asyncHandler(async (req, res) => {
     if (sellerCommission !== undefined) updateFields.sellerCommission = sellerCommission;
     if (autoApproveRecipes !== undefined) updateFields.autoApproveRecipes = autoApproveRecipes;
     if (autoApproveForumPosts !== undefined) updateFields.autoApproveForumPosts = autoApproveForumPosts;
+    if (referralRewardReferrer !== undefined) updateFields.referralRewardReferrer = referralRewardReferrer;
+    if (referralRewardReferee !== undefined) updateFields.referralRewardReferee = referralRewardReferee;
+    if (minWithdrawalAmount !== undefined) updateFields.minWithdrawalAmount = minWithdrawalAmount;
+    if (referralCampaignEnabled !== undefined) updateFields.referralCampaignEnabled = referralCampaignEnabled;
     if (appVersion !== undefined) updateFields.appVersion = appVersion;
 
     settings = await AdminSettings.findByIdAndUpdate(
@@ -201,6 +209,10 @@ const resetSettingsToDefault = asyncHandler(async (req, res) => {
       sellerCommission: 85,
       autoApproveRecipes: false,
       autoApproveForumPosts: false,
+      referralRewardReferrer: 500,
+      referralRewardReferee: 200,
+      minWithdrawalAmount: 300,
+      referralCampaignEnabled: true,
       appVersion: {
         android: '1.0.0',
         ios: '1.0.0',
@@ -241,6 +253,12 @@ const getPublicSettings = asyncHandler(async (req, res) => {
         freeDeliveryThreshold: settings.freeDeliveryThreshold,
         deliveryFee: settings.deliveryFee,
         minOrderValue: settings.minOrderValue
+      },
+      referralSettings: {
+        minWithdrawalAmount: settings.minWithdrawalAmount || 300,
+        referralCampaignEnabled: settings.referralCampaignEnabled !== false,
+        referralRewardReferrer: settings.referralRewardReferrer || 500,
+        referralRewardReferee: settings.referralRewardReferee || 200
       },
       supportContact: settings.supportContact || {},
       recipeOfTheDay: settings.recipeOfTheDay || null

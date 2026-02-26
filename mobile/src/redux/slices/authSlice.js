@@ -26,6 +26,11 @@ export const login = createAsyncThunk(
                 }
             );
 
+            // ⚠️ 2FA Check
+            if (response.data.requires2FA) {
+                return response.data; // Return raw response without storing
+            }
+
             // 3. Store token and user info
             await AsyncStorage.setItem('userToken', idToken);
             await AsyncStorage.setItem('userInfo', JSON.stringify(response.data));
@@ -40,7 +45,7 @@ export const login = createAsyncThunk(
 // Async thunk for register
 export const register = createAsyncThunk(
     'auth/register',
-    async ({ name, email, password, phone, role }, { rejectWithValue }) => {
+    async ({ name, email, password, phone, role, referralCode, deviceId }, { rejectWithValue }) => {
         try {
             // 1. Create user in Firebase
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -49,7 +54,7 @@ export const register = createAsyncThunk(
             // 2. Create user profile in backend
             const response = await axios.post(
                 `${API_URL}/api/auth/register`,
-                { name, email, password, phone, role },
+                { name, email, password, phone, role, referralCode, deviceId },
                 {
                     headers: {
                         'Content-Type': 'application/json',
@@ -125,6 +130,10 @@ const authSlice = createSlice({
             })
             .addCase(login.fulfilled, (state, action) => {
                 state.loading = false;
+                if (action.payload.requires2FA) {
+                    // Don't set authenticated yet
+                    return;
+                }
                 state.user = action.payload.user;
                 state.token = action.payload.token;
                 state.isAuthenticated = true;

@@ -20,6 +20,11 @@ const orderItemSchema = new mongoose.Schema({
     required: true,
     min: 0
   },
+  subtotal: {
+    type: Number,
+    required: true,
+    default: function () { return this.qty * this.price; }
+  },
   image: {
     type: String,
     default: '/images/default-image.jpg'
@@ -41,6 +46,9 @@ const shippingAddressSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  houseNumber: String,
+  colony: String,
+  landmark: String,
   street: {
     type: String,
     required: true
@@ -60,6 +68,11 @@ const shippingAddressSchema = new mongoose.Schema({
   country: {
     type: String,
     default: 'India'
+  },
+  alternativePhone: String,
+  location: {
+    type: { type: String, default: 'Point' },
+    coordinates: [Number]
   },
   addressType: {
     type: String,

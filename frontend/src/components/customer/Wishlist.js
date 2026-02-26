@@ -3,11 +3,13 @@ import { Grid, Typography, Button, Card, CardMedia, CardContent, Box, IconButton
 import { Delete as DeleteIcon, ShoppingCart } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import { useTranslation } from 'react-i18next';
 import Loader from '../common/Loader';
 import Price from '../common/Price';
 
 const Wishlist = ({ loadingBuy, handleAddToCart, handleRemoveFromWishlist, handleBuyNow }) => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { wishlistItems = [], loading, error } = useSelector((state) => state.userWishlist || {});
 
   useEffect(() => {
@@ -19,7 +21,7 @@ const Wishlist = ({ loadingBuy, handleAddToCart, handleRemoveFromWishlist, handl
     return (
       <Box sx={{ textAlign: 'center', py: 8 }}>
         <Loader />
-        <Typography variant="body1" sx={{ mt: 2 }}>Loading wishlist...</Typography>
+        <Typography variant="body1" sx={{ mt: 2 }}>{t('loading')}</Typography>
       </Box>
     );
   }
@@ -35,19 +37,19 @@ const Wishlist = ({ loadingBuy, handleAddToCart, handleRemoveFromWishlist, handl
   return (
     <div>
       <Typography variant="h5" gutterBottom sx={{ mb: 3, fontWeight: 'bold' }}>
-        My Wishlist
+        {t('wishlist')}
       </Typography>
 
       {wishlistItems.length === 0 ? (
         <Box sx={{ textAlign: 'center', py: 8 }}>
           <Typography variant="h6" color="text.secondary" gutterBottom>
-            Your wishlist is empty
+            {t('emptyWishlist') || 'Your wishlist is empty'}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Add products to your wishlist by clicking the heart icon
+            {t('emptyWishlistMessage') || 'Add products to your wishlist by clicking the heart icon'}
           </Typography>
           <Button variant="contained" onClick={() => navigate('/')}>
-            Start Shopping
+            {t('startShopping')}
           </Button>
         </Box>
       ) : (
@@ -141,7 +143,7 @@ const Wishlist = ({ loadingBuy, handleAddToCart, handleRemoveFromWishlist, handl
 
                     <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                       <Typography variant="body2" color="text.secondary">
-                        ★ {item.rating || 0} ({item.numReviews || 0} reviews)
+                        ★ {item.rating || 0} ({item.numReviews || 0} {t('reviews')})
                       </Typography>
                     </Box>
 
@@ -154,7 +156,7 @@ const Wishlist = ({ loadingBuy, handleAddToCart, handleRemoveFromWishlist, handl
                         onClick={() => handleAddToCart(item._id)}
                         sx={{ backgroundColor: '#4CAF50', '&:hover': { backgroundColor: '#45A049' } }}
                       >
-                        Add to Cart
+                        {t('addToCart')}
                       </Button>
                       <Button
                         fullWidth
@@ -164,7 +166,7 @@ const Wishlist = ({ loadingBuy, handleAddToCart, handleRemoveFromWishlist, handl
                         onClick={() => handleBuyNow(item._id)}
                         disabled={loadingBuy}
                       >
-                        {loadingBuy ? <Loader size={20} /> : 'Buy Now'}
+                        {loadingBuy ? <Loader size={20} /> : t('buyNow')}
                       </Button>
                     </Box>
                   </CardContent>

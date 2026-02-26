@@ -13,6 +13,7 @@ const RegisterPage = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState('customer');
+  const [referralCode, setReferralCode] = useState('');
   const { register, loading, isAuthenticated, message, setMessage } = useAuth();
 
   useEffect(() => {
@@ -35,7 +36,7 @@ const RegisterPage = () => {
       return;
     }
 
-    const result = await register({ name, email, phone: phoneDigits, password, role });
+    const result = await register({ name, email, phone: phoneDigits, password, role, referralCode });
     if (!result.success) setMessage(result.message || 'Registration failed.');
   };
 
@@ -58,6 +59,15 @@ const RegisterPage = () => {
               <MenuItem value="seller">Seller</MenuItem>
             </Select>
           </FormControl>
+          <TextField
+            margin="normal"
+            fullWidth
+            id="referralCode"
+            label="Referral Code (Optional)"
+            name="referralCode"
+            value={referralCode}
+            onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+          />
           <Button type="submit" fullWidth variant="contained" sx={{ mt: 3, mb: 2 }} disabled={loading}>
             {loading ? <CircularProgress size={24} /> : 'Register'}
           </Button>

@@ -1,7 +1,10 @@
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
-const Reward = require('../models/Reward');
 const Order = require('../models/Order');
+const Campaign = require('../models/Campaign');
+const WalletTransaction = require('../models/WalletTransaction');
+const WithdrawalRequest = require('../models/WithdrawalRequest');
+const Reward = require('../models/Reward');
 
 // ✅ Get user rewards balance and history
 const getUserRewards = asyncHandler(async (req, res) => {
@@ -55,7 +58,7 @@ const redeemRewards = asyncHandler(async (req, res) => {
 
     // Update user balance
     user.rewardsBalance = (user.rewardsBalance || 0) - points;
-    
+
     // Add to rewards history
     user.rewardsHistory.push({
         amount: -points,
@@ -127,6 +130,7 @@ const getReferralInfo = asyncHandler(async (req, res) => {
     res.json({
         success: true,
         referralCode: user.referralCode,
+        code: { code: user.referralCode }, // Compatibility with mobile app
         referralStats: user.referralStats || {
             referredUsers: 0,
             earnedCredits: 0,
@@ -157,44 +161,58 @@ const processReferralRewards = asyncHandler(async (orderId) => {
     });
 
     if (deliveredOrdersCount === 1) {
+        const AdminSettings = require('../models/AdminSettings');
+        const settings = await AdminSettings.getSettings();
+
+        if (!settings.referralCampaignEnabled) return;
+
         // Credit referrer
         if (user.referredBy) {
             const referrer = await User.findById(user.referredBy);
             if (referrer) {
-                const referrerBonus = 500; // Configurable
-                
+                const referrerBonus = settings.referralRewardReferrer || 500;
+
                 // Update referrer
-                referrer.rewardsBalance = (referrer.rewardsBalance || 0) + referrerBonus;
+                referrer.walletBalance = (referrer.walletBalance || 0) + referrerBonus;
                 referrer.referralStats.earnedCredits = (referrer.referralStats.earnedCredits || 0) + referrerBonus;
+                referrer.referralStats.totalEarnings = (referrer.referralStats.totalEarnings || 0) + referrerBonus;
                 referrer.referralStats.referredUsers = (referrer.referralStats.referredUsers || 0) + 1;
-                
+
                 await referrer.save();
 
-                // Create reward record
-                await Reward.create({
+                // Create Wallet Transaction
+                await WalletTransaction.create({
                     user: referrer._id,
-                    points: referrerBonus,
-                    type: 'referral',
+                    amount: referrerBonus,
+                    type: 'referral_award',
+                    status: 'completed',
                     description: `Referral Bonus for inviting ${user.name}`,
-                    status: 'credited'
+                    referenceId: user._id,
+                    referenceType: 'User',
+                    balanceAfter: referrer.walletBalance
                 });
             }
         }
 
         // Credit referee
-        const refereeBonus = 200;
-        user.rewardsBalance = (user.rewardsBalance || 0) + refereeBonus;
+        const refereeBonus = settings.referralRewardReferee || 200;
+        user.walletBalance = (user.walletBalance || 0) + refereeBonus;
         user.isReferralRewardClaimed = true;
+        user.referralStats.earnedCredits = (user.referralStats.earnedCredits || 0) + refereeBonus;
+        user.referralStats.totalEarnings = (user.referralStats.totalEarnings || 0) + refereeBonus;
 
         await user.save();
 
-        // Create reward record
-        await Reward.create({
+        // Create Wallet Transaction
+        await WalletTransaction.create({
             user: user._id,
-            points: refereeBonus,
-            type: 'referral',
+            amount: refereeBonus,
+            type: 'signup_award',
+            status: 'completed',
             description: `Welcome Bonus for using referral code`,
-            status: 'credited'
+            referenceId: user._id,
+            referenceType: 'User',
+            balanceAfter: user.walletBalance
         });
     }
 });
@@ -222,10 +240,153 @@ const syncRewards = asyncHandler(async (req, res) => {
     });
 });
 
+// ✅ Get wallet data (balance and recent transactions)
+const getWalletData = asyncHandler(async (req, res) => {
+    const user = await User.findById(req.user._id).select('walletBalance');
+    const transactions = await WalletTransaction.find({ user: req.user._id })
+        .sort({ createdAt: -1 })
+        .limit(20);
+
+    res.json({
+        success: true,
+        balance: user.walletBalance || 0,
+        transactions
+    });
+});
+
+// ✅ Request withdrawal
+const requestWithdrawal = asyncHandler(async (req, res) => {
+    const { amount, bankDetails } = req.body;
+    const user = await User.findById(req.user._id);
+
+    const AdminSettings = require('../models/AdminSettings');
+    const settings = await AdminSettings.getSettings();
+    const minWithdrawal = settings.minWithdrawalAmount || 300;
+
+    if (amount < minWithdrawal) {
+        res.status(400);
+        throw new Error(`Minimum withdrawal amount is ₹${minWithdrawal}`);
+    }
+
+    if (user.walletBalance < amount) {
+        res.status(400);
+        throw new Error('Insufficient wallet balance');
+    }
+
+    // Create withdrawal request
+    const withdrawal = await WithdrawalRequest.create({
+        user: req.user._id,
+        amount,
+        bankDetails,
+        status: 'pending'
+    });
+
+    // Deduct from wallet balance immediately (locked)
+    user.walletBalance -= amount;
+    await user.save();
+
+    // Create transaction record
+    await WalletTransaction.create({
+        user: req.user._id,
+        amount: -amount,
+        type: 'withdrawal',
+        status: 'pending',
+        description: `Withdrawal request for ₹${amount}`,
+        referenceId: withdrawal._id,
+        referenceType: 'WithdrawalRequest',
+        balanceAfter: user.walletBalance
+    });
+
+    res.status(201).json({
+        success: true,
+        message: 'Withdrawal request submitted',
+        withdrawal
+    });
+});
+
+// ✅ Get user withdrawal history
+const getWithdrawalHistory = asyncHandler(async (req, res) => {
+    const history = await WithdrawalRequest.find({ user: req.user._id })
+        .sort({ createdAt: -1 });
+
+    res.json({
+        success: true,
+        withdrawals: history
+    });
+});
+
+// ✅ Admin: Get all withdrawal requests
+const adminGetWithdrawals = asyncHandler(async (req, res) => {
+    const withdrawals = await WithdrawalRequest.find({})
+        .populate('user', 'name email phone')
+        .sort({ createdAt: -1 });
+
+    res.json({
+        success: true,
+        withdrawals
+    });
+});
+
+// ✅ Admin: Update withdrawal status (Approve/Reject)
+const adminUpdateWithdrawal = asyncHandler(async (req, res) => {
+    const { status, adminNotes, transactionId } = req.body;
+    const withdrawal = await WithdrawalRequest.findById(req.params.id);
+
+    if (!withdrawal) {
+        res.status(404);
+        throw new Error('Withdrawal request not found');
+    }
+
+    if (withdrawal.status !== 'pending') {
+        res.status(400);
+        throw new Error('Request already processed');
+    }
+
+    withdrawal.status = status;
+    withdrawal.adminNotes = adminNotes;
+    if (transactionId) withdrawal.transactionId = transactionId;
+    if (status === 'approved' || status === 'processed') {
+        withdrawal.processedAt = Date.now();
+    }
+
+    await withdrawal.save();
+
+    const user = await User.findById(withdrawal.user);
+
+    if (status === 'rejected') {
+        // Refund the amount to wallet
+        user.walletBalance += withdrawal.amount;
+        await user.save();
+
+        // Update transaction status
+        await WalletTransaction.findOneAndUpdate(
+            { referenceId: withdrawal._id, type: 'withdrawal' },
+            { status: 'failed', description: `Withdrawal rejected: ${adminNotes}`, balanceAfter: user.walletBalance }
+        );
+    } else if (status === 'approved' || status === 'processed') {
+        // Mark transaction as completed
+        await WalletTransaction.findOneAndUpdate(
+            { referenceId: withdrawal._id, type: 'withdrawal' },
+            { status: 'completed' }
+        );
+    }
+
+    res.json({
+        success: true,
+        message: `Withdrawal ${status}`,
+        withdrawal
+    });
+});
+
 module.exports = {
     getUserRewards,
     redeemRewards,
     getReferralInfo,
     processReferralRewards,
-    syncRewards
+    syncRewards,
+    getWalletData,
+    requestWithdrawal,
+    getWithdrawalHistory,
+    adminGetWithdrawals,
+    adminUpdateWithdrawal
 };

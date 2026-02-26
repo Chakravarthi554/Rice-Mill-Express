@@ -16,7 +16,7 @@ import AddressManager from './AddressManager';
 import BasicInfo from './BasicInfo';
 import SecuritySettings from './SecuritySettings';
 import PreferencesSettings from './PreferencesSettings';
-import PersonalizationSettings from './PersonalizationSettings';
+
 import ReferralKycSettings from './ReferralKycSettings';
 import SettingsPlaceholder from './SettingsPlaceholder';
 
@@ -48,7 +48,7 @@ const Profile = () => {
           <Tab icon={<LocationOnOutlined />} iconPosition="start" label="Address & Contact" />
           <Tab icon={<TuneOutlined />} iconPosition="start" label="Preferences" />
           <Tab icon={<LockOutlined />} iconPosition="start" label="Security" />
-          <Tab icon={<PaletteOutlined />} iconPosition="start" label="Personalization" />
+
           <Tab icon={<ShareOutlined />} iconPosition="start" label="Referrals & KYC" />
         </Tabs>
       </Box>
@@ -64,9 +64,7 @@ const Profile = () => {
       <TabPanel value={value} index={3}>
         <SecuritySettings />
       </TabPanel>
-      <TabPanel value={value} index={4}>
-        <PersonalizationSettings />
-      </TabPanel>
+
       <TabPanel value={value} index={5}>
         <ReferralKycSettings />
       </TabPanel>

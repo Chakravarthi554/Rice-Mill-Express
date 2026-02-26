@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
-import { Card, Title, List, Switch, Divider, Button } from 'react-native-paper';
+import { Card, Title, List, Switch, Divider, Button, useTheme } from 'react-native-paper';
 import Slider from '@react-native-community/slider';
 
 import { useDispatch, useSelector } from 'react-redux';

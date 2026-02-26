@@ -41,7 +41,8 @@ const notificationSchema = new mongoose.Schema(
         'SOCIAL_LIKE',
         'SOCIAL_COMMENT',
         'SOCIAL_SHARE',
-        'SOCIAL_RATE'
+        'SOCIAL_RATE',
+        'SUPPORT_TICKET'
       ],
       required: true
     },
@@ -81,7 +82,8 @@ const notificationSchema = new mongoose.Schema(
         'Product',
         'Message',
         'Payout',
-        'Notification'
+        'Notification',
+        'SupportTicket'
       ]
     },
     actionUrl: {

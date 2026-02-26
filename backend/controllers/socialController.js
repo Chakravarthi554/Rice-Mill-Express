@@ -10,16 +10,48 @@ const Rating = require('../models/Rating');
 const Share = require('../models/Share');
 const Order = require('../models/Order');
 const mongoose = require('mongoose');
+const { anonymizeUser } = require('../utils/userVisibility');
 const { getAsync, setAsync, client: redisClient } = require('../utils/redis');
+
+// Helper to reconcile cached counters with actual document counts
+const syncEngagementCounts = async (Model, targetId) => {
+  const [likesCount, commentsCount, sharesCount] = await Promise.all([
+    Like.countDocuments({ targetId }),
+    Comment.countDocuments({ targetId, approved: true }), // Only approved comments
+    Share.countDocuments({ targetId })
+  ]);
+
+  const updateData = { likesCount, commentsCount, sharesCount };
+
+  // also handle average rating for Recipes if possible, but usually handled by rateItem
+  const updatedItem = await Model.findByIdAndUpdate(targetId, { $set: updateData }, { new: true });
+
+  // Invalidate Redis cache
+  const cacheKey = `engagement:${targetId}`;
+  await setAsync(cacheKey, JSON.stringify(updatedItem), 'EX', 3600);
+
+  return updatedItem;
+};
 
 // Helper for atomic counter updates and Redis cache invalidation
 const updateEngagementCount = async (Model, targetId, field, amount) => {
-  const update = { $inc: { [field]: amount } };
+  // Use atomic increment but also safeguard against negatives
+  const item = await Model.findById(targetId).select(field);
+  let finalAmount = amount;
+
+  if (item && item[field] + amount < 0) {
+    finalAmount = -item[field]; // Set to 0
+  }
+
+  const update = { $inc: { [field]: finalAmount } };
   const updatedItem = await Model.findByIdAndUpdate(targetId, update, { new: true });
 
-  // Invalidate Redis cache for this item's engagement stats
+  // Trigger a full sync in the background for eventual consistency
+  syncEngagementCounts(Model, targetId).catch(err => console.error('Sync error:', err));
+
+  // Invalidate Redis cache
   const cacheKey = `engagement:${targetId}`;
-  await setAsync(cacheKey, JSON.stringify(updatedItem), 'EX', 3600); // 1 hour cache
+  await setAsync(cacheKey, JSON.stringify(updatedItem), 'EX', 3600);
 
   return updatedItem;
 };
@@ -73,10 +105,13 @@ const likeItem = asyncHandler(async (req, res) => {
     const itemOwnerId = updatedItem.sellerId || updatedItem.seller || updatedItem.userId;
 
     if (itemOwnerId && itemOwnerId.toString() !== userId.toString()) {
+      const owner = await User.findById(itemOwnerId).select('role');
+      const senderName = anonymizeUser(req.user, owner)?.name || 'Someone';
+
       await Notification.create({
         user: itemOwnerId,
         type: 'SOCIAL_LIKE',
-        message: `${req.user.name} liked your ${targetType.toLowerCase()}`,
+        message: `${senderName} liked your ${targetType.toLowerCase()}`,
         relatedEntity: id,
         entityModel: targetType
       });
@@ -102,8 +137,8 @@ const likeItem = asyncHandler(async (req, res) => {
           engagementType: 'like',
           itemType: targetType,
           itemId: id,
-          userName: req.user.name,
-          userProfilePic: req.user.profilePic,
+          userName: anonymizeUser(req.user, { role: 'seller' }).name, // Sellers see based on privacy settings
+          userProfilePic: anonymizeUser(req.user, { role: 'seller' }).profilePic,
           createdAt: new Date(),
           counts: {
             likes: updatedItem.likesCount,
@@ -154,15 +189,18 @@ const addComment = asyncHandler(async (req, res) => {
 
   const updatedItem = await updateEngagementCount(Model, id, 'commentsCount', 1);
 
-  const populatedComment = await Comment.findById(comment._id).populate('userId', 'name profilePic');
+  const populatedComment = await Comment.findById(comment._id).populate('userId', 'name profilePic isProfilePublic privacySettings');
 
   // Notify owner
   const itemOwnerId = updatedItem.sellerId || updatedItem.seller || updatedItem.userId;
   if (itemOwnerId && itemOwnerId.toString() !== userId.toString()) {
+    const owner = await User.findById(itemOwnerId).select('role');
+    const senderName = anonymizeUser(req.user, owner)?.name || 'Someone';
+
     await Notification.create({
       user: itemOwnerId,
       type: 'SOCIAL_COMMENT',
-      message: `${req.user.name} commented on your ${targetType.toLowerCase()}`,
+      message: `${senderName} commented on your ${targetType.toLowerCase()}`,
       relatedEntity: id,
       entityModel: targetType
     });
@@ -171,11 +209,16 @@ const addComment = asyncHandler(async (req, res) => {
   // 🔥 Real-time socket events
   if (req.io) {
     const itemRoom = `${type.slice(0, -1)}_${id}`;
+
+    // Create anonymized version for broadcast
+    const anonymizedComment = populatedComment.toObject();
+    anonymizedComment.userId = anonymizeUser(populatedComment.userId, null);
+
     req.io.to(itemRoom).emit('SOCIAL_UPDATE', {
       type: 'COMMENT_ADDED',
       itemType: targetType,
       itemId: id,
-      comment: populatedComment,
+      comment: anonymizedComment,
       commentsCount: updatedItem.commentsCount
     });
 
@@ -186,8 +229,8 @@ const addComment = asyncHandler(async (req, res) => {
         engagementType: 'comment',
         itemType: targetType,
         itemId: id,
-        userName: req.user.name,
-        userProfilePic: req.user.profilePic,
+        userName: anonymizeUser(req.user, { role: 'seller' }).name,
+        userProfilePic: anonymizeUser(req.user, { role: 'seller' }).profilePic,
         createdAt: new Date(),
         counts: {
           likes: updatedItem.likesCount,
@@ -231,15 +274,21 @@ const getComments = asyncHandler(async (req, res) => {
   }
 
   const comments = await Comment.find(query)
-    .populate('userId', 'name profilePic')
+    .populate('userId', 'name profilePic isProfilePublic privacySettings')
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limit);
 
+  const anonymizedComments = comments.map(comment => {
+    const commentObj = comment.toObject();
+    commentObj.userId = anonymizeUser(comment.userId, req.user);
+    return commentObj;
+  });
+
   const totalComments = await Comment.countDocuments(query);
 
   res.json({
-    comments,
+    comments: anonymizedComments,
     page,
     pages: Math.ceil(totalComments / limit),
     total: totalComments
@@ -508,10 +557,13 @@ const rateItem = asyncHandler(async (req, res) => {
 
       // Add persistent Notification
       if (itemOwnerId && itemOwnerId.toString() !== userId.toString()) {
+        const owner = await User.findById(itemOwnerId).select('role');
+        const senderName = anonymizeUser(req.user, owner)?.name || 'Someone';
+
         await Notification.create({
           user: itemOwnerId,
           type: 'SOCIAL_RATE',
-          message: `${req.user.name} rated your ${targetType.toLowerCase()} ${rating} stars`,
+          message: `${senderName} rated your ${targetType.toLowerCase()} ${rating} stars`,
           relatedEntity: id,
           entityModel: targetType
         });
@@ -524,8 +576,8 @@ const rateItem = asyncHandler(async (req, res) => {
           itemType: targetType,
           itemId: id,
           rating: Number(rating),
-          userName: req.user.name,
-          userProfilePic: req.user.profilePic,
+          userName: anonymizeUser(req.user, { role: 'seller' }).name,
+          userProfilePic: anonymizeUser(req.user, { role: 'seller' }).profilePic,
           createdAt: new Date(),
           counts: {
             likes: item.likesCount,
@@ -1014,16 +1066,22 @@ const getSortedComments = asyncHandler(async (req, res) => {
   }
 
   const comments = await Comment.find(query)
-    .populate('userId', 'name profilePic')
+    .populate('userId', 'name profilePic isProfilePublic privacySettings')
     .sort(sortCriteria)
     .skip(skip)
     .limit(limit);
 
   const total = await Comment.countDocuments(query);
 
+  const anonymizedComments = comments.map(comment => {
+    const commentObj = comment.toObject();
+    commentObj.userId = anonymizeUser(comment.userId, req.user);
+    return commentObj;
+  });
+
   res.json({
     success: true,
-    comments,
+    comments: anonymizedComments,
     total,
     page: Number(page),
     pages: Math.ceil(total / Number(limit))
@@ -1043,12 +1101,18 @@ const getCommentReplies = asyncHandler(async (req, res) => {
   // }
 
   const replies = await Comment.find(query)
-    .populate('userId', 'name profilePic')
+    .populate('userId', 'name profilePic isProfilePublic privacySettings')
     .sort({ createdAt: 1 }); // Oldest first for threads
+
+  const anonymizedReplies = replies.map(reply => {
+    const replyObj = reply.toObject();
+    replyObj.userId = anonymizeUser(reply.userId, req.user);
+    return replyObj;
+  });
 
   res.json({
     success: true,
-    replies,
+    replies: anonymizedReplies,
     total: replies.length
   });
 });
@@ -1091,7 +1155,8 @@ const getSocialStats = asyncHandler(async (req, res) => {
 // @desc    Get reviews for a product
 // @route   GET /api/products/:id/reviews
 // @access  Public
-const getProductReviews = asyncHandler(async (req, res) => {
+const getProductReviews =
+  asyncHandler(async (req, res) => {
   const { id } = req.params;
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 10;
@@ -1103,16 +1168,22 @@ const getProductReviews = asyncHandler(async (req, res) => {
   }
 
   const reviews = await Rating.find(query)
-    .populate('userId', 'name profilePic')
+    .populate('userId', 'name profilePic isProfilePublic privacySettings')
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limit);
 
   const total = await Rating.countDocuments(query);
 
+  const anonymizedReviews = reviews.map(review => {
+    const reviewObj = review.toObject();
+    reviewObj.userId = anonymizeUser(review.userId, req.user);
+    return reviewObj;
+  });
+
   res.json({
     success: true,
-    reviews,
+    reviews: anonymizedReviews,
     total,
     page: Number(page),
     pages: Math.ceil(total / Number(limit))
@@ -1139,5 +1210,6 @@ module.exports = {
   getSocialAnalytics,
   replyToComment,
   rateItem,
-  getProductReviews
+  getProductReviews,
+  syncEngagementCounts
 };

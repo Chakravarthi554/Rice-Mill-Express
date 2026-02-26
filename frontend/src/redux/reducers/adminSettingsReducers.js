@@ -38,12 +38,20 @@ export const adminSettingsReducer = (state = initialState, action) => {
     case ADMIN_SETTINGS_SUCCESS:
     case ADMIN_SETTINGS_UPDATE_SUCCESS:
     case ADMIN_SETTINGS_RESET_SUCCESS:
+    case PUBLIC_SETTINGS_SUCCESS:
       return {
         ...state,
         loading: false,
         settings: action.payload,
+        publicSettings: action.payload.referralSettings ? action.payload : state.publicSettings,
         error: null
       };
+
+    case PUBLIC_SETTINGS_REQUEST:
+      return { ...state, loading: true };
+
+    case PUBLIC_SETTINGS_FAIL:
+      return { ...state, loading: false, error: action.payload };
 
     case ADMIN_SETTINGS_FAIL:
     case ADMIN_SETTINGS_UPDATE_FAIL:

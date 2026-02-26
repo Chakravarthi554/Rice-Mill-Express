@@ -13,13 +13,17 @@ import AnalyticsTab from '../components/admin/tabs/AnalyticsTab';
 import DeliveryKYCApproval from '../components/admin/DeliveryKYCApproval';
 
 import AdminReportsPanel from '../components/admin/AdminReportsPanel';
+import AdminSupportDashboard from '../components/admin/AdminSupportDashboard';
+import WithdrawalManagement from '../components/admin/WithdrawalManagement';
 
 const tabs = [
   { label: 'Overview', icon: 'Dashboard', component: <OverviewTab /> },
+  { label: 'Support Tickets', icon: 'SupportAgent', component: <AdminSupportDashboard /> },
   { label: 'Users', icon: 'People', component: <UsersTab /> }, // NEW
   { label: 'Orders', icon: 'ShoppingCart', component: <OrdersTab /> }, // NEW
   { label: 'Analytics', icon: 'Assessment', component: <AnalyticsTab /> },
   { label: 'Payments', icon: 'Payments', component: <PaymentsTab /> },
+  { label: 'Referral Withdrawals', icon: 'AccountBalanceWallet', component: <WithdrawalManagement /> },
   { label: 'KYC Review', icon: 'LocalShipping', component: <KycReviewTab /> },
   { label: 'Delivery KYC', icon: 'DeliveryDining', component: <DeliveryKYCApproval /> },
   { label: 'Recipes', icon: 'RestaurantMenu', component: <RecipesTab /> },

@@ -10,10 +10,12 @@ import { addToCart, listMyCart } from '../../redux/actions/cartActions';
 import { addToWishlist } from '../../redux/actions/userActions';
 import Message from '../common/Message';
 import Price from '../common/Price';
+import { useTranslation } from 'react-i18next';
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { t } = useTranslation();
 
 
   const [loadingBuy, setLoadingBuy] = useState(false);
@@ -97,31 +99,31 @@ const Dashboard = () => {
     <Box sx={{ p: 2 }}>
       {/* Welcome Section */}
       <Typography variant="h5" gutterBottom sx={{ mb: 3, fontWeight: 'bold', color: 'primary.main' }}>
-        Welcome back, {userInfo?.name || 'Customer'}
+        {t('welcomeBack', { name: userInfo?.name || 'Customer' })}
       </Typography>
 
       {/* Quick Action Buttons */}
       <Grid container spacing={2} sx={{ mb: 4 }}>
         <Grid item xs={12} sm={6} md={4}>
           <Button fullWidth variant="contained" color="secondary" onClick={() => navigate('/bulk-order')} sx={{ py: 2, borderRadius: 2, fontWeight: 'bold' }}>
-            Bulk Order
+            {t('bulkOrder')}
           </Button>
         </Grid>
         <Grid item xs={12} sm={6} md={4}>
           <Button fullWidth variant="outlined" color="primary" onClick={() => navigate('/cart')} sx={{ py: 2, borderRadius: 2, fontWeight: 'bold' }}>
-            View Cart ({cartItems.length})
+            {t('viewCart')} ({cartItems.length})
           </Button>
         </Grid>
         <Grid item xs={12} sm={6} md={4}>
           <Button fullWidth variant="outlined" color="secondary" onClick={() => navigate('/wishlist')} sx={{ py: 2, borderRadius: 2, fontWeight: 'bold' }}>
-            My Wishlist
+            {t('myWishlist')}
           </Button>
         </Grid>
       </Grid>
 
       {/* Products Section */}
       <Typography variant="h6" gutterBottom sx={{ mt: 4, mb: 2, fontWeight: 'bold', color: 'text.primary' }}>
-        Featured Products
+        {t('featuredProducts')}
       </Typography>
 
       {productLoading ? (
@@ -176,7 +178,7 @@ const Dashboard = () => {
                         </Typography>
                       )}
                       {hasOffer && (
-                        <Chip label="OFFER" size="small" color="error" sx={{ height: 20, fontSize: '0.7rem' }} />
+                        <Chip label={t('featuredProducts').toUpperCase()} size="small" color="error" sx={{ height: 20, fontSize: '0.7rem' }} />
                       )}
                     </Box>
 
@@ -202,7 +204,7 @@ const Dashboard = () => {
                           }}
                           sx={{ flex: 1, backgroundColor: 'success.main', '&:hover': { backgroundColor: 'success.dark' } }}
                         >
-                          Add to Cart
+                          {t('addToCart')}
                         </Button>
                         <Button
                           variant="outlined"
@@ -213,7 +215,7 @@ const Dashboard = () => {
                           }}
                           sx={{ flex: 1, color: 'primary.main', borderColor: 'primary.main', '&:hover': { borderColor: 'primary.dark', color: 'primary.dark' } }}
                         >
-                          Wishlist
+                          {t('wishlist')}
                         </Button>
                       </Box>
                       <Box sx={{ display: 'flex', gap: 1 }}>
@@ -228,7 +230,7 @@ const Dashboard = () => {
                           disabled={loadingBuy && buyingProductId === product._id}
                           sx={{ flex: 1 }}
                         >
-                          {loadingBuy && buyingProductId === product._id ? <CircularProgress size={20} color="inherit" /> : 'Buy Now'}
+                          {loadingBuy && buyingProductId === product._id ? <CircularProgress size={20} color="inherit" /> : t('buyNow')}
                         </Button>
                       </Box>
                     </Box>
@@ -241,7 +243,7 @@ const Dashboard = () => {
       ) : (
         <Box sx={{ textAlign: 'center', p: 4 }}>
           <Typography variant="body1" color="text.secondary">
-            No products available at the moment.
+            {t('noProductsFound')}
           </Typography>
         </Box>
       )

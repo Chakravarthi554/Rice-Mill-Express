@@ -75,7 +75,7 @@ const ContactForm = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
+
         if (!validateForm()) {
             return;
         }
@@ -83,18 +83,24 @@ const ContactForm = () => {
         try {
             setLoading(true);
             setError('');
-            
+
             const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-            const response = await axios.post(`${API_BASE_URL}/api/legal/contact`, {
-                name: formData.name,
-                email: formData.email,
+            const config = {
+                headers: {
+                    Authorization: `Bearer ${userInfo.token}`
+                }
+            };
+
+            const response = await axios.post(`${API_BASE_URL}/api/support/tickets`, {
                 subject: formData.subject,
                 message: formData.message,
-                category: formData.category
-            });
+                category: formData.category,
+                priority: 'medium'
+            }, config);
 
             if (response.data.success) {
                 setSuccess(true);
+
                 // Reset form
                 setFormData({
                     name: userInfo?.name || '',
@@ -103,9 +109,6 @@ const ContactForm = () => {
                     message: '',
                     category: 'general'
                 });
-                
-                // Hide success message after 5 seconds
-                setTimeout(() => setSuccess(false), 5000);
             }
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to send message. Please try again.');
@@ -120,7 +123,7 @@ const ContactForm = () => {
                 <Typography variant="h4" gutterBottom align="center" sx={{ mb: 3 }}>
                     Contact Us
                 </Typography>
-                
+
                 <Typography variant="body1" align="center" sx={{ mb: 4, color: 'text.secondary' }}>
                     Have questions or need help? Fill out the form below and we'll get back to you within 24-48 hours.
                 </Typography>
@@ -204,8 +207,8 @@ const ContactForm = () => {
                             variant="contained"
                             size="large"
                             disabled={loading}
-                            sx={{ 
-                                px: 4, 
+                            sx={{
+                                px: 4,
                                 py: 1.5,
                                 backgroundColor: '#4CAF50',
                                 '&:hover': { backgroundColor: '#45a049' }

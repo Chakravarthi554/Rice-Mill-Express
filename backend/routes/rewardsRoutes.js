@@ -1,23 +1,31 @@
 const express = require('express');
 const router = express.Router();
-const { protect } = require('../middleware/auth');
 const {
     getUserRewards,
     redeemRewards,
     getReferralInfo,
-    syncRewards
+    syncRewards,
+    getWalletData,
+    requestWithdrawal,
+    getWithdrawalHistory,
+    adminGetWithdrawals,
+    adminUpdateWithdrawal
 } = require('../controllers/rewardsController');
 
-// ✅ Get user rewards and referral info
+const { protect, admin } = require('../middleware/auth');
+
 router.get('/', protect, getUserRewards);
-
-// ✅ Redeem rewards for discount
 router.post('/redeem', protect, redeemRewards);
-
-// ✅ Get referral information
 router.get('/referral', protect, getReferralInfo);
-
-// ✅ Sync rewards data
 router.get('/sync', protect, syncRewards);
+
+// Wallet & Withdrawal Routes
+router.get('/wallet', protect, getWalletData);
+router.post('/withdraw', protect, requestWithdrawal);
+router.get('/withdrawals', protect, getWithdrawalHistory);
+
+// Admin Routes
+router.get('/admin/withdrawals', protect, admin, adminGetWithdrawals);
+router.put('/admin/withdrawals/:id', protect, admin, adminUpdateWithdrawal);
 
 module.exports = router;

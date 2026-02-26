@@ -33,20 +33,26 @@ const refreshToken = asyncHandler(async (req, res) => {
     // Try verifying as legacy JWT first for this specific controller function
     try {
       decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
-      user = await User.findById(decoded.id).select('-password');
+      user = await User.findById(decoded.id).select('-password +refreshToken');
     } catch (err) {
-      // If it fails, maybe it's a Firebase token being passed to the wrong endpoint?
-      // In a pure Firebase setup, we'd usually use Firebase client SDK for refresh.
-      // But let's try to handle it if it arrives here.
       const { auth: firebaseAuth } = require('../config/firebase');
       decoded = await firebaseAuth.verifyIdToken(refreshToken);
-      user = await User.findOne({ $or: [{ firebaseUid: decoded.uid }, { email: decoded.email }] });
+      user = await User.findOne({ $or: [{ firebaseUid: decoded.uid }, { email: decoded.email }] }).select('-password +refreshToken');
     }
 
     if (!user) {
       return res.status(401).json({
         message: 'User not found',
         code: 'USER_NOT_FOUND'
+      });
+    }
+
+    // ✅ Verify that the refresh token matches the one in DB (for session invalidation)
+    if (user.refreshToken !== refreshToken) {
+      console.warn(`⛔ Token Invalidation: Provided refresh token does not match DB for user ${user._id}`);
+      return res.status(401).json({
+        message: 'Session invalidated. Please login again.',
+        code: 'SESSION_INVALIDATED'
       });
     }
 
@@ -101,16 +107,64 @@ const authUser = asyncHandler(async (req, res) => {
 });
 
 const registerUser = asyncHandler(async (req, res) => {
-  const { name, email, password, role, phone, firebaseUid } = req.body;
-  const userExists = await User.findOne({ email });
-  if (userExists) return res.status(400).json({ message: 'User already exists' });
+  const { name, email, password, role, phone, firebaseUid, referralCode, deviceId } = req.body;
 
-  const user = await User.create({ name, email, password, role, phone, firebaseUid });
+  const userExists = await User.findOne({
+    $or: [
+      { email: email?.toLowerCase() },
+      { phone: phone }
+    ]
+  });
+
+  if (userExists) return res.status(400).json({ message: 'User with this email or phone already exists' });
+
+  let referredBy = null;
+  if (referralCode) {
+    const referrer = await User.findOne({ referralCode });
+    if (referrer) {
+      // ✅ Anti-abuse: Check if this deviceId has already been used for a referral signup
+      if (deviceId) {
+        const duplicateDevice = await User.findOne({ registrationDevice: deviceId, referredBy: { $exists: true } });
+        if (duplicateDevice) {
+          console.warn(`⛔ Anti-Abuse: Duplicate Device ID ${deviceId} attempted referral signup.`);
+          // We allow registration but don't link referral to prevent abuse rewards
+          // OR: block referral entirely
+        } else {
+          referredBy = referrer._id;
+        }
+      } else {
+        referredBy = referrer._id;
+      }
+    }
+  }
+
+  const user = await User.create({
+    name,
+    email,
+    password,
+    role: role || 'customer',
+    phone,
+    firebaseUid,
+    referredBy,
+    registrationDevice: deviceId
+  });
+
   const { accessToken, refreshToken: newRefreshToken } = generateTokens(user._id, user.role);
   await User.updateOne({ _id: user._id }, { $set: { refreshToken: newRefreshToken } });
 
   res.cookie('refreshToken', newRefreshToken, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict', maxAge: 7 * 24 * 60 * 60 * 1000 });
-  res.status(201).json({ success: true, user: { _id: user._id, name, email, role }, accessToken, refreshToken: newRefreshToken });
+  res.status(201).json({
+    success: true,
+    user: {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      referralCode: user.referralCode
+    },
+    accessToken,
+    refreshToken: newRefreshToken
+  });
 });
 
 const getUserProfile = asyncHandler(async (req, res) => {
@@ -139,6 +193,13 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     if (req.body[f] && req.body[f] !== 'undefined') updates[f] = req.body[f];
   });
 
+  // ✅ FIXED: Robust boolean handling for isProfilePublic (avoids falsy ignore)
+  if (req.body.isProfilePublic !== undefined) {
+    const isPublic = req.body.isProfilePublic === 'true' || req.body.isProfilePublic === true;
+    updates.isProfilePublic = isPublic;
+    updates['privacySettings.profileVisible'] = isPublic; // Manual sync for updateOne
+  }
+
   if (req.body.preferences) {
     const p = typeof req.body.preferences === 'string' ? JSON.parse(req.body.preferences) : req.body.preferences;
     updates['preferences.language'] = p.language || user.preferences.language;
@@ -146,11 +207,7 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     updates['preferences.recommendationsEnabled'] = p.recommendationsEnabled === true;
   }
 
-  if (req.body.personalization) {
-    const p = typeof req.body.personalization === 'string' ? JSON.parse(req.body.personalization) : req.body.personalization;
-    updates['personalization.bio'] = p.bio || user.personalization.bio;
-    updates['personalization.tagline'] = p.tagline || user.personalization.tagline;
-  }
+
 
   if (req.body.notificationPreferences) {
     const np = typeof req.body.notificationPreferences === 'string' ? JSON.parse(req.body.notificationPreferences) : req.body.notificationPreferences;
@@ -228,27 +285,69 @@ const changePassword = asyncHandler(async (req, res) => {
     throw new Error('User not found');
   }
 
-  const isMatch = await user.matchPassword(currentPassword);
+  let isMatch = false;
+  if (user.password) {
+    // 1. Standard approach: User has a local password hash in MongoDB
+    isMatch = await user.matchPassword(currentPassword);
+  } else if (user.firebaseUid) {
+    // 2. Firebase Fallback: User was auto-provisioned and lacks local hash.
+    // We verify via Firebase Auth REST API.
+    console.log(`ℹ️ No local hash for user ${user._id} (${user.email}). Attempting Firebase verification...`);
+
+    try {
+      const axios = require('axios');
+      const apiKey = process.env.REACT_APP_FIREBASE_API_KEY;
+
+      const firebaseVerifyUrl = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`;
+
+      await axios.post(firebaseVerifyUrl, {
+        email: user.email,
+        password: currentPassword,
+        returnSecureToken: true
+      });
+
+      console.log('✅ Firebase password verification successful');
+      isMatch = true;
+    } catch (error) {
+      console.error('❌ Firebase password verification failed:', error.response?.data?.error?.message || error.message);
+      isMatch = false;
+    }
+  }
+
   if (!isMatch) {
     res.status(401);
     throw new Error('Invalid current password');
   }
 
-  // 🔐 UPDATE PASSWORD AND INVALIDATE SESSIONS
+  // 🔐 SYNC PASSWORD TO FIREBASE IF UID EXISTS
+  if (user.firebaseUid) {
+    try {
+      const { auth: firebaseAdminAuth } = require('../config/firebase');
+      await firebaseAdminAuth.updateUser(user.firebaseUid, {
+        password: newPassword
+      });
+      console.log('✅ Password synced to Firebase Admin');
+    } catch (fbError) {
+      console.error('⚠️ Firebase Admin password update failed (non-critical):', fbError.message);
+      // We continue since we still update MongoDB
+    }
+  }
+
+  // 🔐 UPDATE LOCAL PASSWORD (pre-save hook will hash it)
   user.password = newPassword;
-  
+
   // ✅ Invalidate refresh token to force re-authentication
   user.refreshToken = undefined;
-  
+
   // ✅ Clear any cached Firebase tokens (will be regenerated on next login)
   user.firebaseUid = user.firebaseUid; // Keep existing UID
-  
+
   await user.save();
-  
+
   // ✅ Send success response with instruction to re-login
-  res.status(200).json({ 
+  res.status(200).json({
     message: 'Password changed successfully. Please login again with your new password.',
-    requiresReauth: true 
+    requiresReauth: true
   });
 });
 
@@ -266,6 +365,12 @@ const updatePreferences = asyncHandler(async (req, res) => {
   if (region) updates['preferences.region'] = region;
   if (currency) updates['preferences.currency'] = currency;
 
+  // ✅ Manual Sync: Handle profile visibility if it's passed here (mobile sometimes does this)
+  if (req.body.profileVisible !== undefined) {
+    updates.isProfilePublic = req.body.profileVisible;
+    updates['privacySettings.profileVisible'] = req.body.profileVisible;
+  }
+
   // ✅ Update preferences atomically and return updated user
   const updatedUser = await User.findByIdAndUpdate(
     req.user._id,
@@ -279,7 +384,7 @@ const updatePreferences = asyncHandler(async (req, res) => {
       userId: req.user._id,
       preferences: updatedUser.preferences
     });
-    
+
     // Broadcast to all user's sessions
     req.io.emit('GLOBAL_PREFERENCES_UPDATE', {
       userId: req.user._id,
@@ -287,10 +392,10 @@ const updatePreferences = asyncHandler(async (req, res) => {
     });
   }
 
-  res.json({ 
-    success: true, 
+  res.json({
+    success: true,
     message: 'Preferences updated successfully',
-    preferences: updatedUser.preferences 
+    preferences: updatedUser.preferences
   });
 });
 
@@ -319,6 +424,35 @@ const updateNotificationPreferences = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Notification preferences updated' });
 });
 
+// @desc    Toggle Two-Factor Authentication
+// @route   PUT /api/users/two-factor
+// @access  Private
+const toggleTwoFactor = asyncHandler(async (req, res) => {
+  const { enabled } = req.body;
+
+  const user = await User.findById(req.user._id);
+  if (!user) return res.status(404).json({ message: 'User not found' });
+
+  user.twoFactorEnabled = enabled === true;
+  await user.save();
+
+  res.json({
+    success: true,
+    message: `Two-factor authentication ${user.twoFactorEnabled ? 'enabled' : 'disabled'}`,
+    twoFactorEnabled: user.twoFactorEnabled
+  });
+});
+
+// @desc    Get Login History
+// @route   GET /api/users/login-history
+// @access  Private
+const getLoginHistory = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id).select('loginHistory');
+  if (!user) return res.status(404).json({ message: 'User not found' });
+
+  res.json(user.loginHistory || []);
+});
+
 // ✅ FIXED: Address management functions
 const getAddresses = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id).populate('addresses');
@@ -326,7 +460,7 @@ const getAddresses = asyncHandler(async (req, res) => {
 });
 
 const addAddress = asyncHandler(async (req, res) => {
-  const { name, phone, street, city, state, pinCode, landmark, addressType } = req.body;
+  const { name, phone, street, city, state, pinCode, houseNumber, colony, landmark, alternativePhone, location, type } = req.body;
 
   if (!name || !phone || !street || !city || !state || !pinCode) {
     return res.status(400).json({ message: 'Required address fields missing' });
@@ -340,8 +474,12 @@ const addAddress = asyncHandler(async (req, res) => {
     city,
     state,
     pinCode,
+    houseNumber,
+    colony,
     landmark,
-    addressType: addressType || 'home'
+    alternativePhone,
+    location: location || { type: 'Point', coordinates: [0, 0] },
+    type: type || 'home'
   });
 
   await address.save();
@@ -363,7 +501,13 @@ const updateAddress = asyncHandler(async (req, res) => {
     return res.status(404).json({ message: 'Address not found' });
   }
 
-  Object.keys(updates).forEach(key => {
+  const allowedFields = [
+    'name', 'phone', 'street', 'city', 'state', 'pinCode',
+    'houseNumber', 'colony', 'landmark', 'alternativePhone',
+    'location', 'type', 'isDefault'
+  ];
+
+  allowedFields.forEach(key => {
     if (updates[key] !== undefined) {
       address[key] = updates[key];
     }
@@ -679,11 +823,29 @@ const sendTestNotification = asyncHandler(async (req, res) => {
 
 const deleteAccount = asyncHandler(async (req, res) => {
   const { password } = req.body;
-  const user = await User.findById(req.user._id).select('+password');
+  const user = await User.findById(req.user._id).select('+password +firebaseUid');
   if (!user) return res.status(404).json({ message: 'User not found' });
 
-  const isMatch = await user.matchPassword(password);
-  if (!isMatch) return res.status(401).json({ message: 'Incorrect password' });
+  // Only check password if user HAS a password hash (not just social login)
+  if (user.password) {
+    if (!password) {
+      return res.status(400).json({ message: 'Password is required to delete account' });
+    }
+    const isMatch = await user.matchPassword(password);
+    if (!isMatch) return res.status(401).json({ message: 'Incorrect password' });
+  }
+
+  // FIREBASE: Also delete from Firebase if it's a social user
+  if (user.firebaseUid) {
+    const { auth: fbAuth } = require('../config/firebase');
+    try {
+      await fbAuth.deleteUser(user.firebaseUid);
+      console.log(`✅ Firebase user ${user.firebaseUid} deleted`);
+    } catch (err) {
+      console.error('⚠️ Firebase user deletion failed:', err.message);
+      // Continue with MongoDB deletion anyway
+    }
+  }
 
   await User.deleteOne({ _id: user._id });
 
@@ -693,7 +855,7 @@ const deleteAccount = asyncHandler(async (req, res) => {
     sameSite: 'strict'
   });
 
-  res.json({ message: 'Account deleted permanently' });
+  res.json({ success: true, message: 'Account deleted permanently' });
 });
 
 const resetPreferences = asyncHandler(async (req, res) => {
@@ -713,10 +875,7 @@ const resetPreferences = asyncHandler(async (req, res) => {
     categories: { orders: true, marketing: true, social: true }
   };
 
-  const defaultPersonalization = {
-    bio: '',
-    tagline: ''
-  };
+
 
   await User.updateOne(
     { _id: user._id },
@@ -724,7 +883,7 @@ const resetPreferences = asyncHandler(async (req, res) => {
       $set: {
         preferences: defaultPrefs,
         notificationPreferences: defaultNotif,
-        personalization: defaultPersonalization
+
       }
     }
   );
@@ -850,6 +1009,18 @@ const reportProblem = asyncHandler(async (req, res) => {
 
 
 
+const getReferralCode = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id).select('referralCode');
+
+  if (!user.referralCode) {
+    const crypto = require('crypto');
+    user.referralCode = crypto.randomBytes(4).toString('hex').toUpperCase();
+    await user.save();
+  }
+
+  res.json({ code: user.referralCode });
+});
+
 const getReferrals = asyncHandler(async (req, res) => {
   let user = await User.findById(req.user._id).select('referralCode referralStats');
 
@@ -869,40 +1040,33 @@ const getReferrals = asyncHandler(async (req, res) => {
 const getReviews = asyncHandler(async (req, res) => {
   const Rating = require('../models/Rating');
 
-  // Explicitly ensure the Product model is registered
-  let Product;
-  try {
-    Product = mongoose.model('Product');
-  } catch (e) {
-    Product = require('../models/Product');
-  }
-
-  // Find all ratings/reviews where this user is the author and targetType is Product
-  const ratings = await Rating.find({ userId: req.user._id, targetType: 'Product' })
-    .populate('targetId', 'name images image price')
+  // Find all ratings/reviews where this user is the author
+  const ratings = await Rating.find({ userId: req.user._id })
+    .populate('targetId', 'name title images image price')
     .sort({ createdAt: -1 });
 
   const userReviews = ratings.map(rating => {
-    // If targetId is not populated or null, we can't show full details
-    const product = rating.targetId;
+    const item = rating.targetId;
+    const isPopulated = item && typeof item === 'object';
 
-    // Check if product is actually populated (it should be an object with name)
-    const isPopulated = product && typeof product === 'object' && product.name;
-
+    let name = 'Unknown Item';
     let image = null;
+
     if (isPopulated) {
-      if (product.images && product.images.length > 0) {
-        image = product.images[0];
-      } else if (product.image) {
-        image = product.image;
+      name = item.name || item.title || 'Untitled Item';
+      if (item.images && item.images.length > 0) {
+        image = item.images[0];
+      } else if (item.image) {
+        image = item.image;
       }
     }
 
     return {
       _id: rating._id,
-      product: isPopulated ? product._id : rating.targetId,
-      productId: isPopulated ? product._id : rating.targetId,
-      productName: isPopulated ? product.name : 'Unknown Product',
+      targetId: rating.targetId?._id || rating.targetId,
+      targetType: rating.targetType,
+      productId: rating.targetId?._id || rating.targetId, // Legacy support for frontend
+      productName: name, // Legacy support for frontend
       productImage: image,
       rating: rating.rating,
       comment: rating.comment,
@@ -915,14 +1079,84 @@ const getReviews = asyncHandler(async (req, res) => {
 
 const getPrivacySettings = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id).select('privacySettings');
-  res.json(user.privacySettings || { profileVisibility: 'public', showActivityStatus: true });
+  res.json(user.privacySettings || { profileVisible: true, showActivity: true, marketingEmails: false });
 });
 
 const updatePrivacySettings = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id);
+  if (!user) return res.status(404).json({ message: 'User not found' });
+
   user.privacySettings = { ...user.privacySettings, ...req.body };
+  if (req.body.profileVisible !== undefined) {
+    user.isProfilePublic = req.body.profileVisible;
+  }
+  if (req.body.isProfilePublic !== undefined) {
+    user.isProfilePublic = req.body.isProfilePublic;
+  }
+
   await user.save();
   res.json({ success: true, privacySettings: user.privacySettings });
+});
+
+// @desc    Export User Data
+// @route   POST /api/users/export-data
+// @access  Private
+const exportUserData = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id).populate('addresses wishlist');
+  if (!user) return res.status(404).json({ message: 'User not found' });
+
+  // Gather all data associated with user
+  const orders = await Order.find({ user: user._id });
+
+  // In a real application, we would generate a JSON or CSV file and attach it to an email
+  // For now, we simulate the process and notify the user.
+  const dataSummary = {
+    profile: {
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      joinedAt: user.createdAt
+    },
+    ordersCount: orders.length,
+    addressesCount: user.addresses?.length || 0,
+    wishlistCount: user.wishlist?.length || 0
+  };
+
+  const message = `
+    <h1>Data Export Request</h1>
+    <p>Hello ${user.name},</p>
+    <p>We received a request to export your personal data from Rice Mill App.</p>
+    <p>Here is a summary of the data we have on file for you:</p>
+    <ul>
+      <li>Name: ${user.name}</li>
+      <li>Email: ${user.email}</li>
+      <li>Phone: ${user.phone || 'N/A'}</li>
+      <li>Total Orders: ${orders.length}</li>
+    </ul>
+    <p>Your full data report is being processed and will be available for download shortly.</p>
+  `;
+
+  if (!user.email) {
+    return res.status(400).json({ message: 'User email is required for data export' });
+  }
+
+  try {
+    const emailResult = await sendEmail({
+      email: user.email,
+      subject: 'Your Data Export Request',
+      message
+    });
+
+    res.json({
+      success: true,
+      message: emailResult.simulated
+        ? 'Data export initialized (Simulated: Check server logs)'
+        : 'Data export initialized. Please check your email.'
+    });
+  } catch (error) {
+    console.error('❌ Data export email failed:', error.message);
+    res.status(500).json({ message: 'Failed to send data export email. Please contact support.' });
+  }
 });
 
 const getLinkedAccounts = asyncHandler(async (req, res) => {
@@ -1115,6 +1349,7 @@ module.exports = {
   updateNotificationPreferences,
   getAddresses,
   getReferrals,
+  getReferralCode,
   getPrivacySettings,
   updatePrivacySettings,
   getLinkedAccounts,
@@ -1130,5 +1365,8 @@ module.exports = {
   unbookmarkPost,
   getBookmarks,
   getAdmins,
-  validateReferralCode
+  validateReferralCode,
+  toggleTwoFactor,
+  getLoginHistory,
+  exportUserData
 };

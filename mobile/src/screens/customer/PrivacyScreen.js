@@ -11,9 +11,27 @@ const PrivacyScreen = ({ navigation }) => {
     const dispatch = useDispatch();
     const { privacy = {}, loading, success } = useSelector((state) => state.settings);
 
-    const [profileVisible, setProfileVisible] = useState(privacy?.profileVisible ?? true);
-    const [showActivity, setShowActivity] = useState(privacy?.showActivity ?? true);
+    const [profileVisible, setProfileVisible] = useState(true);
+    const [showActivity, setShowActivity] = useState(true);
     const [marketingEmails, setMarketingEmails] = useState(false);
+    const [fetching, setFetching] = useState(true);
+
+    useEffect(() => {
+        const fetchPrivacy = async () => {
+            try {
+                const response = await apiService.getPrivacySettings();
+                const settings = response.data;
+                setProfileVisible(settings.profileVisible ?? true);
+                setShowActivity(settings.showActivity ?? true);
+                setMarketingEmails(settings.marketingEmails ?? false);
+            } catch (err) {
+                console.error('Failed to fetch privacy settings:', err);
+            } finally {
+                setFetching(false);
+            }
+        };
+        fetchPrivacy();
+    }, []);
 
     useEffect(() => {
         if (success) {
@@ -21,14 +39,40 @@ const PrivacyScreen = ({ navigation }) => {
         }
     }, [success, dispatch]);
 
-    const handleToggle = (key, value) => {
+    const handleToggle = async (key, value) => {
+        // Optimistic update
         if (key === 'profileVisible') setProfileVisible(value);
         if (key === 'showActivity') setShowActivity(value);
+        if (key === 'marketingEmails') setMarketingEmails(value);
 
-        dispatch(updatePrivacy({
-            ...privacy,
-            [key]: value
-        }));
+        try {
+            const response = await apiService.updatePrivacySettings({ [key]: value });
+
+            // ✅ Permanently update auth user state and storage
+            const userInfoStr = await AsyncStorage.getItem('userInfo');
+            if (userInfoStr) {
+                const userInfo = JSON.parse(userInfoStr);
+                const newUserInfo = {
+                    ...userInfo,
+                    privacySettings: {
+                        ...(userInfo.privacySettings || {}),
+                        [key]: value
+                    }
+                };
+
+                // Update Redux
+                dispatch(setUser(newUserInfo));
+
+                // Update Storage
+                await AsyncStorage.setItem('userInfo', JSON.stringify(newUserInfo));
+            }
+        } catch (err) {
+            // Revert on error
+            if (key === 'profileVisible') setProfileVisible(!value);
+            if (key === 'showActivity') setShowActivity(!value);
+            if (key === 'marketingEmails') setMarketingEmails(!value);
+            Alert.alert('Error', 'Failed to update privacy settings');
+        }
     };
 
     const handleDeleteAccount = () => {
@@ -40,14 +84,33 @@ const PrivacyScreen = ({ navigation }) => {
                 {
                     text: 'Delete',
                     style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            await apiService.deleteAccount();
-                            Alert.alert('Success', 'Your account has been deleted.');
-                            dispatch(logout());
-                        } catch (err) {
-                            Alert.alert('Error', 'Failed to delete account. Please try again.');
-                        }
+                    onPress: () => {
+                        // If it's a social user, we can delete directly. 
+                        // If it's email user, we might need a password prompt.
+                        // For simplicity in UI, we'll try to delete and handle potential 400 error.
+                        const performDelete = async (pwd) => {
+                            try {
+                                await apiService.deleteAccount(pwd);
+                                Alert.alert('Success', 'Your account has been deleted.');
+                                dispatch(logout());
+                            } catch (err) {
+                                if (err.response?.status === 400 && !pwd) {
+                                    // Password required
+                                    Alert.prompt(
+                                        'Password Required',
+                                        'Please enter your password to confirm deletion',
+                                        [
+                                            { text: 'Cancel', style: 'cancel' },
+                                            { text: 'Confirm', onPress: (val) => performDelete(val) }
+                                        ],
+                                        'secure-text'
+                                    );
+                                } else {
+                                    Alert.alert('Error', err.response?.data?.message || 'Failed to delete account');
+                                }
+                            }
+                        };
+                        performDelete();
                     }
                 }
             ]
@@ -55,7 +118,12 @@ const PrivacyScreen = ({ navigation }) => {
     };
 
     const handleDownloadData = async () => {
-        Alert.alert('Request Received', 'A link to download your data will be sent to your email shortly.');
+        try {
+            await apiService.exportUserData();
+            Alert.alert('Success', 'A summary of your data has been sent to your email.');
+        } catch (err) {
+            Alert.alert('Error', 'Failed to request data export');
+        }
     };
 
     return (
@@ -64,8 +132,8 @@ const PrivacyScreen = ({ navigation }) => {
                 <List.Section>
                     <List.Subheader>Visibility</List.Subheader>
                     <List.Item
-                        title="Public Profile"
-                        description="Allow others to see your name in forum"
+                        title="Public Profile Visibility"
+                        description="Visible in recipes, forum posts, and reviews"
                         right={() => <Switch value={profileVisible} onValueChange={(v) => handleToggle('profileVisible', v)} color="#4CAF50" />}
                     />
                     <Divider />
@@ -83,7 +151,7 @@ const PrivacyScreen = ({ navigation }) => {
                     <List.Item
                         title="Marketing Emails"
                         description="Receive offers and updates"
-                        right={() => <Switch value={marketingEmails} onValueChange={setMarketingEmails} color="#4CAF50" />}
+                        right={() => <Switch value={marketingEmails} onValueChange={(v) => handleToggle('marketingEmails', v)} color="#4CAF50" />}
                     />
                     <Divider />
                     <List.Item

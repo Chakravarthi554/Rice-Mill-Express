@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
 import { Card, Title, TextInput, Button, HelperText } from 'react-native-paper';
 import { useDispatch, useSelector } from 'react-redux';
-import axios from 'axios';
+import { apiService } from '../../services/api';
 import { API_URL } from '../../config/env';
 
 const ContactScreen = ({ navigation }) => {
@@ -27,11 +27,11 @@ const ContactScreen = ({ navigation }) => {
 
     const validateForm = () => {
         const newErrors = {};
-        
+
         if (!formData.name.trim()) {
             newErrors.name = 'Name is required';
         }
-        
+
         if (!formData.email.trim()) {
             newErrors.email = 'Email is required';
         } else {
@@ -40,17 +40,17 @@ const ContactScreen = ({ navigation }) => {
                 newErrors.email = 'Invalid email format';
             }
         }
-        
+
         if (!formData.subject.trim()) {
             newErrors.subject = 'Subject is required';
         }
-        
+
         if (!formData.message.trim()) {
             newErrors.message = 'Message is required';
         } else if (formData.message.length < 10) {
             newErrors.message = 'Message must be at least 10 characters';
         }
-        
+
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -63,24 +63,21 @@ const ContactScreen = ({ navigation }) => {
 
         try {
             setLoading(true);
-            
-            const response = await axios.post(`${API_URL}/api/legal/contact`, {
-                name: formData.name,
-                email: formData.email,
+
+            const response = await apiService.createSupportTicket({
                 subject: formData.subject,
                 message: formData.message,
-                category: formData.category
+                category: formData.category,
+                priority: 'medium'
             });
 
             if (response.data.success) {
                 Alert.alert(
-                    'Success', 
-                    response.data.message,
-                    [
-                        { text: 'OK', onPress: () => navigation.goBack() }
-                    ]
+                    'Success',
+                    'Your support ticket has been created. Our team will review your request and notify you once it is resolved.',
+                    [{ text: 'OK' }]
                 );
-                
+
                 // Reset form
                 setFormData({
                     name: user?.name || '',
@@ -91,10 +88,10 @@ const ContactScreen = ({ navigation }) => {
                 });
             }
         } catch (error) {
-            console.error('Contact form error:', error);
+            console.error('Support ticket error:', error);
             Alert.alert(
-                'Error', 
-                error.response?.data?.message || 'Failed to send message. Please try again.'
+                'Error',
+                error.response?.data?.message || 'Failed to create support ticket. Please try again.'
             );
         } finally {
             setLoading(false);
@@ -109,21 +106,21 @@ const ContactScreen = ({ navigation }) => {
                     <Text style={styles.subtitle}>
                         Have questions or need help? Fill out the form below and we'll get back to you within 24-48 hours.
                     </Text>
-                    
+
                     <TextInput
                         label="Full Name"
                         value={formData.name}
-                        onChangeText={(text) => setFormData({...formData, name: text})}
+                        onChangeText={(text) => setFormData({ ...formData, name: text })}
                         style={styles.input}
                         mode="outlined"
                         error={!!errors.name}
                     />
                     {errors.name && <HelperText type="error">{errors.name}</HelperText>}
-                    
+
                     <TextInput
                         label="Email Address"
                         value={formData.email}
-                        onChangeText={(text) => setFormData({...formData, email: text})}
+                        onChangeText={(text) => setFormData({ ...formData, email: text })}
                         style={styles.input}
                         mode="outlined"
                         keyboardType="email-address"
@@ -131,17 +128,17 @@ const ContactScreen = ({ navigation }) => {
                         error={!!errors.email}
                     />
                     {errors.email && <HelperText type="error">{errors.email}</HelperText>}
-                    
+
                     <TextInput
                         label="Subject"
                         value={formData.subject}
-                        onChangeText={(text) => setFormData({...formData, subject: text})}
+                        onChangeText={(text) => setFormData({ ...formData, subject: text })}
                         style={styles.input}
                         mode="outlined"
                         error={!!errors.subject}
                     />
                     {errors.subject && <HelperText type="error">{errors.subject}</HelperText>}
-                    
+
                     <TextInput
                         label="Category"
                         value={categories.find(c => c.value === formData.category)?.label}
@@ -149,13 +146,13 @@ const ContactScreen = ({ navigation }) => {
                         mode="outlined"
                         disabled
                     />
-                    
+
                     <View style={styles.categoryContainer}>
                         {categories.map((cat) => (
                             <Button
                                 key={cat.value}
                                 mode={formData.category === cat.value ? "contained" : "outlined"}
-                                onPress={() => setFormData({...formData, category: cat.value})}
+                                onPress={() => setFormData({ ...formData, category: cat.value })}
                                 style={[
                                     styles.categoryButton,
                                     formData.category === cat.value && styles.selectedCategory
@@ -165,11 +162,11 @@ const ContactScreen = ({ navigation }) => {
                             </Button>
                         ))}
                     </View>
-                    
+
                     <TextInput
                         label="Message"
                         value={formData.message}
-                        onChangeText={(text) => setFormData({...formData, message: text})}
+                        onChangeText={(text) => setFormData({ ...formData, message: text })}
                         style={[styles.input, styles.textArea]}
                         mode="outlined"
                         multiline
@@ -178,7 +175,7 @@ const ContactScreen = ({ navigation }) => {
                         error={!!errors.message}
                     />
                     {errors.message && <HelperText type="error">{errors.message}</HelperText>}
-                    
+
                     <Button
                         mode="contained"
                         onPress={handleSubmit}

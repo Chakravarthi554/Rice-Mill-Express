@@ -10,7 +10,7 @@ const ratingSchema = new mongoose.Schema({
     targetType: {
         type: String,
         required: true,
-        enum: ['Product', 'Recipe'],
+        enum: ['Product', 'Recipe', 'ForumPost'],
         index: true
     },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },

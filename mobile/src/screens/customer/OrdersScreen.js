@@ -7,15 +7,19 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     RefreshControl,
+    Image,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { apiService } from '../../services/api';
+import { API_URL } from '../../config/env';
 import { connectSocket, subscribeToOrderUpdates, disconnectSocket } from '../../services/socket';
 
 export default function OrdersScreen({ navigation }) {
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const { t } = useTranslation();
 
     useEffect(() => {
         fetchOrders();
@@ -83,12 +87,35 @@ export default function OrdersScreen({ navigation }) {
             onPress={() => navigation.navigate('OrderDetail', { id: item._id })}
         >
             <View style={styles.orderHeader}>
-                <Text style={styles.orderId}>Order #{item._id.slice(-8)}</Text>
-                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-                    <MaterialIcons name={getStatusIcon(item.status)} size={16} color="#fff" />
-                    <Text style={styles.statusText}>{item.status}</Text>
+                <Text style={styles.orderId}>{t('order')} #{item._id.slice(-8)}</Text>
+                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.orderStatus) }]}>
+                    <MaterialIcons name={getStatusIcon(item.orderStatus)} size={16} color="#fff" />
+                    <Text style={styles.statusText}>{t(item.orderStatus)}</Text>
                 </View>
             </View>
+
+            {item.orderItems && item.orderItems.length > 0 && (
+                <View style={styles.itemPreview}>
+                    <Image
+                        source={{
+                            uri: item.orderItems[0].image?.startsWith('http')
+                                ? item.orderItems[0].image
+                                : `${API_URL}${item.orderItems[0].image}`
+                        }}
+                        style={styles.previewImage}
+                    />
+                    <View style={styles.previewInfo}>
+                        <Text style={styles.previewName} numberOfLines={1}>
+                            {item.orderItems[0].name}
+                        </Text>
+                        {item.orderItems.length > 1 && (
+                            <Text style={styles.moreItems}>
+                                + {item.orderItems.length - 1} {t('moreItems')}
+                            </Text>
+                        )}
+                    </View>
+                </View>
+            )}
 
             <View style={styles.orderDetails}>
                 <View style={styles.detailRow}>
@@ -100,17 +127,17 @@ export default function OrdersScreen({ navigation }) {
 
                 <View style={styles.detailRow}>
                     <MaterialIcons name="shopping-bag" size={16} color="#666" />
-                    <Text style={styles.detailText}>{item.items?.length || 0} items</Text>
+                    <Text style={styles.detailText}>{item.orderItems?.length || 0} {t('itemsCount')}</Text>
                 </View>
 
                 <View style={styles.detailRow}>
                     <MaterialIcons name="attach-money" size={16} color="#666" />
-                    <Text style={styles.detailText}>₹{item.totalAmount}</Text>
+                    <Text style={styles.detailText}>₹{item.totalPrice}</Text>
                 </View>
             </View>
 
             <View style={styles.orderFooter}>
-                <Text style={styles.viewDetails}>View Details</Text>
+                <Text style={styles.viewDetails}>{t('viewDetails')}</Text>
                 <MaterialIcons name="arrow-forward" size={20} color="#4CAF50" />
             </View>
         </TouchableOpacity>
@@ -137,12 +164,12 @@ export default function OrdersScreen({ navigation }) {
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
                         <MaterialIcons name="receipt-long" size={80} color="#ccc" />
-                        <Text style={styles.emptyText}>No orders yet</Text>
+                        <Text style={styles.emptyText}>{t('noOrdersFound')}</Text>
                         <TouchableOpacity
                             style={styles.shopButton}
                             onPress={() => navigation.navigate('Home')}
                         >
-                            <Text style={styles.shopButtonText}>Start Shopping</Text>
+                            <Text style={styles.shopButtonText}>{t('startShopping')}</Text>
                         </TouchableOpacity>
                     </View>
                 }
@@ -212,6 +239,34 @@ const styles = StyleSheet.create({
         marginLeft: 10,
         color: '#666',
         fontSize: 14,
+    },
+    itemPreview: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f9f9f9',
+        padding: 10,
+        borderRadius: 8,
+        marginBottom: 15,
+    },
+    previewImage: {
+        width: 50,
+        height: 50,
+        borderRadius: 6,
+    },
+    previewInfo: {
+        flex: 1,
+        marginLeft: 12,
+    },
+    previewName: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#333',
+    },
+    moreItems: {
+        fontSize: 12,
+        color: '#4CAF50',
+        marginTop: 2,
+        fontWeight: '500',
     },
     orderFooter: {
         flexDirection: 'row',

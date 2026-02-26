@@ -42,13 +42,30 @@ const MyReviewsScreen = ({ navigation }) => {
     };
 
     const handleEdit = (review) => {
-        // Navigate to product detail where they can edit the review
-        navigation.navigate('ProductDetail', {
-            productId: review.productId,
-            editReview: true,
-            initialRating: review.rating,
-            initialComment: review.comment
-        });
+        // Navigate to the correct detail screen based on targetType
+        if (review.targetType === 'Recipe') {
+            navigation.navigate('RecipeDetail', {
+                recipeId: review.targetId,
+                editReview: true,
+                initialRating: review.rating,
+                initialComment: review.comment
+            });
+        } else if (review.targetType === 'ForumPost' || review.targetType === 'Forum') {
+            navigation.navigate('ForumPostDetail', {
+                postId: review.targetId,
+                editReview: true,
+                initialRating: review.rating,
+                initialComment: review.comment
+            });
+        } else {
+            // Default to ProductDetail
+            navigation.navigate('ProductDetail', {
+                productId: review.targetId || review.productId,
+                editReview: true,
+                initialRating: review.rating,
+                initialComment: review.comment
+            });
+        }
     };
 
     const renderStars = (rating) => {

@@ -14,6 +14,14 @@ if (mongoose.models.BulkOrder) {
       ref: 'Product',
       required: [true, 'Product is required']
     },
+    name: {
+      type: String,
+      required: [true, 'Product name snapshot is required']
+    },
+    image: {
+      type: String,
+      default: '/images/default-image.jpg'
+    },
     quantity: {
       type: Number,
       required: [true, 'Quantity is required'],
@@ -51,12 +59,19 @@ if (mongoose.models.BulkOrder) {
   const shippingAddressSchema = new mongoose.Schema({
     name: { type: String, required: true, trim: true },
     phone: { type: String, required: true, trim: true },
+    houseNumber: { type: String, trim: true },
+    colony: { type: String, trim: true },
     street: { type: String, required: true, trim: true },
     city: { type: String, required: true, trim: true },
     state: { type: String, required: true, trim: true },
     pinCode: { type: String, required: true, trim: true },
     landmark: { type: String, trim: true },
+    alternativePhone: { type: String, trim: true },
     country: { type: String, default: 'India' },
+    location: {
+      type: { type: String, enum: ['Point'], default: 'Point' },
+      coordinates: { type: [Number], default: [0, 0] }
+    },
     addressType: { type: String, enum: ['home', 'work', 'other'], default: 'other' }
   }, { _id: false });
 

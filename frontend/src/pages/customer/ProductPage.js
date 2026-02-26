@@ -24,6 +24,7 @@ import {
   TextField,
   CircularProgress
 } from "@mui/material";
+import { useTranslation } from "react-i18next";
 import {
   AddShoppingCart,
   FlashOn,
@@ -114,6 +115,7 @@ const ActionButton = styled(Button)(({ theme, varianttype }) => ({
 
 const ProductPage = () => {
   const { id } = useParams();
+  const { t } = useTranslation();
   const [qty, setQty] = useState(1);
   const [cartSnackbar, setCartSnackbar] = useState(false); // ✅ Cart confirmation
 
@@ -241,9 +243,9 @@ const ProductPage = () => {
                     <Chip icon={<Chat sx={{ fontSize: 16 }} />} label={product.commentsCount || 0} size="small" color="primary" variant="filled" sx={{ background: 'linear-gradient(135deg, #2196F3 0%, #1976D2 100%)' }} />
                   </Stack>
                   {hasOffer && (
-                    <Chip icon={<LocalOffer />} label={`${discountPercentage}% OFF`} color="success" variant="filled" sx={{ position: 'absolute', top: 16, left: 16, fontWeight: 'bold', background: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)' }} />
+                    <Chip icon={<LocalOffer />} label={`${discountPercentage}% ${t('offer')}`} color="success" variant="filled" sx={{ position: 'absolute', top: 16, left: 16, fontWeight: 'bold', background: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)' }} />
                   )}
-                  <Chip label={product.countInStock > 0 ? "In Stock" : "Out of Stock"} color={product.countInStock > 0 ? "success" : "error"} variant="filled" sx={{ position: 'absolute', bottom: 16, left: 16, fontWeight: 'bold' }} />
+                  <Chip label={product.countInStock > 0 ? t('inStock') : t('outOfStock')} color={product.countInStock > 0 ? "success" : "error"} variant="filled" sx={{ position: 'absolute', bottom: 16, left: 16, fontWeight: 'bold' }} />
                 </Box>
               </Box>
               {product.images && product.images.length > 1 && (
@@ -342,10 +344,10 @@ const ProductPage = () => {
                 <Typography variant="h6" sx={{ mb: 3, fontWeight: 'bold' }}>Quick Actions</Typography>
                 <Stack spacing={2}>
                   <ActionButton varianttype="primary" onClick={buyNowHandler} disabled={product.countInStock === 0} startIcon={<FlashOn />}>
-                    Buy Now
+                    {t('buyNow')}
                   </ActionButton>
                   <ActionButton varianttype="secondary" onClick={addToCartHandler} disabled={product.countInStock === 0} startIcon={<AddShoppingCart />}>
-                    Add to Cart
+                    {t('addToCart')}
                   </ActionButton>
                   <Stack direction="row" spacing={2}>
                     <Button variant="outlined" color="error" onClick={addToWishlistHandler} startIcon={<Favorite />} sx={{ flex: 1, py: 1.5, borderRadius: '12px', fontWeight: 'bold' }}>
@@ -367,12 +369,12 @@ const ProductPage = () => {
               <Typography variant="h5" sx={{ mb: 3, fontWeight: 'bold', color: 'primary.main' }}>Product Specifications</Typography>
               <Grid container spacing={2}>
                 {[
-                  { label: 'Brand', value: product.brand },
-                  { label: 'Category', value: product.category },
-                  { label: 'Type', value: product.type },
-                  { label: 'Quality', value: product.quality },
-                  { label: 'Weight', value: `${product.weight} ${product.unit}` },
-                  { label: 'Stock', value: product.countInStock }
+                  { label: t('brand'), value: product.brand },
+                  { label: t('category'), value: product.category },
+                  { label: t('type'), value: product.type },
+                  { label: t('quality'), value: product.quality },
+                  { label: t('weight') || 'Weight', value: `${product.weight} ${product.unit}` },
+                  { label: t('quantity'), value: product.countInStock }
                 ].map((item, index) => (
                   <Grid item xs={6} key={index}>
                     <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'text.primary' }}>{item.label}:</Typography>
@@ -426,7 +428,7 @@ const ProductPage = () => {
         <Box sx={{ mt: 4 }}>
           <Divider sx={{ mb: 3 }} />
           <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 2 }}>
-            You May Also Like
+            {t('youMayAlsoLike')}
           </Typography>
           <Grid container spacing={2}>
             {products

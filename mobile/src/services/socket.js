@@ -142,6 +142,20 @@ export const unsubscribeFromEngagementUpdates = () => {
     }
 };
 
+export const subscribeToChatMessage = (callback) => {
+    if (!socket) {
+        console.warn('Socket not connected');
+        return;
+    }
+    socket.on('chat:message', callback);
+};
+
+export const unsubscribeFromChatMessage = () => {
+    if (socket) {
+        socket.off('chat:message');
+    }
+};
+
 export const getSocket = () => socket;
 
 export default {
@@ -154,6 +168,8 @@ export default {
     subscribeToDeliveryCompleted,
     unsubscribeFromSocialUpdates,
     unsubscribeFromEngagementUpdates,
+    subscribeToChatMessage,
+    unsubscribeFromChatMessage,
     joinRoom,
     leaveRoom,
     getSocket,

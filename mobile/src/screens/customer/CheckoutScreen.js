@@ -112,7 +112,7 @@ const CheckoutScreen = ({ navigation }) => {
                     paymentMethod: 'online',
                     orderItems: cartItems.map(item => ({
                         product: item.product?._id,
-                        qty: item.qty || 1,
+                        qty: item.quantity || item.qty || 1,
                     })),
                     useRewards // Pass flag to backend
                 };
@@ -156,7 +156,7 @@ const CheckoutScreen = ({ navigation }) => {
                 paymentMethod,
                 orderItems: cartItems.map(item => ({
                     product: item.product?._id,
-                    qty: item.quantity || 1,
+                    qty: item.quantity || item.qty || 1,
                 })),
                 useRewards // Pass flag to backend
             };
@@ -277,8 +277,14 @@ const CheckoutScreen = ({ navigation }) => {
                                     <RadioButton value={addr._id} color="#4CAF50" />
                                     <View style={styles.addressDetails}>
                                         <Text style={styles.addressName}>{addr.name}</Text>
-                                        <Text style={styles.addressText}>{addr.street}, {addr.city}</Text>
-                                        <Text style={styles.addressText}>{addr.state} - {addr.pinCode}</Text>
+                                        <Text style={styles.addressText}>
+                                            {addr.houseNumber}, {addr.colony && `${addr.colony}, `}{addr.street}
+                                        </Text>
+                                        {addr.landmark && (
+                                            <Text style={styles.addressText}>Landmark: {addr.landmark}</Text>
+                                        )}
+                                        <Text style={styles.addressText}>{addr.city}, {addr.state} - {addr.pinCode}</Text>
+                                        <Text style={styles.addressText}>Phone: {addr.phone}</Text>
                                     </View>
                                 </TouchableOpacity>
                             ))}

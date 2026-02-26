@@ -3,12 +3,13 @@ import { View, Text, StyleSheet, FlatList, ActivityIndicator, Alert } from 'reac
 import { Card, Button, Divider, Title, Paragraph } from 'react-native-paper';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
-import { getRewards, getRewardTransactions, redeemReward, getActiveCampaigns } from '../../redux/actions/rewardsActions';
+import { getRewards, getRewardTransactions, redeemReward, getActiveCampaigns, getPublicSettings } from '../../redux/actions/rewardsActions';
+import { getWalletData } from '../../redux/actions/walletActions';
 import io from 'socket.io-client';
 import { API_URL } from '../../config/env';
 import { apiService } from '../../services/api';
 
-const RewardsScreen = () => {
+const RewardsScreen = ({ navigation }) => {
     const dispatch = useDispatch();
     const { user } = useSelector((state) => state.auth);
 
@@ -24,12 +25,20 @@ const RewardsScreen = () => {
     const campaignsState = useSelector((state) => state.campaigns);
     const { loading: campaignsLoading, campaigns } = campaignsState;
 
+    const walletState = useSelector((state) => state.wallet);
+    const { loading: walletLoading, walletData } = walletState;
+
+    const { publicSettings } = useSelector((state) => state.publicSettings || {});
+    const minWithdrawal = publicSettings?.referralSettings?.minWithdrawalAmount || 300;
+
     const [syncing, setSyncing] = useState(false);
 
     useEffect(() => {
         dispatch(getRewards());
         dispatch(getRewardTransactions());
         dispatch(getActiveCampaigns());
+        dispatch(getWalletData());
+        dispatch(getPublicSettings());
     }, [dispatch]);
 
     // ✅ Real-time rewards synchronization
@@ -121,42 +130,84 @@ const RewardsScreen = () => {
                     <Text style={styles.syncText}>Syncing rewards data...</Text>
                 </View>
             )}
-            
+
             <View style={styles.header}>
+                <Title style={styles.headerTitle}>Rewards & Wallet</Title>
+                <Paragraph style={styles.headerSubtitle}>Earn by referring and shop more!</Paragraph>
+
                 <Card style={styles.balanceCard}>
                     <Card.Content style={styles.balanceContent}>
-                        <MaterialIcons name="stars" size={48} color="#FFC107" />
                         <View style={styles.pointsInfo}>
                             <Title style={styles.pointsValue}>{rewards?.points || 0}</Title>
-                            <Paragraph style={styles.pointsLabel}>Available Points</Paragraph>
+                            <Paragraph style={styles.pointsLabel}>Reward Points</Paragraph>
                         </View>
+                        <Divider style={styles.verticalDivider} />
+                        <View style={styles.pointsInfo}>
+                            <Title style={styles.pointsValue}>₹{walletData?.balance || 0}</Title>
+                            <Paragraph style={styles.pointsLabel}>Wallet Balance</Paragraph>
+                        </View>
+                    </Card.Content>
+                    <Card.Actions style={styles.cardActions}>
                         <Button
-                            mode="contained"
+                            mode="outlined"
                             onPress={() => handleRedeem(100)}
                             disabled={redeemLoading || (rewards?.points || 0) < 100}
-                            style={styles.redeemButton}
+                            style={styles.actionButton}
                         >
-                            Redeem
+                            Redeem Points
                         </Button>
-                    </Card.Content>
+                        <Button
+                            mode="contained"
+                            onPress={() => navigation.navigate('Withdraw')}
+                            style={[styles.actionButton, styles.withdrawButton]}
+                            disabled={(walletData?.balance || 0) < minWithdrawal}
+                        >
+                            Withdraw
+                        </Button>
+                    </Card.Actions>
                 </Card>
+
+                <View style={styles.statsContainer}>
+                    <View style={styles.statBox}>
+                        <Text style={styles.statValue}>₹{walletData?.totalEarnings || 0}</Text>
+                        <Text style={styles.statLabel}>Total Earned</Text>
+                    </View>
+                    <View style={styles.statBox}>
+                        <Text style={styles.statValue}>₹{walletData?.pendingBalance || 0}</Text>
+                        <Text style={styles.statLabel}>Pending</Text>
+                    </View>
+                    <View style={styles.statBox}>
+                        <Text style={styles.statValue}>{walletData?.referralsCount || 0}</Text>
+                        <Text style={styles.statLabel}>Referrals</Text>
+                    </View>
+                </View>
             </View>
 
             <View style={styles.historySection}>
-                <Title style={styles.historyTitle}>Transaction History</Title>
+                <Title style={styles.historyTitle}>Wallet Activity</Title>
                 <Divider />
-                {transLoading ? (
+                {walletLoading ? (
                     <ActivityIndicator style={{ marginTop: 20 }} color="#4CAF50" />
                 ) : (
                     <FlatList
-                        data={transactions}
+                        data={walletData?.transactions || []}
                         keyExtractor={(item) => item._id}
-                        renderItem={renderTransaction}
+                        renderItem={({ item }) => (
+                            <View style={styles.transactionItem}>
+                                <View style={styles.transDetails}>
+                                    <Text style={styles.transDescription}>{item.description}</Text>
+                                    <Text style={styles.transDate}>{new Date(item.createdAt).toLocaleDateString()}</Text>
+                                </View>
+                                <Text style={[styles.transPoints, { color: item.amount > 0 ? '#4CAF50' : '#F44336' }]}>
+                                    {item.amount > 0 ? '+' : ''}₹{Math.abs(item.amount)}
+                                </Text>
+                            </View>
+                        )}
                         contentContainerStyle={styles.listContent}
                         ListEmptyComponent={
                             <View style={styles.emptyContainer}>
-                                <MaterialIcons name="history" size={64} color="#ccc" />
-                                <Text style={styles.emptyText}>No transactions yet</Text>
+                                <MaterialIcons name="account-balance-wallet" size={64} color="#ccc" />
+                                <Text style={styles.emptyText}>No wallet activity yet</Text>
                             </View>
                         }
                     />
@@ -190,88 +241,83 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '500',
     },
-    header: {
-        padding: 16,
-        backgroundColor: '#4CAF50',
-        paddingBottom: 40,
+    headerTitle: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: 'white',
+        textAlign: 'center',
+        marginTop: 10,
+    },
+    headerSubtitle: {
+        fontSize: 14,
+        color: 'rgba(255,255,255,0.8)',
+        textAlign: 'center',
+        marginBottom: 20,
     },
     balanceCard: {
         borderRadius: 12,
         elevation: 4,
+        padding: 10,
     },
     balanceContent: {
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'space-around',
         paddingVertical: 10,
     },
     pointsInfo: {
+        alignItems: 'center',
         flex: 1,
-        marginLeft: 16,
     },
     pointsValue: {
-        fontSize: 32,
+        fontSize: 24,
         fontWeight: 'bold',
-        lineHeight: 36,
+        color: '#4CAF50',
     },
     pointsLabel: {
-        fontSize: 14,
+        fontSize: 12,
         color: '#666',
     },
-    redeemButton: {
-        borderRadius: 20,
+    verticalDivider: {
+        width: 1,
+        height: '80%',
+        backgroundColor: '#eee',
     },
-    campaignsSection: {
-        marginTop: 10,
-        paddingHorizontal: 16,
+    cardActions: {
+        justifyContent: 'space-around',
+        paddingTop: 10,
+        borderTopWidth: 1,
+        borderTopColor: '#f0f0f0',
     },
-    sectionTitle: {
+    actionButton: {
+        flex: 1,
+        marginHorizontal: 5,
+        borderRadius: 8,
+    },
+    withdrawButton: {
+        backgroundColor: '#4CAF50',
+    },
+    statsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 20,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        padding: 15,
+        borderRadius: 12,
+    },
+    statBox: {
+        alignItems: 'center',
+        flex: 1,
+    },
+    statValue: {
+        color: 'white',
         fontSize: 18,
         fontWeight: 'bold',
-        marginBottom: 10,
-        color: '#333',
     },
-    campaignsList: {
-        paddingRight: 16,
-    },
-    campaignCard: {
-        width: 280,
-        marginRight: 16,
-        borderRadius: 12,
-        elevation: 3,
-        marginBottom: 10,
-    },
-    campaignImage: {
-        height: 120,
-        borderTopLeftRadius: 12,
-        borderTopRightRadius: 12,
-    },
-    campaignTitle: {
-        fontSize: 16,
-        marginTop: 5,
-    },
-    campaignDesc: {
-        fontSize: 12,
-        color: '#666',
+    statLabel: {
+        color: 'rgba(255,255,255,0.7)',
+        fontSize: 11,
         marginTop: 2,
-    },
-    campaignBadge: {
-        position: 'absolute',
-        top: 10,
-        right: 10,
-        backgroundColor: '#FFC107',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 4,
-    },
-    campaignBadgeText: {
-        fontWeight: 'bold',
-        fontSize: 12,
-        color: '#333',
-    },
-    noCampaigns: {
-        fontStyle: 'italic',
-        color: '#999',
-        marginLeft: 4,
     },
     historySection: {
         flex: 1,
@@ -284,6 +330,7 @@ const styles = StyleSheet.create({
     historyTitle: {
         fontSize: 18,
         marginBottom: 10,
+        fontWeight: 'bold',
     },
     listContent: {
         paddingTop: 10,
@@ -294,9 +341,6 @@ const styles = StyleSheet.create({
         paddingVertical: 16,
         borderBottomWidth: 1,
         borderBottomColor: '#eee',
-    },
-    transIconContainer: {
-        marginRight: 16,
     },
     transDetails: {
         flex: 1,

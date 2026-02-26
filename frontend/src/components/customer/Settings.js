@@ -19,59 +19,66 @@ import {
   GetAppOutlined, CardGiftcardOutlined, StarOutline, NotificationsOutlined,
   RecommendOutlined, PrivacyTipOutlined,
   HelpOutlineOutlined, GavelOutlined,
+  BookmarkBorderOutlined,
   DeleteSweepOutlined,
   LogoutOutlined, DeleteForeverOutlined,
+  GroupOutlined
 } from '@mui/icons-material';
-
-const settingsGroups = [
-  {
-    subheader: 'Account & Profile',
-    items: [
-      { text: 'Edit Profile', icon: <PersonOutline />, path: 'profile' },
-      { text: 'Manage Addresses', icon: <LocationOnOutlined />, path: 'addresses' },
-      { text: 'Login & Security', icon: <LockOutlined />, path: 'security' },
-      { text: 'Language & Region', icon: <LanguageOutlined />, path: 'language' },
-      { text: 'Theme Mode', icon: <Brightness4Outlined />, path: 'theme' },
-      { text: 'Accessibility', icon: <AccessibilityNewOutlined />, path: 'accessibility' },
-    ],
-  },
-  {
-    subheader: 'Orders & Payments',
-    items: [
-      { text: 'Order History', icon: <HistoryOutlined />, path: 'order-history' },
-      { text: 'Refunds & Returns', icon: <CachedOutlined />, path: 'refunds' },
-      { text: 'Download Invoices', icon: <GetAppOutlined />, path: 'invoices' },
-      { text: 'Rewards Wallet', icon: <CardGiftcardOutlined />, path: 'rewards' },
-      { text: 'Subscription', icon: <StarOutline />, path: 'subscription' },
-    ],
-  },
-  {
-    subheader: 'Notifications & Privacy',
-    items: [
-      { text: 'Notifications', icon: <NotificationsOutlined />, path: 'notifications' },
-      { text: 'Recommendations', icon: <RecommendOutlined />, path: 'recommendations' },
-      { text: 'Privacy Settings', icon: <PrivacyTipOutlined />, path: 'privacy' },
-    ],
-  },
-  {
-    subheader: 'Support & Legal',
-    items: [
-      { text: 'Help Center', icon: <HelpOutlineOutlined />, path: 'help-center' },
-      { text: 'Legal Policies', icon: <GavelOutlined />, path: 'legal' },
-    ],
-  },
-  {
-    subheader: 'Account Management',
-    items: [
-      { text: 'Clear Cache', icon: <DeleteSweepOutlined />, path: 'clear-cache' },
-      { text: 'Logout', icon: <LogoutOutlined />, path: 'logout' },
-      { text: 'Delete Account', icon: <DeleteForeverOutlined />, path: 'delete-account' },
-    ],
-  },
-];
+import { useTranslation } from 'react-i18next';
 
 const Settings = () => {
   const { logout } = useAuth();
+  const { t } = useTranslation();
+
+  const settingsGroups = [
+    {
+      subheader: t('accountProfile'),
+      items: [
+        { text: t('editProfile'), icon: <PersonOutline />, path: 'profile' },
+        { text: t('manageAddresses'), icon: <LocationOnOutlined />, path: 'addresses' },
+        { text: t('loginSecurity'), icon: <LockOutlined />, path: 'security' },
+        { text: t('languageRegion'), icon: <LanguageOutlined />, path: 'language' },
+        { text: t('themeMode'), icon: <Brightness4Outlined />, path: 'theme' },
+        { text: t('accessibility'), icon: <AccessibilityNewOutlined />, path: 'accessibility' },
+      ],
+    },
+    {
+      subheader: t('ordersPayments'),
+      items: [
+        { text: t('orderHistory'), icon: <HistoryOutlined />, path: 'order-history' },
+        { text: t('refundsReturns'), icon: <CachedOutlined />, path: 'refunds' },
+        { text: t('myReviews'), icon: <StarOutline />, path: 'reviews' },
+        { text: t('myBookmarks'), icon: <BookmarkBorderOutlined />, path: 'bookmarks' },
+        { text: t('downloadInvoices'), icon: <GetAppOutlined />, path: 'invoices' },
+        { text: t('rewardsWallet'), icon: <CardGiftcardOutlined />, path: 'rewards' },
+      ],
+    },
+    {
+      subheader: t('notificationsPrivacy'),
+      items: [
+        { text: t('notifications'), icon: <NotificationsOutlined />, path: 'notifications' },
+        { text: t('recommendations'), icon: <RecommendOutlined />, path: 'recommendations' },
+        { text: t('privacySettings'), icon: <PrivacyTipOutlined />, path: 'privacy' },
+      ],
+    },
+    {
+      subheader: t('supportLegal'),
+      items: [
+        { text: t('helpCenter'), icon: <HelpOutlineOutlined />, path: 'help-center' },
+        { text: t('legalPolicies'), icon: <GavelOutlined />, path: 'legal' },
+        { text: t('about'), icon: <HelpOutlineOutlined />, path: 'about' },
+      ],
+    },
+    {
+      subheader: t('accountManagement'),
+      items: [
+        { text: t('clearCache'), icon: <DeleteSweepOutlined />, path: 'clear-cache' },
+        { text: t('logout'), icon: <LogoutOutlined />, path: 'logout' },
+        { text: t('deleteAccount'), icon: <DeleteForeverOutlined />, path: 'delete-account' },
+      ],
+    },
+  ];
+
   return (
     <Box sx={{ display: 'flex' }}>
       <Paper elevation={2} sx={{ width: 300, minHeight: 'calc(100vh - 64px)', overflow: 'auto' }} component="nav">

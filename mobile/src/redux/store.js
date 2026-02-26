@@ -1,4 +1,4 @@
-import { configureStore } from '@reduxjs/toolkit';
+import { configureStore, combineReducers } from '@reduxjs/toolkit';
 import authReducer from './slices/authSlice';
 import settingsReducer from './slices/settingsSlice';
 import { productListReducer, productDetailsReducer, productCreateReviewReducer } from './reducers/productReducers';
@@ -19,7 +19,8 @@ import {
   rewardsReducer,
   rewardTransactionsReducer,
   redeemRewardReducer,
-  campaignsReducer
+  campaignsReducer,
+  publicSettingsReducer
 } from './reducers/rewardsReducers';
 import {
   userReviewsReducer,
@@ -37,41 +38,70 @@ import {
   subscriptionListReducer,
   subscriptionCreateReducer
 } from './reducers/referralReducers';
+import {
+  walletReducer,
+  withdrawalReducer,
+  withdrawalHistoryReducer
+} from './reducers/walletReducers';
 import { wishlistReducer } from './reducers/wishlistReducers';
+import { addressListReducer } from './reducers/addressReducers';
+
+const combinedReducer = combineReducers({
+  auth: authReducer,
+  productList: productListReducer,
+  productDetails: productDetailsReducer,
+  productCreateReview: productCreateReviewReducer,
+  cart: cartReducer,
+  addressList: addressListReducer,
+  bulkOrderList: bulkOrderListReducer,
+  bulkOrderCreate: bulkOrderCreateReducer,
+  bulkOrderUpdate: bulkOrderUpdateReducer,
+  bulkOrderDetails: bulkOrderDetailsReducer,
+  recipeList: recipeListReducer,
+  recipeDetails: recipeDetailsReducer,
+  forumPostList: forumPostListReducer,
+  forumPostDetails: forumPostDetailsReducer,
+  forumPostCreate: forumPostCreateReducer,
+  rewards: rewardsReducer,
+  rewardTransactions: rewardTransactionsReducer,
+  redeemReward: redeemRewardReducer,
+  campaigns: campaignsReducer,
+  publicSettings: publicSettingsReducer,
+  userReviews: userReviewsReducer,
+  deleteReview: deleteReviewReducer,
+  updateReview: updateReviewReducer,
+  refundCreate: refundCreateReducer,
+  refundList: refundListReducer,
+  refundDetails: refundDetailsReducer,
+  referral: referralReducer,
+  referralCode: referralCodeReducer,
+  wallet: walletReducer,
+  withdrawal: withdrawalReducer,
+  withdrawalHistory: withdrawalHistoryReducer,
+  subscriptionList: subscriptionListReducer,
+  subscriptionCreate: subscriptionCreateReducer,
+  wishlist: wishlistReducer,
+  settings: settingsReducer,
+});
+
+const rootReducer = (state, action) => {
+  if (action.type === 'CLEAR_CACHE_STATE') {
+    // Preserve authentication state but reset everything else
+    const { auth } = state;
+    state = {
+      auth,
+      cart: {
+        cartItems: [],
+        loading: false,
+        error: null
+      }
+    };
+  }
+  return combinedReducer(state, action);
+};
 
 const store = configureStore({
-  reducer: {
-    auth: authReducer,
-    productList: productListReducer,
-    productDetails: productDetailsReducer,
-    productCreateReview: productCreateReviewReducer,
-    cart: cartReducer,
-    bulkOrderList: bulkOrderListReducer,
-    bulkOrderCreate: bulkOrderCreateReducer,
-    bulkOrderUpdate: bulkOrderUpdateReducer,
-    bulkOrderDetails: bulkOrderDetailsReducer,
-    recipeList: recipeListReducer,
-    recipeDetails: recipeDetailsReducer,
-    forumPostList: forumPostListReducer,
-    forumPostDetails: forumPostDetailsReducer,
-    forumPostCreate: forumPostCreateReducer,
-    rewards: rewardsReducer,
-    rewardTransactions: rewardTransactionsReducer,
-    redeemReward: redeemRewardReducer,
-    campaigns: campaignsReducer,
-    userReviews: userReviewsReducer,
-    deleteReview: deleteReviewReducer,
-    updateReview: updateReviewReducer,
-    refundCreate: refundCreateReducer,
-    refundList: refundListReducer,
-    refundDetails: refundDetailsReducer,
-    referral: referralReducer,
-    referralCode: referralCodeReducer,
-    subscriptionList: subscriptionListReducer,
-    subscriptionCreate: subscriptionCreateReducer,
-    wishlist: wishlistReducer,
-    settings: settingsReducer,
-  },
+  reducer: rootReducer,
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {

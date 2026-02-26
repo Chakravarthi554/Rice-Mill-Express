@@ -9,6 +9,7 @@ import {
     Paper,
     Chip
 } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 import {
     Assignment as PlacedIcon,
@@ -41,14 +42,15 @@ const statusColors = {
 };
 
 const OrderTimeline = ({ history = [], currentStatus }) => {
+    const { t } = useTranslation();
     // Map statuses to steps
     const steps = [
-        { label: 'Order Placed', statusKey: 'placed' },
-        { label: 'Processing', statusKey: 'processing' },
-        { label: 'Packed', statusKey: 'packed' },
-        { label: 'Shipped', statusKey: 'shipped' },
-        { label: 'Out for Delivery', statusKey: 'out_for_delivery' },
-        { label: 'Delivered', statusKey: 'delivered' },
+        { label: t('placed') || 'Order Placed', statusKey: 'placed' },
+        { label: t('processing') || 'Processing', statusKey: 'processing' },
+        { label: t('packed') || 'Packed', statusKey: 'packed' },
+        { label: t('shipped') || 'Shipped', statusKey: 'shipped' },
+        { label: t('outForDelivery') || 'Out for Delivery', statusKey: 'out_for_delivery' },
+        { label: t('delivered') || 'Delivered', statusKey: 'delivered' },
     ];
 
     // If cancelled, replace the current step or add it? 
@@ -62,7 +64,7 @@ const OrderTimeline = ({ history = [], currentStatus }) => {
             // This is a bit complex, let's keep it simple: 
             // Show steps until the current index, then add cancelled.
             return true;
-        }), { label: 'Cancelled', statusKey: 'cancelled' }]
+        }), { label: t('cancelled') || 'Cancelled', statusKey: 'cancelled' }]
         : steps;
 
     // Find the index of current status

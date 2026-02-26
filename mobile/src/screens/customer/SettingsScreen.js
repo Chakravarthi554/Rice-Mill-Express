@@ -9,12 +9,14 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from 'react-native-paper';
+import { useTranslation } from 'react-i18next';
 import { useDispatch } from 'react-redux';
 import { fetchSettings } from '../../redux/slices/settingsSlice';
 
 const SettingsScreen = ({ navigation }) => {
     const dispatch = useDispatch();
     const { colors } = useTheme();
+    const { t } = useTranslation();
 
     useEffect(() => {
         dispatch(fetchSettings());
@@ -22,129 +24,111 @@ const SettingsScreen = ({ navigation }) => {
 
     const settingsOptions = [
         {
-            title: 'Account Information',
+            title: t('accountInfo'),
             icon: 'person-outline',
-            description: 'Edit your profile and details',
+            description: t('editProfile'),
             onPress: () => navigation.navigate('EditProfile'),
         },
         {
-            title: 'Addresses',
+            title: t('addresses'),
             icon: 'location-on',
-            description: 'Manage delivery addresses',
+            description: t('addresses'),
             onPress: () => navigation.navigate('Addresses'),
         },
         {
-            title: 'Orders & Invoices',
+            title: t('ordersInvoices'),
             icon: 'receipt-long',
-            description: 'View orders and download invoices',
+            description: t('myOrders'),
             onPress: () => navigation.navigate('Orders'),
         },
         {
-            title: 'Security',
+            title: t('security'),
             icon: 'security',
-            description: 'Password and account security',
+            description: t('security'),
             onPress: () => navigation.navigate('Security'),
         },
         {
-            title: 'Privacy & Data',
+            title: t('privacy'),
             icon: 'lock-outline',
-            description: 'Manage your data and visibility',
+            description: t('privacy'),
             onPress: () => navigation.navigate('Privacy'),
         },
         {
-            title: 'Personalization',
-            icon: 'dashboard-customize',
-            description: 'Bio, tagline and dashboard layout',
-            onPress: () => navigation.navigate('Personalization'),
-        },
-        {
-            title: 'Language & Region',
+            title: t('language'),
             icon: 'language',
-            description: 'Change app language and currency',
+            description: t('appLanguage'),
             onPress: () => navigation.navigate('Language'),
         },
         {
-            title: 'Theme & Appearance',
+            title: t('theme'),
             icon: 'palette',
-            description: 'Light, dark, or system theme',
+            description: t('theme'),
             onPress: () => navigation.navigate('Theme'),
         },
         {
-            title: 'Accessibility',
+            title: t('accessibility'),
             icon: 'accessibility',
-            description: 'Visual and assistive settings',
+            description: t('accessibility'),
             onPress: () => navigation.navigate('Accessibility'),
         },
         {
-            title: 'My Rewards',
+            title: t('rewards'),
             icon: 'stars',
-            description: 'Points and rewards history',
+            description: t('rewards'),
             onPress: () => navigation.navigate('Rewards'),
         },
         {
-            title: 'My Reviews',
+            title: t('myReviews'),
             icon: 'rate-review',
-            description: 'Manage your product reviews',
+            description: t('myReviews'),
             onPress: () => navigation.navigate('MyReviews'),
         },
         {
-            title: 'Manage Subscriptions',
-            icon: 'event-repeat',
-            description: 'Manage recurring orders',
-            onPress: () => navigation.navigate('Subscriptions'),
-        },
-        {
-            title: 'Refer & Earn',
+            title: t('referEarn'),
             icon: 'card-giftcard',
-            description: 'Invite friends and get rewards',
+            description: t('referEarn'),
             onPress: () => navigation.navigate('Referral'),
         },
         {
-            title: 'Notifications',
+            title: t('notifications'),
             icon: 'notifications-none',
-            description: 'Notification preferences',
+            description: t('notifications'),
             onPress: () => navigation.navigate('Notifications'),
         },
         {
-            title: 'Clear Cache',
+            title: t('clearCache'),
             icon: 'delete-sweep',
-            description: 'Free up space and clear history',
+            description: t('clearCache'),
             onPress: () => {
                 Alert.alert(
-                    'Clear Cache', 
+                    t('clearCache'),
                     'This will clear temporary data while preserving your account, profile, and rewards.',
                     [
                         { text: 'Cancel', style: 'cancel' },
-                        { 
-                            text: 'Clear', 
+                        {
+                            text: t('clearCache'),
                             onPress: async () => {
                                 try {
-                                    // ✅ Preserve critical user data
-                                    const userData = await AsyncStorage.getItem('userInfo');
+                                    // ✅ 1. Clear Redux Transient State
+                                    dispatch({ type: 'CLEAR_CACHE_STATE' });
+
+                                    // ✅ 2. Preserve strictly required user data
+                                    const userInfo = await AsyncStorage.getItem('userInfo');
                                     const userToken = await AsyncStorage.getItem('userToken');
-                                    const rewardsData = await AsyncStorage.getItem('rewards');
-                                    
-                                    // ✅ Clear only temporary/cache data
-                                    const cacheKeys = [
-                                        'recentSearches',
-                                        'browseHistory',
-                                        'tempImages', 
-                                        'cachedRecipes',
-                                        'tempFormData',
-                                        'uiPreferences_temp'
-                                    ];
-                                    
-                                    await Promise.all(
-                                        cacheKeys.map(key => AsyncStorage.removeItem(key))
-                                    );
-                                    
-                                    // ✅ Restore preserved data
-                                    if (userData) await AsyncStorage.setItem('userInfo', userData);
+
+                                    // ✅ 3. Clear everything in AsyncStorage
+                                    await AsyncStorage.clear();
+
+                                    // ✅ 4. Restore preserved data immediately
+                                    if (userInfo) await AsyncStorage.setItem('userInfo', userInfo);
                                     if (userToken) await AsyncStorage.setItem('userToken', userToken);
-                                    if (rewardsData) await AsyncStorage.setItem('rewards', rewardsData);
-                                    
-                                    Alert.alert('Success', 'Temporary cache cleared. Your account data is preserved.');
+
+                                    // Optional: Re-fetch some initial data if needed, but the Redux reset
+                                    // will cause slices to revert to initial state anyway.
+
+                                    Alert.alert('Success', 'Temporary cache cleared. Your account and rewards are preserved.');
                                 } catch (error) {
+                                    console.error('Mobile Clear Cache Error:', error);
                                     Alert.alert('Error', 'Failed to clear cache.');
                                 }
                             }
@@ -154,21 +138,21 @@ const SettingsScreen = ({ navigation }) => {
             },
         },
         {
-            title: 'Help Center',
+            title: t('helpCenter'),
             icon: 'help-outline',
-            description: 'FAQ and contact support',
+            description: t('helpCenter'),
             onPress: () => navigation.navigate('HelpCenter'),
         },
         {
-            title: 'Legal & Policies',
+            title: t('legalPolicies'),
             icon: 'policy',
-            description: 'Terms, privacy, and policies',
+            description: t('legalPolicies'),
             onPress: () => navigation.navigate('Legal'),
         },
         {
-            title: 'About',
+            title: t('about'),
             icon: 'info-outline',
-            description: 'About this app',
+            description: t('about'),
             onPress: () => navigation.navigate('About'),
         },
     ];
@@ -177,8 +161,8 @@ const SettingsScreen = ({ navigation }) => {
         <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
             <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.outlineVariant }]}>
                 <MaterialIcons name="settings" size={48} color={colors.primary} />
-                <Text style={[styles.headerTitle, { color: colors.onSurface }]}>Settings</Text>
-                <Text style={[styles.headerSubtitle, { color: colors.onSurfaceVariant }]}>Manage your app preferences</Text>
+                <Text style={[styles.headerTitle, { color: colors.onSurface }]}>{t('settings')}</Text>
+                <Text style={[styles.headerSubtitle, { color: colors.onSurfaceVariant }]}>{t('settings')}</Text>
             </View>
 
             <View style={[styles.section, { backgroundColor: colors.surface }]}>
@@ -201,7 +185,7 @@ const SettingsScreen = ({ navigation }) => {
             </View>
 
             <View style={styles.footer}>
-                <Text style={styles.footerText}>Version 1.0.0</Text>
+                <Text style={styles.footerText}>{t('version')} 1.0.0</Text>
             </View>
         </ScrollView>
     );

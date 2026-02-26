@@ -40,10 +40,10 @@ const PrivacySettings = () => {
     try {
       setLoading(true);
       setError(null);
-      await dispatch(updatePrivacySettings({ 
+      await dispatch(updatePrivacySettings({
         preferences: {
-          adsPersonalization: ads, 
-          dataSharing: sharing 
+          adsPersonalization: ads,
+          dataSharing: sharing
         }
       }));
       setSuccess(true);
@@ -76,8 +76,25 @@ const PrivacySettings = () => {
           label="Allow Data Sharing with Partners"
           sx={{ mb: 2, display: 'block' }}
         />
+        <FormControlLabel
+          control={<Switch
+            checked={userInfo?.privacySettings?.profileVisible ?? true}
+            onChange={e => dispatch(updatePrivacySettings({ profileVisible: e.target.checked }))}
+            disabled={loading}
+          />}
+          label="Public Profile Visibility"
+          sx={{ mb: 2, display: 'block' }}
+        />
+        <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+          When disabled, your identity will be hidden in recipes, forum posts, and reviews for other users.
+        </Typography>
+        <Alert severity="info" sx={{ mb: 3, py: 0 }}>
+          <Typography variant="caption">
+            <strong>Note:</strong> You will still see your own name on your posts. To verify, please log in with a different account or ask a friend.
+          </Typography>
+        </Alert>
         <Button type="submit" variant="contained" disabled={loading} sx={{ mt: 2 }}>
-          {loading ? <CircularProgress size={20} /> : 'Save Settings'}
+          {loading ? <CircularProgress size={20} /> : 'Save Ad Preferences'}
         </Button>
       </Box>
       <Snackbar

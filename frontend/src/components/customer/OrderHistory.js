@@ -7,9 +7,11 @@ import { useDispatch, useSelector } from 'react-redux';
 import { listMyOrders, cancelOrder, downloadInvoice } from '../../redux/actions/orderActions';
 import OrderTracker from './OrderTracker';
 import { Download as DownloadIcon } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
 
 const OrderHistory = () => {
   const dispatch = useDispatch();
+  const { t } = useTranslation();
   const { loading, error, orders } = useSelector(state => state.orderListMy);
   const { loading: cancelLoading, success: cancelSuccess } = useSelector(state => state.orderCancel);
   const [cancellingId, setCancellingId] = React.useState(null);
@@ -20,8 +22,8 @@ const OrderHistory = () => {
   }, [dispatch, cancelSuccess]);
 
   const handleCancel = async (orderId) => {
-    const reason = window.prompt('Reason for cancellation:');
-    if (reason && window.confirm('Cancel order?')) {
+    const reason = window.prompt(t('cancelReasonPrompt'));
+    if (reason && window.confirm(t('cancelOrderConfirm'))) {
       setCancellingId(orderId);
       await dispatch(cancelOrder(orderId, reason));
       setCancellingId(null);
@@ -42,12 +44,12 @@ const OrderHistory = () => {
       <Table>
         <TableHead sx={{ backgroundColor: 'grey.100' }}>
           <TableRow>
-            <TableCell><strong>ID</strong></TableCell>
-            <TableCell><strong>Date</strong></TableCell>
-            <TableCell><strong>Total</strong></TableCell>
-            <TableCell><strong>Status</strong></TableCell>
-            <TableCell align="center"><strong>Actions</strong></TableCell>
-            <TableCell><strong>Tracking</strong></TableCell>
+            <TableCell><strong>{t('id')}</strong></TableCell>
+            <TableCell><strong>{t('date')}</strong></TableCell>
+            <TableCell><strong>{t('total')}</strong></TableCell>
+            <TableCell><strong>{t('status')}</strong></TableCell>
+            <TableCell align="center"><strong>{t('actions')}</strong></TableCell>
+            <TableCell><strong>{t('tracking')}</strong></TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -56,7 +58,7 @@ const OrderHistory = () => {
               <TableCell>{o._id.toString().slice(-8).toUpperCase()}</TableCell>
               <TableCell>{new Date(o.createdAt).toLocaleDateString()}</TableCell>
               <TableCell>₹{o.totalPrice}</TableCell>
-              <TableCell>{o.orderStatus}</TableCell>
+              <TableCell>{t(o.orderStatus.toLowerCase())}</TableCell>
               <TableCell align="center">
                 <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1 }}>
                   <Button
@@ -67,7 +69,7 @@ const OrderHistory = () => {
                     onClick={() => handleDownload(o._id)}
                     disabled={downloadingId !== null}
                   >
-                    {downloadingId === o._id ? '...' : 'Invoice'}
+                    {downloadingId === o._id ? '...' : t('invoice')}
                   </Button>
                   {['placed', 'processing', 'packed'].includes(o.orderStatus.toLowerCase()) && (
                     <Button
@@ -77,7 +79,7 @@ const OrderHistory = () => {
                       onClick={() => handleCancel(o._id)}
                       disabled={cancellingId === o._id}
                     >
-                      {cancellingId === o._id ? '...' : 'Cancel'}
+                      {cancellingId === o._id ? '...' : t('cancel')}
                     </Button>
                   )}
                 </Box>

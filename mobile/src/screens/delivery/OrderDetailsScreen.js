@@ -7,12 +7,14 @@ import {
     TouchableOpacity,
     Linking,
     Alert,
+    Platform,
     Image,
 } from 'react-native';
 import { Card, Button, ActivityIndicator, Divider } from 'react-native-paper';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { apiService } from '../../services/api';
+import { API_URL } from '../../config/env';
 
 const OrderDetailsScreen = ({ route, navigation }) => {
     const { orderId } = route.params;
@@ -160,29 +162,74 @@ const OrderDetailsScreen = ({ route, navigation }) => {
                         <Text style={styles.infoText}>{order.shippingAddress.name}</Text>
                     </View>
 
-                    <View style={styles.infoRow}>
-                        <MaterialIcons name="phone" size={20} color="#666" />
-                        <Text style={styles.infoText}>{order.shippingAddress.phone}</Text>
-                        <TouchableOpacity onPress={handleCallCustomer} style={styles.callButton}>
-                            <MaterialIcons name="call" size={20} color="#4CAF50" />
-                            <Text style={styles.callButtonText}>Call</Text>
-                        </TouchableOpacity>
+                    <Text style={styles.sectionTitle}>Customer & Delivery Details</Text>
+                    <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Customer:</Text>
+                        <Text style={styles.detailValue}>{order.user?.name}</Text>
                     </View>
-
-                    <Divider style={styles.divider} />
-
-                    <View style={styles.addressContainer}>
-                        <MaterialIcons name="location-on" size={20} color="#666" />
-                        <View style={styles.addressTextContainer}>
-                            <Text style={styles.addressLabel}>Delivery Address</Text>
-                            <Text style={styles.addressText}>
-                                {order.shippingAddress.street}
+                    <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Phone:</Text>
+                        <Text style={styles.detailValue} onPress={() => Linking.openURL(`tel:${order.shippingAddress?.phone}`)}>
+                            {order.shippingAddress?.phone}
+                        </Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Address:</Text>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.detailValue}>
+                                {order.shippingAddress?.houseNumber}, {order.shippingAddress?.colony && `${order.shippingAddress?.colony}, `}
+                                {order.shippingAddress?.street}
                             </Text>
-                            <Text style={styles.addressText}>
-                                {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.pinCode}
+                            {order.shippingAddress?.landmark && (
+                                <Text style={styles.landmarkText}>Landmark: {order.shippingAddress?.landmark}</Text>
+                            )}
+                            <Text style={styles.detailValue}>
+                                {order.shippingAddress?.city}, {order.shippingAddress?.state} - {order.shippingAddress?.pinCode}
                             </Text>
                         </View>
                     </View>
+                    {order.shippingAddress && (
+                        <Button
+                            icon="map"
+                            mode="contained"
+                            onPress={() => {
+                                const { houseNumber, street, city, state, pinCode, location } = order.shippingAddress;
+                                const coordinates = location?.coordinates;
+                                const [lng, lat] = Array.isArray(coordinates) && coordinates.length === 2 ? coordinates : [null, null];
+
+                                // Construct address string for fallback
+                                const addressString = `${houseNumber || ''} ${street || ''}, ${city || ''}, ${state || ''} ${pinCode || ''}`.trim();
+
+                                let url = '';
+                                if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
+                                    // Use coordinates if available
+                                    url = Platform.select({
+                                        ios: `maps:0,0?q=${lat},${lng}`,
+                                        android: `geo:0,0?q=${lat},${lng}`
+                                    });
+                                } else if (addressString) {
+                                    // Fallback to address string
+                                    const encodedAddress = encodeURIComponent(addressString);
+                                    url = Platform.select({
+                                        ios: `maps:0,0?q=${encodedAddress}`,
+                                        android: `geo:0,0?q=${encodedAddress}`
+                                    });
+                                }
+
+                                if (url) {
+                                    Linking.openURL(url).catch(() => {
+                                        Alert.alert('Error', 'Could not open maps application');
+                                    });
+                                } else {
+                                    Alert.alert('Error', 'No valid address or coordinates available for navigation');
+                                }
+                            }}
+                            style={styles.navigateButton}
+                            buttonColor="#2196F3"
+                        >
+                            Navigate to Customer
+                        </Button>
+                    )}
                 </Card.Content>
             </Card>
 
@@ -192,9 +239,19 @@ const OrderDetailsScreen = ({ route, navigation }) => {
                 <Card.Content>
                     {order.orderItems.map((item, index) => (
                         <View key={index} style={styles.itemRow}>
-                            <Text style={styles.itemName}>{item.name}</Text>
-                            <Text style={styles.itemQuantity}>x{item.quantity}</Text>
-                            <Text style={styles.itemPrice}>₹{item.price * item.quantity}</Text>
+                            <Image
+                                source={{
+                                    uri: item.image?.startsWith('http')
+                                        ? item.image
+                                        : `${API_URL}${item.image}`
+                                }}
+                                style={styles.itemImage}
+                            />
+                            <View style={styles.itemInfo}>
+                                <Text style={styles.itemName}>{item.name}</Text>
+                                <Text style={styles.itemQuantity}>Quantity: {item.qty || item.quantity}</Text>
+                            </View>
+                            <Text style={styles.itemPrice}>₹{(item.price * (item.qty || item.quantity)).toFixed(2)}</Text>
                         </View>
                     ))}
                 </Card.Content>
@@ -353,22 +410,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#333',
     },
-    infoRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    infoText: {
-        marginLeft: 12,
-        fontSize: 16,
-        color: '#333',
-        flex: 1,
-    },
     callButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#E8F5E9',
-        paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: 20,
     },
@@ -400,13 +442,22 @@ const styles = StyleSheet.create({
     },
     itemRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 12,
+        marginBottom: 16,
+    },
+    itemImage: {
+        width: 50,
+        height: 50,
+        borderRadius: 8,
+        backgroundColor: '#f0f0f0',
+    },
+    itemInfo: {
+        flex: 1,
+        marginLeft: 12,
     },
     itemName: {
-        flex: 1,
         fontSize: 16,
+        fontWeight: '500',
         color: '#333',
     },
     itemQuantity: {

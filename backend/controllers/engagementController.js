@@ -6,6 +6,7 @@ const Like = require('../models/Like');
 const Rating = require('../models/Rating');
 const Share = require('../models/Share');
 const User = require('../models/User');
+const { anonymizeUser } = require('../utils/userVisibility');
 
 /**
  * @desc    Simple sentiment analysis helper
@@ -123,15 +124,15 @@ exports.getRecentActivityFeed = asyncHandler(async (req, res) => {
     // Fetch latest comments and ratings
     const [latestComments, latestRatings, latestLikes] = await Promise.all([
         Comment.find({ targetId: { $in: recipeIds }, targetType: 'Recipe', parentCommentId: null })
-            .populate('userId', 'name profilePic')
+            .populate('userId', 'name profilePic isProfilePublic privacySettings')
             .sort({ createdAt: -1 })
             .limit(10),
         Rating.find({ targetId: { $in: recipeIds }, targetType: 'Recipe' })
-            .populate('userId', 'name profilePic')
+            .populate('userId', 'name profilePic isProfilePublic privacySettings')
             .sort({ createdAt: -1 })
             .limit(10),
         Like.find({ targetId: { $in: recipeIds }, targetType: 'Recipe' })
-            .populate('userId', 'name profilePic')
+            .populate('userId', 'name profilePic isProfilePublic privacySettings')
             .sort({ createdAt: -1 })
             .limit(10)
     ]);
@@ -142,7 +143,7 @@ exports.getRecentActivityFeed = asyncHandler(async (req, res) => {
             type: 'comment',
             id: c._id,
             content: c.content,
-            user: c.userId,
+            user: anonymizeUser(c.userId, req.user),
             targetId: c.targetId,
             recipeTitle: recipes.find(recipe => recipe._id.toString() === c.targetId?.toString())?.title || 'Unknown Recipe',
             createdAt: c.createdAt,
@@ -153,7 +154,7 @@ exports.getRecentActivityFeed = asyncHandler(async (req, res) => {
             id: rat._id,
             rating: rat.rating,
             content: rat.comment,
-            user: rat.userId,
+            user: anonymizeUser(rat.userId, req.user),
             targetId: rat.targetId,
             recipeTitle: recipes.find(recipe => recipe._id.toString() === rat.targetId?.toString())?.title || 'Unknown Recipe',
             createdAt: rat.createdAt,
@@ -162,7 +163,7 @@ exports.getRecentActivityFeed = asyncHandler(async (req, res) => {
         ...latestLikes.map(lk => ({
             type: 'like',
             id: lk._id,
-            user: lk.userId,
+            user: anonymizeUser(lk.userId, req.user),
             targetId: lk.targetId,
             recipeTitle: recipes.find(recipe => recipe._id.toString() === lk.targetId?.toString())?.title || 'Unknown Recipe',
             createdAt: lk.createdAt
@@ -190,14 +191,14 @@ exports.getRecipeEngagementDetails = asyncHandler(async (req, res) => {
 
     const [comments, ratings, shares] = await Promise.all([
         Comment.find({ targetId: recipeId, targetType: 'Recipe', parentCommentId: null })
-            .populate('userId', 'name profilePic')
+            .populate('userId', 'name profilePic isProfilePublic privacySettings')
             .populate({
                 path: 'replies',
-                populate: { path: 'userId', select: 'name profilePic' }
+                populate: { path: 'userId', select: 'name profilePic isProfilePublic privacySettings' }
             })
             .sort({ createdAt: -1 }),
         Rating.find({ targetId: recipeId, targetType: 'Recipe' })
-            .populate('userId', 'name profilePic')
+            .populate('userId', 'name profilePic isProfilePublic privacySettings')
             .sort({ createdAt: -1 }),
         Share.aggregate([
             { $match: { targetId: new mongoose.Types.ObjectId(recipeId) } },
@@ -225,8 +226,22 @@ exports.getRecipeEngagementDetails = asyncHandler(async (req, res) => {
                 distribution: recipe.ratingDistribution
             }
         },
-        comments,
-        ratings,
+        comments: comments.map(c => {
+            const co = c.toObject();
+            co.userId = anonymizeUser(c.userId, req.user);
+            if (co.replies) {
+                co.replies = co.replies.map(r => {
+                    r.userId = anonymizeUser(r.userId, req.user);
+                    return r;
+                });
+            }
+            return co;
+        }),
+        ratings: ratings.map(r => {
+            const ro = r.toObject();
+            ro.userId = anonymizeUser(r.userId, req.user);
+            return ro;
+        }),
         sharesBreakdown: shares,
         sentiment: sentimentStats
     });

@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { MaterialIcons } from '@expo/vector-icons';
 import { apiService } from '../../services/api';
 
-const NotificationsScreen = () => {
+const NotificationsScreen = ({ navigation }) => {
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -32,37 +32,68 @@ const NotificationsScreen = () => {
         loadNotifications();
     };
 
-    const handleMarkAsRead = async (id, isRead) => {
-        if (isRead) return;
+    const handleMarkAsRead = async (id, read) => {
+        if (read) return;
         try {
             await apiService.markNotificationRead(id);
             // Optimistic update
             setNotifications(prev =>
-                prev.map(n => n._id === id ? { ...n, isRead: true } : n)
+                prev.map(n => n._id === id ? { ...n, read: true } : n)
             );
         } catch (error) {
             console.error('Error marking notification as read:', error);
         }
     };
 
+    const handleNotificationClick = async (notification) => {
+        if (!notification.read) {
+            await handleMarkAsRead(notification._id, notification.read);
+        }
+
+        if (notification.actionUrl) {
+            // Handle internal navigation if actionUrl is defined
+            // Common internal routes: /orders/:id, /forum/post/:id, etc.
+            // ActionUrls might look like "/orders/123" or "OrderDetails"
+
+            if (notification.actionUrl.includes('orders/')) {
+                const orderId = notification.actionUrl.split('/').pop();
+                navigation.navigate('OrderDetail', { orderId });
+            } else if (notification.actionUrl.includes('forum/post/')) {
+                const postId = notification.actionUrl.split('/').pop();
+                navigation.navigate('ForumPostDetail', { postId });
+            } else if (notification.actionUrl.includes('tickets/')) {
+                navigation.navigate('SupportChat');
+            } else {
+                // Fallback navigation or external link
+                console.log('🔗 Action URL:', notification.actionUrl);
+            }
+        }
+    };
+
     const renderItem = ({ item }) => (
         <TouchableOpacity
-            style={[styles.notificationItem, !item.isRead && styles.unreadItem]}
-            onPress={() => handleMarkAsRead(item._id, item.isRead)}
+            style={[styles.notificationItem, !item.read && styles.unreadItem]}
+            onPress={() => handleNotificationClick(item)}
         >
             <View style={styles.iconContainer}>
                 <MaterialIcons
-                    name={item.type === 'ORDER' ? 'local-shipping' : (item.type === 'SYSTEM' ? 'info' : 'notifications')}
+                    name={
+                        item.type === 'ORDER_UPDATE' || item.type === 'ORDER' ? 'local-shipping' :
+                            item.type === 'SYSTEM' ? 'info' :
+                                item.type === 'SUPPORT_TICKET' ? 'support-agent' :
+                                    item.type === 'NEW_CHAT_MESSAGE' ? 'chat' :
+                                        'notifications'
+                    }
                     size={24}
-                    color={item.isRead ? '#999' : '#4CAF50'}
+                    color={item.read ? '#999' : '#4CAF50'}
                 />
             </View>
             <View style={styles.content}>
-                <Text style={[styles.title, !item.isRead && styles.unreadText]}>{item.title || 'Notification'}</Text>
+                <Text style={[styles.title, !item.read && styles.unreadText]}>{item.title || 'Notification'}</Text>
                 <Text style={styles.message} numberOfLines={2}>{item.message}</Text>
                 <Text style={styles.time}>{new Date(item.createdAt).toLocaleDateString()}</Text>
             </View>
-            {!item.isRead && <View style={styles.dot} />}
+            {!item.read && <View style={styles.dot} />}
         </TouchableOpacity>
     );
 

@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Alert, TouchableOpacity, Linking } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Alert, TouchableOpacity, Linking, Image } from 'react-native';
 import { Card, Divider, Button } from 'react-native-paper';
 import { MaterialIcons } from '@expo/vector-icons';
 import { apiService } from '../../services/api';
+import { API_URL } from '../../config/env';
 
 const OrderDetailScreen = ({ route, navigation }) => {
     const { id } = route.params;
@@ -70,6 +71,7 @@ const OrderDetailScreen = ({ route, navigation }) => {
                         <View>
                             <Text style={styles.orderId}>Order #{order._id.slice(-6).toUpperCase()}</Text>
                             <Text style={styles.date}>Placed on {new Date(order.createdAt).toLocaleDateString()}</Text>
+                            <Text style={styles.itemCountText}>{order.orderItems?.length || 0} items in this order</Text>
                         </View>
                         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.orderStatus) }]}>
                             <Text style={styles.statusText}>{order.orderStatus.toUpperCase()}</Text>
@@ -126,11 +128,19 @@ const OrderDetailScreen = ({ route, navigation }) => {
                 <Card.Content>
                     {order.orderItems.map((item, index) => (
                         <View key={index} style={styles.itemRow}>
-                            <View style={{ flex: 1 }}>
+                            <Image
+                                source={{
+                                    uri: item.image?.startsWith('http')
+                                        ? item.image
+                                        : `${API_URL}${item.image}`
+                                }}
+                                style={styles.itemImage}
+                            />
+                            <View style={{ flex: 1, marginLeft: 12 }}>
                                 <Text style={styles.itemName}>{item.name}</Text>
-                                <Text style={styles.itemQty}>Qty: {item.qty} x ₹{item.price}</Text>
+                                <Text style={styles.itemQty}>{item.qty} x ₹{item.price}</Text>
                             </View>
-                            <Text style={styles.itemTotal}>₹{item.qty * item.price}</Text>
+                            <Text style={styles.itemTotal}>₹{item.subtotal || (item.qty * item.price)}</Text>
                         </View>
                     ))}
                     <Divider style={{ marginVertical: 10 }} />
@@ -248,6 +258,12 @@ const styles = StyleSheet.create({
         color: '#666',
         fontSize: 14,
     },
+    itemCountText: {
+        color: '#4CAF50',
+        fontSize: 12,
+        fontWeight: 'bold',
+        marginTop: 4,
+    },
     statusBadge: {
         paddingHorizontal: 12,
         paddingVertical: 4,
@@ -283,13 +299,19 @@ const styles = StyleSheet.create({
     },
     itemRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 12,
+        marginBottom: 16,
+    },
+    itemImage: {
+        width: 60,
+        height: 60,
+        borderRadius: 8,
+        backgroundColor: '#f0f0f0',
     },
     itemName: {
-        fontSize: 16,
-        fontWeight: '500',
+        fontSize: 15,
+        fontWeight: 'bold',
+        color: '#333',
     },
     itemQty: {
         color: '#666',
