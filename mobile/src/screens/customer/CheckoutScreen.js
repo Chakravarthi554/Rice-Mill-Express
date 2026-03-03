@@ -7,6 +7,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { apiService } from '../../services/api';
 import { clearCart } from '../../redux/actions/cartActions';
 import { getRewards } from '../../redux/actions/rewardsActions';
+import { API_URL } from '../../config/env';
 
 const CheckoutScreen = ({ navigation }) => {
     const dispatch = useDispatch();
@@ -121,7 +122,7 @@ const CheckoutScreen = ({ navigation }) => {
 
                 // 2. Redirect to a secure payment page on our backend
                 const token = await apiService.getAuthToken();
-                const paymentUrl = `${process.env.EXPO_PUBLIC_API_URL}/api/payments/razorpay/pay/${order._id}?token=${token}`;
+                const paymentUrl = `${API_URL}/api/payments/razorpay/pay/${order._id}?token=${token}`;
                 console.log('🔗 Redirecting to payment URL (with token):', paymentUrl);
 
                 // Open terminal to let user know

@@ -4,6 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { getWishlist, removeFromWishlist } from '../../redux/actions/wishlistActions';
 import { addToCart } from '../../redux/actions/cartActions';
+import { API_URL } from '../../config/env';
 
 const WishlistScreen = ({ navigation }) => {
     const dispatch = useDispatch();
@@ -28,7 +29,7 @@ const WishlistScreen = ({ navigation }) => {
         const imageUri = firstImage?.startsWith('http')
             ? firstImage
             : firstImage
-                ? `${process.env.EXPO_PUBLIC_API_URL}${firstImage}`
+                ? `${API_URL}${firstImage}`
                 : 'https://via.placeholder.com/150';
 
         const hasOffer = typeof item.offerPrice === 'number' && item.offerPrice > 0 && item.offerPrice < item.price;

@@ -268,6 +268,7 @@ const assignDeliveryToOrder = asyncHandler(async (req, res) => {
       {
         $set: {
           deliveryPartner: deliveryPartner,
+          deliveryPartnerStatus: 'assigned',
           trackingNumber: trackingNumber,
           orderStatus: 'shipped',
           shippedAt: Date.now()
@@ -277,6 +278,7 @@ const assignDeliveryToOrder = asyncHandler(async (req, res) => {
 
     // Process the updated order object for response and broadcast
     order.deliveryPartner = deliveryPartner;
+    order.deliveryPartnerStatus = 'assigned';
     order.trackingNumber = trackingNumber;
     order.orderStatus = 'shipped';
     order.shippedAt = Date.now();
@@ -488,7 +490,8 @@ const getAssignedOrders = asyncHandler(async (req, res) => {
   if (status) {
     query.orderStatus = status;
   } else {
-    query.orderStatus = { $in: ['shipped', 'out_for_delivery', 'delivered'] };
+    // Include all statuses that a delivery partner should see
+    query.orderStatus = { $in: ['packed', 'shipped', 'out_for_delivery', 'delivered'] };
   }
 
   // 3. Fetch orders
@@ -565,7 +568,7 @@ const startDelivery = asyncHandler(async (req, res) => {
   }
 
   // 4. Verify order status allows starting delivery
-  if (!['shipped', 'out_for_delivery'].includes(order.orderStatus)) {
+  if (!['placed', 'processing', 'packed', 'shipped', 'out_for_delivery'].includes(order.orderStatus)) {
     res.status(400);
     throw new Error(`Cannot start delivery for order with status: ${order.orderStatus}`);
   }
@@ -709,7 +712,7 @@ const confirmDelivery = asyncHandler(async (req, res) => {
 // @access  Private/DeliveryPartner
 const requestReplacement = asyncHandler(async (req, res) => {
   const { orderId } = req.params;
-  
+
   console.log('📝 Replacement Request Received:', {
     orderId,
     body: req.body,
@@ -850,7 +853,7 @@ const reviewReplacement = asyncHandler(async (req, res) => {
 // @access  Private/Seller
 const redispatchReplacement = asyncHandler(async (req, res) => {
   const { orderId } = req.params;
-  const { deliveryPartnerId } = req.body; 
+  const { deliveryPartnerId } = req.body;
 
   const order = await Order.findById(orderId);
 
@@ -866,11 +869,11 @@ const redispatchReplacement = asyncHandler(async (req, res) => {
 
   // 1. Assign new partner
   order.deliveryPartner = deliveryPartnerId;
-  
+
   // 2. Reset Status to 'shipped' so it appears in the new partner's assigned list
   order.orderStatus = 'shipped';
   order.deliveryPartnerStatus = 'assigned';
-  
+
   // 3. Reset Delivery Tracking Fields (Clear previous delivery data)
   order.isDelivered = false;
   order.deliveredAt = undefined;
@@ -896,7 +899,7 @@ const redispatchReplacement = asyncHandler(async (req, res) => {
   const DeliveryPartner = require('../models/deliveryPartner');
   const Notification = require('../models/Notification');
   const partner = await DeliveryPartner.findById(deliveryPartnerId);
-  
+
   if (partner && partner.user) {
     await Notification.create({
       user: partner.user,
@@ -905,7 +908,7 @@ const redispatchReplacement = asyncHandler(async (req, res) => {
       relatedEntity: order._id,
       entityModel: 'Order'
     });
-    
+
     const io = req.app.get('io');
     if (io) {
       io.to(`delivery_${partner.user.toString()}`).emit('ORDER_ASSIGNED', updatedOrder);

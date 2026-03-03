@@ -36,7 +36,8 @@ import {
   Support as SupportIcon,
   Refresh as ResetIcon,
   Send as SendIcon,
-  Info as InfoIcon
+  Info as InfoIcon,
+  CardGiftcard
 } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
 import {

@@ -69,7 +69,8 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
 
         const filtered = orders.filter(order => {
             if (activeTab === 'assigned') {
-                return order.orderStatus === 'shipped';
+                // Show all orders assigned to partner that are not yet out for delivery or delivered
+                return ['placed', 'processing', 'packed', 'shipped'].includes(order.orderStatus);
             } else if (activeTab === 'pending') {
                 return order.orderStatus === 'out_for_delivery';
             } else if (activeTab === 'delivered') {
@@ -170,7 +171,7 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
                         <Text style={styles.statLabel}>Today</Text>
                     </View>
                     <View style={styles.summaryCard}>
-                        <Text style={styles.statValue}>{(Array.isArray(orders) ? orders : []).filter(o => o.orderStatus === 'shipped' || o.orderStatus === 'out_for_delivery').length}</Text>
+                        <Text style={styles.statValue}>{(Array.isArray(orders) ? orders : []).filter(o => ['placed', 'processing', 'packed', 'shipped', 'out_for_delivery'].includes(o.orderStatus)).length}</Text>
                         <Text style={styles.statLabel}>Active</Text>
                     </View>
                 </View>

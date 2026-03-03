@@ -3,8 +3,7 @@ import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } f
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { auth } from '../../config/firebase';
-
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
+import { API_URL } from '../../config/env';
 
 // Async thunk for login
 export const login = createAsyncThunk(

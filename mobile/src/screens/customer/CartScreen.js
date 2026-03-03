@@ -13,6 +13,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { useTranslation } from 'react-i18next';
 import { getCart, removeFromCart, updateCartItem } from '../../redux/actions/cartActions';
+import { API_URL } from '../../config/env';
 
 export default function CartScreen({ navigation }) {
     const dispatch = useDispatch();
@@ -54,7 +55,7 @@ export default function CartScreen({ navigation }) {
         const imageUri = firstImage?.startsWith('http')
             ? firstImage
             : firstImage
-                ? `${process.env.EXPO_PUBLIC_API_URL}${firstImage}`
+                ? `${API_URL}${firstImage}`
                 : 'https://via.placeholder.com/150';
 
         return (

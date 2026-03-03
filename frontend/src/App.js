@@ -22,7 +22,6 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import CustomerDashboard from './pages/CustomerDashboard';
 import SellerDashboard from './pages/SellerDashboard';
 import AdminDashboard from './pages/AdminDashboard';
-import DeliveryPartnerDashboard from './pages/DeliveryPartnerDashboard';
 import SellerKycPage from './pages/seller/SellerKycPage';
 import AdminForumPanel from './components/admin/AdminForumPanel';
 import ProductPage from './pages/customer/ProductPage';
@@ -36,15 +35,7 @@ import DeliveryKYCApproval from './components/admin/DeliveryKYCApproval';
 import OrderSuccessPage from './pages/customer/OrderSuccessPage';
 import VerifyEmailNotice from './pages/VerifyEmailNotice';
 
-// --- Delivery Partner Components ---
-import DeliveryPartnerOrders from './pages/delivery/DeliveryPartnerOrders';
-import DeliveryPartnerOrderDetails from './pages/delivery/DeliveryPartnerOrderDetails';
-import DeliveryPartnerDashboardNew from './pages/delivery/DeliveryPartnerDashboardNew';
-import DeliveryPartnerOrderDetailsNew from './pages/delivery/DeliveryPartnerOrderDetailsNew';
-import DeliveryHistory from './pages/delivery/DeliveryHistory';
-import DeliveryPartnerProfile from './pages/delivery/DeliveryPartnerProfile';
-import EmergencyAlert from './pages/delivery/EmergencyAlert';
-import DeliveryPartnerHelpCenter from './pages/delivery/HelpCenter';
+
 
 // --- Replacement Components ---
 import ReplacementManagement from './components/admin/ReplacementManagement';
@@ -170,45 +161,7 @@ function App() {
                 element={<ProtectedRoute roles={['seller']}><SellerKycPage /></ProtectedRoute>}
               />
 
-              {/* --- DELIVERY PARTNER --- */}
-              <Route
-                path="/delivery/dashboard"
-                element={<ProtectedRoute roles={['deliveryPartner']}><DeliveryPartnerDashboard /></ProtectedRoute>}
-              />
-              <Route
-                path="/delivery-partner/orders"
-                element={<ProtectedRoute roles={['deliveryPartner']}><DeliveryPartnerOrders /></ProtectedRoute>}
-              />
-              <Route
-                path="/delivery-partner/orders/:orderId"
-                element={<ProtectedRoute roles={['deliveryPartner']}><DeliveryPartnerOrderDetails /></ProtectedRoute>}
-              />
 
-              {/* New Delivery Partner Routes */}
-              <Route
-                path="/delivery-partner/dashboard"
-                element={<ProtectedRoute roles={['deliveryPartner']}><DeliveryPartnerDashboardNew /></ProtectedRoute>}
-              />
-              <Route
-                path="/delivery-partner/order/:orderId"
-                element={<ProtectedRoute roles={['deliveryPartner']}><DeliveryPartnerOrderDetailsNew /></ProtectedRoute>}
-              />
-              <Route
-                path="/delivery-partner/history"
-                element={<ProtectedRoute roles={['deliveryPartner']}><DeliveryHistory /></ProtectedRoute>}
-              />
-              <Route
-                path="/delivery-partner/profile"
-                element={<ProtectedRoute roles={['deliveryPartner']}><DeliveryPartnerProfile /></ProtectedRoute>}
-              />
-              <Route
-                path="/delivery-partner/emergency"
-                element={<ProtectedRoute roles={['deliveryPartner']}><EmergencyAlert /></ProtectedRoute>}
-              />
-              <Route
-                path="/delivery-partner/help"
-                element={<ProtectedRoute roles={['deliveryPartner']}><DeliveryPartnerHelpCenter /></ProtectedRoute>}
-              />
 
               {/* --- ADMIN --- */}
               <Route

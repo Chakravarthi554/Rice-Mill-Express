@@ -1018,7 +1018,11 @@ const getReferralCode = asyncHandler(async (req, res) => {
     await user.save();
   }
 
-  res.json({ code: user.referralCode });
+  res.json({
+    success: true,
+    code: user.referralCode,
+    referralCode: user.referralCode
+  });
 });
 
 const getReferrals = asyncHandler(async (req, res) => {
@@ -1031,9 +1035,13 @@ const getReferrals = asyncHandler(async (req, res) => {
     await user.save();
   }
 
+  const stats = user.referralStats || { referredUsers: 0, earnedCredits: 0 };
   res.json({
+    success: true,
     referralCode: user.referralCode,
-    stats: user.referralStats || { referredUsers: 0, earnedCredits: 0 }
+    code: user.referralCode,
+    referralStats: stats,
+    stats: stats
   });
 });
 

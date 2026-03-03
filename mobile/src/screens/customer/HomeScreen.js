@@ -16,6 +16,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useTranslation } from 'react-i18next';
 import { apiService } from '../../services/api';
 import { addToWishlist, removeFromWishlist, getWishlist } from '../../redux/actions/wishlistActions';
+import { API_URL } from '../../config/env';
 
 export default function HomeScreen({ navigation }) {
     const [products, setProducts] = useState([]);
@@ -70,7 +71,7 @@ export default function HomeScreen({ navigation }) {
         const imageUri = item.images?.[0]?.startsWith('http')
             ? item.images[0]
             : item.images?.[0]
-                ? `${process.env.EXPO_PUBLIC_API_URL}${item.images[0]}`
+                ? `${API_URL}${item.images[0]}`
                 : 'https://via.placeholder.com/150';
 
         const favorited = isWishlisted(item._id);

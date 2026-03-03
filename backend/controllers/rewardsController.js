@@ -127,16 +127,19 @@ const getReferralInfo = asyncHandler(async (req, res) => {
         await user.save();
     }
 
+    const stats = user.referralStats || {
+        referredUsers: 0,
+        earnedCredits: 0,
+        pendingCredits: 0,
+        totalReferrals: 0
+    };
+
     res.json({
         success: true,
         referralCode: user.referralCode,
-        code: { code: user.referralCode }, // Compatibility with mobile app
-        referralStats: user.referralStats || {
-            referredUsers: 0,
-            earnedCredits: 0,
-            pendingCredits: 0,
-            totalReferrals: 0
-        },
+        code: user.referralCode, // Direct code for simplicity
+        referralStats: stats,
+        stats: stats, // Compatibility alias
         isReferralRewardClaimed: user.isReferralRewardClaimed || false,
         referredBy: user.referredBy || null
     });
@@ -174,6 +177,7 @@ const processReferralRewards = asyncHandler(async (orderId) => {
 
                 // Update referrer
                 referrer.walletBalance = (referrer.walletBalance || 0) + referrerBonus;
+                if (!referrer.referralStats) referrer.referralStats = { referredUsers: 0, earnedCredits: 0, totalEarnings: 0 };
                 referrer.referralStats.earnedCredits = (referrer.referralStats.earnedCredits || 0) + referrerBonus;
                 referrer.referralStats.totalEarnings = (referrer.referralStats.totalEarnings || 0) + referrerBonus;
                 referrer.referralStats.referredUsers = (referrer.referralStats.referredUsers || 0) + 1;
@@ -296,6 +300,16 @@ const requestWithdrawal = asyncHandler(async (req, res) => {
         referenceType: 'WithdrawalRequest',
         balanceAfter: user.walletBalance
     });
+
+    // Notify Admins
+    if (req.io) {
+        req.io.emit('ADMIN_ALERT', {
+            title: 'New Withdrawal Request',
+            message: `${user.name} has requested a withdrawal of ₹${amount}`,
+            type: 'withdrawal',
+            withdrawalId: withdrawal._id
+        });
+    }
 
     res.status(201).json({
         success: true,

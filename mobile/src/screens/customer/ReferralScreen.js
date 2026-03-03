@@ -22,8 +22,9 @@ const ReferralScreen = () => {
 
     const handleShare = async () => {
         try {
+            const referralCode = typeof code === 'object' ? code?.code : code;
             await Share.share({
-                message: `Join Rice Mill and get rewards! Use my referral code: ${code?.code || 'CHECKAPP'}. Download now: https://ricemill.example.com`,
+                message: `Join Rice Mill and get rewards! Use my referral code: ${referralCode || 'CHECKAPP'}. Download now: https://ricemill.example.com`,
             });
         } catch (error) {
             Alert.alert('Error', 'Failed to share referral code');
@@ -50,7 +51,9 @@ const ReferralScreen = () => {
                 <Card.Content style={styles.codeContent}>
                     <Text style={styles.codeLabel}>YOUR REFERRAL CODE</Text>
                     <View style={styles.codeBox}>
-                        <Text style={styles.codeText}>{code?.code || 'LOADING...'}</Text>
+                        <Text style={styles.codeText}>
+                            {typeof code === 'object' ? (code?.code || 'LOADING...') : (code || 'LOADING...')}
+                        </Text>
                         <TouchableOpacity onPress={handleShare}>
                             <MaterialIcons name="share" size={24} color="#4CAF50" />
                         </TouchableOpacity>

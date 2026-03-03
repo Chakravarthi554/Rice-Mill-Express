@@ -130,11 +130,17 @@ export const apiService = {
     updateDeliveryStatus: (orderId, status, location) =>
         api.put(`/api/delivery-partners/orders/${orderId}/status`, { status, location }),
     uploadDeliveryPhoto: (orderId, formData) =>
-        api.post(`/api/delivery-partners/orders/${orderId}/confirm`, formData),
+        api.post(`/api/delivery-partners/orders/${orderId}/confirm`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: 30000, // 30s timeout for photo uploads
+        }),
     startDelivery: (orderId) => api.post(`/api/delivery-partners/orders/${orderId}/start`, {}),
     completeDelivery: (orderId, data) => api.post(`/api/delivery-partners/orders/${orderId}/complete`, data),
     requestReplacement: (orderId, formData) =>
-        api.post(`/api/delivery-partners/orders/${orderId}/replacement`, formData),
+        api.post(`/api/delivery-partners/orders/${orderId}/replacement`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: 30000,
+        }),
 
 
     // ============ Seller ============

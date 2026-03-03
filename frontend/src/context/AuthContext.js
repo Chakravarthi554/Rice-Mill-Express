@@ -342,7 +342,14 @@ export const AuthProvider = ({ children }) => {
       const redirectPath = () => {
         if (userInfo.role === 'admin') return '/admin/dashboard';
         if (userInfo.role === 'customer') return '/customer/dashboard';
-        if (userInfo.role === 'deliveryPartner') return '/delivery/dashboard';
+        if (userInfo.role === 'deliveryPartner') {
+          // Delivery partners should only use the mobile app
+          setTimeout(() => {
+            logout(true);
+            setMessage('Delivery partners can only access through the mobile app. Please use the mobile application.');
+          }, 100);
+          return '/login';
+        }
 
         // Mandatory email verification check for Sellers/Customers
         if (!userInfo.emailVerified && userInfo.requiresVerification) {

@@ -30,6 +30,7 @@ import {
     joinRoom,
     leaveRoom
 } from '../../services/socket';
+import { API_URL } from '../../config/env';
 
 const RecipeDetailScreen = ({ route, navigation }) => {
     const { recipeId } = route.params;
@@ -85,7 +86,7 @@ const RecipeDetailScreen = ({ route, navigation }) => {
     const handleShare = async () => {
         try {
             // Include link in message for Android since Android ignores the 'url' property
-            const appUrl = `${process.env.EXPO_PUBLIC_API_URL}/recipes/${recipeId}`;
+            const appUrl = `${API_URL}/recipes/${recipeId}`;
             const message = `Check out this delicious recipe: ${recipe.title}\n\nView here: ${appUrl}\n\nDownload the Rice Mill App to see more!`;
 
             const result = await Share.share({

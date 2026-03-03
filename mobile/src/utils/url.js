@@ -1,4 +1,4 @@
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000';
+import { API_URL } from '../config/env';
 
 export const getImageUrl = (path) => {
     if (!path) return null;

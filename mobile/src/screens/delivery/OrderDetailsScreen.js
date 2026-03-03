@@ -113,6 +113,9 @@ const OrderDetailsScreen = ({ route, navigation }) => {
 
     const getStatusBadgeColor = (status) => {
         switch (status) {
+            case 'placed': return '#9C27B0';
+            case 'processing': return '#FF9800';
+            case 'packed': return '#607D8B';
             case 'shipped': return '#2196F3';
             case 'out_for_delivery': return '#FFA500';
             case 'delivered': return '#4CAF50';
@@ -290,7 +293,7 @@ const OrderDetailsScreen = ({ route, navigation }) => {
 
             {/* Action Buttons */}
             <View style={styles.actionContainer}>
-                {order.orderStatus === 'shipped' && order.replacementStatus !== 'requested' && (
+                {['placed', 'processing', 'packed', 'shipped'].includes(order.orderStatus) && order.replacementStatus !== 'requested' && (
                     <Button
                         mode="contained"
                         onPress={handleStartDelivery}

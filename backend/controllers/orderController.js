@@ -424,8 +424,11 @@ exports.updateOrderStatus = asyncHandler(async (req, res) => {
   if (status === 'delivered') {
     order.isDelivered = true;
     order.deliveredAt = Date.now();
-    // Trigger referral rewards
-    processReferralRewards(order._id);
+    await order.save(); // Save first
+    // Trigger referral rewards after save to ensure data consistency
+    await processReferralRewards(order._id);
+  } else {
+    await order.save();
   }
 
   if (status === 'cancelled') {
@@ -726,8 +729,13 @@ exports.assignDeliveryPartner = asyncHandler(async (req, res) => {
   order.deliveryPartner = partnerId || null;
   order.updatedBy = req.user._id;
 
-  // Auto-update status to 'shipped' if assigning for the first time on packable orders
-  if (partnerId && !oldPartnerId && ['packed', 'processing'].includes(order.orderStatus)) {
+  // Set delivery partner status to 'assigned' so mobile app can find the order
+  if (partnerId) {
+    order.deliveryPartnerStatus = 'assigned';
+  }
+
+  // Auto-update status to 'shipped' when assigning a delivery partner
+  if (partnerId && !oldPartnerId && ['placed', 'processing', 'packed'].includes(order.orderStatus)) {
     const previousStatusForLog = order.orderStatus;
     order.orderStatus = 'shipped';
     order.statusHistory.push({

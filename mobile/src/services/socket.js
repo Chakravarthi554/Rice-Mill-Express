@@ -1,5 +1,6 @@
 import { io } from 'socket.io-client';
 import { auth } from '../config/firebase';
+import { API_URL } from '../config/env';
 
 let socket = null;
 
@@ -13,7 +14,7 @@ export const connectSocket = async () => {
     try {
         const token = await user.getIdToken();
 
-        socket = io(process.env.EXPO_PUBLIC_API_URL, {
+        socket = io(API_URL, {
             auth: { token },
             transports: ['websocket'],
             reconnection: true,

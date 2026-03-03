@@ -41,7 +41,7 @@ const ReferralKycSettings = () => {
     fetchData();
   }, [dispatch]);
 
-  const referralCode = code || user?.referralCode || 'NOTSET';
+  const referralCode = (typeof code === 'object' ? code?.code : code) || user?.referralCode || 'NOTSET';
   const referralLink = `${window.location.origin}/register?ref=${referralCode}`;
 
   const copyToClipboard = () => {

@@ -34,7 +34,7 @@ const OrderDetailScreen = ({ route, navigation }) => {
             setDownloading(true);
             const auth = await apiService.getAuthToken(); // If I can get it
             // Construct authenticated URL
-            const invoiceUrl = `${process.env.EXPO_PUBLIC_API_URL}/api/orders/${id}/invoice?token=${auth}`;
+            const invoiceUrl = `${API_URL}/api/orders/${id}/invoice?token=${auth}`;
             await Linking.openURL(invoiceUrl);
         } catch (error) {
             console.error('Error downloading invoice:', error);

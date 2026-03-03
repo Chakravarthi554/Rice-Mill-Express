@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, Image, ScrollView, Alert, TouchableOpacity } from 'react-native';
 import { Button, Card, ActivityIndicator, HelperText } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
-import { useSelector } from 'react-redux';
 import { MaterialIcons } from '@expo/vector-icons';
-import axios from 'axios';
+import { apiService } from '../services/api';
 
 const DeliveryConfirmationScreen = ({ route, navigation }) => {
     const { orderId } = route.params;
@@ -14,8 +13,6 @@ const DeliveryConfirmationScreen = ({ route, navigation }) => {
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [order, setOrder] = useState(null);
-
-    const { userInfo } = useSelector(state => state.userLogin);
 
     useEffect(() => {
         fetchOrderDetails();
@@ -33,13 +30,15 @@ const DeliveryConfirmationScreen = ({ route, navigation }) => {
 
     const fetchOrderDetails = async () => {
         try {
-            const config = {
-                headers: { Authorization: `Bearer ${userInfo.token}` },
-            };
-            const { data } = await axios.get(`/api/orders/${orderId}`, config);
-            setOrder(data);
+            setLoading(true);
+            const response = await apiService.getDeliveryOrderById(orderId);
+            const orderData = response.data?.order || response.data;
+            setOrder(orderData);
         } catch (error) {
             console.error('Error fetching order:', error);
+            Alert.alert('Error', 'Failed to load order details');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -72,40 +71,21 @@ const DeliveryConfirmationScreen = ({ route, navigation }) => {
         try {
             setUploading(true);
 
-            // 1. In a real-world scenario, you'd upload this to Firebase Storage here
-            // and get a URL. Since we don't have a direct Firebase config file, 
-            // we'll assume a standard multipart upload or that the user will configure the storage bucket later.
-            // For this implementation, we'll simulate the "photoUrl" being sent to the backend.
-
             const formData = new FormData();
-            formData.append('image', {
+            formData.append('deliveryPhoto', {
                 uri: photo.uri,
                 name: `delivery_${orderId}.jpg`,
                 type: 'image/jpeg',
             });
 
-            // Simulation: We'll send the data to the backend confirm endpoint
-            const config = {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                    Authorization: `Bearer ${userInfo.token}`,
-                },
-            };
+            if (location) {
+                formData.append('latitude', location.latitude.toString());
+                formData.append('longitude', location.longitude.toString());
+            }
 
-            // Path corresponds to the updated backend route
-            const payload = {
-                orderId,
-                photoProofUrl: photo.uri,
-                location: location ? {
-                    lat: location.latitude,
-                    lng: location.longitude
-                } : null,
-                notes: 'Delivered via Zepto-Style Photo Confirmation'
-            };
+            formData.append('notes', 'Delivered via Photo Confirmation');
 
-            await axios.post('/api/delivery/confirm', payload, {
-                headers: { Authorization: `Bearer ${userInfo.token}` }
-            });
+            await apiService.uploadDeliveryPhoto(orderId, formData);
 
             Alert.alert('Delivery Confirmed', 'The order has been marked as delivered and all dashboards updated.', [
                 { text: 'Back to Dashboard', onPress: () => navigation.navigate('DeliveryDashboard') }
