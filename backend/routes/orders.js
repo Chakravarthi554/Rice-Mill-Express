@@ -85,6 +85,9 @@ router
   .post(protect, validateController(orderController, 'createOrder'))
   .get(protect, role("admin"), validateController(orderController, 'getOrders'));
 
+// Delivery fee preview for checkout
+router.post("/delivery-fee-preview", protect, validateController(orderController, 'previewDeliveryFee'));
+
 // ✅ FIXED: User orders
 router.route("/myorders")
   .get(protect, validateController(orderController, 'getMyOrders'));

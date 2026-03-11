@@ -495,16 +495,26 @@ export const deleteDeliveryPartner = (partnerId) => async (dispatch, getState) =
     });
   }
 };
-// --- SELLER PROFILE UPDATE ---
-export const updateSellerProfile = (profileData) => async (dispatch, getState) => {
+// --- SELLER PROFILE UPDATE (Fixed: Correct headers for FormData) ---
+export const updateSellerProfile = (formData) => async (dispatch, getState) => {
   try {
     dispatch({ type: SELLER_UPDATE_PROFILE_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = {
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${userInfo.token}` },
+      headers: {
+        // NOTE: Do NOT set Content-Type for FormData, browser will set it with boundary
+        Authorization: `Bearer ${userInfo.token}`
+      },
     };
-    const { data } = await axios.put('/api/sellers/profile', profileData, config);
+    const { data } = await axios.put('/api/seller/profile', formData, config);
     dispatch({ type: SELLER_UPDATE_PROFILE_SUCCESS, payload: data });
+
+    // Update USER_LOGIN_SUCCESS if the updated data is returned
+    if (data && !data.error) {
+      const updatedUserInfo = { ...userInfo, ...data };
+      dispatch({ type: USER_LOGIN_SUCCESS, payload: updatedUserInfo });
+      localStorage.setItem('userInfo', JSON.stringify(updatedUserInfo));
+    }
   } catch (error) {
     dispatch({
       type: SELLER_UPDATE_PROFILE_FAIL,

@@ -280,7 +280,7 @@ const AnalyticsTab = () => {
         <Grid item xs={12} sm={6} md={3}>
           <StatCard
             title="Total Revenue"
-            value={`₹${analyticsData.salesOverview.totalSales.toLocaleString()}`}
+            value={`₹${(analyticsData.salesOverview.totalSales || 0).toLocaleString()}`}
             icon={TrendingUpIcon}
             color="success"
             trend={12}
@@ -299,17 +299,17 @@ const AnalyticsTab = () => {
         <Grid item xs={12} sm={6} md={3}>
           <StatCard
             title="Active Users"
-            value={analyticsData.userEngagement.activeUsers.customers}
+            value={analyticsData.userEngagement.activeUsers?.customers || 0}
             icon={PeopleIcon}
             color="info"
             trend={15}
-            subtitle={`${analyticsData.userEngagement.activeUsers.sellers} sellers`}
+            subtitle={`${analyticsData.userEngagement.activeUsers?.sellers || 0} sellers`}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <StatCard
             title="Commission"
-            value={`₹${analyticsData.salesOverview.commissionEarned.toLocaleString()}`}
+            value={`₹${(analyticsData.salesOverview.commissionEarned || 0).toLocaleString()}`}
             icon={PaymentIcon}
             color="warning"
             trend={10}
@@ -352,7 +352,7 @@ const AnalyticsTab = () => {
                       <ChartTooltip
                         contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: 8, color: 'white' }}
                         itemStyle={{ color: '#38bdf8' }}
-                        formatter={(value) => [`₹${value.toLocaleString()}`, 'Sales']}
+                        formatter={(value) => [`₹${(value || 0).toLocaleString()}`, 'Sales']}
                       />
                       <Legend wrapperStyle={{ paddingTop: 20 }} />
                       <Bar dataKey="sales" fill="#38bdf8" name="Daily Sales" radius={[6, 6, 0, 0]} />
@@ -534,7 +534,7 @@ const AnalyticsTab = () => {
                         </Typography>
                       </Box>
                       <Typography variant="body2" fontWeight="medium">
-                        ₹{seller.revenue.toLocaleString()}
+                        ₹{(seller.revenue || 0).toLocaleString()}
                       </Typography>
                     </Box>
                   ))}

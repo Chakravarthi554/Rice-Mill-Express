@@ -8,40 +8,49 @@ import { auth } from '../config/firebase';
 
 const DeliveryPartnerDashboard = ({ navigation }) => {
     const [orders, setOrders] = useState([]);
+    const [stats, setStats] = useState({
+        totalOrders: 0,
+        todayOrders: 0,
+        activeOrders: 0,
+        totalEarnings: 0,
+        todayEarnings: 0
+    });
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [activeTab, setActiveTab] = useState('assigned');
 
     const { user, token } = useSelector(state => state.auth);
 
-
-    const fetchOrders = async () => {
+    const fetchDashboardData = async () => {
         try {
             setLoading(true);
-            const response = await apiService.getAssignedOrders();
-            // Handle { orders: [...] } response structure
+            const [ordersRes, statsRes] = await Promise.all([
+                apiService.getAssignedOrders(),
+                apiService.getDPDashboard()
+            ]);
+
+            // Handle Orders
             let ordersData = [];
-            if (response.data && Array.isArray(response.data.orders)) {
-                ordersData = response.data.orders;
-            } else if (Array.isArray(response.data)) {
-                ordersData = response.data;
-            } else {
-                console.warn('⚠️ Unexpected API response format:', typeof response.data, response.data);
+            if (ordersRes.data && Array.isArray(ordersRes.data.orders)) {
+                ordersData = ordersRes.data.orders;
+            } else if (Array.isArray(ordersRes.data)) {
+                ordersData = ordersRes.data;
             }
-
-            console.log(`📊 Fetched ${ordersData.length} orders`);
-            if (ordersData.length > 0) {
-                console.log('📝 Sample order status:', ordersData[0].orderStatus);
-            }
-
             setOrders(ordersData);
-        } catch (error) {
-            console.error('Error fetching assigned orders:', error);
-            // Only show alert if it's not an auth error (user will see login screen)
-            if (error.response?.status !== 401) {
-                // Alert.alert('Error', 'Failed to fetch orders. Please try again.');
+
+            // Handle Stats - Backend returns { success, stats: { ... } }
+            if (statsRes.data && statsRes.data.success && statsRes.data.stats) {
+                const s = statsRes.data.stats;
+                setStats({
+                    totalOrders: s.totalDeliveries || 0,
+                    todayOrders: s.todayOrders || 0,
+                    activeOrders: s.activeDeliveries || 0,
+                    totalEarnings: s.totalEarnings || 0,
+                    todayEarnings: s.todayEarnings || 0
+                });
             }
-            setOrders([]);
+        } catch (error) {
+            console.error('Error fetching dashboard data:', error);
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -49,19 +58,14 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
     };
 
     useEffect(() => {
-        // Only fetch orders if we have a Redux user AND Firebase is initialized
-        // This prevents 401 errors from using stale storage tokens before Firebase is ready
         if (user && auth.currentUser) {
-            console.log('✅ Auth ready, fetching orders...');
-            fetchOrders();
-        } else if (user && !auth.currentUser) {
-            console.log('⏳ Waiting for Firebase auth to initialize before fetching...');
+            fetchDashboardData();
         }
-    }, [user, token]); // Re-run when token updates from App.js listener
+    }, [user, token]);
 
     const onRefresh = () => {
         setRefreshing(true);
-        fetchOrders();
+        fetchDashboardData();
     };
 
     const filteredOrders = useMemo(() => {
@@ -157,21 +161,26 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
             <View style={styles.header}>
                 <View style={styles.summaryContainer}>
                     <View style={styles.summaryCard}>
-                        <Text style={styles.statValue}>{(Array.isArray(orders) ? orders : []).length}</Text>
-                        <Text style={styles.statLabel}>Total</Text>
+                        <Text style={styles.statValue}>₹{stats.totalEarnings}</Text>
+                        <Text style={styles.statLabel}>Total Earned</Text>
                     </View>
                     <View style={styles.summaryCard}>
-                        <Text style={styles.statValue}>
-                            {(Array.isArray(orders) ? orders : []).filter(o => {
-                                const orderDate = new Date(o.createdAt);
-                                const today = new Date();
-                                return orderDate.toDateString() === today.toDateString();
-                            }).length}
-                        </Text>
+                        <Text style={styles.statValue}>₹{stats.todayEarnings}</Text>
+                        <Text style={styles.statLabel}>Today Earned</Text>
+                    </View>
+                </View>
+
+                <View style={styles.headerStats}>
+                    <View style={styles.statItem}>
+                        <Text style={styles.statValue}>{stats.totalOrders}</Text>
+                        <Text style={styles.statLabel}>Total Orders</Text>
+                    </View>
+                    <View style={styles.statItem}>
+                        <Text style={styles.statValue}>{stats.todayOrders}</Text>
                         <Text style={styles.statLabel}>Today</Text>
                     </View>
-                    <View style={styles.summaryCard}>
-                        <Text style={styles.statValue}>{(Array.isArray(orders) ? orders : []).filter(o => ['placed', 'processing', 'packed', 'shipped', 'out_for_delivery'].includes(o.orderStatus)).length}</Text>
+                    <View style={styles.statItem}>
+                        <Text style={styles.statValue}>{stats.activeOrders}</Text>
                         <Text style={styles.statLabel}>Active</Text>
                     </View>
                 </View>
@@ -224,10 +233,25 @@ const styles = StyleSheet.create({
         borderBottomRightRadius: 24,
         elevation: 8,
     },
+    summaryContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 20,
+    },
+    summaryCard: {
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        padding: 15,
+        borderRadius: 12,
+        flex: 0.48,
+        alignItems: 'center',
+    },
     headerStats: {
         flexDirection: 'row',
         justifyContent: 'space-around',
         alignItems: 'center',
+        paddingTop: 10,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255,255,255,0.3)',
     },
     statItem: {
         alignItems: 'center',

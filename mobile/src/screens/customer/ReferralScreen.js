@@ -15,6 +15,10 @@ const ReferralScreen = () => {
     const referralCodeState = useSelector((state) => state.referralCode || { code: null });
     const { loading: codeLoading, code } = referralCodeState;
 
+    const { publicSettings } = useSelector((state) => state.publicSettings || {});
+    const referralReward = publicSettings?.referralSettings?.referralRewardReferrer || 50;
+    const refereeReward = publicSettings?.referralSettings?.referralRewardReferee || 20;
+
     useEffect(() => {
         dispatch(getReferrals());
         dispatch(getReferralCode());
@@ -44,7 +48,7 @@ const ReferralScreen = () => {
             <View style={styles.header}>
                 <MaterialIcons name="card-giftcard" size={80} color="white" />
                 <Title style={styles.headerTitle}>Refer & Earn</Title>
-                <Paragraph style={styles.headerSubtitle}>Invite your friends and get reward points for every successful purchase they make!</Paragraph>
+                <Paragraph style={styles.headerSubtitle}>Invite your friends and get ₹{referralReward} reward for every successful purchase they make!</Paragraph>
             </View>
 
             <Card style={styles.codeCard}>
@@ -102,11 +106,11 @@ const ReferralScreen = () => {
                 </View>
                 <View style={styles.step}>
                     <View style={styles.stepNumber}><Text style={styles.stepNumberText}>2</Text></View>
-                    <Text style={styles.stepText}>They make their first purchase</Text>
+                    <Text style={styles.stepText}>They register and make their first purchase</Text>
                 </View>
                 <View style={styles.step}>
                     <View style={styles.stepNumber}><Text style={styles.stepNumberText}>3</Text></View>
-                    <Text style={styles.stepText}>You both get reward points!</Text>
+                    <Text style={styles.stepText}>You get ₹{referralReward} and they get ₹{refereeReward}!</Text>
                 </View>
             </View>
         </ScrollView>

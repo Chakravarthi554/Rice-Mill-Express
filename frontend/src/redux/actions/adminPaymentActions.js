@@ -21,7 +21,7 @@ import {
   ADMIN_PAYMENT_EXPORT_SUCCESS,
   ADMIN_PAYMENT_EXPORT_FAIL
 } from '../constants/adminPaymentConstants';
-import axios from 'axios';
+import api from '../../utils/api';
 
 // Get admin payment statistics
 export const getAdminPaymentStats = () => async (dispatch, getState) => {
@@ -36,7 +36,7 @@ export const getAdminPaymentStats = () => async (dispatch, getState) => {
       },
     };
 
-    const { data } = await axios.get('/api/admin/payments/stats', config);
+    const { data } = await api.get('/api/admin/payments/stats', config);
 
     dispatch({
       type: ADMIN_PAYMENT_STATS_SUCCESS,
@@ -67,7 +67,7 @@ export const getAdminTransactions = (filters = {}) => async (dispatch, getState)
       params: filters,
     };
 
-    const { data } = await axios.get('/api/admin/payments/transactions', config);
+    const { data } = await api.get('/api/admin/payments/transactions', config);
 
     dispatch({
       type: ADMIN_TRANSACTIONS_SUCCESS,
@@ -98,7 +98,7 @@ export const getPayoutsList = (filters = {}) => async (dispatch, getState) => {
       params: filters,
     };
 
-    const { data } = await axios.get('/api/admin/payments/payouts', config);
+    const { data } = await api.get('/api/admin/payments/payouts', config);
 
     dispatch({
       type: ADMIN_PAYOUTS_LIST_SUCCESS,
@@ -128,7 +128,7 @@ export const processRefund = (paymentId, refundData) => async (dispatch, getStat
       },
     };
 
-    const { data } = await axios.post(`/api/admin/payments/refund/${paymentId}`, refundData, config);
+    const { data } = await api.post(`/api/admin/payments/refund/${paymentId}`, refundData, config);
 
     dispatch({
       type: ADMIN_REFUND_SUCCESS,
@@ -163,7 +163,7 @@ export const releasePayout = (payoutId, payoutData) => async (dispatch, getState
       },
     };
 
-    const { data } = await axios.post(`/api/admin/payments/payout/${payoutId}/release`, payoutData, config);
+    const { data } = await api.post(`/api/admin/payments/payout/${payoutId}/release`, payoutData, config);
 
     dispatch({
       type: ADMIN_PAYOUT_RELEASE_SUCCESS,
@@ -198,7 +198,7 @@ export const flagPayment = (paymentId, flagData) => async (dispatch, getState) =
       },
     };
 
-    const { data } = await axios.post(`/api/admin/payments/flag/${paymentId}`, flagData, config);
+    const { data } = await api.post(`/api/admin/payments/flag/${paymentId}`, flagData, config);
 
     dispatch({
       type: ADMIN_PAYMENT_FLAG_SUCCESS,
@@ -234,17 +234,17 @@ export const exportPaymentReport = (exportParams) => async (dispatch, getState) 
       params: exportParams,
     };
 
-    const response = await axios.get('/api/admin/payments/export', config);
+    const response = await api.get('/api/admin/payments/export', config);
 
     // Create download link
     const url = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement('a');
     link.href = url;
-    
-    const filename = exportParams.type === 'payouts' 
+
+    const filename = exportParams.type === 'payouts'
       ? `payouts_export_${Date.now()}.csv`
       : `payments_export_${Date.now()}.csv`;
-    
+
     link.setAttribute('download', filename);
     document.body.appendChild(link);
     link.click();

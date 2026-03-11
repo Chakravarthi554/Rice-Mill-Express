@@ -22,6 +22,8 @@ const CheckoutScreen = ({ navigation }) => {
 
     // Rewards State
     const [useRewards, setUseRewards] = useState(false);
+    const [deliveryFee, setDeliveryFee] = useState(0);
+    const [freeDelivery, setFreeDelivery] = useState(false);
     const rewardsState = useSelector((state) => state.rewards);
     const { rewards } = rewardsState;
     const rewardsBalance = rewards?.balance || 0; // Ensure backend sends 'balance'
@@ -41,6 +43,7 @@ const CheckoutScreen = ({ navigation }) => {
             setAddresses(addrList);
             if (addrList.length > 0) {
                 setSelectedAddress(addrList[0]);
+                fetchDeliveryFee(addrList[0]);
             }
         } catch (error) {
             console.error('Error fetching addresses:', error);
@@ -61,7 +64,25 @@ const CheckoutScreen = ({ navigation }) => {
     };
 
     const calculateTotal = () => {
-        return calculateSubtotal() - calculateDiscount();
+        return calculateSubtotal() + deliveryFee - calculateDiscount();
+    };
+
+    // Fetch delivery fee when address changes
+    const fetchDeliveryFee = async (address) => {
+        if (!address) return;
+        try {
+            const subtotal = calculateSubtotal();
+            const response = await apiService.getDeliveryFeePreview({
+                shippingAddressId: address._id,
+                orderTotal: subtotal
+            });
+            const data = response.data;
+            setDeliveryFee(data.deliveryFee || 0);
+            setFreeDelivery(data.freeDelivery || false);
+        } catch (error) {
+            console.error('Error fetching delivery fee:', error);
+            setDeliveryFee(0);
+        }
     };
 
     useEffect(() => {
@@ -206,6 +227,18 @@ const CheckoutScreen = ({ navigation }) => {
                         </View>
                     ))}
 
+                    <Divider style={styles.divider} />
+                    <View style={styles.summaryItem}>
+                        <Text style={styles.itemText}>Subtotal</Text>
+                        <Text style={styles.itemPrice}>₹{calculateSubtotal()}</Text>
+                    </View>
+                    <View style={styles.summaryItem}>
+                        <Text style={styles.itemText}>Delivery Fee</Text>
+                        <Text style={[styles.itemPrice, freeDelivery ? { color: '#4CAF50' } : {}]}>
+                            {freeDelivery ? 'FREE' : `₹${deliveryFee}`}
+                        </Text>
+                    </View>
+
                     {useRewards && (
                         <View style={styles.summaryItem}>
                             <Text style={[styles.itemText, { color: '#4CAF50' }]}>Reward Discount</Text>
@@ -268,12 +301,19 @@ const CheckoutScreen = ({ navigation }) => {
                             </Button>
                         </View>
                     ) : (
-                        <RadioButton.Group onValueChange={id => setSelectedAddress(addresses.find(a => a._id === id))} value={selectedAddress?._id}>
+                        <RadioButton.Group onValueChange={id => {
+                            const addr = addresses.find(a => a._id === id);
+                            setSelectedAddress(addr);
+                            fetchDeliveryFee(addr);
+                        }} value={selectedAddress?._id}>
                             {addresses.map((addr) => (
                                 <TouchableOpacity
                                     key={addr._id}
                                     style={styles.addressItem}
-                                    onPress={() => setSelectedAddress(addr)}
+                                    onPress={() => {
+                                        setSelectedAddress(addr);
+                                        fetchDeliveryFee(addr);
+                                    }}
                                 >
                                     <RadioButton value={addr._id} color="#4CAF50" />
                                     <View style={styles.addressDetails}>

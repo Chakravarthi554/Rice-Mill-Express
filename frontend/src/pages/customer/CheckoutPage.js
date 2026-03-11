@@ -16,6 +16,7 @@ import { createRazorpayOrder } from '../../redux/actions/paymentActions';
 import { loadScript } from '../../utils/loadScript';
 import { ORDER_CREATE_RESET } from '../../redux/constants/orderConstants';
 import { RAZORPAY_ORDER_CREATE_RESET } from '../../redux/constants/paymentConstants';
+import api from '../../utils/api';
 
 const CheckoutPage = () => {
   const dispatch = useDispatch();
@@ -94,17 +95,34 @@ const CheckoutPage = () => {
 
   // Calculate delivery charge
   useEffect(() => {
-    if (totalAmount >= 1000) {
-      setDeliveryCharge(0);
-      setFreeDelivery(true);
-    } else {
-      // Base charge: ₹50
-      // For demo, using fixed charge. In production, calculate based on distance
-      const baseCharge = 50;
-      setDeliveryCharge(baseCharge);
-      setFreeDelivery(false);
-    }
-  }, [totalAmount]);
+    const fetchDeliveryFee = async () => {
+      if (!selectedAddress || selectedItems.length === 0) return;
+
+      try {
+        const { data } = await api.post('/api/orders/delivery-fee-preview', {
+          orderItems: cartItems
+            .filter(i => selectedItems.includes(i.product._id))
+            .map(i => ({ product: i.product._id, qty: i.quantity })),
+          shippingAddressId: selectedAddress._id
+        });
+
+        setDeliveryCharge(data.deliveryFee);
+        setFreeDelivery(data.freeDeliveryApplied);
+      } catch (err) {
+        console.error('Error fetching delivery fee:', err);
+        // Fallback to basic calculation
+        if (totalAmount >= 5000) {
+          setDeliveryCharge(0);
+          setFreeDelivery(true);
+        } else {
+          setDeliveryCharge(50);
+          setFreeDelivery(false);
+        }
+      }
+    };
+
+    fetchDeliveryFee();
+  }, [totalAmount, selectedAddress, selectedItems, cartItems]);
 
   const grandTotal = totalAmount + deliveryCharge;
 
@@ -172,7 +190,7 @@ const CheckoutPage = () => {
     if (!rzpOrder?.id) throw new Error('Failed to create Razorpay order');
 
     const options = {
-      key: process.env.REACT_APP_RAZORPAY_KEY_ID,
+      key: rzpOrder.key || process.env.REACT_APP_RAZORPAY_KEY_ID,
       amount: rzpOrder.amount,
       currency: rzpOrder.currency,
       name: 'RiceMill Express',

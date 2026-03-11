@@ -114,6 +114,7 @@ export const apiService = {
     // Customer orders endpoint (not admin)
     getOrders: () => api.get('/api/orders/myorders'),
     createOrder: (orderData) => api.post('/api/orders', orderData),
+    getDeliveryFeePreview: (data) => api.post('/api/orders/delivery-fee-preview', data),
     getOrderById: (id) => api.get(`/api/orders/${id}`),
     updateOrderStatus: (id, status) => api.put(`/api/orders/${id}/status`, { status }),
 
@@ -141,6 +142,7 @@ export const apiService = {
             headers: { 'Content-Type': 'multipart/form-data' },
             timeout: 30000,
         }),
+    getDPDashboard: () => api.get('/api/dp/dashboard'),
 
 
     // ============ Seller ============
@@ -175,7 +177,8 @@ export const apiService = {
     redeemReward: (points) => api.post('/api/rewards/redeem', { points }),
     getReferralInfo: () => api.get('/api/rewards/referral'),
     syncRewards: () => api.get('/api/rewards/sync'),
-    getWalletData: () => api.get('/api/rewards/wallet'),
+    getWalletData: () => api.get('/api/dp/dashboard'),
+    getRewardsWallet: () => api.get('/api/rewards/wallet'),
     requestWithdrawal: (data) => api.post('/api/rewards/withdraw', data),
     getWithdrawalHistory: () => api.get('/api/rewards/withdrawals'),
     getPublicSettings: () => api.get('/api/settings/public'),

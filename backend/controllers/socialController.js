@@ -487,7 +487,7 @@ const rateItem = asyncHandler(async (req, res) => {
     existingRating.comment = comment;
     await existingRating.save();
   } else {
-    await Rating.create({
+    const ratingDoc = await Rating.create({
       targetId: id,
       targetType,
       userId,
@@ -495,6 +495,44 @@ const rateItem = asyncHandler(async (req, res) => {
       comment,
       approved: true
     });
+
+    // ✅ Reward User for first-time review
+    try {
+      const AdminSettings = require('../models/AdminSettings');
+      const WalletTransaction = require('../models/WalletTransaction');
+      const settings = await AdminSettings.getSettings();
+
+      if (settings?.reviewRewardAmount > 0) {
+        const user = await User.findById(userId);
+        if (user) {
+          user.walletBalance = Math.round((user.walletBalance || 0) + settings.reviewRewardAmount);
+          await user.save();
+
+          await WalletTransaction.create({
+            user: userId,
+            amount: settings.reviewRewardAmount,
+            type: 'review_reward',
+            status: 'completed',
+            description: `Review Reward for ${targetType} #${id.toString().slice(-6)}`,
+            referenceId: ratingDoc._id,
+            referenceType: 'Rating',
+            balanceAfter: user.walletBalance
+          });
+
+          // Notify user via socket
+          if (req.io) {
+            req.io.to(`user_${userId.toString()}`).emit('REWARDS_UPDATED', {
+              userId: userId,
+              rewardsBalance: user.walletBalance,
+              action: 'review_award',
+              points: settings.reviewRewardAmount
+            });
+          }
+        }
+      }
+    } catch (rewardError) {
+      console.error('Failed to process review reward:', rewardError);
+    }
   }
 
   try {
@@ -1157,38 +1195,38 @@ const getSocialStats = asyncHandler(async (req, res) => {
 // @access  Public
 const getProductReviews =
   asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 10;
-  const skip = (page - 1) * limit;
+    const { id } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
 
-  const query = { targetId: id, targetType: 'Product' };
-  if (req.user?.role !== 'admin') {
-    query.approved = true;
-  }
+    const query = { targetId: id, targetType: 'Product' };
+    if (req.user?.role !== 'admin') {
+      query.approved = true;
+    }
 
-  const reviews = await Rating.find(query)
-    .populate('userId', 'name profilePic isProfilePublic privacySettings')
-    .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(limit);
+    const reviews = await Rating.find(query)
+      .populate('userId', 'name profilePic isProfilePublic privacySettings')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
 
-  const total = await Rating.countDocuments(query);
+    const total = await Rating.countDocuments(query);
 
-  const anonymizedReviews = reviews.map(review => {
-    const reviewObj = review.toObject();
-    reviewObj.userId = anonymizeUser(review.userId, req.user);
-    return reviewObj;
+    const anonymizedReviews = reviews.map(review => {
+      const reviewObj = review.toObject();
+      reviewObj.userId = anonymizeUser(review.userId, req.user);
+      return reviewObj;
+    });
+
+    res.json({
+      success: true,
+      reviews: anonymizedReviews,
+      total,
+      page: Number(page),
+      pages: Math.ceil(total / Number(limit))
+    });
   });
-
-  res.json({
-    success: true,
-    reviews: anonymizedReviews,
-    total,
-    page: Number(page),
-    pages: Math.ceil(total / Number(limit))
-  });
-});
 
 module.exports = {
   likeItem,

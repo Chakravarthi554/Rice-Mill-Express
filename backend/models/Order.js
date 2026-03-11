@@ -201,6 +201,50 @@ const orderSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   },
+  // --- Marketplace Financial Breakdown ---
+  productAmount: {
+    type: Number,
+    required: true,
+    default: 0
+  },
+  deliveryFee: {
+    type: Number,
+    required: true,
+    default: 0
+  },
+  discountAmount: {
+    type: Number,
+    default: 0
+  },
+  walletUsedAmount: {
+    type: Number,
+    default: 0
+  },
+  commissionAmount: {
+    type: Number,
+    required: true,
+    default: 0
+  },
+  sellerAmount: {
+    type: Number,
+    required: true,
+    default: 0
+  },
+  adminAmount: {
+    type: Number,
+    required: true,
+    default: 0
+  },
+  deliveryPartnerAmount: {
+    type: Number,
+    default: 0
+  },
+  finalPaidAmount: {
+    type: Number,
+    required: true,
+    default: 0
+  },
+  // --- End Marketplace Fields ---
   // Delivery Charge Fields
   deliveryCharge: {
     type: Number,
@@ -436,6 +480,11 @@ orderSchema.virtual('orderNumber').get(function () {
   return `ORD-${this._id.toString().substring(18, 24).toUpperCase()}`;
 });
 
+// Virtual for total amount (used by mobile app)
+orderSchema.virtual('totalAmount').get(function () {
+  return this.totalPrice;
+});
+
 // Pre-save middleware to set seller for order items if missing
 orderSchema.pre('save', function (next) {
   // ✅ FIXED: Set seller for order items if missing
@@ -447,10 +496,19 @@ orderSchema.pre('save', function (next) {
     });
   }
 
-  // Calculate commission and earnings if not set
+  // Calculate commission and earnings if not set (Legacy logic - maintained for compatibility)
   if (this.isModified('totalPrice') || this.isNew) {
-    this.commissionAmount = this.totalPrice * this.commissionRate;
-    this.sellerEarnings = this.totalPrice - this.commissionAmount;
+    if (!this.productAmount) this.productAmount = this.totalPrice;
+    if (!this.commissionAmount) this.commissionAmount = this.totalPrice * (this.commissionRate || 0.15);
+    if (!this.sellerAmount) this.sellerAmount = this.totalPrice - this.commissionAmount;
+
+    // ✅ Ensure deliveryPartnerAmount is calculated if missing
+    if (!this.deliveryPartnerAmount) {
+      this.deliveryPartnerAmount = this.deliveryCharge || this.deliveryFee || 0;
+    }
+
+    // Backwards compatibility for fields used in other controllers
+    this.sellerEarnings = this.sellerAmount;
   }
 
 

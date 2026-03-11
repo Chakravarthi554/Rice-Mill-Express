@@ -14,7 +14,7 @@ const walletTransactionSchema = mongoose.Schema(
         type: {
             type: String,
             required: true,
-            enum: ['referral_award', 'signup_award', 'withdrawal', 'refund', 'purchase', 'admin_adjustment'],
+            enum: ['referral_award', 'signup_award', 'review_reward', 'withdrawal', 'refund', 'purchase', 'admin_adjustment'],
         },
         status: {
             type: String,
@@ -32,7 +32,7 @@ const walletTransactionSchema = mongoose.Schema(
         },
         referenceType: {
             type: String,
-            enum: ['Order', 'WithdrawalRequest', 'Referral', 'User'],
+            enum: ['Order', 'WithdrawalRequest', 'Referral', 'User', 'Rating'],
         },
         balanceAfter: {
             type: Number,

@@ -227,6 +227,11 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
+    header: {
+        backgroundColor: '#4CAF50',
+        padding: 20,
+        paddingBottom: 40,
+    },
     syncBanner: {
         backgroundColor: '#4CAF50',
         paddingVertical: 8,

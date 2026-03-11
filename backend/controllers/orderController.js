@@ -15,6 +15,12 @@ const NotificationService = require('../services/NotificationService');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const Razorpay = require('razorpay');
+const AdminSettings = require('../models/AdminSettings');
+const {
+  calculateDeliveryCharge,
+  calculatePincodeDistance,
+  calculateOrderWeight
+} = require('../utils/deliveryChargeCalculator');
 
 let razorpayInstance = null;
 if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
@@ -104,9 +110,12 @@ exports.createOrder = asyncHandler(async (req, res) => {
       seller: sellerId,
     });
     ordersBySeller[sellerId].totalPrice += itemPrice * item.qty;
+    ordersBySeller[sellerId].totalWeight = (ordersBySeller[sellerId].totalWeight || 0) + (product.weight || 5) * item.qty;
     grandTotal += itemPrice * item.qty;
   }
   if (validationError) { res.status(400); throw new Error(validationError); }
+
+  const settings = await AdminSettings.getSettings();
 
   // COD Minimum Check
   if (paymentMethod === 'cod') {
@@ -179,8 +188,8 @@ exports.createOrder = asyncHandler(async (req, res) => {
     let remainingDiscount = req.redemption ? req.redemption.amount : 0;
     const initialGrandTotal = grandTotal + remainingDiscount; // Reconstruct original total to calculate ratio
 
-    let orderIndex = 0;
     const sellerIds = Object.keys(ordersBySeller);
+    let orderIndex = 0;
 
     for (const sellerId of sellerIds) {
       orderIndex++;
@@ -190,10 +199,8 @@ exports.createOrder = asyncHandler(async (req, res) => {
       let orderDiscount = 0;
       if (req.redemption && req.redemption.amount > 0 && initialGrandTotal > 0) {
         if (orderIndex === sellerIds.length) {
-          // Assign all remaining discount to the last order to handle rounding errors
           orderDiscount = remainingDiscount;
         } else {
-          // Proportional calculation
           const ratio = data.totalPrice / initialGrandTotal;
           orderDiscount = Math.floor(req.redemption.amount * ratio);
           remainingDiscount -= orderDiscount;
@@ -202,18 +209,36 @@ exports.createOrder = asyncHandler(async (req, res) => {
 
       const netPrice = data.totalPrice - orderDiscount;
 
-      // Recalculate commission based on NET Price (or Total Price depending on business logic)
-      // Usually commission is on the sold price. If discount is by platform (rewards), seller should ideally get full amount?
-      // For now, let's assume commission is on the price USER PAYS (Net Price) to keep it simple, 
-      // OR if platform bears the cost, commission should be on TotalPrice.
-      // Let's assume Platform bears the cost of Rewards -> Commission on TotalPrice.
-      const commissionRate = 0.15;
-      const commissionAmount = data.totalPrice * commissionRate;
-      const sellerEarnings = data.totalPrice - commissionAmount; // Seller gets full value, platform takes hit on reward? 
-      // Actually, if user pays less, where does the money come from?
-      // If it's a platform reward, Platform pays Seller.
-      // So Seller Earnings shouldn't be affected by user's reward redemption usually.
-      // We will keep Seller Earnings based on Total Price.
+      // NEW: Calculate Delivery Fees based on distance and settings
+      const sellerUser = await User.findById(sellerId).select('businessDetails');
+      const sellerPincode = sellerUser?.businessDetails?.address?.pinCode || '500001'; // Fallback
+      const customerPincode = selectedAddress.pinCode;
+
+      const distance = await calculatePincodeDistance(sellerPincode, customerPincode);
+      const deliveryInfo = calculateDeliveryCharge(
+        distance,
+        data.totalWeight,
+        data.totalPrice,
+        settings
+      );
+
+      const deliveryFee = deliveryInfo.charge;
+      const dpAmount = deliveryInfo.breakdown.dpShare;
+
+      // Commission Logic: Platform Commission % on product value
+      const platformCommRate = (settings.platformCommissionRate || 15) / 100;
+      const commissionAmount = Math.round(data.totalPrice * platformCommRate);
+
+      // Breakdown Calculation
+      // User pays: NetPrice + DeliveryFee
+      // Platform gets: Commission + (DeliveryFee - DP Share)
+      // Seller gets: NetPrice - Commission (Wait, NetPrice is after rewards, let's keep it simple)
+
+      // Requirement: "Commission must be calculated as a percentage of the product value"
+      // "Seller share, admin share, and delivery partner share"
+
+      const sellerEarnings = data.totalPrice - commissionAmount;
+      const adminShare = commissionAmount + (deliveryFee - dpAmount);
 
       const order = new Order({
         user: req.user._id,
@@ -235,14 +260,31 @@ exports.createOrder = asyncHandler(async (req, res) => {
           addressType: selectedAddress.type || selectedAddress.addressType || 'home',
         },
         paymentMethod: finalPaymentMethod,
-        totalPrice: data.totalPrice,
+
+        // Detailed Financial Breakdown (Marketplace Requirements)
+        productAmount: data.totalPrice,
+        deliveryFee: deliveryFee,
+        discountAmount: orderDiscount,
+        walletUsedAmount: 0, // Will update if wallet is used for partial pay
+        commissionAmount: commissionAmount,
+        sellerAmount: sellerEarnings,
+        adminAmount: adminShare,
+        deliveryPartnerAmount: dpAmount,
+        finalPaidAmount: netPrice + deliveryFee,
+
+        totalPrice: netPrice + deliveryFee, // User Total includes delivery
         discount: orderDiscount,
         netPrice: netPrice,
         appliedReward: orderDiscount > 0 ? {
-          pointsRedeemed: Math.round((orderDiscount / req.redemption.amount) * req.redemption.points), // Approx split of points
+          pointsRedeemed: Math.round((orderDiscount / req.redemption.amount) * req.redemption.points),
           discountAmount: orderDiscount
         } : undefined,
-        commissionRate, commissionAmount, sellerEarnings,
+
+        commissionRate: platformCommRate,
+        sellerEarnings: sellerEarnings, // Legacy compatibility
+        deliveryDistance: distance,
+        deliveryCharge: deliveryFee,
+
         orderStatus: 'placed',
         isPaid: isImmediatePayment,
         paidAt: isImmediatePayment ? Date.now() : null,
@@ -350,6 +392,35 @@ exports.createOrder = asyncHandler(async (req, res) => {
   }
 });
 
+// Preview delivery fee before placing order
+exports.previewDeliveryFee = asyncHandler(async (req, res) => {
+  const { shippingAddressId, orderTotal } = req.body;
+
+  const user = await User.findById(req.user._id).populate('addresses');
+  if (!user) { res.status(404); throw new Error('User not found'); }
+
+  const selectedAddress = user.addresses.find(a => a._id.toString() === shippingAddressId);
+  if (!selectedAddress) {
+    return res.json({ deliveryFee: 0, freeDelivery: false, reason: 'Address not found' });
+  }
+
+  const settings = await AdminSettings.getSettings();
+  const customerPincode = selectedAddress.pinCode;
+
+  // Use a default seller pincode (first seller in cart) or general logic
+  const sellerPincode = '500001'; // Fallback
+  const distance = await calculatePincodeDistance(sellerPincode, customerPincode);
+  const deliveryInfo = calculateDeliveryCharge(distance, 5, orderTotal || 0, settings);
+
+  res.json({
+    deliveryFee: deliveryInfo.charge,
+    freeDelivery: deliveryInfo.freeDelivery,
+    reason: deliveryInfo.reason,
+    distance: distance,
+    breakdown: deliveryInfo.breakdown
+  });
+});
+
 exports.getOrderById = asyncHandler(async (req, res) => {
   if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
     return res.status(400).json({ message: 'Invalid order ID format' });
@@ -424,8 +495,51 @@ exports.updateOrderStatus = asyncHandler(async (req, res) => {
   if (status === 'delivered') {
     order.isDelivered = true;
     order.deliveredAt = Date.now();
-    await order.save(); // Save first
-    // Trigger referral rewards after save to ensure data consistency
+    order.actualDeliveryDate = Date.now();
+
+    // COD Handling: If COD, mark as collected by delivery partner
+    if (order.paymentMethod === 'cod') {
+      order.codCollected = true;
+      order.codCollectedAt = Date.now();
+      order.paymentStatus = 'completed'; // Cash collected is considered paid for order lifecycle
+      order.isPaid = true;
+      order.paidAt = Date.now();
+
+      // Update associated payment record
+      await Payment.updateOne(
+        { order: order._id },
+        { $set: { status: 'completed', paidAt: Date.now() } }
+      );
+    }
+
+    // Credit Delivery Partner Wallet
+    if (order.deliveryPartner && order.deliveryPartnerAmount > 0) {
+      const dpProfile = await require('../models/deliveryPartner.js').findById(order.deliveryPartner).populate('user');
+      if (dpProfile && dpProfile.user) {
+        const dpUser = await User.findById(dpProfile.user._id);
+        if (dpUser) {
+          const amount = Math.round(order.deliveryPartnerAmount);
+          dpUser.walletBalance = (dpUser.walletBalance || 0) + amount;
+          await dpUser.save();
+
+          // Create Wallet Transaction
+          await WalletTransaction.create({
+            user: dpUser._id,
+            amount: amount,
+            type: 'delivery_earning',
+            status: 'completed',
+            description: `Earnings for delivering Order #${order._id.toString().slice(-6)}`,
+            referenceId: order._id,
+            referenceType: 'Order',
+            balanceAfter: dpUser.walletBalance
+          });
+        }
+      }
+    }
+
+    await order.save(); // Save first to ensure isPaid is true for referral logic
+
+    // Trigger referral rewards (this function will now have additional checks)
     await processReferralRewards(order._id);
   } else {
     await order.save();

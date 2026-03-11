@@ -124,9 +124,12 @@ const verifyRazorpayPayment = asyncHandler(async (req, res) => {
                                 status: 'completed',
                                 razorpayPaymentId: razorpay_payment_id,
                                 razorpayOrderId: razorpay_order_id,
-                                amount: order.totalPrice,
+                                amount: order.finalPaidAmount, // User paid amount
                                 method: 'razorpay',
-                                paidAt: new Date()
+                                paidAt: new Date(),
+                                commissionAmount: order.commissionAmount,
+                                sellerPayoutAmount: order.sellerAmount,
+                                payoutStatus: 'pending',
                             },
                             { upsert: true, new: true }
                         );
@@ -206,11 +209,11 @@ const handleRazorpayWebhook = asyncHandler(async (req, res) => {
                                     notes: (payment?.notes || '') + `\nWebhook: Payment captured.`,
                                     user: order.user,
                                     seller: order.seller,
-                                    amount: order.totalPrice,
+                                    amount: order.finalPaidAmount,
                                     currency: 'INR',
                                     method: 'razorpay',
                                     commissionAmount: order.commissionAmount,
-                                    sellerPayoutAmount: order.sellerEarnings,
+                                    sellerPayoutAmount: order.sellerAmount,
                                     payoutStatus: 'pending',
                                 }
                             },
@@ -353,10 +356,10 @@ const recordCodPayment = asyncHandler(async (req, res) => {
                 notes: `COD received. Proof: ${proof || 'Seller confirmed'}`,
                 user: order.user,
                 seller: order.seller,
-                amount: order.totalPrice,
+                amount: order.finalPaidAmount,
                 currency: 'INR',
                 commissionAmount: order.commissionAmount,
-                sellerPayoutAmount: order.sellerEarnings,
+                sellerPayoutAmount: order.sellerAmount,
                 payoutStatus: 'pending',
             }
         },
@@ -667,6 +670,9 @@ const renderRazorpayCheckout = asyncHandler(async (req, res) => {
 
     res.send(html);
 });
+
+
+
 
 module.exports = {
     createRazorpayOrder,

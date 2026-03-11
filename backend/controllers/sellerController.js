@@ -9,23 +9,23 @@ const { getAsync, setAsync } = require('../utils/redis');
 const getSellerDashboard = asyncHandler(async (req, res) => {
   const sellerId = req.user.id;
   console.log('Fetching dashboard for seller:', sellerId);
-  
+
   const [orders, products, earnings] = await Promise.all([
     Order.countDocuments({ seller: sellerId }),
     Product.countDocuments({ seller: sellerId }),
     Order.aggregate([
-      { $match: { seller: new mongoose.Types.ObjectId(sellerId), paymentStatus: 'completed' } },
-      { $group: { _id: null, total: { $sum: "$sellerEarnings" } } }
+      { $match: { seller: new mongoose.Types.ObjectId(sellerId), $or: [{ isPaid: true }, { orderStatus: 'delivered' }] } },
+      { $group: { _id: null, total: { $sum: { $ifNull: ['$sellerAmount', { $multiply: ['$totalPrice', 0.85] }] } } } }
     ])
   ]);
-  
+
   res.json({
     orderCount: orders,
     productCount: products,
     totalEarnings: earnings[0]?.total || 0,
-    pendingOrders: await Order.countDocuments({ 
-      seller: sellerId, 
-      orderStatus: { $in: ['placed', 'processing', 'packed'] } 
+    pendingOrders: await Order.countDocuments({
+      seller: sellerId,
+      orderStatus: { $in: ['placed', 'processing', 'packed'] }
     })
   });
 });
@@ -41,16 +41,16 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
     _id: req.params.id,
     seller: req.user.id
   });
-  
+
   if (!order) {
     res.status(404);
     throw new Error('Order not found');
   }
-  
+
   order.orderStatus = status;
   order.statusHistory.push({ status, timestamp: new Date() });
   await order.save();
-  
+
   const io = req.app.get('io');
   if (io && (status === 'delivered' || status === 'completed')) {
     io.to(`seller_${req.user.id.toString()}`).emit('REFRESH_ANALYTICS', { sellerId: req.user.id.toString() });
@@ -222,12 +222,12 @@ const getSellerAnalytics = asyncHandler(async (req, res) => {
     });
   }
 
-  const totalSales = orders.reduce((sum, order) => sum + (order.totalPrice || 0), 0);
+  const totalSales = orders.reduce((sum, order) => sum + (order.productAmount || order.totalPrice || 0), 0);
   const totalOrders = orders.length;
 
   const salesByDate = orders.reduce((acc, order) => {
     const date = new Date(order.createdAt).toISOString().split('T')[0];
-    acc[date] = (acc[date] || 0) + (order.totalPrice || 0);
+    acc[date] = (acc[date] || 0) + (order.productAmount || order.totalPrice || 0);
     return acc;
   }, {});
 

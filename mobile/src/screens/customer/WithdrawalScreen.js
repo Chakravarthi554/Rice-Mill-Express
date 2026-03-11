@@ -10,6 +10,8 @@ const WithdrawalScreen = ({ navigation }) => {
     const dispatch = useDispatch();
     const { walletData } = useSelector((state) => state.wallet);
     const { loading, success, error } = useSelector((state) => state.withdrawal);
+    const { publicSettings } = useSelector((state) => state.publicSettings || {});
+    const minWithdrawal = publicSettings?.referralSettings?.minWithdrawalAmount || 300;
 
     const [formData, setFormData] = useState({
         amount: '',
@@ -45,8 +47,8 @@ const WithdrawalScreen = ({ navigation }) => {
 
         if (!formData.amount || isNaN(amountNum)) {
             newErrors.amount = 'Enter a valid amount';
-        } else if (amountNum < 300) {
-            newErrors.amount = 'Minimum withdrawal is ₹300';
+        } else if (amountNum < minWithdrawal) {
+            newErrors.amount = `Minimum withdrawal is ₹${minWithdrawal}`;
         } else if (amountNum > (walletData?.balance || 0)) {
             newErrors.amount = 'Insufficient balance';
         }
@@ -89,7 +91,7 @@ const WithdrawalScreen = ({ navigation }) => {
                 <Card style={styles.formCard}>
                     <Card.Content>
                         <TextInput
-                            label="Amount (Min ₹300)"
+                            label={`Amount (Min ₹${minWithdrawal})`}
                             value={formData.amount}
                             onChangeText={(val) => setFormData({ ...formData, amount: val })}
                             keyboardType="numeric"

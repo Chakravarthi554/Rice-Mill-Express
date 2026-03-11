@@ -225,9 +225,60 @@ const updateUserProfile = asyncHandler(async (req, res) => {
 
   if (req.file) updates.profileImage = `/uploads/${req.file.filename}`;
 
-  if (user.role === 'seller' && req.body.businessDetails) {
-    const bd = typeof req.body.businessDetails === 'string' ? JSON.parse(req.body.businessDetails) : req.body.businessDetails;
-    updates.businessDetails = { ...user.businessDetails, ...bd };
+  // Handle boolean toggles from FormData (which come as strings)
+  if (req.body.productAvailability !== undefined) {
+    updates.productAvailability = req.body.productAvailability === 'true' || req.body.productAvailability === true;
+  }
+  if (req.body.notificationEnabled !== undefined) {
+    updates.notificationEnabled = req.body.notificationEnabled === 'true' || req.body.notificationEnabled === true;
+  }
+
+  if (user.role === 'seller') {
+    let bd = {};
+    if (req.body.businessDetails) {
+      bd = typeof req.body.businessDetails === 'string' ? JSON.parse(req.body.businessDetails) : req.body.businessDetails;
+    }
+
+    // Handle root-level business fields sent from FormData
+    const rootBusFields = ['businessName', 'businessType', 'gstNumber', 'panNumber'];
+    rootBusFields.forEach(f => {
+      if (req.body[f] && req.body[f] !== 'undefined') bd[f] = req.body[f];
+    });
+
+    // Handle flattened businessDetails from FormData (common in Multer uploads)
+    Object.keys(req.body).forEach(key => {
+      if (key.startsWith('businessDetails[')) {
+        const matches = key.match(/businessDetails\[([^\]]+)\](?:\[([^\]]+)\])?/);
+        if (matches) {
+          const mainKey = matches[1];
+          const subKey = matches[2];
+          if (subKey) {
+            if (!bd[mainKey]) bd[mainKey] = {};
+            bd[mainKey][subKey] = req.body[key];
+          } else {
+            bd[mainKey] = req.body[key];
+          }
+        }
+      }
+    });
+
+    if (Object.keys(bd).length > 0) {
+      // Robust merging: merge bd into existing businessDetails
+      const existingBD = user.businessDetails ? user.businessDetails.toObject() : {};
+
+      // Merge Top Level
+      const mergedBD = { ...existingBD, ...bd };
+
+      // Specifically Deep Merge Objects (address, bankAccount) if they were partially updated
+      if (bd.address && typeof bd.address === 'object') {
+        mergedBD.address = { ...(existingBD.address || {}), ...bd.address };
+      }
+      if (bd.bankAccount && typeof bd.bankAccount === 'object') {
+        mergedBD.bankAccount = { ...(existingBD.bankAccount || {}), ...bd.bankAccount };
+      }
+
+      updates.businessDetails = mergedBD;
+    }
   }
 
   await User.updateOne({ _id: user._id }, { $set: updates });

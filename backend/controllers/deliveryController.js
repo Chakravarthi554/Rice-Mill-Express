@@ -700,6 +700,54 @@ const confirmDelivery = asyncHandler(async (req, res) => {
 
   await order.save();
 
+  // ✅ COD Payment Handling: Mark as paid on delivery and update Payment record
+  if (order.paymentMethod === 'cod' && !order.isPaid) {
+    order.isPaid = true;
+    order.paidAt = new Date();
+    order.paymentStatus = 'completed';
+    order.codCollected = true;
+    order.codCollectedAt = new Date();
+    order.codAmount = order.totalPrice;
+    await order.save();
+
+    // Update the associated Payment record
+    const Payment = require('../models/Payment');
+    try {
+      await Payment.findOneAndUpdate(
+        { order: order._id },
+        {
+          status: 'completed',
+          paidAt: new Date(),
+          commissionAmount: order.commissionAmount || Math.round(order.totalPrice * (order.commissionRate || 0.15)),
+          sellerPayoutAmount: order.sellerAmount || Math.round(order.totalPrice * 0.85),
+        }
+      );
+      console.log(`✅ COD Payment record updated for order ${order._id}`);
+    } catch (payErr) {
+      console.error('⚠️ Failed to update Payment record (non-fatal):', payErr.message);
+    }
+  }
+
+  // ✅ Trigger referral rewards on first delivered+paid order
+  try {
+    const { processReferralRewards } = require('./rewardsController');
+    if (typeof processReferralRewards === 'function') {
+      await processReferralRewards(order.user, order._id);
+      console.log(`✅ Referral reward processing triggered for order ${order._id}`);
+    }
+  } catch (refErr) {
+    console.error('⚠️ Referral reward processing error (non-fatal):', refErr.message);
+  }
+
+  // ✅ Update delivery partner stats
+  try {
+    partnerProfile.totalDeliveries = (partnerProfile.totalDeliveries || 0) + 1;
+    await partnerProfile.save();
+    console.log(`✅ Updated total deliveries for partner ${partnerProfile._id}`);
+  } catch (statErr) {
+    console.error('⚠️ Failed to update partner stats:', statErr.message);
+  }
+
   res.json({
     success: true,
     message: 'Delivery confirmed successfully',

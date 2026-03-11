@@ -22,15 +22,26 @@ const adminSettingsSchema = new mongoose.Schema({
   // Delivery Settings
   freeDeliveryThreshold: {
     type: Number,
-    default: 999,
+    default: 5000,
     min: 0,
-    max: 5000
+    max: 50000
   },
   deliveryFee: {
     type: Number,
     default: 40,
     min: 0,
     max: 200
+  },
+  deliverySlabs: [
+    {
+      minKm: { type: Number, required: true },
+      maxKm: { type: Number, required: true },
+      fee: { type: Number, required: true }
+    }
+  ],
+  extraKmFee: {
+    type: Number,
+    default: 10
   },
 
   // Festival & Promotional Settings
@@ -97,7 +108,7 @@ const adminSettingsSchema = new mongoose.Schema({
   // Referral & Reward Settings
   referralRewardReferrer: {
     type: Number,
-    default: 500,
+    default: 50, // Updated to ₹50 as per requirement
     min: 0
   },
   referralRewardReferee: {
@@ -113,6 +124,13 @@ const adminSettingsSchema = new mongoose.Schema({
   referralCampaignEnabled: {
     type: Boolean,
     default: true
+  },
+
+  // Review Reward Settings
+  reviewRewardAmount: {
+    type: Number,
+    default: 10,
+    min: 0
   },
 
   // Version info

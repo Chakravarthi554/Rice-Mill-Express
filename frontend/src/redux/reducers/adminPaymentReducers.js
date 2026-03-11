@@ -28,7 +28,7 @@ export const adminPaymentStatsReducer = (state = { stats: {}, loading: false }, 
     case ADMIN_PAYMENT_STATS_REQUEST:
       return { ...state, loading: true };
     case ADMIN_PAYMENT_STATS_SUCCESS:
-      return { loading: false, stats: action.payload };
+      return { loading: false, stats: action.payload.stats || action.payload.data || action.payload };
     case ADMIN_PAYMENT_STATS_FAIL:
       return { ...state, loading: false, error: action.payload };
     default:
@@ -42,8 +42,8 @@ export const adminTransactionsReducer = (state = { transactions: [], loading: fa
     case ADMIN_TRANSACTIONS_REQUEST:
       return { ...state, loading: true };
     case ADMIN_TRANSACTIONS_SUCCESS:
-      return { 
-        loading: false, 
+      return {
+        loading: false,
         transactions: action.payload.transactions,
         total: action.payload.total,
         totalPages: action.payload.totalPages,
@@ -62,8 +62,8 @@ export const adminPayoutsListReducer = (state = { payouts: [], loading: false },
     case ADMIN_PAYOUTS_LIST_REQUEST:
       return { ...state, loading: true };
     case ADMIN_PAYOUTS_LIST_SUCCESS:
-      return { 
-        loading: false, 
+      return {
+        loading: false,
         payouts: action.payload.payouts,
         total: action.payload.total,
         totalPages: action.payload.totalPages,

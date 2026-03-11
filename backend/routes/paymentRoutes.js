@@ -53,6 +53,11 @@ router.post('/razorpay/order', paymentController.createRazorpayOrder);
 router.post('/razorpay/verify', paymentController.verifyRazorpayPayment);
 router.get('/razorpay/pay/:orderId', paymentController.renderRazorpayCheckout);
 
+// ✅ NEW: Seller payment routes
+router.get('/seller', authorize('seller'), paymentController.getSellerPayments);
+router.post('/cod-report/:orderId', authorize('seller'), paymentController.recordCodPayment);
+router.post('/request-payout', authorize('seller'), paymentController.requestPayout);
+
 // Admin Routes (Apply admin check to all subsequent routes or individually)
 router.use(authorize('admin'));
 

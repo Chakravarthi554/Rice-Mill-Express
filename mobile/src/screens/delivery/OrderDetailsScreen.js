@@ -271,25 +271,32 @@ const OrderDetailsScreen = ({ route, navigation }) => {
                         </Text>
                     </View>
                     <View style={styles.paymentRow}>
-                        <Text style={styles.paymentLabel}>Total Amount</Text>
-                        <Text style={styles.totalAmount}>₹{order.totalAmount}</Text>
+                        <Text style={styles.paymentLabel}>Customer Paid</Text>
+                        <Text style={styles.paymentValue}>₹{order.finalPaidAmount || order.totalAmount}</Text>
+                    </View>
+                    <Divider style={{ marginVertical: 8 }} />
+                    <View style={styles.paymentRow}>
+                        <Text style={styles.earningsLabel}>Your Earnings</Text>
+                        <Text style={styles.earningsValue}>₹{order.deliveryPartnerAmount || 0}</Text>
                     </View>
                 </Card.Content>
             </Card>
 
             {/* Delivery Proof (if delivered) */}
-            {order.orderStatus === 'delivered' && order.deliveryConfirmation?.photoProofUrl && (
-                <Card style={styles.card}>
-                    <Card.Title title="Delivery Proof" titleStyle={styles.cardTitle} />
-                    <Card.Content>
-                        <Image
-                            source={{ uri: order.deliveryConfirmation.photoProofUrl }}
-                            style={styles.proofImage}
-                            resizeMode="cover"
-                        />
-                    </Card.Content>
-                </Card>
-            )}
+            {
+                order.orderStatus === 'delivered' && order.deliveryConfirmation?.photoProofUrl && (
+                    <Card style={styles.card}>
+                        <Card.Title title="Delivery Proof" titleStyle={styles.cardTitle} />
+                        <Card.Content>
+                            <Image
+                                source={{ uri: order.deliveryConfirmation.photoProofUrl }}
+                                style={styles.proofImage}
+                                resizeMode="cover"
+                            />
+                        </Card.Content>
+                    </Card>
+                )
+            }
 
             {/* Action Buttons */}
             <View style={styles.actionContainer}>
@@ -351,7 +358,7 @@ const OrderDetailsScreen = ({ route, navigation }) => {
                     </>
                 )}
             </View>
-        </ScrollView>
+        </ScrollView >
     );
 };
 
@@ -492,6 +499,16 @@ const styles = StyleSheet.create({
         fontSize: 20,
         fontWeight: 'bold',
         color: '#4CAF50',
+    },
+    earningsLabel: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#333',
+    },
+    earningsValue: {
+        fontSize: 22,
+        fontWeight: 'bold',
+        color: '#2E7D32',
     },
     proofImage: {
         width: '100%',

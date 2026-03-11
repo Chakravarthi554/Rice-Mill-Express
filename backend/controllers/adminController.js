@@ -86,10 +86,10 @@ const getDashboardStats = asyncHandler(async (req, res) => {
       Recipe.countDocuments().catch(() => 0),
       ForumPost.countDocuments().catch(() => 0),
 
-      // Total Revenue (all time completed)
+      // Total Revenue (all time - includes both paid online and delivered COD)
       Order.aggregate([
-        { $match: { isPaid: true } },
-        { $group: { _id: null, totalRevenue: { $sum: '$totalPrice' } } }
+        { $match: { $or: [{ isPaid: true }, { orderStatus: 'delivered' }] } },
+        { $group: { _id: null, totalRevenue: { $sum: { $ifNull: ['$adminAmount', { $multiply: ['$totalPrice', 0.15] }] } } } }
       ]).catch(() => []),
 
       // Moderation counts
@@ -157,7 +157,7 @@ const getDashboardStats = asyncHandler(async (req, res) => {
             _id: '$seller',
             name: { $first: '$sellerInfo.name' },
             orderCount: { $sum: 1 },
-            totalRevenue: { $sum: '$totalPrice' }
+            totalRevenue: { $sum: '$productAmount' } // Seller GMV
           }
         },
         { $sort: { orderCount: -1 } },
@@ -175,14 +175,14 @@ const getDashboardStats = asyncHandler(async (req, res) => {
       Order.aggregate([
         {
           $match: {
-            isPaid: true,
+            $or: [{ isPaid: true }, { orderStatus: 'delivered' }],
             createdAt: { $gte: new Date(new Date().getFullYear(), 0, 1) }
           }
         },
         {
           $group: {
             _id: { $month: '$createdAt' },
-            revenue: { $sum: '$totalPrice' }
+            revenue: { $sum: { $ifNull: ['$adminAmount', { $multiply: ['$totalPrice', 0.15] }] } }
           }
         },
         { $sort: { '_id': 1 } }
@@ -192,11 +192,11 @@ const getDashboardStats = asyncHandler(async (req, res) => {
       Order.aggregate([
         {
           $match: {
-            isPaid: true,
+            $or: [{ isPaid: true }, { orderStatus: 'delivered' }],
             createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth }
           }
         },
-        { $group: { _id: null, total: { $sum: '$totalPrice' } } }
+        { $group: { _id: null, total: { $sum: { $ifNull: ['$adminAmount', { $multiply: ['$totalPrice', 0.15] }] } } } }
       ]).catch(() => []),
 
       // New users current month
@@ -670,7 +670,7 @@ const getPlatformOverview = asyncHandler(async (req, res) => {
         createdAt: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) }
       }).catch(() => 0),
 
-      // Today's revenue
+      // Today's revenue - Platform Earnings
       Order.aggregate([
         {
           $match: {
@@ -678,7 +678,7 @@ const getPlatformOverview = asyncHandler(async (req, res) => {
             createdAt: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) }
           }
         },
-        { $group: { _id: null, total: { $sum: '$totalPrice' } } }
+        { $group: { _id: null, total: { $sum: '$adminAmount' } } }
       ]).catch(() => []),
 
       // New users today
@@ -735,367 +735,6 @@ const getPlatformOverview = asyncHandler(async (req, res) => {
   }
 });
 
-// 🔥 NEW: Get comprehensive analytics data
-const getAnalyticsData = asyncHandler(async (req, res) => {
-  try {
-    console.log('🔄 Fetching comprehensive analytics data...');
-
-    const { timeframe = 'week' } = req.query;
-
-    // Calculate date range based on timeframe
-    const now = new Date();
-    let startDate;
-    switch (timeframe) {
-      case 'today':
-        startDate = new Date(now.setHours(0, 0, 0, 0));
-        break;
-      case 'week':
-        startDate = new Date(now.setDate(now.getDate() - 7));
-        break;
-      case 'month':
-        startDate = new Date(now.setMonth(now.getMonth() - 1));
-        break;
-      case 'quarter':
-        startDate = new Date(now.setMonth(now.getMonth() - 3));
-        break;
-      case 'year':
-        startDate = new Date(now.setFullYear(now.getFullYear() - 1));
-        break;
-      default:
-        startDate = new Date(now.setDate(now.getDate() - 7));
-    }
-
-    const [
-      salesData,
-      orderStats,
-      paymentStats,
-      userStats,
-      inventoryAlerts,
-      topSellers,
-      topRiceTypes,
-      commissionData
-    ] = await Promise.all([
-      // Sales data
-      Order.aggregate([
-        {
-          $match: {
-            isPaid: true,
-            createdAt: { $gte: startDate }
-          }
-        },
-        {
-          $group: {
-            _id: {
-              $dateToString: { format: "%Y-%m-%d", date: "$createdAt" }
-            },
-            dailySales: { $sum: "$totalPrice" },
-            orderCount: { $sum: 1 }
-          }
-        },
-        { $sort: { _id: 1 } }
-      ]).catch(() => []),
-
-      // Order performance
-      Order.aggregate([
-        {
-          $match: {
-            createdAt: { $gte: startDate }
-          }
-        },
-        {
-          $group: {
-            _id: "$orderStatus",
-            count: { $sum: 1 }
-          }
-        }
-      ]).catch(() => []),
-
-      // Payment trends
-      Order.aggregate([
-        {
-          $match: {
-            createdAt: { $gte: startDate }
-          }
-        },
-        {
-          $group: {
-            _id: "$paymentMethod",
-            count: { $sum: 1 },
-            totalAmount: { $sum: "$totalPrice" }
-          }
-        }
-      ]).catch(() => []),
-
-      // User engagement
-      User.aggregate([
-        {
-          $match: {
-            createdAt: { $gte: startDate }
-          }
-        },
-        {
-          $group: {
-            _id: "$role",
-            count: { $sum: 1 }
-          }
-        }
-      ]).catch(() => []),
-
-      // Inventory alerts
-      Product.find({ countInStock: { $lt: 10 } })
-        .select('name countInStock')
-        .limit(5)
-        .catch(() => []),
-
-      // Top sellers
-      Order.aggregate([
-        {
-          $match: {
-            isPaid: true,
-            createdAt: { $gte: startDate }
-          }
-        },
-        {
-          $group: {
-            _id: "$seller",
-            totalOrders: { $sum: 1 },
-            totalRevenue: { $sum: "$totalPrice" }
-          }
-        },
-        { $sort: { totalRevenue: -1 } },
-        { $limit: 5 }
-      ]).catch(() => []),
-
-      // Top rice types
-      Order.aggregate([
-        { $unwind: "$orderItems" },
-        {
-          $lookup: {
-            from: "products",
-            localField: "orderItems.product",
-            foreignField: "_id",
-            as: "product"
-          }
-        },
-        { $unwind: "$product" },
-        {
-          $group: {
-            _id: "$product.name",
-            totalSold: { $sum: "$orderItems.qty" },
-            totalRevenue: { $sum: { $multiply: ["$orderItems.price", "$orderItems.qty"] } }
-          }
-        },
-        { $sort: { totalSold: -1 } },
-        { $limit: 5 }
-      ]).catch(() => []),
-
-      // Commission data
-      Order.aggregate([
-        {
-          $match: {
-            isPaid: true,
-            createdAt: { $gte: startDate }
-          }
-        },
-        {
-          $group: {
-            _id: null,
-            totalCommission: { $sum: "$commissionAmount" },
-            totalRevenue: { $sum: "$totalPrice" }
-          }
-        }
-      ]).catch(() => [])
-    ]);
-
-    // Format the response
-    const totalSales = salesData.reduce((sum, day) => sum + day.dailySales, 0);
-    const totalOrders = salesData.reduce((sum, day) => sum + day.orderCount, 0);
-    const totalCommission = commissionData && commissionData.length > 0 ? commissionData[0].totalCommission : totalSales * 0.15;
-
-    const analyticsData = {
-      salesOverview: {
-        totalSales: totalSales,
-        dailySales: salesData.map(day => ({
-          day: new Date(day._id).toLocaleDateString('en-US', { weekday: 'short' }),
-          sales: day.dailySales
-        })),
-        topRiceTypes: topRiceTypes.map(item => ({
-          name: item._id,
-          percentage: topRiceTypes.reduce((sum, i) => sum + i.totalSold, 0) > 0
-            ? Math.round((item.totalSold / topRiceTypes.reduce((sum, i) => sum + i.totalSold, 0)) * 100)
-            : 0,
-          sales: item.totalRevenue
-        })),
-        commissionEarned: totalCommission
-      },
-      orderPerformance: {
-        totalOrders: totalOrders,
-        deliveryStats: {
-          onTime: orderStats.find(s => s._id === 'delivered')?.count || 0,
-          delayed: orderStats.find(s => s._id === 'shipped')?.count || 0,
-          cancelled: orderStats.find(s => s._id === 'cancelled')?.count || 0
-        },
-        orderStatus: orderStats.map(stat => ({
-          name: stat._id,
-          value: stat.count,
-          color: getStatusColor(stat._id)
-        })),
-        topSellers: await Promise.all(
-          topSellers.map(async (seller) => {
-            try {
-              const sellerInfo = await User.findById(seller._id).select('name');
-              return {
-                name: sellerInfo?.name || 'Unknown Seller',
-                orders: seller.totalOrders,
-                revenue: seller.totalRevenue
-              };
-            } catch (error) {
-              return {
-                name: 'Unknown Seller',
-                orders: seller.totalOrders,
-                revenue: seller.totalRevenue
-              };
-            }
-          })
-        )
-      },
-      paymentTrends: {
-        paymentMethods: paymentStats.map(method => ({
-          name: method._id ? method._id.toUpperCase() : 'Unknown',
-          value: paymentStats.reduce((sum, m) => sum + m.count, 0) > 0
-            ? Math.round((method.count / paymentStats.reduce((sum, m) => sum + m.count, 0)) * 100)
-            : 0,
-          color: method._id === 'razorpay' ? '#667eea' : '#764ba2'
-        })),
-        refundRate: 3, // This would need actual refund data
-        dailyPayments: salesData.map(day => ({
-          date: new Date(day._id).toLocaleDateString('en-US', { day: 'numeric', month: 'short' }),
-          online: Math.round(day.dailySales * 0.6), // Estimate 60% online
-          cod: Math.round(day.dailySales * 0.4) // Estimate 40% COD
-        })),
-        highValueCOD: await Order.countDocuments({
-          paymentMethod: 'cod',
-          totalPrice: { $gt: 2000 },
-          createdAt: { $gte: startDate }
-        }).catch(() => 0)
-      },
-      userEngagement: {
-        activeUsers: {
-          customers: userStats.find(u => u._id === 'customer')?.count || 0,
-          sellers: userStats.find(u => u._id === 'seller')?.count || 0
-        },
-        recipeViews: await Recipe.aggregate([
-          {
-            $match: {
-              createdAt: { $gte: startDate }
-            }
-          },
-          {
-            $group: {
-              _id: null,
-              totalViews: { $sum: "$views" }
-            }
-          }
-        ]).then(result => result[0]?.totalViews || 1000).catch(() => 1000),
-        conversionRate: totalOrders > 0 ? Math.round((totalOrders / (userStats.find(u => u._id === 'customer')?.count || 1)) * 100) : 0,
-        forumPosts: await ForumPost.countDocuments({
-          createdAt: { $gte: startDate }
-        }).catch(() => 50),
-        userGrowth: await getUserGrowthData(startDate)
-      },
-      inventoryAlerts: {
-        lowStock: inventoryAlerts.map(product => ({
-          product: product.name,
-          stock: product.countInStock,
-          threshold: 10
-        })),
-        topPromotions: [
-          { name: 'Diwali 20% Off', sales: 50, revenue: 25000 },
-          { name: 'Free Delivery', sales: 30, revenue: 15000 }
-        ],
-        fraudFlags: await Payment.countDocuments({
-          isFlagged: true,
-          createdAt: { $gte: startDate }
-        }).catch(() => 0)
-      },
-      timeframe,
-      lastUpdated: new Date()
-    };
-
-    console.log('✅ Analytics data prepared successfully');
-    res.json(analyticsData);
-
-  } catch (error) {
-    console.error('❌ Analytics data error:', error);
-    res.status(500).json({
-      message: 'Error fetching analytics data',
-      error: error.message,
-      // Provide fallback data
-      salesOverview: { totalSales: 0, dailySales: [], topRiceTypes: [], commissionEarned: 0 },
-      orderPerformance: { totalOrders: 0, deliveryStats: {}, orderStatus: [], topSellers: [] },
-      paymentTrends: { paymentMethods: [], refundRate: 0, dailyPayments: [], highValueCOD: 0 },
-      userEngagement: { activeUsers: {}, recipeViews: 0, conversionRate: 0, forumPosts: 0, userGrowth: [] },
-      inventoryAlerts: { lowStock: [], topPromotions: [], fraudFlags: 0 },
-      timeframe: req.query.timeframe,
-      lastUpdated: new Date()
-    });
-  }
-});
-
-// Helper function to get status color
-const getStatusColor = (status) => {
-  const colors = {
-    'delivered': '#4caf50',
-    'placed': '#2196f3',
-    'processing': '#ff9800',
-    'packed': '#9c27b0',
-    'shipped': '#673ab7',
-    'out_for_delivery': '#3f51b5',
-    'cancelled': '#f44336',
-    'refunded': '#607d8b'
-  };
-  return colors[status] || '#666';
-};
-
-// Helper function to get user growth data
-const getUserGrowthData = async (startDate) => {
-  try {
-    const growthData = await User.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: startDate },
-          role: 'customer'
-        }
-      },
-      {
-        $group: {
-          _id: {
-            $dateToString: { format: "%Y-%m-%d", date: "$createdAt" }
-          },
-          users: { $sum: 1 }
-        }
-      },
-      { $sort: { _id: 1 } },
-      { $limit: 7 }
-    ]);
-
-    return growthData.map(item => ({
-      day: new Date(item._id).toLocaleDateString('en-US', { weekday: 'short' }),
-      users: item.users
-    }));
-  } catch (error) {
-    console.error('Error fetching user growth data:', error);
-    return [
-      { day: 'Mon', users: 10 },
-      { day: 'Tue', users: 15 },
-      { day: 'Wed', users: 12 },
-      { day: 'Thu', users: 18 },
-      { day: 'Fri', users: 20 },
-      { day: 'Sat', users: 25 },
-      { day: 'Sun', users: 22 }
-    ];
-  }
-};
 
 // 🔥 NEW: Export analytics data as CSV
 const exportAnalyticsCSV = asyncHandler(async (req, res) => {
@@ -1316,6 +955,149 @@ const getAnalyticsAlerts = asyncHandler(async (req, res) => {
   }
 });
 
+const getAnalyticsData = asyncHandler(async (req, res) => {
+  const { timeframe = 'week' } = req.query;
+  const now = new Date();
+  let startDate;
+
+  if (timeframe === 'week') {
+    startDate = new Date(now.setDate(now.getDate() - 7));
+  } else if (timeframe === 'month') {
+    startDate = new Date(now.setMonth(now.getMonth() - 1));
+  } else if (timeframe === 'year') {
+    startDate = new Date(now.setFullYear(now.getFullYear() - 1));
+  } else {
+    startDate = new Date(now.setDate(now.getDate() - 7));
+  }
+
+  try {
+    // 1. Sales Overview
+    const salesOverview = await Order.aggregate([
+      { $match: { createdAt: { $gte: startDate }, orderStatus: { $ne: 'cancelled' } } },
+      {
+        $group: {
+          _id: null,
+          totalSales: { $sum: "$totalPrice" },
+          commissionEarned: { $sum: { $ifNull: ["$commissionAmount", { $multiply: ["$totalPrice", 0.15] }] } },
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const dailySales = await Order.aggregate([
+      { $match: { createdAt: { $gte: startDate }, orderStatus: { $ne: 'cancelled' } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+          sales: { $sum: "$totalPrice" }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    const topRiceTypes = await Order.aggregate([
+      { $match: { createdAt: { $gte: startDate } } },
+      { $unwind: "$orderItems" },
+      { $group: { _id: "$orderItems.name", value: { $sum: "$orderItems.qty" } } },
+      { $sort: { value: -1 } },
+      { $limit: 5 }
+    ]);
+
+    // 2. Order Performance
+    const orderStats = await Order.aggregate([
+      { $match: { createdAt: { $gte: startDate } } },
+      { $group: { _id: "$orderStatus", count: { $sum: 1 } } }
+    ]);
+
+    const topSellers = await Order.aggregate([
+      { $match: { createdAt: { $gte: startDate }, orderStatus: 'delivered' } },
+      { $group: { _id: "$seller", totalSales: { $sum: "$totalPrice" }, orderCount: { $sum: 1 } } },
+      { $sort: { totalSales: -1 } },
+      { $limit: 5 },
+      { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'sellerInfo' } },
+      { $unwind: '$sellerInfo' },
+      { $project: { name: '$sellerInfo.name', sales: '$totalSales', orders: '$orderCount' } }
+    ]);
+
+    // 3. Payment Trends
+    const paymentMethods = await Payment.aggregate([
+      { $match: { createdAt: { $gte: startDate } } },
+      { $group: { _id: "$method", value: { $sum: 1 } } }
+    ]);
+
+    const dailyPayments = await Payment.aggregate([
+      { $match: { createdAt: { $gte: startDate }, status: 'completed' } },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+          amount: { $sum: "$amount" }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    // 4. User Engagement
+    const userGrowth = await User.aggregate([
+      { $match: { createdAt: { $gte: startDate } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+          users: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    const activeUsers = {
+      customers: await User.countDocuments({ role: 'customer' }),
+      sellers: await User.countDocuments({ role: 'seller' }),
+      deliveryPartners: await User.countDocuments({ role: 'deliveryPartner' })
+    };
+
+    // 5. Inventory & Alerts
+    const lowStock = await Product.find({ stock: { $lt: 10 } }).limit(5).select('name stock price');
+
+    res.json({
+      success: true,
+      data: {
+        salesOverview: {
+          totalSales: salesOverview[0]?.totalSales || 0,
+          dailySales: dailySales.map(d => ({ day: d._id, sales: d.amount })),
+          topRiceTypes: topRiceTypes.map(t => ({ name: t._id, value: t.value })),
+          commissionEarned: salesOverview[0]?.commissionEarned || 0
+        },
+        orderPerformance: {
+          totalOrders: salesOverview[0]?.totalOrders || 0,
+          orderStatus: orderStats.map(s => ({ name: s._id, value: s.count })),
+          topSellers: topSellers.map(s => ({ ...s, revenue: s.sales })),
+          deliveryStats: { onTime: 85, delayed: 10, cancelled: 5 } // Mocked for now
+        },
+        paymentTrends: {
+          paymentMethods: paymentMethods.map(p => ({ name: p._id.toUpperCase(), value: p.value })),
+          dailyPayments: dailyPayments.map(d => ({ date: d._id, amount: d.amount })),
+          refundRate: 2.5, // Mocked
+          highValueCOD: await Order.countDocuments({ paymentMethod: 'cod', totalPrice: { $gt: 5000 }, orderStatus: 'placed' })
+        },
+        userEngagement: {
+          activeUsers,
+          userGrowth: userGrowth.map(u => ({ month: u._id, users: u.users })),
+          recipeViews: 1250, // Mocked
+          conversionRate: 3.8
+        },
+        inventoryAlerts: {
+          lowStock: lowStock.map(p => ({ product: p.name, stock: p.stock })),
+          fraudFlags: 0,
+          topPromotions: []
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Analytics Error:', error);
+    res.status(500).json({ message: 'Error fetching analytics data', error: error.message });
+  }
+});
+
 const bootstrapAdmin = asyncHandler(async (req, res) => {
   // 1. Check if ANY admin already exists
   const adminCount = await User.countDocuments({ role: 'admin' });
@@ -1349,7 +1131,6 @@ module.exports = {
   moderateComment,
   getPlatformOverview,
   exportAnalyticsCSV,
-  getAnalyticsData,
   getAnalyticsData,
   getAnalyticsAlerts,
   bootstrapAdmin

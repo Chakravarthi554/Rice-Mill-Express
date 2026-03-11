@@ -21,16 +21,16 @@ const getDashboard = asyncHandler(async (req, res) => {
     tomorrow.setDate(tomorrow.getDate() + 1);
 
     // Get today's assigned orders
-    const todayOrders = await Order.find({
+    const todayOrders = await Order.countDocuments({
         deliveryPartner: partnerProfile._id,
         createdAt: { $gte: today, $lt: tomorrow }
-    }).countDocuments();
+    });
 
     // Get active deliveries (not delivered)
-    const activeDeliveries = await Order.find({
+    const activeDeliveries = await Order.countDocuments({
         deliveryPartner: partnerProfile._id,
         deliveryPartnerStatus: { $in: ['assigned', 'picked_up', 'in_transit'] }
-    }).countDocuments();
+    });
 
     // Get status counts
     const statusCounts = await Order.aggregate([
@@ -51,6 +51,34 @@ const getDashboard = asyncHandler(async (req, res) => {
     // Get total deliveries completed
     const totalDeliveries = partnerProfile.totalDeliveries || 0;
 
+    // Get earnings (Total and Today)
+    const earnings = await Order.aggregate([
+        {
+            $match: {
+                deliveryPartner: partnerProfile._id,
+                isDelivered: true
+            }
+        },
+        {
+            $group: {
+                _id: null,
+                totalEarnings: { $sum: '$deliveryPartnerAmount' },
+                todayEarnings: {
+                    $sum: {
+                        $cond: [
+                            { $and: [{ $gte: ['$deliveredAt', today] }, { $lt: ['$deliveredAt', tomorrow] }] },
+                            '$deliveryPartnerAmount',
+                            0
+                        ]
+                    }
+                }
+            }
+        }
+    ]);
+
+    const totalEarnings = earnings.length > 0 ? earnings[0].totalEarnings : 0;
+    const todayEarnings = earnings.length > 0 ? earnings[0].todayEarnings : 0;
+
     // Get today's completed deliveries
     const todayCompleted = await Order.find({
         deliveryPartner: partnerProfile._id,
@@ -65,6 +93,8 @@ const getDashboard = asyncHandler(async (req, res) => {
             activeDeliveries,
             totalDeliveries,
             todayCompleted,
+            totalEarnings,
+            todayEarnings,
             statusCounts: statusCounts.reduce((acc, item) => {
                 acc[item._id] = item.count;
                 return acc;
@@ -425,6 +455,39 @@ const uploadDeliveryPhotoAndComplete = asyncHandler(async (req, res) => {
     });
 
     await order.save();
+
+    // ✅ FIX: For COD orders, mark as paid on delivery and update Payment record
+    if (order.paymentMethod === 'cod' && !order.isPaid) {
+        order.isPaid = true;
+        order.paidAt = new Date();
+        order.paymentStatus = 'completed';
+        order.codCollected = true;
+        order.codCollectedAt = new Date();
+        order.codAmount = order.totalPrice;
+        await order.save();
+
+        // Update the associated Payment record
+        const Payment = require('../models/Payment');
+        await Payment.findOneAndUpdate(
+            { order: order._id },
+            {
+                status: 'completed',
+                paidAt: new Date(),
+                commissionAmount: order.commissionAmount || Math.round(order.totalPrice * (order.commissionRate || 0.15)),
+                sellerPayoutAmount: order.sellerAmount || Math.round(order.totalPrice * 0.85),
+            }
+        );
+    }
+
+    // ✅ Trigger referral rewards on first delivered+paid order
+    try {
+        const { processReferralRewards } = require('./rewardsController');
+        if (typeof processReferralRewards === 'function') {
+            await processReferralRewards(order.user, order._id);
+        }
+    } catch (refErr) {
+        console.error('Referral reward processing error (non-fatal):', refErr.message);
+    }
 
     // Update delivery partner stats
     partnerProfile.totalDeliveries = (partnerProfile.totalDeliveries || 0) + 1;

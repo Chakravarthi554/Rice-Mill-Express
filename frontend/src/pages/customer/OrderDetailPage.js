@@ -53,9 +53,10 @@ const OrderDetailPage = () => {
 
   /* ------------------------------------------------------------------ */
   useEffect(() => {
+    const backPath = user?.role === 'seller' ? '/seller/dashboard?tab=1' : '/customer/dashboard?tab=1';
     if (id) dispatch(getOrderDetails(id));
-    else navigate('/customer/dashboard?tab=1');
-  }, [dispatch, id, navigate]);
+    else navigate(backPath);
+  }, [dispatch, id, navigate, user?.role]);
 
   useEffect(() => {
     if (cancelSuccess) {
@@ -119,8 +120,14 @@ const OrderDetailPage = () => {
 
   /* ------------------------------------------------------------------ */
   if (loading) return <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px"><CircularProgress /></Box>;
-  if (error) return <Box p={3}><Message severity="error">{error}</Message><Button onClick={() => navigate('/customer/dashboard?tab=1')} sx={{ mt: 2 }}>Back</Button></Box>;
-  if (!order) return <Box p={3}><Message severity="error">Order not found</Message><Button onClick={() => navigate('/customer/dashboard?tab=1')} sx={{ mt: 2 }}>Back</Button></Box>;
+  if (error) {
+    const backPath = user?.role === 'seller' ? '/seller/dashboard?tab=1' : '/customer/dashboard?tab=1';
+    return <Box p={3}><Message severity="error">{error}</Message><Button onClick={() => navigate(backPath)} sx={{ mt: 2 }}>Back</Button></Box>;
+  }
+  if (!order) {
+    const backPath = user?.role === 'seller' ? '/seller/dashboard?tab=1' : '/customer/dashboard?tab=1';
+    return <Box p={3}><Message severity="error">Order not found</Message><Button onClick={() => navigate(backPath)} sx={{ mt: 2 }}>Back</Button></Box>;
+  }
 
   return (
     <Box p={3}>

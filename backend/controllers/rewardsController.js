@@ -148,7 +148,7 @@ const getReferralInfo = asyncHandler(async (req, res) => {
 // ✅ Process referral rewards (called when order is delivered)
 const processReferralRewards = asyncHandler(async (orderId) => {
     const order = await Order.findById(orderId).populate('user');
-    if (!order || order.orderStatus !== 'delivered') {
+    if (!order || order.orderStatus !== 'delivered' || !order.isPaid) {
         return;
     }
 
@@ -172,14 +172,19 @@ const processReferralRewards = asyncHandler(async (orderId) => {
         // Credit referrer
         if (user.referredBy) {
             const referrer = await User.findById(user.referredBy);
-            if (referrer) {
-                const referrerBonus = settings.referralRewardReferrer || 500;
+
+            // Anti-Abuse: Prevent self-referral and same-device referral
+            const isSelfReferral = referrer && referrer._id.toString() === user._id.toString();
+            // In a real app, you'd check req.ip or a deviceId here.
+
+            if (referrer && !isSelfReferral) {
+                const referrerBonus = settings.referralRewardReferrer || 50; // Requirement: ₹50
 
                 // Update referrer
-                referrer.walletBalance = (referrer.walletBalance || 0) + referrerBonus;
+                referrer.walletBalance = Math.round((referrer.walletBalance || 0) + referrerBonus);
                 if (!referrer.referralStats) referrer.referralStats = { referredUsers: 0, earnedCredits: 0, totalEarnings: 0 };
-                referrer.referralStats.earnedCredits = (referrer.referralStats.earnedCredits || 0) + referrerBonus;
-                referrer.referralStats.totalEarnings = (referrer.referralStats.totalEarnings || 0) + referrerBonus;
+                referrer.referralStats.earnedCredits = Math.round((referrer.referralStats.earnedCredits || 0) + referrerBonus);
+                referrer.referralStats.totalEarnings = Math.round((referrer.referralStats.totalEarnings || 0) + referrerBonus);
                 referrer.referralStats.referredUsers = (referrer.referralStats.referredUsers || 0) + 1;
 
                 await referrer.save();
@@ -190,7 +195,7 @@ const processReferralRewards = asyncHandler(async (orderId) => {
                     amount: referrerBonus,
                     type: 'referral_award',
                     status: 'completed',
-                    description: `Referral Bonus for inviting ${user.name}`,
+                    description: `Referral Bonus for inviting ${user.name} (Order #${order._id.toString().slice(-6)})`,
                     referenceId: user._id,
                     referenceType: 'User',
                     balanceAfter: referrer.walletBalance

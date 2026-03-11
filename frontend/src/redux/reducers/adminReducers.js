@@ -483,7 +483,7 @@ export const adminAnalyticsReducer = (state = initialAnalyticsState, action) => 
       return {
         ...state,
         loading: false,
-        data: action.payload,
+        data: action.payload.data || action.payload,
         error: null,
       };
     case 'ADMIN_ANALYTICS_FAIL':

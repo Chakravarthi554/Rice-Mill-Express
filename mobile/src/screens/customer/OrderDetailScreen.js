@@ -145,8 +145,29 @@ const OrderDetailScreen = ({ route, navigation }) => {
                     ))}
                     <Divider style={{ marginVertical: 10 }} />
                     <View style={styles.totalRow}>
-                        <Text style={styles.totalLabel}>Total Amount</Text>
-                        <Text style={styles.totalAmount}>₹{order.totalPrice}</Text>
+                        <Text style={styles.totalLabel}>Subtotal</Text>
+                        <Text style={styles.totalValue}>₹{order.productAmount || order.totalPrice - (order.deliveryFee || 0) + (order.discountAmount || 0)}</Text>
+                    </View>
+                    <View style={styles.totalRow}>
+                        <Text style={styles.totalLabel}>Delivery Fee</Text>
+                        <Text style={styles.totalValue}>₹{order.deliveryFee || 0}</Text>
+                    </View>
+                    {order.discountAmount > 0 && (
+                        <View style={styles.totalRow}>
+                            <Text style={styles.totalLabel}>Discount</Text>
+                            <Text style={[styles.totalValue, { color: '#F44336' }]}>- ₹{order.discountAmount}</Text>
+                        </View>
+                    )}
+                    {order.walletUsedAmount > 0 && (
+                        <View style={styles.totalRow}>
+                            <Text style={styles.totalLabel}>Wallet Used</Text>
+                            <Text style={[styles.totalValue, { color: '#2196F3' }]}>- ₹{order.walletUsedAmount}</Text>
+                        </View>
+                    )}
+                    <Divider style={{ marginVertical: 10 }} />
+                    <View style={styles.totalRow}>
+                        <Text style={styles.grandTotalLabel}>Total Amount Paid</Text>
+                        <Text style={styles.grandTotalAmount}>₹{order.finalPaidAmount || order.totalPrice}</Text>
                     </View>
                 </Card.Content>
             </Card>
@@ -326,10 +347,20 @@ const styles = StyleSheet.create({
         marginTop: 8,
     },
     totalLabel: {
+        fontSize: 14,
+        color: '#666',
+    },
+    totalValue: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: '#333',
+    },
+    grandTotalLabel: {
         fontSize: 16,
         fontWeight: 'bold',
+        color: '#333',
     },
-    totalAmount: {
+    grandTotalAmount: {
         fontSize: 18,
         fontWeight: 'bold',
         color: '#4CAF50',

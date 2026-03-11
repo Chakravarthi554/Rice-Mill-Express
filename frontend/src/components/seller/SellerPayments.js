@@ -16,6 +16,7 @@ import {
   Cancel,
   History // Icon for Payout History
 } from '@mui/icons-material';
+import { Link } from 'react-router-dom';
 import {
   getSellerPayments,
   recordCodReceived, // Use specific action name
@@ -66,32 +67,32 @@ const SellerPayments = () => {
 
   // Show snackbar messages on success/error from actions
   useEffect(() => {
-      if (paymentRecordSuccess) {
-          setSnackbar({ open: true, message: 'COD Payment Recorded Successfully!', severity: 'success' });
-          dispatch({ type: PAYMENT_RECORD_COD_RESET }); // Reset state
-      }
-      if (paymentRecordError) {
-           setSnackbar({ open: true, message: `Error Recording COD: ${paymentRecordError}`, severity: 'error' });
-           dispatch({ type: PAYMENT_RECORD_COD_RESET }); // Reset state
-      }
+    if (paymentRecordSuccess) {
+      setSnackbar({ open: true, message: 'COD Payment Recorded Successfully!', severity: 'success' });
+      dispatch({ type: PAYMENT_RECORD_COD_RESET }); // Reset state
+    }
+    if (paymentRecordError) {
+      setSnackbar({ open: true, message: `Error Recording COD: ${paymentRecordError}`, severity: 'error' });
+      dispatch({ type: PAYMENT_RECORD_COD_RESET }); // Reset state
+    }
   }, [paymentRecordSuccess, paymentRecordError, dispatch]);
 
-    useEffect(() => {
-      if (payoutRequestSuccess) {
-          setSnackbar({ open: true, message: 'Payout Requested Successfully!', severity: 'success' });
-           dispatch({ type: PAYOUT_REQUEST_RESET }); // Reset state
-      }
-      if (payoutRequestError) {
-           setSnackbar({ open: true, message: `Error Requesting Payout: ${payoutRequestError}`, severity: 'error' });
-            dispatch({ type: PAYOUT_REQUEST_RESET }); // Reset state
-      }
+  useEffect(() => {
+    if (payoutRequestSuccess) {
+      setSnackbar({ open: true, message: 'Payout Requested Successfully!', severity: 'success' });
+      dispatch({ type: PAYOUT_REQUEST_RESET }); // Reset state
+    }
+    if (payoutRequestError) {
+      setSnackbar({ open: true, message: `Error Requesting Payout: ${payoutRequestError}`, severity: 'error' });
+      dispatch({ type: PAYOUT_REQUEST_RESET }); // Reset state
+    }
   }, [payoutRequestSuccess, payoutRequestError, dispatch]);
 
 
   const handleOpenCodDialog = (payment) => {
-      setSelectedPayment(payment);
-      setPaymentAmount(payment.amount); // Pre-fill with expected amount
-      setOpenPaymentDialog(true);
+    setSelectedPayment(payment);
+    setPaymentAmount(payment.amount); // Pre-fill with expected amount
+    setOpenPaymentDialog(true);
   };
 
   const handleRecordCodSubmit = () => {
@@ -197,7 +198,7 @@ const SellerPayments = () => {
                         </Button>
                       )}
                       {/* Add View Order link/button */}
-                      {payment.order?._id && <Button size="small" component="a" href={`/order/${payment.order._id}`} sx={{ ml: 1 }}>View Order</Button>}
+                      {payment.order?._id && <Button size="small" component={Link} to={`/orders/${payment.order._id}`} sx={{ ml: 1 }}>View Order</Button>}
                     </TableCell>
                   </TableRow>
                 ))
@@ -209,40 +210,40 @@ const SellerPayments = () => {
         {/* Payout History Table */}
         <Typography variant="h6" gutterBottom>Payout History</Typography>
         <TableContainer component={Paper} elevation={2}>
-             <Table aria-label="payout history table">
-                 <TableHead>
-                     <TableRow sx={{ backgroundColor: grey[100] }}>
-                         <TableCell sx={{ fontWeight: 'bold' }}>Requested At</TableCell>
-                         <TableCell sx={{ fontWeight: 'bold' }}>Amount</TableCell>
-                         <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-                         <TableCell sx={{ fontWeight: 'bold' }}>Processed At</TableCell>
-                         <TableCell sx={{ fontWeight: 'bold' }}>Notes/Txn ID</TableCell>
-                     </TableRow>
-                 </TableHead>
-                 <TableBody>
-                     {paymentsLoading ? ( // Reuse paymentsLoading for initial load
-                        <TableRow><TableCell colSpan={5} align="center"><CircularProgress /></TableCell></TableRow>
-                     ) : payoutHistory.length === 0 ? (
-                         <TableRow><TableCell colSpan={5} align="center">No payout requests found</TableCell></TableRow>
-                     ) : (
-                        payoutHistory.map((payout) => (
-                           <TableRow key={payout._id} hover>
-                               <TableCell>{new Date(payout.createdAt).toLocaleString()}</TableCell>
-                               <TableCell>₹{payout.amount?.toFixed(2) || '0.00'}</TableCell>
-                               <TableCell>
-                                   <Chip
-                                      label={payout.status}
-                                      size="small"
-                                      color={payout.status === 'completed' ? 'success' : payout.status === 'failed' ? 'error' : 'warning'}
-                                    />
-                               </TableCell>
-                               <TableCell>{payout.processedAt ? new Date(payout.processedAt).toLocaleDateString() : 'N/A'}</TableCell>
-                               <TableCell>{payout.transactionId || payout.notes || 'N/A'}</TableCell>
-                           </TableRow>
-                        ))
-                     )}
-                 </TableBody>
-             </Table>
+          <Table aria-label="payout history table">
+            <TableHead>
+              <TableRow sx={{ backgroundColor: grey[100] }}>
+                <TableCell sx={{ fontWeight: 'bold' }}>Requested At</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Amount</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Processed At</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Notes/Txn ID</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {paymentsLoading ? ( // Reuse paymentsLoading for initial load
+                <TableRow><TableCell colSpan={5} align="center"><CircularProgress /></TableCell></TableRow>
+              ) : payoutHistory.length === 0 ? (
+                <TableRow><TableCell colSpan={5} align="center">No payout requests found</TableCell></TableRow>
+              ) : (
+                payoutHistory.map((payout) => (
+                  <TableRow key={payout._id} hover>
+                    <TableCell>{new Date(payout.createdAt).toLocaleString()}</TableCell>
+                    <TableCell>₹{payout.amount?.toFixed(2) || '0.00'}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={payout.status}
+                        size="small"
+                        color={payout.status === 'completed' ? 'success' : payout.status === 'failed' ? 'error' : 'warning'}
+                      />
+                    </TableCell>
+                    <TableCell>{payout.processedAt ? new Date(payout.processedAt).toLocaleDateString() : 'N/A'}</TableCell>
+                    <TableCell>{payout.transactionId || payout.notes || 'N/A'}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
         </TableContainer>
 
       </Box>
@@ -290,7 +291,7 @@ const SellerPayments = () => {
       <Dialog open={openPayoutDialog} onClose={() => setOpenPayoutDialog(false)}>
         <DialogTitle>Request Payout</DialogTitle>
         <DialogContent>
-           {payoutRequestError && <Alert severity="error" sx={{ mb: 2 }}>{payoutRequestError}</Alert>}
+          {payoutRequestError && <Alert severity="error" sx={{ mb: 2 }}>{payoutRequestError}</Alert>}
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12}>
               <Typography>Available Balance: ₹{balance?.availableBalance?.toFixed(2) || '0.00'}</Typography>
@@ -301,7 +302,7 @@ const SellerPayments = () => {
                 label="Amount to Withdraw (₹)"
                 type="number"
                 value={payoutAmount}
-                 onChange={(e) => {
+                onChange={(e) => {
                   const maxAmount = balance?.availableBalance || 0;
                   const requestedAmount = e.target.value === '' ? 0 : parseFloat(e.target.value);
                   const amount = Math.max(0, Math.min(maxAmount, requestedAmount || 0));
@@ -331,12 +332,12 @@ const SellerPayments = () => {
         </DialogActions>
       </Dialog>
 
-       {/* Snackbar for feedback */}
-       <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={() => setSnackbar({...snackbar, open: false})} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
-         <Alert onClose={() => setSnackbar({...snackbar, open: false})} severity={snackbar.severity} sx={{ width: '100%' }}>
-           {snackbar.message}
-         </Alert>
-       </Snackbar>
+      {/* Snackbar for feedback */}
+      <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={() => setSnackbar({ ...snackbar, open: false })} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
 
     </Container>
   );
