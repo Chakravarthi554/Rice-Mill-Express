@@ -510,6 +510,52 @@ exports.updateOrderStatus = asyncHandler(async (req, res) => {
         { order: order._id },
         { $set: { status: 'completed', paidAt: Date.now() } }
       );
+
+      // BUG-4 FIX: COD Settlement — create wallet ledger entries for the seller.
+      // The platform never touches the cash, so we:
+      //   1. Credit seller their net earnings (sellerAmount) in their wallet.
+      //   2. Record the platform commission as a negative `commission_owed` debit
+      //      so the seller's effective balance reflects what they owe the platform.
+      // This implements the negative-wallet COD commission model.
+      const WalletTransaction = require('../models/WalletTransaction');
+      const sellerUser = await User.findById(order.seller);
+      if (sellerUser && order.sellerAmount > 0) {
+        const codSellerEarning = Math.round(order.sellerAmount);
+        const codCommission   = Math.round(order.commissionAmount);
+
+        // Credit: seller received cash from customer, net of commission
+        sellerUser.walletBalance = (sellerUser.walletBalance || 0) + codSellerEarning;
+        await sellerUser.save();
+
+        await WalletTransaction.create({
+          user: sellerUser._id,
+          amount: codSellerEarning,
+          type: 'seller_credit',
+          status: 'completed',
+          description: `COD earnings for Order #${order._id.toString().slice(-6)} (cash collected)`,
+          referenceId: order._id,
+          referenceType: 'Order',
+          balanceAfter: sellerUser.walletBalance
+        });
+
+        // Debit: platform commission the seller owes the platform
+        if (codCommission > 0) {
+          const balanceAfterCommission = sellerUser.walletBalance - codCommission;
+          await WalletTransaction.create({
+            user: sellerUser._id,
+            amount: -codCommission,
+            type: 'commission_owed',
+            status: 'completed',
+            description: `Platform commission owed for COD Order #${order._id.toString().slice(-6)}`,
+            referenceId: order._id,
+            referenceType: 'Order',
+            balanceAfter: balanceAfterCommission
+          });
+          // Update seller wallet to reflect the commission owed
+          sellerUser.walletBalance = balanceAfterCommission;
+          await sellerUser.save();
+        }
+      }
     }
 
     // Credit Delivery Partner Wallet

@@ -122,16 +122,9 @@ const userSchema = mongoose.Schema(
       referenceId: { type: mongoose.Schema.Types.ObjectId }, // Order ID, Campaign ID, etc.
       status: { type: String, enum: ['pending', 'completed', 'cancelled', 'expired'], default: 'completed' }
     }],
-    referredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    isReferralRewardClaimed: { type: Boolean, default: false },
+    // (referredBy and isReferralRewardClaimed declared above at lines 96-97; no duplicate needed)
 
-    // ✅ ENHANCED: Better referral tracking
-    referralStats: {
-      referredUsers: { type: Number, default: 0 },
-      earnedCredits: { type: Number, default: 0 },
-      pendingCredits: { type: Number, default: 0 },
-      totalReferrals: { type: Number, default: 0 }
-    },
+    // ✅ Enhanced referral tracking fields are included in referralStats above
 
     bookmarks: [{
       postId: { type: mongoose.Schema.Types.ObjectId, ref: 'ForumPost', required: true },

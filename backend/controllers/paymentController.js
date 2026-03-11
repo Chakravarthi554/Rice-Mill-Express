@@ -118,20 +118,26 @@ const verifyRazorpayPayment = asyncHandler(async (req, res) => {
                         }
 
                         // Create/Update Payment Record
+                        // BUG-3 FIX: Include required `user` and `seller` fields so upsert
+                        // doesn't fail Mongoose validation when the document is new.
                         await Payment.findOneAndUpdate(
                             { order: order._id },
                             {
-                                status: 'completed',
-                                razorpayPaymentId: razorpay_payment_id,
-                                razorpayOrderId: razorpay_order_id,
-                                amount: order.finalPaidAmount, // User paid amount
-                                method: 'razorpay',
-                                paidAt: new Date(),
-                                commissionAmount: order.commissionAmount,
-                                sellerPayoutAmount: order.sellerAmount,
-                                payoutStatus: 'pending',
+                                $set: {
+                                    status: 'completed',
+                                    razorpayPaymentId: razorpay_payment_id,
+                                    razorpayOrderId: razorpay_order_id,
+                                    amount: order.finalPaidAmount,
+                                    method: 'razorpay',
+                                    user: order.user,
+                                    seller: order.seller,
+                                    currency: 'INR',
+                                    commissionAmount: order.commissionAmount,
+                                    sellerPayoutAmount: order.sellerAmount,
+                                    payoutStatus: 'pending',
+                                }
                             },
-                            { upsert: true, new: true }
+                            { upsert: true, new: true, setDefaultsOnInsert: true }
                         );
                     }
                 }
@@ -249,9 +255,10 @@ const handleRazorpayWebhook = asyncHandler(async (req, res) => {
                         }
                         const io = req.app.get('io');
                         if (io) {
+                            // BUG-2 FIX: `updateDataEmit` was never defined — replaced with actual fields.
                             io.to('admin').emit('ORDER_UPDATE', {
                                 type: 'ORDER_UPDATE',
-                                data: { orderId: order._id, ...updateDataEmit }
+                                data: { orderId: order._id, isPaid: true, paymentStatus: 'completed' }
                             });
                         }
                     }

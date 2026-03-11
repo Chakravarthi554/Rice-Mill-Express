@@ -207,8 +207,15 @@ const processReferralRewards = asyncHandler(async (orderId) => {
         const refereeBonus = settings.referralRewardReferee || 200;
         user.walletBalance = (user.walletBalance || 0) + refereeBonus;
         user.isReferralRewardClaimed = true;
+
+        // BUG-5 FIX: Guard against null/undefined referralStats for existing user accounts
+        if (!user.referralStats) {
+          user.referralStats = { referredUsers: 0, earnedCredits: 0, pendingCredits: 0, totalReferrals: 0 };
+        }
         user.referralStats.earnedCredits = (user.referralStats.earnedCredits || 0) + refereeBonus;
-        user.referralStats.totalEarnings = (user.referralStats.totalEarnings || 0) + refereeBonus;
+        if (user.referralStats.totalEarnings !== undefined) {
+          user.referralStats.totalEarnings = (user.referralStats.totalEarnings || 0) + refereeBonus;
+        }
 
         await user.save();
 
@@ -361,9 +368,19 @@ const adminUpdateWithdrawal = asyncHandler(async (req, res) => {
         throw new Error('Request already processed');
     }
 
-    withdrawal.status = status;
     withdrawal.adminNotes = adminNotes;
     if (transactionId) withdrawal.transactionId = transactionId;
+
+    // BUG-6 FIX: Validate status against WithdrawalRequest model enum before saving.
+    // Without this, an invalid status string causes a Mongoose validation error (500)
+    // instead of a clean user-facing 400 error.
+    const VALID_WITHDRAWAL_STATUSES = ['approved', 'rejected', 'processed'];
+    if (!VALID_WITHDRAWAL_STATUSES.includes(status)) {
+        res.status(400);
+        throw new Error(`Invalid status. Must be one of: ${VALID_WITHDRAWAL_STATUSES.join(', ')}`);
+    }
+    withdrawal.status = status;
+
     if (status === 'approved' || status === 'processed') {
         withdrawal.processedAt = Date.now();
     }
