@@ -681,7 +681,6 @@ module.exports = {
   refreshAccessToken,
   resendOtp,
   verifyOtp,
-  verifyOtp,
   logoutUser,
   loginWithGoogle,
   firebaseLogin,
