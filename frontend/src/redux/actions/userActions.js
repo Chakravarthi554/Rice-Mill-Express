@@ -100,25 +100,23 @@ export const loginUser = (email, password) => async (dispatch) => {
 
     console.log('🔄 Attempting login...');
 
-    const loginConfig = {
+    // ✅ FIX: Use axiosInstance (has explicit baseURL=http://localhost:5000)
+    //    instead of bare axios which only works via CRA proxy — a fragile dev-only mechanism.
+    const { data: loginData } = await axiosInstance.post('/api/auth/login', { email, password }, {
       headers: { 'Content-Type': 'application/json' },
       withCredentials: true,
       timeout: 30000
-    };
-
-    const { data: loginData } = await axiosInstance.post('/api/auth/login', { email, password }, loginConfig);
+    });
 
     if (!loginData.accessToken) {
       throw new Error('No access token received from server');
     }
 
-    const profileConfig = {
+    console.log('✅ Login successful, fetching full profile...');
+    const { data: profileData } = await axiosInstance.get('/api/users/profile', {
       headers: { Authorization: `Bearer ${loginData.accessToken}` },
       timeout: 30000
-    };
-
-    console.log('✅ Login successful, fetching full profile...');
-    const { data: profileData } = await axiosInstance.get('/api/users/profile', profileConfig);
+    });
 
     const fullUserData = { ...profileData, token: loginData.accessToken };
 
@@ -146,6 +144,8 @@ export const loginUser = (email, password) => async (dispatch) => {
       errorMessage = error.response.data.message;
     } else if (error.code === 'ECONNABORTED') {
       errorMessage = 'Login timeout. Please check your connection and try again.';
+    } else if (!error.response && error.message.includes('Network')) {
+      errorMessage = 'Cannot reach server. Make sure the backend is running on port 5000.';
     } else if (error.message) {
       errorMessage = error.message;
     }

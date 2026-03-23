@@ -33,9 +33,8 @@ router.post('/phone-login', loginWithPhone);
 // Google login route
 router.post('/google-login', asyncHandler(loginWithGoogle));
 
-// Refresh token route
+// Refresh token route (single registration — the second one was overriding with a 410 response)
 router.post('/refresh-token', asyncHandler(refreshAccessToken));
-router.post('/refresh-token', auth.refreshToken);
 
 // OTP verification route
 router.post('/verify-otp', auth.protect, asyncHandler(verifyOtp));

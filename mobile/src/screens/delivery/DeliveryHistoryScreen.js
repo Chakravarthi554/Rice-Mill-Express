@@ -126,7 +126,7 @@ const DeliveryHistoryScreen = ({ navigation }) => {
                 <View style={styles.divider} />
 
                 <View style={styles.footer}>
-                    <Text style={styles.amountText}>₹{delivery.totalAmount}</Text>
+                    <Text style={styles.amountText}>Earnt: ₹{delivery.deliveryPartnerAmount || 0}</Text>
                     {delivery.deliveryConfirmation?.photoProofUrl && (
                         <TouchableOpacity style={styles.proofButton}>
                             <MaterialIcons name="image" size={18} color="#4CAF50" />
@@ -165,7 +165,7 @@ const DeliveryHistoryScreen = ({ navigation }) => {
                 </View>
                 <View style={styles.statCard}>
                     <Text style={styles.statValue}>
-                        ₹{deliveries.reduce((sum, d) => sum + d.totalAmount, 0)}
+                        ₹{deliveries.reduce((sum, d) => sum + (d.deliveryPartnerAmount || 0), 0).toFixed(0)}
                     </Text>
                     <Text style={styles.statLabel}>Total Earned</Text>
                 </View>

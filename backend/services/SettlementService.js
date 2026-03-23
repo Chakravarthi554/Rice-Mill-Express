@@ -53,6 +53,9 @@ class SettlementService {
             // 1. Handle Seller Settlement
             const seller = await User.findById(order.seller);
             
+            order.sellerAmount = sellerEarning;
+            order.commissionAmount = platformCommission;
+            
             // Handle Negative Wallet Auto-Deduction
             let duesDeducted = 0;
             let currentBalance = seller.walletBalance;
@@ -92,6 +95,7 @@ class SettlementService {
             );
 
             await seller.save();
+            await order.save(); // Save sellerAmount and commissionAmount
 
             // 2. Handle Delivery Partner Settlement
             if (order.deliveryPartner) {
@@ -101,6 +105,10 @@ class SettlementService {
                 if (dpUser) {
                     dpUser.walletBalance += deliveryPartnerEarning;
                     await dpUser.save();
+
+                    // Save DP earning to order for stats
+                    order.deliveryPartnerAmount = deliveryPartnerEarning;
+                    await order.save();
 
                     await WalletTransaction.create([{
                         user: dpUser._id,
