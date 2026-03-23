@@ -2,6 +2,7 @@ const DeliveryPartner = require('../models/deliveryPartner.js');
 const Order = require('../models/Order.js');
 const asyncHandler = require('../middleware/asyncHandler.js');
 const { uploadDeliveryPhoto, uploadReplacementPhoto } = require('../utils/cloudinaryService.js');
+const SettlementService = require('../services/SettlementService');
 
 // @desc    Get delivery partner dashboard stats
 // @route   GET /api/delivery-partners/dashboard
@@ -504,6 +505,14 @@ const uploadDeliveryPhotoAndComplete = asyncHandler(async (req, res) => {
                 sellerPayoutAmount: order.sellerAmount || Math.round(order.totalPrice * 0.85),
             }
         );
+    }
+
+    // ✅ Automated Settlement Handling
+    try {
+        await SettlementService.processDeliverySettlement(order._id);
+        console.log(`✅ Automated settlement processed for order ${order._id}`);
+    } catch (settleErr) {
+        console.error('⚠️ Failed to process automated settlement:', settleErr.message);
     }
 
     // ✅ Trigger referral rewards on first delivered+paid order

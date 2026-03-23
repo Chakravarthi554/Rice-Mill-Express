@@ -16,6 +16,7 @@ const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const Razorpay = require('razorpay');
 const AdminSettings = require('../models/AdminSettings');
+const SettlementService = require('../services/SettlementService');
 const {
   calculateDeliveryCharge,
   calculatePincodeDistance,
@@ -537,7 +538,6 @@ exports.updateOrderStatus = asyncHandler(async (req, res) => {
 
     // ✅ Automated Settlement Handling
     try {
-      const SettlementService = require('../services/SettlementService');
       await SettlementService.processDeliverySettlement(order._id);
       console.log(`✅ Automated settlement processed for order ${order._id}`);
     } catch (settleErr) {
@@ -1003,6 +1003,14 @@ exports.updateOrderToDelivered = asyncHandler(async (req, res) => {
         description: 'Order Rewards & Bonuses'
       });
       await user.save();
+    }
+
+    // ✅ Automated Settlement Handling
+    try {
+      await SettlementService.processDeliverySettlement(updatedOrder._id);
+      console.log(`✅ Automated settlement handled during manual delivery update for order ${updatedOrder._id}`);
+    } catch (settleErr) {
+      console.error('⚠️ Failed to process automated settlement:', settleErr.message);
     }
 
   } catch (rewardError) {
