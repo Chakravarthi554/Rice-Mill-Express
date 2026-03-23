@@ -1,4 +1,5 @@
-import axios from 'axios';
+import api from '../../utils/api';
+import { handleApiError } from '../../utils/handleApiError';
 import {
   RAZORPAY_ORDER_CREATE_REQUEST,
   RAZORPAY_ORDER_CREATE_SUCCESS,
@@ -19,7 +20,6 @@ import {
   SELLER_PAYOUTS_HISTORY_SUCCESS,
   SELLER_PAYOUTS_HISTORY_FAIL,
 } from '../constants/paymentConstants';
-import { handleApiError } from '../../utils/handleApiError'; // Ensure correct path
 
 /**
  * 1️⃣ Create Razorpay Order
@@ -29,14 +29,7 @@ import { handleApiError } from '../../utils/handleApiError'; // Ensure correct p
 export const createRazorpayOrder = (orderData) => async (dispatch, getState) => {
   try {
     dispatch({ type: RAZORPAY_ORDER_CREATE_REQUEST });
-    const { userLogin: { userInfo } } = getState();
-    const config = {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${userInfo.token}`,
-      },
-    };
-    const { data } = await axios.post('/api/payments/razorpay/order', orderData, config);
+    const { data } = await api.post('/api/payments/razorpay/order', orderData);
     dispatch({ type: RAZORPAY_ORDER_CREATE_SUCCESS, payload: data });
     return Promise.resolve(data);
   } catch (error) {
@@ -53,15 +46,7 @@ export const createRazorpayOrder = (orderData) => async (dispatch, getState) => 
 export const verifyRazorpayPayment = (paymentData) => async (dispatch, getState) => {
   try {
     dispatch({ type: RAZORPAY_VERIFY_REQUEST });
-    const { userLogin: { userInfo } } = getState();
-    const config = {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${userInfo.token}`,
-      },
-    };
-    
-    const { data } = await axios.post('/api/payments/razorpay/verify', paymentData, config);
+    const { data } = await api.post('/api/payments/razorpay/verify', paymentData);
 
     if (data.success) {
       dispatch({ type: RAZORPAY_VERIFY_SUCCESS, payload: data });
@@ -83,9 +68,7 @@ export const verifyRazorpayPayment = (paymentData) => async (dispatch, getState)
 export const getSellerPayments = () => async (dispatch, getState) => {
   try {
     dispatch({ type: SELLER_PAYMENTS_REQUEST });
-    const { userLogin: { userInfo } } = getState();
-    const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await axios.get('/api/payments/seller', config);
+    const { data } = await api.get('/api/payments/seller');
     dispatch({ type: SELLER_PAYMENTS_SUCCESS, payload: data });
   } catch (error) {
     dispatch({ type: SELLER_PAYMENTS_FAIL, payload: handleApiError(error) });
@@ -99,14 +82,7 @@ export const getSellerPayments = () => async (dispatch, getState) => {
 export const recordCodReceived = (orderId, amountReceived, proof = 'Seller confirmed') => async (dispatch, getState) => {
   try {
     dispatch({ type: PAYMENT_RECORD_COD_REQUEST });
-    const { userLogin: { userInfo } } = getState();
-    const config = {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${userInfo.token}`,
-      },
-    };
-    const { data } = await axios.post(`/api/payments/cod-report/${orderId}`, { amountReceived, proof }, config);
+    const { data } = await api.post(`/api/payments/cod-report/${orderId}`, { amountReceived, proof });
 
     dispatch({ type: PAYMENT_RECORD_COD_SUCCESS, payload: data.payment });
     return Promise.resolve(data);
@@ -124,14 +100,7 @@ export const recordCodReceived = (orderId, amountReceived, proof = 'Seller confi
 export const requestPayout = (payoutData) => async (dispatch, getState) => {
   try {
     dispatch({ type: PAYOUT_REQUEST_REQUEST });
-    const { userLogin: { userInfo } } = getState();
-    const config = {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${userInfo.token}`,
-      },
-    };
-    const { data } = await axios.post('/api/payments/request-payout', payoutData, config);
+    const { data } = await api.post('/api/payments/request-payout', payoutData);
     dispatch({ type: PAYOUT_REQUEST_SUCCESS, payload: data.payout });
     // Refresh seller balance after payout request
     dispatch(getSellerPayments());
@@ -150,9 +119,7 @@ export const requestPayout = (payoutData) => async (dispatch, getState) => {
 export const getPayoutHistory = () => async (dispatch, getState) => {
   try {
     dispatch({ type: SELLER_PAYOUTS_HISTORY_REQUEST });
-    const { userLogin: { userInfo } } = getState();
-    const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await axios.get('/api/payments/payout-history', config);
+    const { data } = await api.get('/api/payments/payout-history');
     dispatch({ type: SELLER_PAYOUTS_HISTORY_SUCCESS, payload: data });
   } catch (error) {
     dispatch({ type: SELLER_PAYOUTS_HISTORY_FAIL, payload: handleApiError(error) });

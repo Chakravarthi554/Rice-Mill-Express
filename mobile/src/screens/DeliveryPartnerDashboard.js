@@ -74,7 +74,7 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
         const filtered = orders.filter(order => {
             if (activeTab === 'assigned') {
                 // Show all orders assigned to partner that are not yet out for delivery or delivered
-                return ['placed', 'processing', 'packed', 'shipped'].includes(order.orderStatus);
+                return ['confirmed', 'placed', 'processing', 'packed', 'shipped'].includes(order.orderStatus);
             } else if (activeTab === 'pending') {
                 return order.orderStatus === 'out_for_delivery';
             } else if (activeTab === 'delivered') {

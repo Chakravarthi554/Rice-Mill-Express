@@ -31,7 +31,7 @@ if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
 }
 
 let transporter = null;
-if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+if (process.env.EMAIL_USER && process.env.EMAIL_PASS && !process.env.EMAIL_USER.includes('your.email')) {
   transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
@@ -69,9 +69,11 @@ exports.createOrder = asyncHandler(async (req, res) => {
   // Normalize payment method
   const finalPaymentMethod = paymentMethod === 'online' ? 'razorpay' : paymentMethod;
 
-  // Razorpay details are only required if payment is being confirmed immediately (e.g., Desktop Flow)
-  // For Mobile Flow, we create the order first, then redirect to a payment page.
+  // Razorpay details are required if payment is being confirmed immediately
   const isImmediatePayment = finalPaymentMethod === 'razorpay' && razorpayPaymentId && razorpayOrderId && razorpaySignature;
+  
+  // Custom logic for 20% advance payment on high-value COD orders
+  const isAdvancePayment = finalPaymentMethod === 'cod' && req.body.isAdvancePaid === true && razorpayPaymentId && razorpayOrderId && razorpaySignature;
 
   const user = await User.findById(req.user._id).populate('addresses');
   if (!user) { res.status(404); throw new Error('User not found'); }
@@ -90,16 +92,16 @@ exports.createOrder = asyncHandler(async (req, res) => {
     if (!item.product || !item.qty || item.qty <= 0) {
       validationError = 'Invalid item data (missing product or quantity)'; break;
     }
-    const product = await Product.findById(item.product).select('name price seller images stock');
+    const product = await Product.findById(item.product).select('name price offerPrice seller images stock weight');
     if (!product) { validationError = `Product not found: ID ${item.product}`; break; }
     if (product.stock < item.qty) { validationError = `Insufficient stock for ${product.name}`; break; }
     if (!product.seller) { validationError = `Seller missing for ${product.name}`; break; }
 
     const sellerId = product.seller.toString();
     if (!ordersBySeller[sellerId]) {
-      ordersBySeller[sellerId] = { seller: sellerId, orderItems: [], totalPrice: 0 };
+      ordersBySeller[sellerId] = { seller: sellerId, orderItems: [], totalPrice: 0, totalWeight: 0 };
     }
-    const itemPrice = product.price;
+    const itemPrice = product.offerPrice || product.price;
     ordersBySeller[sellerId].orderItems.push({
       product: product._id,
       name: product.name,
@@ -110,7 +112,7 @@ exports.createOrder = asyncHandler(async (req, res) => {
       seller: sellerId,
     });
     ordersBySeller[sellerId].totalPrice += itemPrice * item.qty;
-    ordersBySeller[sellerId].totalWeight = (ordersBySeller[sellerId].totalWeight || 0) + (product.weight || 5) * item.qty;
+    ordersBySeller[sellerId].totalWeight += (product.weight || 5) * item.qty;
     grandTotal += itemPrice * item.qty;
   }
   if (validationError) { res.status(400); throw new Error(validationError); }
@@ -151,9 +153,23 @@ exports.createOrder = asyncHandler(async (req, res) => {
     }
   }
 
+  // Status Machine:
+  // Paid Online orders and Regular CODs <= 5000 are 'confirmed'
+  // Unpaid online orders and CODs > 5000 (waiting for advance) stay in 'pending_payment'
+  let initialStatus = 'pending_payment';
+  if (isImmediatePayment || isAdvancePayment) {
+    initialStatus = 'confirmed';
+  } else if (finalPaymentMethod === 'cod') {
+    if (grandTotal > 5000) {
+      initialStatus = 'pending_payment'; // Waiting for advance payment link redirection
+    } else {
+      initialStatus = 'confirmed'; // Standard COD
+    }
+  }
+
   // Payment Verification logic
-  let isPaymentVerified = finalPaymentMethod === 'cod' || !isImmediatePayment;
-  if (isImmediatePayment) {
+  let isPaymentVerified = false;
+  if (isImmediatePayment || isAdvancePayment) {
     if (!razorpayInstance) {
       res.status(500); throw new Error("Razorpay not configured");
     }
@@ -165,13 +181,18 @@ exports.createOrder = asyncHandler(async (req, res) => {
     try {
       const payment = await razorpayInstance.payments.fetch(razorpayPaymentId);
       // Allow for small floating point differences or if rewards reduced the amount
-      const expectedAmount = Math.round(grandTotal * 100);
+      let expectedAmount = Math.round(grandTotal * 100);
+      if (isAdvancePayment) {
+        expectedAmount = Math.round(req.body.advanceAmountPaid * 100);
+      }
       if (payment.status !== 'captured') throw new Error(`Payment not captured: ${payment.status}`);
       if (Math.abs(payment.amount - expectedAmount) > 100) throw new Error("Amount mismatch"); // Allow ₹1 variance
       isPaymentVerified = true;
     } catch (err) {
       res.status(500); throw new Error("Razorpay verification failed: " + err.message);
     }
+  } else {
+    isPaymentVerified = true; // Regular COD or unpaid Online order
   }
 
   if (!isPaymentVerified) {
@@ -187,6 +208,8 @@ exports.createOrder = asyncHandler(async (req, res) => {
     // Calculate proportional discount if rewards are used
     let remainingDiscount = req.redemption ? req.redemption.amount : 0;
     const initialGrandTotal = grandTotal + remainingDiscount; // Reconstruct original total to calculate ratio
+
+    let remainingAdvance = req.body.advanceAmountPaid || 0;
 
     const sellerIds = Object.keys(ordersBySeller);
     let orderIndex = 0;
@@ -208,6 +231,18 @@ exports.createOrder = asyncHandler(async (req, res) => {
       }
 
       const netPrice = data.totalPrice - orderDiscount;
+
+      // Calculate the portion of advance payment for this seller's order
+      let orderAdvancePaid = 0;
+      if (isAdvancePayment && initialGrandTotal > 0) {
+        if (orderIndex === sellerIds.length) {
+          orderAdvancePaid = remainingAdvance;
+        } else {
+          const ratio = data.totalPrice / initialGrandTotal;
+          orderAdvancePaid = Math.floor(req.body.advanceAmountPaid * ratio);
+          remainingAdvance -= orderAdvancePaid;
+        }
+      }
 
       // NEW: Calculate Delivery Fees based on distance and settings
       const sellerUser = await User.findById(sellerId).select('businessDetails');
@@ -275,6 +310,9 @@ exports.createOrder = asyncHandler(async (req, res) => {
         totalPrice: netPrice + deliveryFee, // User Total includes delivery
         discount: orderDiscount,
         netPrice: netPrice,
+        isAdvancePaid: isAdvancePayment,
+        advanceAmountPaid: orderAdvancePaid,
+        remainingCodAmount: finalPaymentMethod === 'cod' ? (netPrice + deliveryFee - orderAdvancePaid) : 0,
         appliedReward: orderDiscount > 0 ? {
           pointsRedeemed: Math.round((orderDiscount / req.redemption.amount) * req.redemption.points),
           discountAmount: orderDiscount
@@ -285,7 +323,7 @@ exports.createOrder = asyncHandler(async (req, res) => {
         deliveryDistance: distance,
         deliveryCharge: deliveryFee,
 
-        orderStatus: 'placed',
+        orderStatus: initialStatus,
         isPaid: isImmediatePayment,
         paidAt: isImmediatePayment ? Date.now() : null,
         paymentStatus: isImmediatePayment ? 'completed' : 'pending',
@@ -300,7 +338,7 @@ exports.createOrder = asyncHandler(async (req, res) => {
       // Usually Payment Record tracks the transaction. The transaction amount is Net Price.
       await Payment.create([{
         order: savedOrder._id, user: savedOrder.user, seller: savedOrder.seller,
-        amount: savedOrder.netPrice, // ✅ FIXED: Use Net Price for payment record
+        amount: savedOrder.finalPaidAmount, // ✅ FIX: Use finalPaidAmount (includes delivery fee) for payment record
         currency: 'INR', method: savedOrder.paymentMethod,
         status: savedOrder.paymentStatus, razorpayOrderId: savedOrder.razorpayOrderId,
         razorpayPaymentId: isImmediatePayment ? razorpayPaymentId : null,
@@ -497,95 +535,16 @@ exports.updateOrderStatus = asyncHandler(async (req, res) => {
     order.deliveredAt = Date.now();
     order.actualDeliveryDate = Date.now();
 
-    // COD Handling: If COD, mark as collected by delivery partner
-    if (order.paymentMethod === 'cod') {
-      order.codCollected = true;
-      order.codCollectedAt = Date.now();
-      order.paymentStatus = 'completed'; // Cash collected is considered paid for order lifecycle
-      order.isPaid = true;
-      order.paidAt = Date.now();
-
-      // Update associated payment record
-      await Payment.updateOne(
-        { order: order._id },
-        { $set: { status: 'completed', paidAt: Date.now() } }
-      );
-
-      // BUG-4 FIX: COD Settlement — create wallet ledger entries for the seller.
-      // The platform never touches the cash, so we:
-      //   1. Credit seller their net earnings (sellerAmount) in their wallet.
-      //   2. Record the platform commission as a negative `commission_owed` debit
-      //      so the seller's effective balance reflects what they owe the platform.
-      // This implements the negative-wallet COD commission model.
-      const WalletTransaction = require('../models/WalletTransaction');
-      const sellerUser = await User.findById(order.seller);
-      if (sellerUser && order.sellerAmount > 0) {
-        const codSellerEarning = Math.round(order.sellerAmount);
-        const codCommission   = Math.round(order.commissionAmount);
-
-        // Credit: seller received cash from customer, net of commission
-        sellerUser.walletBalance = (sellerUser.walletBalance || 0) + codSellerEarning;
-        await sellerUser.save();
-
-        await WalletTransaction.create({
-          user: sellerUser._id,
-          amount: codSellerEarning,
-          type: 'seller_credit',
-          status: 'completed',
-          description: `COD earnings for Order #${order._id.toString().slice(-6)} (cash collected)`,
-          referenceId: order._id,
-          referenceType: 'Order',
-          balanceAfter: sellerUser.walletBalance
-        });
-
-        // Debit: platform commission the seller owes the platform
-        if (codCommission > 0) {
-          const balanceAfterCommission = sellerUser.walletBalance - codCommission;
-          await WalletTransaction.create({
-            user: sellerUser._id,
-            amount: -codCommission,
-            type: 'commission_owed',
-            status: 'completed',
-            description: `Platform commission owed for COD Order #${order._id.toString().slice(-6)}`,
-            referenceId: order._id,
-            referenceType: 'Order',
-            balanceAfter: balanceAfterCommission
-          });
-          // Update seller wallet to reflect the commission owed
-          sellerUser.walletBalance = balanceAfterCommission;
-          await sellerUser.save();
-        }
-      }
+    // ✅ Automated Settlement Handling
+    try {
+      const SettlementService = require('../services/SettlementService');
+      await SettlementService.processDeliverySettlement(order._id);
+      console.log(`✅ Automated settlement processed for order ${order._id}`);
+    } catch (settleErr) {
+      console.error('⚠️ Failed to process automated settlement:', settleErr.message);
     }
-
-    // Credit Delivery Partner Wallet
-    if (order.deliveryPartner && order.deliveryPartnerAmount > 0) {
-      const dpProfile = await require('../models/deliveryPartner.js').findById(order.deliveryPartner).populate('user');
-      if (dpProfile && dpProfile.user) {
-        const dpUser = await User.findById(dpProfile.user._id);
-        if (dpUser) {
-          const amount = Math.round(order.deliveryPartnerAmount);
-          dpUser.walletBalance = (dpUser.walletBalance || 0) + amount;
-          await dpUser.save();
-
-          // Create Wallet Transaction
-          await WalletTransaction.create({
-            user: dpUser._id,
-            amount: amount,
-            type: 'delivery_earning',
-            status: 'completed',
-            description: `Earnings for delivering Order #${order._id.toString().slice(-6)}`,
-            referenceId: order._id,
-            referenceType: 'Order',
-            balanceAfter: dpUser.walletBalance
-          });
-        }
-      }
-    }
-
-    await order.save(); // Save first to ensure isPaid is true for referral logic
-
-    // Trigger referral rewards (this function will now have additional checks)
+    
+    // Trigger referral rewards
     await processReferralRewards(order._id);
   } else {
     await order.save();
@@ -601,6 +560,22 @@ exports.updateOrderStatus = asyncHandler(async (req, res) => {
     const paymentUpdate = { status: order.isPaid ? 'refunded' : 'failed', notes: `Order cancelled. Reason: ${order.cancelReason}` };
     await Payment.updateOne({ order: order._id }, { $set: paymentUpdate });
     order.paymentStatus = paymentUpdate.status;
+
+    // Trigger automated refund if paid online
+    if (order.isPaid && order.paymentMethod === 'razorpay') {
+        try {
+            const SettlementService = require('../services/SettlementService');
+            await SettlementService.processRefund(order._id, `Order Cancelled: ${order.cancelReason}`);
+        } catch (err) { console.error('Refund trigger failed:', err.message); }
+    }
+  }
+
+  if (status === 'returned') {
+    try {
+        const SettlementService = require('../services/SettlementService');
+        await SettlementService.reverseSettlement(order._id);
+        console.log(`✅ Settlement reversed for returned order ${order._id}`);
+    } catch (err) { console.error('Settlement reversal failed:', err.message); }
   }
 
   const updatedOrder = await order.save();
@@ -644,9 +619,15 @@ exports.cancelOrder = asyncHandler(async (req, res) => {
   await Payment.updateOne({ order: order._id }, { $set: paymentUpdate });
   order.paymentStatus = paymentUpdate.status;
 
-  // Handle potential refund for paid Razorpay orders
+  // Handle automated refund for paid Razorpay orders
   if (order.isPaid && order.paymentMethod === 'razorpay') {
-    console.warn(`Order ${orderId} was cancelled by user but paid online. Manual refund might be required.`);
+    try {
+      const SettlementService = require('../services/SettlementService');
+      await SettlementService.processRefund(order._id, `Customer Cancellation: ${cancellationReason}`);
+      console.log(`✅ Automated refund triggered for order ${order._id}`);
+    } catch (refundErr) {
+      console.error(`⚠️ Failed to trigger automated refund for order ${order._id}:`, refundErr.message);
+    }
   }
 
   const updatedOrder = await order.save();
@@ -769,7 +750,13 @@ exports.getSellerOrders = asyncHandler(async (req, res) => {
   const { status, sort = '-createdAt', hasReplacementRequest, replacementStatus } = req.query;
 
   const query = { seller: req.user._id };
-  if (status) query.orderStatus = status;
+  if (status) {
+    query.orderStatus = status;
+  } else {
+    // ✅ FIX: Exclude pending_payment orders from seller view —
+    // these are incomplete online payments that haven't been confirmed yet.
+    query.orderStatus = { $ne: 'pending_payment' };
+  }
   if (hasReplacementRequest) query.hasReplacementRequest = hasReplacementRequest === 'true';
   if (replacementStatus) query.replacementStatus = replacementStatus;
 
@@ -895,7 +882,7 @@ exports.assignDeliveryPartner = asyncHandler(async (req, res) => {
   }
 
   // Auto-update status to 'shipped' when assigning a delivery partner
-  if (partnerId && !oldPartnerId && ['placed', 'processing', 'packed'].includes(order.orderStatus)) {
+  if (partnerId && !oldPartnerId && ['confirmed', 'placed', 'processing', 'packed'].includes(order.orderStatus)) {
     const previousStatusForLog = order.orderStatus;
     order.orderStatus = 'shipped';
     order.statusHistory.push({

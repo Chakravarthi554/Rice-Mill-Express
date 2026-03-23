@@ -19,7 +19,13 @@ import {
   ADMIN_PAYMENT_FLAG_FAIL,
   ADMIN_PAYMENT_EXPORT_REQUEST,
   ADMIN_PAYMENT_EXPORT_SUCCESS,
-  ADMIN_PAYMENT_EXPORT_FAIL
+  ADMIN_PAYMENT_EXPORT_FAIL,
+  ADMIN_COD_SETTLEMENTS_REQUEST,
+  ADMIN_COD_SETTLEMENTS_SUCCESS,
+  ADMIN_COD_SETTLEMENTS_FAIL,
+  ADMIN_SETTLE_COD_REQUEST,
+  ADMIN_SETTLE_COD_SUCCESS,
+  ADMIN_SETTLE_COD_FAIL
 } from '../constants/adminPaymentConstants';
 
 // Payment Statistics Reducer
@@ -126,6 +132,40 @@ export const adminPaymentExportReducer = (state = { loading: false }, action) =>
     case ADMIN_PAYMENT_EXPORT_SUCCESS:
       return { loading: false, success: true };
     case ADMIN_PAYMENT_EXPORT_FAIL:
+      return { loading: false, error: action.payload };
+    default:
+      return state;
+  }
+};
+
+// COD Settlements Reducer
+export const adminCODSettlementsReducer = (state = { settlements: [], loading: false }, action) => {
+  switch (action.type) {
+    case ADMIN_COD_SETTLEMENTS_REQUEST:
+      return { ...state, loading: true };
+    case ADMIN_COD_SETTLEMENTS_SUCCESS:
+      return {
+        loading: false,
+        settlements: action.payload.settlements,
+        total: action.payload.total,
+        pages: action.payload.pages,
+        page: action.payload.page
+      };
+    case ADMIN_COD_SETTLEMENTS_FAIL:
+      return { ...state, loading: false, error: action.payload };
+    default:
+      return state;
+  }
+};
+
+// Settle COD Reducer
+export const adminSettleCODReducer = (state = { loading: false }, action) => {
+  switch (action.type) {
+    case ADMIN_SETTLE_COD_REQUEST:
+      return { loading: true };
+    case ADMIN_SETTLE_COD_SUCCESS:
+      return { loading: false, success: true, order: action.payload.order };
+    case ADMIN_SETTLE_COD_FAIL:
       return { loading: false, error: action.payload };
     default:
       return state;

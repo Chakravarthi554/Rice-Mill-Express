@@ -147,89 +147,130 @@ const getReferralInfo = asyncHandler(async (req, res) => {
 
 // ✅ Process referral rewards (called when order is delivered)
 const processReferralRewards = asyncHandler(async (orderId) => {
-    const order = await Order.findById(orderId).populate('user');
-    if (!order || order.orderStatus !== 'delivered' || !order.isPaid) {
-        return;
-    }
-
-    const user = order.user;
-    if (!user || user.isReferralRewardClaimed) {
-        return;
-    }
-
-    // Check if this is the user's first delivered order
-    const deliveredOrdersCount = await Order.countDocuments({
-        user: user._id,
-        orderStatus: 'delivered'
-    });
-
-    if (deliveredOrdersCount === 1) {
-        const AdminSettings = require('../models/AdminSettings');
-        const settings = await AdminSettings.getSettings();
-
-        if (!settings.referralCampaignEnabled) return;
-
-        // Credit referrer
-        if (user.referredBy) {
-            const referrer = await User.findById(user.referredBy);
-
-            // Anti-Abuse: Prevent self-referral and same-device referral
-            const isSelfReferral = referrer && referrer._id.toString() === user._id.toString();
-            // In a real app, you'd check req.ip or a deviceId here.
-
-            if (referrer && !isSelfReferral) {
-                const referrerBonus = settings.referralRewardReferrer || 50; // Requirement: ₹50
-
-                // Update referrer
-                referrer.walletBalance = Math.round((referrer.walletBalance || 0) + referrerBonus);
-                if (!referrer.referralStats) referrer.referralStats = { referredUsers: 0, earnedCredits: 0, totalEarnings: 0 };
-                referrer.referralStats.earnedCredits = Math.round((referrer.referralStats.earnedCredits || 0) + referrerBonus);
-                referrer.referralStats.totalEarnings = Math.round((referrer.referralStats.totalEarnings || 0) + referrerBonus);
-                referrer.referralStats.referredUsers = (referrer.referralStats.referredUsers || 0) + 1;
-
-                await referrer.save();
-
-                // Create Wallet Transaction
-                await WalletTransaction.create({
-                    user: referrer._id,
-                    amount: referrerBonus,
-                    type: 'referral_award',
-                    status: 'completed',
-                    description: `Referral Bonus for inviting ${user.name} (Order #${order._id.toString().slice(-6)})`,
-                    referenceId: user._id,
-                    referenceType: 'User',
-                    balanceAfter: referrer.walletBalance
-                });
-            }
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+        const order = await Order.findById(orderId).populate('user').session(session);
+        if (!order || order.orderStatus !== 'delivered' || !order.isPaid) {
+            await session.abortTransaction();
+            return;
         }
 
-        // Credit referee
-        const refereeBonus = settings.referralRewardReferee || 200;
-        user.walletBalance = (user.walletBalance || 0) + refereeBonus;
-        user.isReferralRewardClaimed = true;
-
-        // BUG-5 FIX: Guard against null/undefined referralStats for existing user accounts
-        if (!user.referralStats) {
-          user.referralStats = { referredUsers: 0, earnedCredits: 0, pendingCredits: 0, totalReferrals: 0 };
-        }
-        user.referralStats.earnedCredits = (user.referralStats.earnedCredits || 0) + refereeBonus;
-        if (user.referralStats.totalEarnings !== undefined) {
-          user.referralStats.totalEarnings = (user.referralStats.totalEarnings || 0) + refereeBonus;
+        const user = order.user;
+        if (!user || user.role !== 'customer' || user.isReferralRewardClaimed) {
+            await session.abortTransaction();
+            return;
         }
 
-        await user.save();
-
-        // Create Wallet Transaction
-        await WalletTransaction.create({
+        // Check if this is the user's first delivered order
+        const deliveredOrdersCount = await Order.countDocuments({
             user: user._id,
-            amount: refereeBonus,
-            type: 'signup_award',
-            status: 'completed',
-            description: `Welcome Bonus for using referral code`,
-            referenceId: user._id,
-            referenceType: 'User',
-            balanceAfter: user.walletBalance
-        });
+            orderStatus: 'delivered'
+        }).session(session);
+
+        if (deliveredOrdersCount === 1) {
+            const AdminSettings = require('../models/AdminSettings');
+            const settings = await AdminSettings.getSettings(); // Statics usually don't need session if just reading
+            if (!settings.referralCampaignEnabled) {
+                await session.abortTransaction();
+                return;
+            }
+
+            const rewardAmount = settings.referralRewardAmount || 100;
+            const admin = await User.findOne({ role: 'admin' }).session(session);
+            
+            // 1. Credit Referrer
+            if (user.referredBy) {
+                const referrer = await User.findById(user.referredBy).session(session);
+
+                // Anti-Abuse: Only Customers can refer, and prevent self-referral
+                if (referrer && referrer.role === 'customer' && referrer._id.toString() !== user._id.toString()) {
+                    referrer.walletBalance = Math.round((referrer.walletBalance || 0) + rewardAmount);
+                    if (!referrer.referralStats) referrer.referralStats = { referredUsers: 0, earnedCredits: 0, totalEarnings: 0 };
+                    referrer.referralStats.earnedCredits = (referrer.referralStats.earnedCredits || 0) + rewardAmount;
+                    referrer.referralStats.totalEarnings = (referrer.referralStats.totalEarnings || 0) + rewardAmount;
+                    referrer.referralStats.referredUsers = (referrer.referralStats.referredUsers || 0) + 1;
+                    await referrer.save({ session });
+
+                    // Debit Admin for Referrer Reward
+                    if (admin) {
+                        admin.walletBalance -= rewardAmount;
+                        await admin.save({ session });
+                    }
+
+                    await WalletTransaction.create([{
+                        user: referrer._id,
+                        amount: rewardAmount,
+                        type: 'referral_reward',
+                        status: 'completed',
+                        description: `Referral Reward for inviting ${user.name} (Order #${order._id.toString().slice(-6)})`,
+                        referenceId: user._id,
+                        referenceType: 'User',
+                        balanceAfter: referrer.walletBalance
+                    }], { session });
+
+                    if (admin) {
+                        await WalletTransaction.create([{
+                            user: admin._id,
+                            amount: -rewardAmount,
+                            type: 'marketing_expense',
+                            status: 'completed',
+                            description: `Referral Reward Payout to ${referrer.name} for inviting ${user.name}`,
+                            referenceId: order._id,
+                            referenceType: 'Order',
+                            balanceAfter: admin.walletBalance
+                        }], { session });
+                    }
+                }
+            }
+
+            // 2. Credit Referee (New Customer)
+            user.walletBalance = (user.walletBalance || 0) + rewardAmount;
+            user.isReferralRewardClaimed = true;
+            if (!user.referralStats) user.referralStats = { referredUsers: 0, earnedCredits: 0, pendingCredits: 0, totalReferrals: 0 };
+            user.referralStats.earnedCredits = (user.referralStats.earnedCredits || 0) + rewardAmount;
+            await user.save({ session });
+
+            // Debit Admin for Referee Reward
+            if (admin) {
+                admin.walletBalance -= rewardAmount;
+                await admin.save({ session });
+            }
+
+            await WalletTransaction.create([{
+                user: user._id,
+                amount: rewardAmount,
+                type: 'referral_signup_bonus',
+                status: 'completed',
+                description: `Welcome Reward for first successful order (Referral Code)`,
+                referenceId: user._id,
+                referenceType: 'User',
+                balanceAfter: user.walletBalance
+            }], { session });
+
+            if (admin) {
+                await WalletTransaction.create([{
+                    user: admin._id,
+                    amount: -rewardAmount,
+                    type: 'marketing_expense',
+                    status: 'completed',
+                    description: `Signup Bonus Payout to ${user.name}`,
+                    referenceId: order._id,
+                    referenceType: 'Order',
+                    balanceAfter: admin.walletBalance
+                }], { session });
+            }
+
+            await session.commitTransaction();
+            console.log(`✅ Referral rewards processed for Order ${orderId}`);
+        } else {
+            await session.abortTransaction();
+        }
+    } catch (error) {
+        if (session.inTransaction()) await session.abortTransaction();
+        console.error(`❌ Referral processing failed for Order ${orderId}:`, error.message);
+    } finally {
+        session.endSession();
     }
 });
 
@@ -403,7 +444,11 @@ const adminUpdateWithdrawal = asyncHandler(async (req, res) => {
         // Mark transaction as completed
         await WalletTransaction.findOneAndUpdate(
             { referenceId: withdrawal._id, type: 'withdrawal' },
-            { status: 'completed' }
+            { 
+                status: 'completed', 
+                description: `Withdrawal of ₹${withdrawal.amount} completed. Ref: ${transactionId || 'Manual Transfer'}`,
+                metadata: { transactionId: transactionId || '' }
+            }
         );
     }
 

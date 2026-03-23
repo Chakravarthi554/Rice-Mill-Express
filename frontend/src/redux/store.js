@@ -116,6 +116,7 @@ import {
 import {
   adminPaymentStatsReducer, adminTransactionsReducer, adminRefundReducer,
   adminPayoutReducer, adminPayoutsListReducer, adminPaymentExportReducer,
+  adminCODSettlementsReducer, adminSettleCODReducer,
 } from './reducers/adminPaymentReducers';
 
 // ==================== HELPERS ====================
@@ -175,6 +176,7 @@ const initialState = {
   adminPaymentStats: { stats: {}, loading: false, error: null },
   adminTransactions: { transactions: [], loading: false, error: null, page: 1, pages: 1, total: 0 },
   adminPayoutsList: { payouts: [], loading: false, error: null, page: 1, pages: 1, total: 0 },
+  adminCODSettlements: { settlements: [], loading: false, error: null, page: 1, pages: 1, total: 0 },
 };
 
 // ==================== ROOT REDUCER ====================
@@ -344,6 +346,8 @@ const combinedReducer = combineReducers({
   adminPayout: adminPayoutReducer,
   adminPayoutsList: adminPayoutsListReducer,
   adminPaymentExport: adminPaymentExportReducer,
+  adminCODSettlements: adminCODSettlementsReducer,
+  adminSettleCOD: adminSettleCODReducer,
 });
 
 const rootReducer = (state, action) => {
@@ -430,5 +434,6 @@ export const selectBulkOrderUpdate = (state) => state.bulkOrderUpdate;
 export const selectAdminPaymentStats = (state) => state.adminPaymentStats;
 export const selectAdminTransactions = (state) => state.adminTransactions;
 export const selectAdminPayoutsList = (state) => state.adminPayoutsList;
+export const selectAdminCODSettlements = (state) => state.adminCODSettlements;
 
 export default store;

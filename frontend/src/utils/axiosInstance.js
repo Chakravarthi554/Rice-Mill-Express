@@ -4,7 +4,7 @@ import store from '../redux/store';
 
 // ✅ FIXED: Remove /api from base URL since routes already include /api
 const axiosInstance = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000',
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5001',
   timeout: 30000,
   withCredentials: true,
 });
@@ -105,7 +105,7 @@ axiosInstance.interceptors.response.use(
 
         // ✅ FIXED: Use the same base URL without /api
         const refreshResponse = await axios.post(
-          `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/auth/refresh-token`, 
+          `${process.env.REACT_APP_API_URL || 'http://localhost:5001'}/api/auth/refresh-token`, 
           { refreshToken: refreshTokenValue }
         );
         

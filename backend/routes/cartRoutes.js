@@ -9,7 +9,7 @@ router.get('/', protect, async (req, res) => {
     const user = await User.findById(req.user._id)
       .populate({
         path: 'cartItems.product',
-        select: 'name price images stock'   // <-- everything Checkout needs
+        select: 'name price offerPrice images stock weight'   // Now includes offerPrice and weight
       });
     res.json(user.cartItems || []);
   } catch (err) {
@@ -61,7 +61,7 @@ router.post('/', protect, async (req, res) => {
     const saved = await user.save();
     await saved.populate({
       path: 'cartItems.product',
-      select: 'name price images stock'
+      select: 'name price offerPrice images stock weight'
     });
     res.json(saved.cartItems);
   } catch (err) {
@@ -83,7 +83,7 @@ router.delete('/:productId', protect, async (req, res) => {
     const saved = await user.save();
     await saved.populate({
       path: 'cartItems.product',
-      select: 'name price images stock'
+      select: 'name price offerPrice images stock weight'
     });
     res.json(saved.cartItems);
   } catch (err) {

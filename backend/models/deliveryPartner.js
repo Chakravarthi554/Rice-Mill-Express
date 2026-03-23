@@ -101,7 +101,15 @@ const deliveryPartnerSchema = new mongoose.Schema(
       resolvedAt: Date,
       resolvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
       notes: String
-    }]
+    }],
+    
+    // Bank Details for Payouts
+    bankAccount: {
+      accountNumber: { type: String },
+      ifscCode: { type: String },
+      accountHolderName: { type: String },
+      bankName: { type: String }
+    }
   },
   { timestamps: true }
 );

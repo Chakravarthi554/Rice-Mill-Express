@@ -207,11 +207,11 @@ const ForumPostCard = ({ post, onUpdate }) => {
   const closeSnackbar = () => setSnackbar({ ...snackbar, open: false });
 
   const getImageUrl = (path) => {
-    if (!path) return `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/uploads/default_avatar.jpg`;
+    if (!path) return `${process.env.REACT_APP_API_URL || 'http://localhost:5001'}/uploads/default_avatar.jpg`;
     if (path.startsWith('http')) return path;
     // Ensure path starts with /
     const cleanPath = path.startsWith('/') ? path : `/${path}`;
-    return `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}${cleanPath}`;
+    return `${process.env.REACT_APP_API_URL || 'http://localhost:5001'}${cleanPath}`;
   };
 
   return (

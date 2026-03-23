@@ -1,3 +1,6 @@
+const dotenv = require("dotenv");
+dotenv.config();
+
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
@@ -6,15 +9,12 @@ const helmet = require("helmet");
 const compression = require("compression");
 const cookieParser = require("cookie-parser");
 const fs = require("fs");
-const dotenv = require("dotenv");
 const http = require("http");
 
 const connectDB = require("./config/db");
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 const setupSocketServer = require("./utils/socketServer");
 const { connectRedis } = require("./utils/redis");
-
-dotenv.config();
 
 // 🔍 Environment Variable Checks
 console.log("🔍 Checking environment variables...");
@@ -86,22 +86,64 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // Enhanced CORS setup
+const getLocalIPs = () => {
+  const { networkInterfaces } = require('os');
+  const nets = networkInterfaces();
+  const results = [];
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]) {
+      if (net.family === 'IPv4' && !net.internal) {
+        results.push(net.address);
+      }
+    }
+  }
+  return results;
+};
+
+const localIPs = getLocalIPs();
+console.log("\n" + "=".repeat(50));
+console.log("📡 SERVER DETECTED THESE NETWORK ADDRESSES:");
+localIPs.forEach(ip => {
+    console.log(`   👉 http://${ip}:5000`);
+});
+console.log("\n📱 TO FIX YOUR MOBILE APP:");
+console.log("1. Open: mobile/src/config/env.js");
+console.log("2. Copy/Paste this line:");
+if (localIPs.length > 0) {
+    console.log(`   export const API_URL = 'http://${localIPs[0]}:5000';`);
+} else {
+    console.log("   (No external IPs found! Connect to Hotspot or WiFi)");
+}
+console.log("=".repeat(50) + "\n");
+
+// 🌐 Aggressive Network Logger (Must be at TOP)
+app.use((req, res, next) => {
+    console.log(`🔌 [BRIDGE HIT] ${new Date().toLocaleTimeString()} - ${req.method} ${req.url} (Origin: ${req.get('origin') || 'None'})`);
+    next();
+});
+
 app.use(
   cors({
     origin: [
       "http://localhost:3000",
       "http://127.0.0.1:3000",
       "http://localhost:3001",
-      "exp://10.131.19.143:8081",     // Expo mobile app (local network)
-      "http://10.131.19.143:8081",    // Expo mobile app (alternative)
-      /^exp:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}:8081$/,  // Expo on 10.x local network
-      /^http:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}:8081$/,  // HTTP on 10.x local network
-      /^exp:\/\/192\.168\.\d{1,3}\.\d{1,3}:8081$/,  // Expo on 192.168.x local network
-      /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}:8081$/,  // HTTP on 192.168.x local network
+      ...localIPs.map(ip => `http://${ip}:5000`),
+      ...localIPs.map(ip => `http://${ip}:8081`),
+      ...localIPs.map(ip => `exp://${ip}:8081`),
+      /^exp:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/,
+      /^http:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/,
+      /^exp:\/\/192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$/,
+      /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$/,
+      /^exp:\/\/172\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/,
+      /^https:\/\/.*\.loca\.lt$/,
+      /^https:\/\/.*\.ngrok-free\.app$/,
+      /^https:\/\/.*\.lhr\.life$/,
+      /^https:\/\/.*\.localhost\.run$/,
     ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Bypass-Tunnel-Reminder", "bypass-tunnel-reminder", "ngrok-skip-browser-warning"],
     exposedHeaders: ["Authorization"],
   })
 );
@@ -112,10 +154,10 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        imgSrc: ["'self'", "data:", "http://localhost:5000", "https:", "blob:"],
+        imgSrc: ["'self'", "data:", "http://localhost:5000", "https:", "blob:", "*.loca.lt", "*.ngrok-free.app", "*.lhr.life", "*.localhost.run"],
         scriptSrc: ["'self'", "'unsafe-inline'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
-        connectSrc: ["'self'", "ws://localhost:5000", "http://localhost:5000"],
+        connectSrc: ["'self'", "ws://localhost:5000", "http://localhost:5000", "https://*.loca.lt", "wss://*.loca.lt", "https://*.ngrok-free.app", "wss://*.ngrok-free.app", "https://*.lhr.life", "wss://*.lhr.life", "https://*.localhost.run", "wss://*.localhost.run"],
       },
     },
     crossOriginEmbedderPolicy: false,
@@ -126,7 +168,8 @@ app.use(compression());
 
 // Request logging middleware
 app.use((req, res, next) => {
-  console.log(`➡️ ${req.method} ${req.originalUrl}`);
+  const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+  console.log(`➡️ [${new Date().toISOString()}] ${req.method} ${req.originalUrl} - From: ${clientIp}`);
   next();
 });
 
@@ -400,12 +443,12 @@ process.on("unhandledRejection", (err) => {
       }
     });
 
-    server.listen(PORT, () => {
-      console.log(`🚀 Server running on http://localhost:${PORT}`);
-      console.log(`🔌 WebSocket active at ws://localhost:${PORT}`);
-      console.log(`🏥 Health check: http://localhost:${PORT}/api/health`);
-      console.log(`📦 Bulk Orders API: http://localhost:${PORT}/api/bulk-orders`);
-      console.log(`💰 Admin Payments: http://localhost:${PORT}/api/admin/payments`);
+    server.listen(PORT, "0.0.0.0", () => {
+      console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
+      console.log(`🔌 WebSocket active at ws://0.0.0.0:${PORT}`);
+      console.log(`🏥 Health check: http://0.0.0.0:${PORT}/api/health`);
+      console.log(`📦 Bulk Orders API: http://0.0.0.0:${PORT}/api/bulk-orders`);
+      console.log(`💰 Admin Payments: http://0.0.0.0:${PORT}/api/admin/payments`);
       console.log(`📱 Notifications system: ACTIVE`);
       console.log(`👨‍💼 Admin features: ENABLED`);
       console.log(`✅ All routes loaded successfully`);

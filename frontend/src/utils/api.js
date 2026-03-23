@@ -3,7 +3,7 @@ import { USER_LOGOUT } from '../redux/constants/userConstants';
 import store from '../redux/store';
 
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5001/api',
   withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
   timeout: 10000, // 10 second timeout
@@ -83,7 +83,7 @@ api.interceptors.response.use(
         console.log('🔄 API: Attempting token refresh...');
         
         // Use the base URL without /api for auth endpoints
-        const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+        const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
         const res = await axios.post(
           `${baseURL}/api/auth/refresh-token`,
           { refreshToken },
@@ -176,7 +176,7 @@ api.interceptors.response.use(
 // Helper function to check if API is reachable
 export const checkAPIHealth = async () => {
   try {
-    const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+    const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
     const response = await axios.get(`${baseURL}/api/health`, { timeout: 5000 });
     return { 
       success: true, 

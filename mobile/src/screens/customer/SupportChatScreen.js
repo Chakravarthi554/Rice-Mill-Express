@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
-import { apiService } from '../../services/api';
+import api, { apiService } from '../../services/api';
 import socketService from '../../services/socket';
 
 const SupportChatScreen = ({ route, navigation }) => {
@@ -74,9 +74,7 @@ const SupportChatScreen = ({ route, navigation }) => {
             // Alternatively, I can create a dedicated support-reply endpoint or fetch conversation details first.
 
             // Let's fetch conversation details to get the admin ID
-            const convRes = await axios.get(`${API_URL}/api/chat/conversations`, {
-                headers: { Authorization: `Bearer ${user.token}` }
-            });
+            const convRes = await api.get('/api/chat/conversations');
             const conv = convRes.data.find(c => c._id === conversationId);
             const adminParticipant = conv?.participants.find(p => p._id !== user._id);
 
@@ -84,12 +82,10 @@ const SupportChatScreen = ({ route, navigation }) => {
                 throw new Error('Support agent not found in conversation');
             }
 
-            await axios.post(`${API_URL}/api/chat/send`, {
+            await api.post('/api/chat/send', {
                 receiverId: adminParticipant._id,
                 content,
                 type: 'text'
-            }, {
-                headers: { Authorization: `Bearer ${user.token}` }
             });
 
             // Note: socket will emit back the message so we don't need to manually add it to state here

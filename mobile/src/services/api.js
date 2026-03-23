@@ -9,8 +9,12 @@ const api = axios.create({
     baseURL: API_URL,
     headers: {
         'Content-Type': 'application/json',
+        'Bypass-Tunnel-Reminder': 'true', // Case-sensitive professional headers
+        'bypass-tunnel-reminder': 'true', // Lowercase fallback
+        'ngrok-skip-browser-warning': 'true', // Support for Ngrok fallback
+        'User-Agent': 'Rice-Mill-App-Mobile', // Professional identification
     },
-    timeout: 10000, // 10 second timeout
+    timeout: 30000, 
 });
 
 // Add auth token to every request
@@ -52,6 +56,16 @@ export const setupInterceptors = (store) => {
     api.interceptors.response.use(
         (response) => response,
         async (error) => {
+            console.error('🌐 [API Error] Detailed Diagnostic:');
+            console.error(`  - URL: ${error?.config?.baseURL}${error?.config?.url}`);
+            console.error(`  - Message: ${error?.message}`);
+            console.error(`  - Code: ${error?.code}`);
+            console.error(`  - Status: ${error?.response?.status || 'N/A'}`);
+
+            if (error.message === 'Network Error') {
+                console.error('  💡 TRACING: Request failed at OS level. Check Firewall or Tunnel SSL.');
+            }
+
             const originalRequest = error.config;
 
             // If error is 401 and we haven't retried yet
@@ -90,7 +104,7 @@ export const setupInterceptors = (store) => {
                     console.error('API Error:', error.response.status, error.response.data);
                 }
             } else if (error.request) {
-                console.error('Network Error:', error.message);
+                console.error(`Network Error to [${api.defaults.baseURL}]:`, error.message);
             } else {
                 console.error('Error:', error.message);
             }
@@ -143,7 +157,8 @@ export const apiService = {
             timeout: 30000,
         }),
     getDPDashboard: () => api.get('/api/dp/dashboard'),
-
+    generateDeliveryPaymentLink: (orderId) => api.post(`/api/delivery-partners/orders/${orderId}/generate-delivery-payment-link`),
+    checkDeliveryPaymentStatus: (orderId, paymentLinkId) => api.get(`/api/delivery-partners/orders/${orderId}/check-delivery-payment/${paymentLinkId}`),
 
     // ============ Seller ============
     getSellerOrders: () => api.get('/api/seller/orders'),

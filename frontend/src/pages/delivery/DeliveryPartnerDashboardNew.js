@@ -19,6 +19,9 @@ import {
     Grow,
     Paper,
     Divider,
+    Dialog,
+    TextField,
+    CircularProgress,
 } from '@mui/material';
 import {
     LocalShipping,
@@ -30,9 +33,10 @@ import {
     Logout,
     Help,
     Warning,
-    Navigation,
     Assignment,
     Phone,
+    AccountBalanceWallet,
+    History,
 } from '@mui/icons-material';
 import { styled, keyframes } from '@mui/material/styles';
 
@@ -82,6 +86,14 @@ const HeaderCard = styled(Card)(({ theme }) => ({
     boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
 }));
 
+const BalanceCard = styled(Card)(({ theme }) => ({
+    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+    color: '#ffffff',
+    borderRadius: 20,
+    marginBottom: theme.spacing(3),
+    boxShadow: '0 4px 20px rgba(16, 185, 129, 0.4)',
+}));
+
 const ActionButton = styled(Button)(({ theme, bgcolor }) => ({
     background: `linear-gradient(135deg, ${bgcolor} 0%, ${bgcolor}dd 100%)`,
     color: '#ffffff',
@@ -101,30 +113,52 @@ const DeliveryPartnerDashboard = () => {
     const navigate = useNavigate();
     const { userInfo } = useSelector((state) => state.user);
 
-    const [stats, setStats] = useState(null);
-    const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+    const [error, setError] = useState(null);
+    const [stats, setStats] = useState({
+        todayOrders: 0,
+        activeDeliveries: 0,
+        totalDeliveries: 0,
+        todayCompleted: 0,
+        totalEarnings: 0,
+        todayEarnings: 0,
+        rating: 5,
+        onTimeRate: 100,
+        withdrawals: []
+    });
+    const [orders, setOrders] = useState([]);
+
+    // Withdrawal State
+    const [showWithdrawDialog, setShowWithdrawDialog] = useState(false);
+    const [withdrawAmount, setWithdrawAmount] = useState('');
+    const [withdrawLoading, setWithdrawLoading] = useState(false);
+    const [withdrawError, setWithdrawError] = useState(null);
 
     useEffect(() => {
-        fetchDashboardData();
-        fetchOrders();
+        fetchData();
     }, []);
 
-    const fetchDashboardData = async () => {
+    const fetchData = async () => {
         try {
+            setLoading(true);
             const config = {
                 headers: {
                     Authorization: `Bearer ${userInfo.token}`,
                 },
             };
 
-            const { data } = await axios.get(
-                `${process.env.REACT_APP_API_URL}/api/dp/dashboard`,
-                config
-            );
+            const [statsRes, ordersRes] = await Promise.all([
+                axios.get(`${process.env.REACT_APP_API_URL}/api/dp/dashboard`, config),
+                axios.get(`${process.env.REACT_APP_API_URL}/api/dp/my-orders?limit=10`, config)
+            ]);
 
-            setStats(data.stats);
+            if (statsRes.data) {
+                setStats(statsRes.data.stats);
+            }
+            if (ordersRes.data) {
+                setOrders(ordersRes.data.orders || []);
+            }
+            setError(null);
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to fetch dashboard data');
         } finally {
@@ -132,22 +166,43 @@ const DeliveryPartnerDashboard = () => {
         }
     };
 
-    const fetchOrders = async () => {
+    const handleWithdrawRequest = async () => {
+        if (!withdrawAmount || isNaN(withdrawAmount) || Number(withdrawAmount) <= 0) {
+            setWithdrawError('Please enter a valid amount greater than 0');
+            return;
+        }
+
+        const availableBalance = stats.totalEarnings - (stats.withdrawals?.reduce((acc, w) => w.status !== 'rejected' ? acc + w.amount : acc, 0) || 0);
+        
+        if (Number(withdrawAmount) > availableBalance) {
+            setWithdrawError('Withdrawal amount cannot exceed your available balance.');
+            return;
+        }
+
         try {
+            setWithdrawLoading(true);
+            setWithdrawError(null);
             const config = {
                 headers: {
                     Authorization: `Bearer ${userInfo.token}`,
                 },
             };
-
-            const { data } = await axios.get(
-                `${process.env.REACT_APP_API_URL}/api/dp/my-orders?limit=10`,
+            const { data } = await axios.post(
+                `${process.env.REACT_APP_API_URL}/api/dp/request-withdrawal`,
+                { amount: Number(withdrawAmount) },
                 config
             );
 
-            setOrders(data.orders || []);
+            if (data.success) {
+                alert('Withdrawal request submitted successfully');
+                setShowWithdrawDialog(false);
+                setWithdrawAmount('');
+                fetchData(); // Refresh stats
+            }
         } catch (err) {
-            console.error('Failed to fetch orders:', err);
+            setWithdrawError(err.response?.data?.message || err.message);
+        } finally {
+            setWithdrawLoading(false);
         }
     };
 
@@ -192,6 +247,8 @@ const DeliveryPartnerDashboard = () => {
             </DashboardContainer>
         );
     }
+
+    const availableBalance = stats.totalEarnings - (stats.withdrawals?.reduce((acc, w) => w.status !== 'rejected' ? acc + w.amount : acc, 0) || 0);
 
     return (
         <DashboardContainer>
@@ -260,7 +317,7 @@ const DeliveryPartnerDashboard = () => {
                 {/* Error Alert */}
                 {error && (
                     <Fade in>
-                        <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }} onClose={() => setError('')}>
+                        <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }} onClose={() => setError(null)}>
                             {error}
                         </Alert>
                     </Fade>
@@ -270,18 +327,18 @@ const DeliveryPartnerDashboard = () => {
                 <Grid container spacing={3} mb={4}>
                     <Grid item xs={12} sm={6} md={3}>
                         <Grow in timeout={600}>
-                            <StatsCard color="#3b82f6">
+                            <StatsCard color="#10b981">
                                 <CardContent>
                                     <Box display="flex" alignItems="center" justifyContent="space-between">
                                         <Box>
-                                            <Typography variant="h3" fontWeight="700" color="#3b82f6">
-                                                {stats?.todayOrders || 0}
+                                            <Typography variant="h4" fontWeight="700" color="#10b981">
+                                                ₹{stats?.totalEarnings?.toLocaleString('en-IN') || 0}
                                             </Typography>
                                             <Typography variant="body2" color="textSecondary" fontWeight="600">
-                                                Today's Orders
+                                                Total Earned
                                             </Typography>
                                         </Box>
-                                        <Assignment sx={{ fontSize: 48, color: '#3b82f6', opacity: 0.3 }} />
+                                        <TrendingUp sx={{ fontSize: 40, color: '#10b981', opacity: 0.3 }} />
                                     </Box>
                                 </CardContent>
                             </StatsCard>
@@ -290,18 +347,18 @@ const DeliveryPartnerDashboard = () => {
 
                     <Grid item xs={12} sm={6} md={3}>
                         <Grow in timeout={700}>
-                            <StatsCard color="#f59e0b">
+                            <StatsCard color="#3b82f6">
                                 <CardContent>
                                     <Box display="flex" alignItems="center" justifyContent="space-between">
                                         <Box>
-                                            <Typography variant="h3" fontWeight="700" color="#f59e0b">
-                                                {stats?.activeDeliveries || 0}
+                                            <Typography variant="h4" fontWeight="700" color="#3b82f6">
+                                                ₹{stats?.todayEarnings?.toLocaleString('en-IN') || 0}
                                             </Typography>
                                             <Typography variant="body2" color="textSecondary" fontWeight="600">
-                                                Active Deliveries
+                                                Today's Earnings
                                             </Typography>
                                         </Box>
-                                        <LocalShipping sx={{ fontSize: 48, color: '#f59e0b', opacity: 0.3 }} />
+                                        <CheckCircle sx={{ fontSize: 40, color: '#3b82f6', opacity: 0.3 }} />
                                     </Box>
                                 </CardContent>
                             </StatsCard>
@@ -310,18 +367,18 @@ const DeliveryPartnerDashboard = () => {
 
                     <Grid item xs={12} sm={6} md={3}>
                         <Grow in timeout={800}>
-                            <StatsCard color="#10b981">
+                            <StatsCard color="#f59e0b">
                                 <CardContent>
                                     <Box display="flex" alignItems="center" justifyContent="space-between">
                                         <Box>
-                                            <Typography variant="h3" fontWeight="700" color="#10b981">
-                                                {stats?.todayCompleted || 0}
+                                            <Typography variant="h4" fontWeight="700" color="#f59e0b">
+                                                {stats?.activeDeliveries || 0}
                                             </Typography>
                                             <Typography variant="body2" color="textSecondary" fontWeight="600">
-                                                Today Completed
+                                                Active Deliveries
                                             </Typography>
                                         </Box>
-                                        <CheckCircle sx={{ fontSize: 48, color: '#10b981', opacity: 0.3 }} />
+                                        <LocalShipping sx={{ fontSize: 40, color: '#f59e0b', opacity: 0.3 }} />
                                     </Box>
                                 </CardContent>
                             </StatsCard>
@@ -334,14 +391,14 @@ const DeliveryPartnerDashboard = () => {
                                 <CardContent>
                                     <Box display="flex" alignItems="center" justifyContent="space-between">
                                         <Box>
-                                            <Typography variant="h3" fontWeight="700" color="#8b5cf6">
+                                            <Typography variant="h4" fontWeight="700" color="#8b5cf6">
                                                 {stats?.rating?.toFixed(1) || '5.0'}
                                             </Typography>
                                             <Typography variant="body2" color="textSecondary" fontWeight="600">
                                                 Your Rating
                                             </Typography>
                                         </Box>
-                                        <Star sx={{ fontSize: 48, color: '#8b5cf6', opacity: 0.3 }} />
+                                        <Star sx={{ fontSize: 40, color: '#8b5cf6', opacity: 0.3 }} />
                                     </Box>
                                 </CardContent>
                             </StatsCard>
@@ -349,9 +406,105 @@ const DeliveryPartnerDashboard = () => {
                     </Grid>
                 </Grid>
 
+                {/* Granular Order Stats */}
+                <Grid container spacing={3} mb={4}>
+                    <Grid item xs={12} sm={4}>
+                        <Grow in timeout={1000}>
+                            <Card sx={{ borderRadius: 3, boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}>
+                                <CardContent>
+                                    <Box display="flex" alignItems="center" gap={2}>
+                                        <Assignment color="primary" sx={{ fontSize: 32 }} />
+                                        <Box>
+                                            <Typography variant="h5" fontWeight="700">
+                                                {stats?.assignedCount || 0}
+                                            </Typography>
+                                            <Typography variant="body2" color="textSecondary">
+                                                Assigned (Pending Pickup)
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                </CardContent>
+                            </Card>
+                        </Grow>
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                        <Grow in timeout={1100}>
+                            <Card sx={{ borderRadius: 3, boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}>
+                                <CardContent>
+                                    <Box display="flex" alignItems="center" gap={2}>
+                                        <LocalShipping color="warning" sx={{ fontSize: 32 }} />
+                                        <Box>
+                                            <Typography variant="h5" fontWeight="700">
+                                                {stats?.inTransitCount || 0}
+                                            </Typography>
+                                            <Typography variant="body2" color="textSecondary">
+                                                In Transit (Picked Up)
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                </CardContent>
+                            </Card>
+                        </Grow>
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                        <Grow in timeout={1200}>
+                            <Card sx={{ borderRadius: 3, boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}>
+                                <CardContent>
+                                    <Box display="flex" alignItems="center" gap={2}>
+                                        <CheckCircle color="success" sx={{ fontSize: 32 }} />
+                                        <Box>
+                                            <Typography variant="h5" fontWeight="700">
+                                                {stats?.todayCompleted || 0}
+                                            </Typography>
+                                            <Typography variant="body2" color="textSecondary">
+                                                Completed Today
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                </CardContent>
+                            </Card>
+                        </Grow>
+                    </Grid>
+                </Grid>
+
+                {/* Balance & Withdrawal Section */}
+                <Fade in timeout={1000}>
+                    <BalanceCard>
+                        <CardContent>
+                            <Grid container alignItems="center" spacing={2}>
+                                <Grid item xs={12} sm={8}>
+                                    <Typography variant="h6" sx={{ opacity: 0.9 }}>
+                                        Available Balance
+                                    </Typography>
+                                    <Typography variant="h3" fontWeight="800">
+                                        ₹{availableBalance.toLocaleString('en-IN')}
+                                    </Typography>
+                                </Grid>
+                                <Grid item xs={12} sm={4} sx={{ textAlign: { sm: 'right' } }}>
+                                    <Button
+                                        variant="contained"
+                                        size="large"
+                                        onClick={() => setShowWithdrawDialog(true)}
+                                        sx={{
+                                            bgcolor: 'rgba(255,255,255,0.2)',
+                                            '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' },
+                                            borderRadius: 3,
+                                            px: 4,
+                                            backdropFilter: 'blur(10px)',
+                                        }}
+                                        startIcon={<AccountBalanceWallet />}
+                                    >
+                                        Request Payout
+                                    </Button>
+                                </Grid>
+                            </Grid>
+                        </CardContent>
+                    </BalanceCard>
+                </Fade>
+
                 {/* Orders Section */}
                 <Fade in timeout={1000}>
-                    <Box>
+                    <Box mt={4}>
                         <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
                             <Typography variant="h5" fontWeight="700" color="#ffffff">
                                 📦 Your Orders
@@ -411,7 +564,7 @@ const DeliveryPartnerDashboard = () => {
                                                         <Grid item xs={12} sm={3}>
                                                             <Typography variant="body2" color="textSecondary" fontWeight="600">
                                                                 Customer
-                                                            </Typography>
+                              </Typography>
                                                             <Typography variant="body1" fontWeight="600">
                                                                 {order.user?.name}
                                                             </Typography>
@@ -424,7 +577,7 @@ const DeliveryPartnerDashboard = () => {
                                                         <Grid item xs={12} sm={4}>
                                                             <Typography variant="body2" color="textSecondary" fontWeight="600">
                                                                 Delivery Address
-                                                            </Typography>
+                              </Typography>
                                                             <Typography variant="body2">
                                                                 {order.shippingAddress?.street}, {order.shippingAddress?.city}
                                                             </Typography>
@@ -437,7 +590,7 @@ const DeliveryPartnerDashboard = () => {
                                                         <Grid item xs={12} sm={2}>
                                                             <Typography variant="body2" color="textSecondary" fontWeight="600">
                                                                 Payment
-                                                            </Typography>
+                              </Typography>
                                                             <Chip
                                                                 label={order.paymentMethod === 'cod' ? 'COD' : 'Prepaid'}
                                                                 size="small"
@@ -458,6 +611,37 @@ const DeliveryPartnerDashboard = () => {
                         )}
                     </Box>
                 </Fade>
+
+                {/* Withdrawal History */}
+                {stats.withdrawals?.length > 0 && (
+                    <Fade in timeout={1100}>
+                        <Box mt={6}>
+                            <Typography variant="h5" fontWeight="700" color="#ffffff" mb={3}>
+                                💰 Recent Withdrawals
+                            </Typography>
+                            <Paper sx={{ borderRadius: 3, overflow: 'hidden' }}>
+                                {stats.withdrawals.map((w, index) => (
+                                    <Box key={w._id}>
+                                        <Box p={2} display="flex" justifyContent="space-between" alignItems="center">
+                                            <Box>
+                                                <Typography fontWeight="700">₹{w.amount.toLocaleString('en-IN')}</Typography>
+                                                <Typography variant="caption" color="textSecondary">
+                                                    Requested on {new Date(w.createdAt).toLocaleDateString()}
+                                                </Typography>
+                                            </Box>
+                                            <Chip
+                                                label={w.status}
+                                                size="small"
+                                                color={w.status === 'processed' ? 'success' : w.status === 'pending' ? 'warning' : 'default'}
+                                            />
+                                        </Box>
+                                        {index < stats.withdrawals.length - 1 && <Divider />}
+                                    </Box>
+                                ))}
+                            </Paper>
+                        </Box>
+                    </Fade>
+                )}
 
                 {/* Quick Actions */}
                 <Fade in timeout={1200}>
@@ -509,6 +693,57 @@ const DeliveryPartnerDashboard = () => {
                         </Grid>
                     </Box>
                 </Fade>
+
+                {/* Withdrawal Dialog */}
+                <Dialog
+                    open={showWithdrawDialog}
+                    onClose={() => setShowWithdrawDialog(false)}
+                    PaperProps={{ sx: { borderRadius: 4, padding: 2, minWidth: 320 } }}
+                >
+                    <Box textAlign="center" py={2}>
+                        <AccountBalanceWallet color="primary" sx={{ fontSize: 48, mb: 1 }} />
+                        <Typography variant="h5" fontWeight="700">Request Withdrawal</Typography>
+                        <Typography variant="body2" color="textSecondary">
+                            Available: ₹{availableBalance.toLocaleString('en-IN')}
+                        </Typography>
+                    </Box>
+                    <Box p={2}>
+                        <TextField
+                            fullWidth
+                            label="Amount (₹)"
+                            type="number"
+                            variant="outlined"
+                            value={withdrawAmount}
+                            onChange={(e) => setWithdrawAmount(e.target.value)}
+                            sx={{ mb: 2 }}
+                            autoFocus
+                        />
+                        {withdrawError && (
+                            <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+                                {withdrawError}
+                            </Alert>
+                        )}
+                        <Box display="flex" gap={2}>
+                            <Button
+                                fullWidth
+                                variant="outlined"
+                                onClick={() => setShowWithdrawDialog(false)}
+                                sx={{ borderRadius: 2, py: 1.5 }}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                fullWidth
+                                variant="contained"
+                                onClick={handleWithdrawRequest}
+                                disabled={withdrawLoading}
+                                sx={{ borderRadius: 2, py: 1.5 }}
+                            >
+                                {withdrawLoading ? <CircularProgress size={24} color="inherit" /> : 'Confirm'}
+                            </Button>
+                        </Box>
+                    </Box>
+                </Dialog>
             </Container>
         </DashboardContainer>
     );

@@ -7,11 +7,25 @@ const { uploadDeliveryPhoto, uploadReplacementPhoto } = require('../utils/cloudi
 // @route   GET /api/delivery-partners/dashboard
 // @access  Private/DeliveryPartner
 const getDashboard = asyncHandler(async (req, res) => {
-    const partnerProfile = await DeliveryPartner.findOne({ user: req.user._id });
+    // 1. Get ALL delivery partner profiles linked to this user (could be multiple sellers)
+    const partnerProfiles = await DeliveryPartner.find({ user: req.user._id });
+    const profileIds = partnerProfiles.map(p => p._id);
 
-    if (!partnerProfile) {
-        res.status(404);
-        throw new Error('Delivery partner profile not found');
+    if (profileIds.length === 0) {
+        return res.json({
+            success: true,
+            stats: {
+                todayOrders: 0,
+                activeDeliveries: 0,
+                totalDeliveries: 0,
+                todayCompleted: 0,
+                totalEarnings: 0,
+                todayEarnings: 0,
+                statusCounts: {},
+                rating: 5,
+                onTimeRate: 100
+            }
+        });
     }
 
     // Get today's date range
@@ -22,21 +36,21 @@ const getDashboard = asyncHandler(async (req, res) => {
 
     // Get today's assigned orders
     const todayOrders = await Order.countDocuments({
-        deliveryPartner: partnerProfile._id,
+        deliveryPartner: { $in: profileIds },
         createdAt: { $gte: today, $lt: tomorrow }
     });
 
     // Get active deliveries (not delivered)
     const activeDeliveries = await Order.countDocuments({
-        deliveryPartner: partnerProfile._id,
+        deliveryPartner: { $in: profileIds },
         deliveryPartnerStatus: { $in: ['assigned', 'picked_up', 'in_transit'] }
     });
 
-    // Get status counts
+    // Get status counts across all profiles
     const statusCounts = await Order.aggregate([
         {
             $match: {
-                deliveryPartner: partnerProfile._id,
+                deliveryPartner: { $in: profileIds },
                 deliveryPartnerStatus: { $ne: 'delivered' }
             }
         },
@@ -48,14 +62,14 @@ const getDashboard = asyncHandler(async (req, res) => {
         }
     ]);
 
-    // Get total deliveries completed
-    const totalDeliveries = partnerProfile.totalDeliveries || 0;
+    // Get total deliveries completed across all profiles
+    const totalDeliveries = partnerProfiles.reduce((sum, p) => sum + (p.totalDeliveries || 0), 0);
 
-    // Get earnings (Total and Today)
+    // Get earnings (Total and Today) across all profiles
     const earnings = await Order.aggregate([
         {
             $match: {
-                deliveryPartner: partnerProfile._id,
+                deliveryPartner: { $in: profileIds },
                 isDelivered: true
             }
         },
@@ -79,12 +93,12 @@ const getDashboard = asyncHandler(async (req, res) => {
     const totalEarnings = earnings.length > 0 ? earnings[0].totalEarnings : 0;
     const todayEarnings = earnings.length > 0 ? earnings[0].todayEarnings : 0;
 
-    // Get today's completed deliveries
-    const todayCompleted = await Order.find({
-        deliveryPartner: partnerProfile._id,
+    // Get today's completed deliveries across all profiles
+    const todayCompleted = await Order.countDocuments({
+        deliveryPartner: { $in: profileIds },
         deliveryPartnerStatus: 'delivered',
         deliveredAt: { $gte: today, $lt: tomorrow }
-    }).countDocuments();
+    });
 
     res.json({
         success: true,
@@ -99,8 +113,8 @@ const getDashboard = asyncHandler(async (req, res) => {
                 acc[item._id] = item.count;
                 return acc;
             }, {}),
-            rating: partnerProfile.rating || 5,
-            onTimeRate: partnerProfile.onTimeDeliveryRate || 100
+            rating: partnerProfiles.length > 0 ? (partnerProfiles.reduce((sum, p) => sum + (p.rating || 5), 0) / partnerProfiles.length) : 5,
+            onTimeRate: partnerProfiles.length > 0 ? (partnerProfiles.reduce((sum, p) => sum + (p.onTimeDeliveryRate || 100), 0) / partnerProfiles.length) : 100
         }
     });
 });
@@ -111,15 +125,15 @@ const getDashboard = asyncHandler(async (req, res) => {
 const getMyOrders = asyncHandler(async (req, res) => {
     const { status, limit = 50 } = req.query;
 
-    const partnerProfile = await DeliveryPartner.findOne({ user: req.user._id });
+    const partnerProfiles = await DeliveryPartner.find({ user: req.user._id });
+    const profileIds = partnerProfiles.map(p => p._id);
 
-    if (!partnerProfile) {
-        res.status(404);
-        throw new Error('Delivery partner profile not found');
+    if (profileIds.length === 0) {
+        return res.json({ success: true, orders: [] });
     }
 
-    // Build query - ONLY orders assigned to this delivery partner
-    const query = { deliveryPartner: partnerProfile._id };
+    // Build query - ALL orders assigned to any of this user's profiles
+    const query = { deliveryPartner: { $in: profileIds } };
 
     if (status) {
         query.deliveryPartnerStatus = status;
@@ -146,9 +160,10 @@ const getMyOrders = asyncHandler(async (req, res) => {
 const getOrderDetails = asyncHandler(async (req, res) => {
     const { orderId } = req.params;
 
-    const partnerProfile = await DeliveryPartner.findOne({ user: req.user._id });
+    const partnerProfiles = await DeliveryPartner.find({ user: req.user._id });
+    const profileIds = partnerProfiles.map(p => p._id.toString());
 
-    if (!partnerProfile) {
+    if (profileIds.length === 0) {
         res.status(404);
         throw new Error('Delivery partner profile not found');
     }
@@ -163,8 +178,8 @@ const getOrderDetails = asyncHandler(async (req, res) => {
         throw new Error('Order not found');
     }
 
-    // CRITICAL: Verify this order is assigned to this delivery partner
-    if (!order.deliveryPartner || order.deliveryPartner._id.toString() !== partnerProfile._id.toString()) {
+    // CRITICAL: Verify this order is assigned to any of this user's profiles
+    if (!order.deliveryPartner || !profileIds.includes(order.deliveryPartner._id.toString())) {
         res.status(403);
         throw new Error('Access denied: This order is not assigned to you');
     }
@@ -181,9 +196,10 @@ const getOrderDetails = asyncHandler(async (req, res) => {
 const confirmPickup = asyncHandler(async (req, res) => {
     const { orderId } = req.params;
 
-    const partnerProfile = await DeliveryPartner.findOne({ user: req.user._id });
+    const partnerProfiles = await DeliveryPartner.find({ user: req.user._id }).populate('user', 'name');
+    const profileIds = partnerProfiles.map(p => p._id.toString());
 
-    if (!partnerProfile) {
+    if (profileIds.length === 0) {
         res.status(404);
         throw new Error('Delivery partner profile not found');
     }
@@ -195,11 +211,13 @@ const confirmPickup = asyncHandler(async (req, res) => {
         throw new Error('Order not found');
     }
 
-    // Verify assignment
-    if (!order.deliveryPartner || order.deliveryPartner.toString() !== partnerProfile._id.toString()) {
+    // Verify assignment against any of the user's profiles
+    if (!order.deliveryPartner || !profileIds.includes(order.deliveryPartner.toString())) {
         res.status(403);
         throw new Error('Access denied: This order is not assigned to you');
     }
+
+    const partnerProfile = partnerProfiles.find(p => p._id.toString() === order.deliveryPartner.toString());
 
     // Verify order status
     if (order.deliveryPartnerStatus !== 'assigned') {
@@ -263,9 +281,10 @@ const startNavigation = asyncHandler(async (req, res) => {
     const { orderId } = req.params;
     const { estimatedArrival } = req.body;
 
-    const partnerProfile = await DeliveryPartner.findOne({ user: req.user._id });
+    const partnerProfiles = await DeliveryPartner.find({ user: req.user._id });
+    const profileIds = partnerProfiles.map(p => p._id.toString());
 
-    if (!partnerProfile) {
+    if (profileIds.length === 0) {
         res.status(404);
         throw new Error('Delivery partner profile not found');
     }
@@ -277,11 +296,13 @@ const startNavigation = asyncHandler(async (req, res) => {
         throw new Error('Order not found');
     }
 
-    // Verify assignment
-    if (!order.deliveryPartner || order.deliveryPartner.toString() !== partnerProfile._id.toString()) {
+    // Verify assignment against any profile
+    if (!order.deliveryPartner || !profileIds.includes(order.deliveryPartner.toString())) {
         res.status(403);
         throw new Error('Access denied: This order is not assigned to you');
     }
+
+    const partnerProfile = partnerProfiles.find(p => p._id.toString() === order.deliveryPartner.toString());
 
     // Update navigation tracking
     const previousStatus = order.deliveryPartnerStatus;
@@ -331,9 +352,10 @@ const startNavigation = asyncHandler(async (req, res) => {
 const confirmCOD = asyncHandler(async (req, res) => {
     const { orderId } = req.params;
 
-    const partnerProfile = await DeliveryPartner.findOne({ user: req.user._id });
+    const partnerProfiles = await DeliveryPartner.find({ user: req.user._id });
+    const profileIds = partnerProfiles.map(p => p._id.toString());
 
-    if (!partnerProfile) {
+    if (profileIds.length === 0) {
         res.status(404);
         throw new Error('Delivery partner profile not found');
     }
@@ -345,11 +367,13 @@ const confirmCOD = asyncHandler(async (req, res) => {
         throw new Error('Order not found');
     }
 
-    // Verify assignment
-    if (!order.deliveryPartner || order.deliveryPartner.toString() !== partnerProfile._id.toString()) {
+    // Verify assignment against any profile
+    if (!order.deliveryPartner || !profileIds.includes(order.deliveryPartner.toString())) {
         res.status(403);
         throw new Error('Access denied: This order is not assigned to you');
     }
+
+    const partnerProfile = partnerProfiles.find(p => p._id.toString() === order.deliveryPartner.toString());
 
     // Verify payment method is COD
     if (order.paymentMethod !== 'cod') {
@@ -381,10 +405,11 @@ const uploadDeliveryPhotoAndComplete = asyncHandler(async (req, res) => {
         throw new Error('Delivery photo is required');
     }
 
-    const partnerProfile = await DeliveryPartner.findOne({ user: req.user._id })
+    const partnerProfiles = await DeliveryPartner.find({ user: req.user._id })
         .populate('user', 'name');
+    const profileIds = partnerProfiles.map(p => p._id.toString());
 
-    if (!partnerProfile) {
+    if (profileIds.length === 0) {
         res.status(404);
         throw new Error('Delivery partner profile not found');
     }
@@ -396,11 +421,13 @@ const uploadDeliveryPhotoAndComplete = asyncHandler(async (req, res) => {
         throw new Error('Order not found');
     }
 
-    // Verify assignment
-    if (!order.deliveryPartner || order.deliveryPartner.toString() !== partnerProfile._id.toString()) {
+    // Verify assignment against any profile
+    if (!order.deliveryPartner || !profileIds.includes(order.deliveryPartner.toString())) {
         res.status(403);
         throw new Error('Access denied: This order is not assigned to you');
     }
+
+    const partnerProfile = partnerProfiles.find(p => p._id.toString() === order.deliveryPartner.toString());
 
     // Verify order is not already delivered
     if (order.deliveryPartnerStatus === 'delivered') {
@@ -535,9 +562,10 @@ const requestReplacement = asyncHandler(async (req, res) => {
         throw new Error('Replacement reason is required');
     }
 
-    const partnerProfile = await DeliveryPartner.findOne({ user: req.user._id });
+    const partnerProfiles = await DeliveryPartner.find({ user: req.user._id });
+    const profileIds = partnerProfiles.map(p => p._id.toString());
 
-    if (!partnerProfile) {
+    if (profileIds.length === 0) {
         res.status(404);
         throw new Error('Delivery partner profile not found');
     }
@@ -549,11 +577,13 @@ const requestReplacement = asyncHandler(async (req, res) => {
         throw new Error('Order not found');
     }
 
-    // Verify assignment
-    if (!order.deliveryPartner || order.deliveryPartner.toString() !== partnerProfile._id.toString()) {
+    // Verify assignment against any profile
+    if (!order.deliveryPartner || !profileIds.includes(order.deliveryPartner.toString())) {
         res.status(403);
         throw new Error('Access denied: This order is not assigned to you');
     }
+
+    const partnerProfile = partnerProfiles.find(p => p._id.toString() === order.deliveryPartner.toString());
 
     // Check if replacement already requested
     if (order.hasReplacementRequest) {

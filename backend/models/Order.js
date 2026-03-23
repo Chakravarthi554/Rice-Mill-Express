@@ -152,7 +152,9 @@ const orderSchema = new mongoose.Schema({
   orderStatus: {
     type: String,
     enum: [
-      'placed',
+      'created',
+      'pending_payment',
+      'confirmed',
       'processing',
       'packed',
       'shipped',
@@ -162,7 +164,7 @@ const orderSchema = new mongoose.Schema({
       'returned',
       'refunded'
     ],
-    default: 'placed'
+    default: 'created'
   },
   statusHistory: [statusHistorySchema],
   isPaid: {
@@ -266,6 +268,18 @@ const orderSchema = new mongoose.Schema({
   },
   // COD Fields
   codAmount: {
+    type: Number,
+    default: 0
+  },
+  isAdvancePaid: {
+    type: Boolean,
+    default: false
+  },
+  advanceAmountPaid: {
+    type: Number,
+    default: 0
+  },
+  remainingCodAmount: {
     type: Number,
     default: 0
   },
@@ -386,6 +400,17 @@ const orderSchema = new mongoose.Schema({
   },
   codCollectionPhotoUrl: {
     type: String
+  },
+  codSettled: {
+    type: Boolean,
+    default: false
+  },
+  codSettledAt: {
+    type: Date
+  },
+  codSettledBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   },
 
   // Replacement Request Tracking

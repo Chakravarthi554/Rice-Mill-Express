@@ -38,7 +38,10 @@ export default function CartScreen({ navigation }) {
     };
 
     const calculateTotal = () => {
-        return cartItems.reduce((total, item) => total + (item.product?.price || 0) * (item.quantity || 1), 0);
+        return cartItems.reduce((total, item) => {
+            const price = item.product?.offerPrice || item.product?.price || 0;
+            return total + price * (item.quantity || 1);
+        }, 0);
     };
 
     const handleCheckout = () => {
@@ -72,7 +75,7 @@ export default function CartScreen({ navigation }) {
                         </TouchableOpacity>
                     </View>
 
-                    <Text style={styles.itemPrice}>₹{product.price || 0}</Text>
+                    <Text style={styles.itemPrice}>₹{product.offerPrice || product.price || 0}</Text>
 
                     <View style={styles.quantityRow}>
                         <View style={styles.quantityControl}>
@@ -90,7 +93,7 @@ export default function CartScreen({ navigation }) {
                                 <MaterialIcons name="add" size={16} color="#4CAF50" />
                             </TouchableOpacity>
                         </View>
-                        <Text style={styles.itemSubtotal}>₹{(product.price || 0) * (item.quantity || 1)}</Text>
+                        <Text style={styles.itemSubtotal}>₹{(product.offerPrice || product.price || 0) * (item.quantity || 1)}</Text>
                     </View>
                 </View>
             </View>
@@ -149,7 +152,7 @@ export default function CartScreen({ navigation }) {
                             </View>
                             <View style={styles.summaryRow}>
                                 <Text style={styles.summaryLabel}>{t('delivery')}</Text>
-                                <Text style={styles.summaryValue}>{t('free')}</Text>
+                                <Text style={styles.summaryValue}>{t('calculatedAtCheckout') || 'Calculated at checkout'}</Text>
                             </View>
                             <View style={[styles.summaryRow, styles.totalRow]}>
                                 <Text style={styles.totalLabel}>{t('grandTotal')}</Text>

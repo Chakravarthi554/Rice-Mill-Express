@@ -197,7 +197,7 @@ const ChatWindow = ({ receiverId, orderId, productId, postId, onClose, receiverN
   useEffect(() => {
     if (!receiverId || !userInfo?._id) return;
 
-    socketRef.current = io(process.env.REACT_APP_SOCKET_URL || "http://localhost:5000", {
+    socketRef.current = io(process.env.REACT_APP_SOCKET_URL || "http://localhost:5001", {
       auth: { token: `Bearer ${userInfo.token}` },
       transports: ["websocket"],
     });

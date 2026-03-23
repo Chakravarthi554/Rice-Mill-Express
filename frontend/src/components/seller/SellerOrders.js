@@ -314,7 +314,7 @@ const SellerOrders = () => {
                     <Box sx={{ mt: 1 }}>
                       <Typography variant="subtitle2">Proof Photo:</Typography>
                       <img
-                        src={`http://localhost:5000${selectedOrder.replacementPhotoUrl}`}
+                        src={`http://localhost:5001${selectedOrder.replacementPhotoUrl}`}
                         alt="Damage Proof"
                         style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 4, marginTop: 4 }}
                       />
@@ -395,3 +395,4 @@ const SellerOrders = () => {
 };
 
 export default SellerOrders;
+

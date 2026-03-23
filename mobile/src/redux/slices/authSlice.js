@@ -1,9 +1,8 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
 import { auth } from '../../config/firebase';
-import { API_URL } from '../../config/env';
+import api from '../../services/api';
 
 // Async thunk for login
 export const login = createAsyncThunk(
@@ -15,14 +14,9 @@ export const login = createAsyncThunk(
             const idToken = await userCredential.user.getIdToken();
 
             // 2. Get user profile from backend
-            const response = await axios.post(
-                `${API_URL}/api/auth/firebase-login`,
-                { idToken },
-                {
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                }
+            const response = await api.post(
+                '/api/auth/firebase-login',
+                { idToken }
             );
 
             // ⚠️ 2FA Check
@@ -51,15 +45,10 @@ export const register = createAsyncThunk(
             const idToken = await userCredential.user.getIdToken();
 
             // 2. Create user profile in backend
-            const response = await axios.post(
-                `${API_URL}/api/auth/register`,
-                { name, email, password, phone, role, referralCode, deviceId },
-                {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${idToken}`,
-                    },
-                }
+            // Note: api service already has Authorization header interceptor
+            const response = await api.post(
+                '/api/auth/register',
+                { name, email, password, phone, role, referralCode, deviceId }
             );
 
             return response.data;

@@ -106,14 +106,9 @@ const adminSettingsSchema = new mongoose.Schema({
   },
 
   // Referral & Reward Settings
-  referralRewardReferrer: {
+  referralRewardAmount: {
     type: Number,
-    default: 50, // Updated to ₹50 as per requirement
-    min: 0
-  },
-  referralRewardReferee: {
-    type: Number,
-    default: 200,
+    default: 100, // Combined reward (e.g., ₹100 for both)
     min: 0
   },
   minWithdrawalAmount: {
@@ -132,6 +127,10 @@ const adminSettingsSchema = new mongoose.Schema({
     default: 10,
     min: 0
   },
+
+  // Payment Settings
+  adminUpiId: { type: String, default: 'admin@upi' },
+  adminUpiName: { type: String, default: 'RiceMill Admin' },
 
   // Version info
   appVersion: {

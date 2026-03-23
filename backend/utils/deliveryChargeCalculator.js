@@ -32,7 +32,8 @@ const evictCache = () => {
  * @returns {Object} - { charge, breakdown, freeDelivery }
  */
 const calculateDeliveryCharge = (distance = 0, weight = 0, orderTotal = 0, settings = {}) => {
-    // 1. Check for free delivery threshold from settings
+    // 1. Free delivery logic disabled as per requirement: "no free delivery to anyone in our app"
+    /*
     const freeThreshold = settings.freeDeliveryThreshold || 1000;
     if (orderTotal >= freeThreshold) {
         return {
@@ -42,6 +43,7 @@ const calculateDeliveryCharge = (distance = 0, weight = 0, orderTotal = 0, setti
             reason: `Free delivery for orders ≥ ₹${freeThreshold}`
         };
     }
+    */
 
     // 2. Use slab-based logic if available in settings
     if (settings.deliverySlabs && settings.deliverySlabs.length > 0) {

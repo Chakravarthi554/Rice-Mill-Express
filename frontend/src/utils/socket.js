@@ -1,7 +1,7 @@
 import { io } from 'socket.io-client';
 
 // ✅ FIXED: Enhanced API URL configuration
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 let socketInstance = null;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;

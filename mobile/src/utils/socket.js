@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import { API_URL } from '../config/env';
 
 class OrderTrackingSocket extends EventEmitter {
   constructor(userId) {
@@ -11,8 +12,11 @@ class OrderTrackingSocket extends EventEmitter {
   }
 
   connect() {
-    const protocol = __DEV__ ? 'ws' : 'wss';
-    const host = __DEV__ ? 'localhost:5000' : 'your-production-domain.com';
+    // Parse host and protocol from API_URL
+    const url = new URL(API_URL);
+    const protocol = url.protocol === 'https:' ? 'wss' : 'ws';
+    const host = url.host; // This will correctly handle localhost:5000 or tunnel domain
+
     this.socket = new WebSocket(`${protocol}://${host}/ws?userId=${this.userId}`);
 
     this.socket.onopen = () => {

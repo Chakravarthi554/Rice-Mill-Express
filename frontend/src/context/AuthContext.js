@@ -121,7 +121,7 @@ export const AuthProvider = ({ children }) => {
         return null;
       }
 
-      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
       const response = await axios.post(
         `${API_BASE_URL}/api/auth/refresh-token`,
         { refreshToken: refreshTokenValue }
@@ -212,7 +212,7 @@ export const AuthProvider = ({ children }) => {
 
           // Get Firebase ID token
           const idToken = await firebaseUser.getIdToken();
-          const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+          const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 
           console.log('📡 AuthContext: Calling API:', `${API_BASE_URL}/api/auth/firebase-login`);
 
@@ -412,7 +412,7 @@ export const AuthProvider = ({ children }) => {
       };
 
       // 2. Sync with MongoDB
-      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
       const { data } = await axios.post(`${API_BASE_URL}/api/auth/register`, registrationData);
 
       if (data.success) {

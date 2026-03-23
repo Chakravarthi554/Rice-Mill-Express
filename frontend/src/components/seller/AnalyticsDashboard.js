@@ -38,10 +38,8 @@ const AnalyticsDashboard = () => {
   useEffect(() => {
     if (userInfo?._id) {
       dispatch(listSellerAnalytics(timeframe));
-    } else {
-      console.error('No userInfo available, cannot fetch analytics');
     }
-  }, [dispatch, timeframe, userInfo]);
+  }, [dispatch, timeframe, userInfo?._id]);
 
   useEffect(() => {
     const token = userInfo?.token || localStorage.getItem('token');
@@ -50,7 +48,7 @@ const AnalyticsDashboard = () => {
       return;
     }
 
-    const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5000';
+    const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5001';
     const socket = io(SOCKET_URL, {
       auth: { token: `Bearer ${token}` },
       withCredentials: true,
@@ -91,7 +89,7 @@ const AnalyticsDashboard = () => {
       socket.off('disconnect');
       socket.disconnect();
     };
-  }, [dispatch, timeframe, userInfo]);
+  }, [dispatch, timeframe, userInfo?._id, userInfo?.token]);
 
   useEffect(() => {
     console.log('Analytics state:', { analytics, loading, error });

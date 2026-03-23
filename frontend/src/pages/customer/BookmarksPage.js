@@ -51,7 +51,7 @@ const BookmarksPage = () => {
   const fetchBookmarks = async () => {
     setLoading(true);
     try {
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
       const response = await fetch(`${apiUrl}/api/forum/bookmarks?page=${page}&limit=20`, {
         headers: {
           'Authorization': `Bearer ${userInfo.token}`,
@@ -76,7 +76,7 @@ const BookmarksPage = () => {
 
   const handleUnbookmark = async (postId) => {
     try {
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
       const response = await fetch(`${apiUrl}/api/forum/${postId}/bookmark`, {
         method: 'POST',
         headers: {
@@ -318,3 +318,4 @@ const BookmarksPage = () => {
 };
 
 export default BookmarksPage;
+

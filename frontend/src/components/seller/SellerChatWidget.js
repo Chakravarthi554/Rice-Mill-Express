@@ -42,7 +42,7 @@ import { useSelector } from 'react-redux';
 import io from 'socket.io-client';
 import axios from 'axios';
 
-const socketUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const socketUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 
 const SellerChatWidget = () => {
     const [isOpen, setIsOpen] = useState(false);
@@ -667,3 +667,4 @@ const SellerChatWidget = () => {
 };
 
 export default SellerChatWidget;
+

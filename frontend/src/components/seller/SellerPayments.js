@@ -316,6 +316,9 @@ const SellerPayments = () => {
               <Typography variant="body2" color="text.secondary">
                 Payouts are typically processed within 3-5 business days to your registered bank account.
               </Typography>
+              <Typography variant="body2" color="primary" sx={{ mt: 1 }}>
+                Ensure your <Link to="/profile" style={{ color: '#1976d2', fontWeight: 'bold' }}>Bank Details</Link> are up to date in your profile.
+              </Typography>
             </Grid>
           </Grid>
         </DialogContent>

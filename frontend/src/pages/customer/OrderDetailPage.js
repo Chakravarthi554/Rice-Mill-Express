@@ -195,11 +195,29 @@ const OrderDetailPage = () => {
             </Table></TableContainer>
 
             <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-              <Box display="flex" justifyContent="space-between" mb={1}><Typography>{t('orderItems')}:</Typography><Typography>₹{Number(order.itemsPrice || 0).toFixed(2)}</Typography></Box>
-              <Box display="flex" justifyContent="space-between" mb={1}><Typography>{t('delivery')}:</Typography><Typography>₹{Number(order.shippingPrice || 0).toFixed(2)}</Typography></Box>
-              <Box display="flex" justifyContent="space-between" mb={1}><Typography>{t('tax') || 'Tax'}:</Typography><Typography>₹{Number(order.taxPrice || 0).toFixed(2)}</Typography></Box>
+              <Box display="flex" justifyContent="space-between" mb={1}><Typography>Products Total:</Typography><Typography>₹{Number(order.productAmount || order.itemsPrice || 0).toFixed(2)}</Typography></Box>
+              <Box display="flex" justifyContent="space-between" mb={1}><Typography>{t('delivery')}:</Typography><Typography>₹{Number(order.deliveryFee || order.shippingPrice || 0).toFixed(2)}</Typography></Box>
+              {order.discountAmount > 0 && (
+                 <Box display="flex" justifyContent="space-between" mb={1}><Typography color="error">Discount:</Typography><Typography color="error">-₹{Number(order.discountAmount).toFixed(2)}</Typography></Box>
+              )}
+              {order.walletUsedAmount > 0 && (
+                 <Box display="flex" justifyContent="space-between" mb={1}><Typography color="primary">Wallet Used:</Typography><Typography color="primary">-₹{Number(order.walletUsedAmount).toFixed(2)}</Typography></Box>
+              )}
               <Divider sx={{ my: 1 }} />
-              <Box display="flex" justifyContent="space-between"><Typography variant="h6">{t('total')}:</Typography><Typography variant="h6">₹{Number(order.totalPrice || 0).toFixed(2)}</Typography></Box>
+              <Box display="flex" justifyContent="space-between"><Typography variant="h6">Total Order Value:</Typography><Typography variant="h6">₹{Number(order.finalPaidAmount || order.totalPrice || 0).toFixed(2)}</Typography></Box>
+              {order.paymentMethod === 'cod' && order.isAdvancePaid && (
+                  <>
+                      <Divider sx={{ my: 1 }} />
+                      <Box display="flex" justifyContent="space-between" mb={1}>
+                          <Typography>Advance Paid:</Typography>
+                          <Typography>₹{Number(order.advanceAmountPaid || 0).toFixed(2)}</Typography>
+                      </Box>
+                      <Box display="flex" justifyContent="space-between" mb={1}>
+                          <Typography variant="subtitle1" color="error">Remaining (To Pay at Delivery):</Typography>
+                          <Typography variant="subtitle1" color="error" fontWeight="bold">₹{Number(order.remainingCodAmount || 0).toFixed(2)}</Typography>
+                      </Box>
+                  </>
+              )}
             </Box>
           </CardContent></Card>
         </Grid>

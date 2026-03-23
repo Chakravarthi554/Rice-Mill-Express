@@ -166,9 +166,22 @@ const OrderDetailScreen = ({ route, navigation }) => {
                     )}
                     <Divider style={{ marginVertical: 10 }} />
                     <View style={styles.totalRow}>
-                        <Text style={styles.grandTotalLabel}>Total Amount Paid</Text>
+                        <Text style={styles.grandTotalLabel}>Total Order Amount</Text>
                         <Text style={styles.grandTotalAmount}>₹{order.finalPaidAmount || order.totalPrice}</Text>
                     </View>
+                    
+                    {order.paymentMethod === 'cod' && order.isAdvancePaid && (
+                        <>
+                            <View style={styles.totalRow}>
+                                <Text style={styles.grandTotalLabel}>Advance Paid</Text>
+                                <Text style={styles.grandTotalAmount}>₹{order.advanceAmountPaid}</Text>
+                            </View>
+                            <View style={styles.totalRow}>
+                                <Text style={styles.grandTotalLabel}>Remaining (To Pay at Delivery)</Text>
+                                <Text style={[styles.grandTotalAmount, { color: '#F44336' }]}>₹{order.remainingCodAmount}</Text>
+                            </View>
+                        </>
+                    )}
                 </Card.Content>
             </Card>
 

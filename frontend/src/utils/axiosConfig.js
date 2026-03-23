@@ -2,7 +2,7 @@ import axios from 'axios';
 import { logout } from '../redux/actions/userActions';
 
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5001/api',
   withCredentials: true, // 🔑 allow sending refreshToken cookie
 });
 
@@ -64,3 +64,4 @@ api.interceptors.response.use(
 );
 
 export default api;
+

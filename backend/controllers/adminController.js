@@ -87,9 +87,10 @@ const getDashboardStats = asyncHandler(async (req, res) => {
       ForumPost.countDocuments().catch(() => 0),
 
       // Total Revenue (all time - includes both paid online and delivered COD)
+      // ✅ FIX: Sum finalPaidAmount (actual platform GMV), not adminAmount (which is only commission)
       Order.aggregate([
         { $match: { $or: [{ isPaid: true }, { orderStatus: 'delivered' }] } },
-        { $group: { _id: null, totalRevenue: { $sum: { $ifNull: ['$adminAmount', { $multiply: ['$totalPrice', 0.15] }] } } } }
+        { $group: { _id: null, totalRevenue: { $sum: { $ifNull: ['$finalPaidAmount', '$totalPrice'] } } } }
       ]).catch(() => []),
 
       // Moderation counts
@@ -172,6 +173,7 @@ const getDashboardStats = asyncHandler(async (req, res) => {
         .catch(() => []),
 
       // Monthly revenue for chart (current year)
+      // ✅ FIX: Use finalPaidAmount for consistent revenue reporting
       Order.aggregate([
         {
           $match: {
@@ -182,7 +184,7 @@ const getDashboardStats = asyncHandler(async (req, res) => {
         {
           $group: {
             _id: { $month: '$createdAt' },
-            revenue: { $sum: { $ifNull: ['$adminAmount', { $multiply: ['$totalPrice', 0.15] }] } }
+            revenue: { $sum: { $ifNull: ['$finalPaidAmount', '$totalPrice'] } }
           }
         },
         { $sort: { '_id': 1 } }
@@ -196,7 +198,7 @@ const getDashboardStats = asyncHandler(async (req, res) => {
             createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth }
           }
         },
-        { $group: { _id: null, total: { $sum: { $ifNull: ['$adminAmount', { $multiply: ['$totalPrice', 0.15] }] } } } }
+        { $group: { _id: null, total: { $sum: { $ifNull: ['$finalPaidAmount', '$totalPrice'] } } } }
       ]).catch(() => []),
 
       // New users current month
@@ -1067,7 +1069,7 @@ const getAnalyticsData = asyncHandler(async (req, res) => {
           commissionEarned: salesOverview[0]?.commissionEarned || 0
         },
         orderPerformance: {
-          totalOrders: salesOverview[0]?.totalOrders || 0,
+          totalOrders: orderStats.reduce((acc, curr) => acc + curr.count, 0) || 0,
           orderStatus: orderStats.map(s => ({ name: s._id, value: s.count })),
           topSellers: topSellers.map(s => ({ ...s, revenue: s.sales })),
           deliveryStats: { onTime: 85, delayed: 10, cancelled: 5 } // Mocked for now

@@ -21,7 +21,7 @@ const CustomerDashboard = () => {
       if (!confirm) return;
 
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/admin/bootstrap', {
+      const response = await fetch('http://localhost:5001/api/admin/bootstrap', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -87,3 +87,4 @@ const CustomerDashboard = () => {
 };
 
 export default CustomerDashboard;
+

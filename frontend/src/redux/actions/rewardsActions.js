@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from '../../utils/api';
 import {
     REWARDS_REQUEST,
     REWARDS_SUCCESS,
@@ -48,7 +48,7 @@ export const getRewards = () => async (dispatch, getState) => {
             },
         };
 
-        const { data } = await axios.get('/api/users/rewards', config);
+        const { data } = await api.get('/api/users/rewards');
 
         dispatch({
             type: REWARDS_SUCCESS,
@@ -75,7 +75,7 @@ export const getRewardTransactions = () => async (dispatch, getState) => {
             },
         };
 
-        const { data } = await axios.get('/api/users/rewards/transactions', config);
+        const { data } = await api.get('/api/users/rewards/transactions');
 
         dispatch({
             type: REWARD_TRANSACTIONS_SUCCESS,
@@ -103,7 +103,7 @@ export const redeemReward = (points) => async (dispatch, getState) => {
             },
         };
 
-        const { data } = await axios.post('/api/users/rewards/redeem', { points }, config);
+        const { data } = await api.post('/api/users/rewards/redeem', { points });
 
         dispatch({
             type: REDEEM_REWARD_SUCCESS,
@@ -136,7 +136,7 @@ export const getActiveCampaigns = () => async (dispatch, getState) => {
             },
         };
 
-        const { data } = await axios.get('/api/campaigns/active', config);
+        const { data } = await api.get('/api/campaigns/active');
 
         dispatch({
             type: CAMPAIGNS_SUCCESS,
@@ -163,7 +163,7 @@ export const getReferralCode = () => async (dispatch, getState) => {
             },
         };
 
-        const { data } = await axios.get('/api/users/referral-code', config);
+        const { data } = await api.get('/api/users/referral-code');
 
         dispatch({
             type: REFERRAL_CODE_SUCCESS,
@@ -190,7 +190,7 @@ export const getReferrals = () => async (dispatch, getState) => {
             },
         };
 
-        const { data } = await axios.get('/api/users/referrals', config);
+        const { data } = await api.get('/api/users/referrals');
 
         dispatch({
             type: REFERRALS_SUCCESS,
@@ -213,7 +213,7 @@ export const getWalletData = () => async (dispatch, getState) => {
         const config = {
             headers: { Authorization: `Bearer ${userInfo.token}` },
         };
-        const { data } = await axios.get('/api/rewards/wallet', config);
+        const { data } = await api.get('/api/rewards/wallet');
         dispatch({ type: WALLET_DATA_SUCCESS, payload: data });
     } catch (error) {
         dispatch({
@@ -235,7 +235,7 @@ export const requestWithdrawal = (withdrawalData) => async (dispatch, getState) 
                 Authorization: `Bearer ${userInfo.token}`
             },
         };
-        const { data } = await axios.post('/api/rewards/withdraw', withdrawalData, config);
+        const { data } = await api.post('/api/rewards/withdraw', withdrawalData);
         dispatch({ type: WITHDRAW_SUCCESS, payload: data });
         dispatch(getWalletData());
     } catch (error) {
@@ -255,7 +255,7 @@ export const getWithdrawalHistory = () => async (dispatch, getState) => {
         const config = {
             headers: { Authorization: `Bearer ${userInfo.token}` },
         };
-        const { data } = await axios.get('/api/rewards/withdrawals', config);
+        const { data } = await api.get('/api/rewards/withdrawals');
         dispatch({ type: WITHDRAWAL_HISTORY_SUCCESS, payload: data });
     } catch (error) {
         dispatch({
@@ -274,7 +274,7 @@ export const listAdminWithdrawals = () => async (dispatch, getState) => {
         const config = {
             headers: { Authorization: `Bearer ${userInfo.token}` },
         };
-        const { data } = await axios.get('/api/rewards/admin/withdrawals', config);
+        const { data } = await api.get('/api/rewards/admin/withdrawals');
         dispatch({ type: ADMIN_WITHDRAWAL_LIST_SUCCESS, payload: data.withdrawals });
     } catch (error) {
         dispatch({
@@ -296,7 +296,7 @@ export const updateWithdrawalStatus = (id, updateData) => async (dispatch, getSt
                 Authorization: `Bearer ${userInfo.token}`
             },
         };
-        const { data } = await axios.put(`/api/rewards/admin/withdrawals/${id}`, updateData, config);
+        const { data } = await api.put(`/api/rewards/admin/withdrawals/${id}`, updateData);
         dispatch({ type: ADMIN_WITHDRAWAL_UPDATE_SUCCESS, payload: data });
     } catch (error) {
         dispatch({

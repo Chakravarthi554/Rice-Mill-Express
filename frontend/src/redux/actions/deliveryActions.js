@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from '../../utils/api';
 import {
   DELIVERY_PARTNER_LIST_REQUEST,
   DELIVERY_PARTNER_LIST_SUCCESS,
@@ -23,21 +23,7 @@ import {
 export const listDeliveryPartners = () => async (dispatch, getState) => {
   try {
     dispatch({ type: DELIVERY_PARTNER_LIST_REQUEST });
-    const {
-      userLogin: { userInfo },
-    } = getState();
-
-    console.log('🔄 Fetching delivery partners...', {
-      userId: userInfo.user?._id,
-      token: userInfo.token ? 'Present' : 'Missing'
-    });
-
-    const config = {
-      headers: {
-        Authorization: `Bearer ${userInfo.token}`,
-      },
-    };
-    const { data } = await axios.get('/api/delivery-partners/partners', config);
+    const { data } = await api.get('/api/delivery-partners/partners');
 
     console.log('✅ Delivery partners fetched:', {
       count: data.length,
@@ -57,16 +43,7 @@ export const listDeliveryPartners = () => async (dispatch, getState) => {
 export const createDeliveryPartner = (partnerData) => async (dispatch, getState) => {
   try {
     dispatch({ type: DELIVERY_PARTNER_CREATE_REQUEST });
-    const {
-      userLogin: { userInfo },
-    } = getState();
-    const config = {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${userInfo.token}`,
-      },
-    };
-    const { data } = await axios.post('/api/delivery-partners/partners', partnerData, config);
+    const { data } = await api.post('/api/delivery-partners/partners', partnerData);
     dispatch({ type: DELIVERY_PARTNER_CREATE_SUCCESS, payload: data });
   } catch (error) {
     dispatch({
@@ -79,16 +56,7 @@ export const createDeliveryPartner = (partnerData) => async (dispatch, getState)
 export const updateDeliveryPartner = (id, partnerData) => async (dispatch, getState) => {
   try {
     dispatch({ type: DELIVERY_PARTNER_UPDATE_REQUEST });
-    const {
-      userLogin: { userInfo },
-    } = getState();
-    const config = {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${userInfo.token}`,
-      },
-    };
-    const { data } = await axios.put(`/api/delivery-partners/partners/${id}`, partnerData, config);
+    const { data } = await api.put(`/api/delivery-partners/partners/${id}`, partnerData);
     dispatch({ type: DELIVERY_PARTNER_UPDATE_SUCCESS, payload: data });
   } catch (error) {
     dispatch({
@@ -101,15 +69,7 @@ export const updateDeliveryPartner = (id, partnerData) => async (dispatch, getSt
 export const deleteDeliveryPartner = (id) => async (dispatch, getState) => {
   try {
     dispatch({ type: DELIVERY_PARTNER_DELETE_REQUEST });
-    const {
-      userLogin: { userInfo },
-    } = getState();
-    const config = {
-      headers: {
-        Authorization: `Bearer ${userInfo.token}`,
-      },
-    };
-    await axios.delete(`/api/delivery-partners/partners/${id}`, config);
+    await api.delete(`/api/delivery-partners/partners/${id}`);
     dispatch({ type: DELIVERY_PARTNER_DELETE_SUCCESS, payload: id });
   } catch (error) {
     dispatch({
@@ -128,17 +88,7 @@ export const assignDeliveryPartner = (orderId, deliveryData) => async (dispatch,
     });
 
     dispatch({ type: DELIVERY_ASSIGN_REQUEST });
-    const {
-      userLogin: { userInfo },
-    } = getState();
-    const config = {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${userInfo.token}`,
-      },
-    };
-
-    const { data } = await axios.put(`/api/orders/${orderId}/assign-partner`, deliveryData, config);
+    const { data } = await api.put(`/api/orders/${orderId}/assign-partner`, deliveryData);
     console.log('✅ Partner assigned successfully:', data);
 
     dispatch({ type: DELIVERY_ASSIGN_SUCCESS, payload: data });
@@ -148,8 +98,15 @@ export const assignDeliveryPartner = (orderId, deliveryData) => async (dispatch,
     dispatch(listOrdersForDelivery());
 
     // Import and call listSellerOrders from orderActions
-    const { listSellerOrders } = require('./orderActions');
-    await dispatch(listSellerOrders());
+    // Use the already imported function if possible, but action files often have circular deps.
+    // However, SellerDashboard.js already calls listSellerOrders.
+    // We'll keep the require but ensure it doesn't crash.
+    try {
+        const { listSellerOrders } = require('./orderActions');
+        dispatch(listSellerOrders());
+    } catch (e) {
+        console.warn('Could not refresh seller orders from deliveryActions:', e.message);
+    }
 
   } catch (error) {
     console.error('❌ Partner assignment failed:', {
@@ -168,15 +125,7 @@ export const assignDeliveryPartner = (orderId, deliveryData) => async (dispatch,
 export const listOrdersForDelivery = () => async (dispatch, getState) => {
   try {
     dispatch({ type: ORDER_LIST_FOR_DELIVERY_REQUEST });
-    const {
-      userLogin: { userInfo },
-    } = getState();
-    const config = {
-      headers: {
-        Authorization: `Bearer ${userInfo.token}`,
-      },
-    };
-    const { data } = await axios.get('/api/delivery-partners/orders/ready-for-delivery', config);
+    const { data } = await api.get('/api/delivery-partners/orders/ready-for-delivery');
     dispatch({ type: ORDER_LIST_FOR_DELIVERY_SUCCESS, payload: data });
   } catch (error) {
     dispatch({

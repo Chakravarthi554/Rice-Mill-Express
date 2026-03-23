@@ -29,6 +29,8 @@ const {
     confirmCOD,
     uploadDeliveryPhotoAndComplete,
     requestReplacement,
+    requestWithdrawal,
+    getWithdrawalHistory,
 } = require('../controllers/deliveryPartnerController.js');
 
 const {

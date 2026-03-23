@@ -1,5 +1,6 @@
 {
     "expo": {
+        "newArchEnabled": true,
         "name": "Rice Mill Express",
         "slug": "rice-mill-mobile",
         "scheme": "ricemill",
@@ -25,6 +26,7 @@
                 "backgroundColor": "#ffffff"
             },
             "package": "com.ricemill.express",
+            "usesCleartextTraffic": true,
             "permissions": [
                 "CAMERA",
                 "ACCESS_FINE_LOCATION",

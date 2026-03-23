@@ -45,8 +45,7 @@ const updateAdminSettings = asyncHandler(async (req, res) => {
       sellerCommission,
       autoApproveRecipes,
       autoApproveForumPosts,
-      referralRewardReferrer,
-      referralRewardReferee,
+      referralRewardAmount,
       minWithdrawalAmount,
       referralCampaignEnabled,
       appVersion
@@ -70,8 +69,7 @@ const updateAdminSettings = asyncHandler(async (req, res) => {
     if (sellerCommission !== undefined) updateFields.sellerCommission = sellerCommission;
     if (autoApproveRecipes !== undefined) updateFields.autoApproveRecipes = autoApproveRecipes;
     if (autoApproveForumPosts !== undefined) updateFields.autoApproveForumPosts = autoApproveForumPosts;
-    if (referralRewardReferrer !== undefined) updateFields.referralRewardReferrer = referralRewardReferrer;
-    if (referralRewardReferee !== undefined) updateFields.referralRewardReferee = referralRewardReferee;
+    if (referralRewardAmount !== undefined) updateFields.referralRewardAmount = referralRewardAmount;
     if (minWithdrawalAmount !== undefined) updateFields.minWithdrawalAmount = minWithdrawalAmount;
     if (referralCampaignEnabled !== undefined) updateFields.referralCampaignEnabled = referralCampaignEnabled;
     if (appVersion !== undefined) updateFields.appVersion = appVersion;
@@ -209,8 +207,7 @@ const resetSettingsToDefault = asyncHandler(async (req, res) => {
       sellerCommission: 85,
       autoApproveRecipes: false,
       autoApproveForumPosts: false,
-      referralRewardReferrer: 500,
-      referralRewardReferee: 200,
+      referralRewardAmount: 100,
       minWithdrawalAmount: 300,
       referralCampaignEnabled: true,
       appVersion: {
@@ -257,8 +254,7 @@ const getPublicSettings = asyncHandler(async (req, res) => {
       referralSettings: {
         minWithdrawalAmount: settings.minWithdrawalAmount || 300,
         referralCampaignEnabled: settings.referralCampaignEnabled !== false,
-        referralRewardReferrer: settings.referralRewardReferrer || 500,
-        referralRewardReferee: settings.referralRewardReferee || 200
+        referralRewardAmount: settings.referralRewardAmount || 100
       },
       supportContact: settings.supportContact || {},
       recipeOfTheDay: settings.recipeOfTheDay || null

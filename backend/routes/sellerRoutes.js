@@ -12,7 +12,6 @@ router.put(
   '/profile',
   protect,
   role('seller'),
-  kycVerified,
   upload.single('profileImage'),
   updateUserProfile
 );

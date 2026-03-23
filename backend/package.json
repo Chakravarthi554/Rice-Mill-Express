@@ -47,6 +47,7 @@
     "firebase-admin": "^13.6.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
+    "localtunnel": "^2.0.2",
     "mongoose": "^8.18.1",
     "mongoose-paginate-v2": "^1.9.1",
     "mongoose-redis-cache": "^0.0.3",

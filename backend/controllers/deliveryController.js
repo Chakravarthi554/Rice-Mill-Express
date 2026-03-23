@@ -2,6 +2,7 @@ const DeliveryPartner = require('../models/deliveryPartner.js');
 const Order = require('../models/Order.js');
 const asyncHandler = require('../middleware/asyncHandler.js');
 const User = require('../models/User.js');
+const SettlementService = require('../services/SettlementService');
 
 // @desc    Get all delivery partners for the current seller
 // @route   GET /api/delivery-partners/partners
@@ -477,21 +478,22 @@ const reportCOD = asyncHandler(async (req, res) => {
 const getAssignedOrders = asyncHandler(async (req, res) => {
   const { status } = req.query;
 
-  // 1. Find the delivery partner profile linked to this user
-  const partnerProfile = await DeliveryPartner.findOne({ user: req.user._id });
+  // 1. Find the delivery partner profiles linked to this user
+  const partnerProfiles = await DeliveryPartner.find({ user: req.user._id });
+  const profileIds = partnerProfiles.map(p => p._id);
 
-  if (!partnerProfile) {
+  if (profileIds.length === 0) {
     return res.json({ success: true, orders: [] }); // No profile = no assigned orders
   }
 
   // 2. Build query
-  const query = { deliveryPartner: partnerProfile._id };
+  const query = { deliveryPartner: { $in: profileIds } };
 
   if (status) {
     query.orderStatus = status;
   } else {
     // Include all statuses that a delivery partner should see
-    query.orderStatus = { $in: ['packed', 'shipped', 'out_for_delivery', 'delivered'] };
+    query.orderStatus = { $in: ['confirmed', 'placed', 'processing', 'packed', 'shipped', 'out_for_delivery', 'delivered'] };
   }
 
   // 3. Fetch orders
@@ -510,15 +512,16 @@ const getAssignedOrders = asyncHandler(async (req, res) => {
 const getOrderDetails = asyncHandler(async (req, res) => {
   const { orderId } = req.params;
 
-  // 1. Get delivery partner profile
-  const partnerProfile = await DeliveryPartner.findOne({ user: req.user._id });
+  // 1. Get ALL delivery partner profiles linked to this user
+  const partnerProfiles = await DeliveryPartner.find({ user: req.user._id });
+  const profileIds = partnerProfiles.map(p => p._id.toString());
 
-  if (!partnerProfile) {
+  if (profileIds.length === 0) {
     res.status(404);
     throw new Error('Delivery partner profile not found');
   }
 
-  // 2. Fetch order and verify it's assigned to this partner
+  // 2. Fetch order and verify it's assigned to any of these profiles
   const order = await Order.findById(orderId)
     .populate('user', 'name email phone')
     .populate('seller', 'name phone email businessDetails')
@@ -529,8 +532,8 @@ const getOrderDetails = asyncHandler(async (req, res) => {
     throw new Error('Order not found');
   }
 
-  // 3. Verify this order is assigned to the logged-in delivery partner
-  if (!order.deliveryPartner || order.deliveryPartner._id.toString() !== partnerProfile._id.toString()) {
+  // 3. Verify this order is assigned to any of the logged-in user's profiles
+  if (!order.deliveryPartner || !profileIds.includes(order.deliveryPartner._id.toString())) {
     res.status(403);
     throw new Error('You are not authorized to view this order');
   }
@@ -545,10 +548,11 @@ const startDelivery = asyncHandler(async (req, res) => {
   const { orderId } = req.params;
   const { latitude, longitude } = req.body;
 
-  // 1. Get delivery partner profile
-  const partnerProfile = await DeliveryPartner.findOne({ user: req.user._id });
+  // 1. Get delivery partner profiles
+  const partnerProfiles = await DeliveryPartner.find({ user: req.user._id });
+  const profileIds = partnerProfiles.map(p => p._id.toString());
 
-  if (!partnerProfile) {
+  if (profileIds.length === 0) {
     res.status(404);
     throw new Error('Delivery partner profile not found');
   }
@@ -561,14 +565,14 @@ const startDelivery = asyncHandler(async (req, res) => {
     throw new Error('Order not found');
   }
 
-  // 3. Verify assignment
-  if (!order.deliveryPartner || order.deliveryPartner.toString() !== partnerProfile._id.toString()) {
+  // 3. Verify assignment against any profile
+  if (!order.deliveryPartner || !profileIds.includes(order.deliveryPartner.toString())) {
     res.status(403);
     throw new Error('You are not authorized to update this order');
   }
 
   // 4. Verify order status allows starting delivery
-  if (!['placed', 'processing', 'packed', 'shipped', 'out_for_delivery'].includes(order.orderStatus)) {
+  if (!['confirmed', 'placed', 'processing', 'packed', 'shipped', 'out_for_delivery'].includes(order.orderStatus)) {
     res.status(400);
     throw new Error(`Cannot start delivery for order with status: ${order.orderStatus}`);
   }
@@ -610,10 +614,11 @@ const confirmDelivery = asyncHandler(async (req, res) => {
   const { orderId } = req.params;
   const { latitude, longitude, notes } = req.body;
 
-  // 1. Get delivery partner profile
-  const partnerProfile = await DeliveryPartner.findOne({ user: req.user._id });
+  // 1. Get delivery partner profiles
+  const partnerProfiles = await DeliveryPartner.find({ user: req.user._id });
+  const profileIds = partnerProfiles.map(p => p._id.toString());
 
-  if (!partnerProfile) {
+  if (profileIds.length === 0) {
     res.status(404);
     throw new Error('Delivery partner profile not found');
   }
@@ -626,11 +631,13 @@ const confirmDelivery = asyncHandler(async (req, res) => {
     throw new Error('Order not found');
   }
 
-  // 3. Verify assignment
-  if (!order.deliveryPartner || order.deliveryPartner.toString() !== partnerProfile._id.toString()) {
+  // 3. Verify assignment against any profile
+  if (!order.deliveryPartner || !profileIds.includes(order.deliveryPartner.toString())) {
     res.status(403);
     throw new Error('You are not authorized to update this order');
   }
+
+  const partnerProfile = partnerProfiles.find(p => p._id.toString() === order.deliveryPartner.toString());
 
   // 4. Verify order status
   if (order.orderStatus === 'delivered') {
@@ -700,39 +707,21 @@ const confirmDelivery = asyncHandler(async (req, res) => {
 
   await order.save();
 
-  // ✅ COD Payment Handling: Mark as paid on delivery and update Payment record
-  if (order.paymentMethod === 'cod' && !order.isPaid) {
-    order.isPaid = true;
-    order.paidAt = new Date();
-    order.paymentStatus = 'completed';
-    order.codCollected = true;
-    order.codCollectedAt = new Date();
-    order.codAmount = order.totalPrice;
-    await order.save();
-
-    // Update the associated Payment record
-    const Payment = require('../models/Payment');
-    try {
-      await Payment.findOneAndUpdate(
-        { order: order._id },
-        {
-          status: 'completed',
-          paidAt: new Date(),
-          commissionAmount: order.commissionAmount || Math.round(order.totalPrice * (order.commissionRate || 0.15)),
-          sellerPayoutAmount: order.sellerAmount || Math.round(order.totalPrice * 0.85),
-        }
-      );
-      console.log(`✅ COD Payment record updated for order ${order._id}`);
-    } catch (payErr) {
-      console.error('⚠️ Failed to update Payment record (non-fatal):', payErr.message);
-    }
+  // ✅ Automated Settlement Handling
+  try {
+    await SettlementService.processDeliverySettlement(order._id);
+    console.log(`✅ Automated settlement processed for order ${order._id}`);
+  } catch (settleErr) {
+    console.error('⚠️ Failed to process automated settlement:', settleErr.message);
+    // Note: We don't fail the whole delivery confirmation if settlement logic fails, 
+    // but we log it for reconciliation.
   }
 
   // ✅ Trigger referral rewards on first delivered+paid order
   try {
     const { processReferralRewards } = require('./rewardsController');
     if (typeof processReferralRewards === 'function') {
-      await processReferralRewards(order.user, order._id);
+      await processReferralRewards(order._id);
       console.log(`✅ Referral reward processing triggered for order ${order._id}`);
     }
   } catch (refErr) {
@@ -787,10 +776,11 @@ const requestReplacement = asyncHandler(async (req, res) => {
     throw new Error('Photo proof is required for replacement requests');
   }
 
-  // 3. Get delivery partner profile
-  const partnerProfile = await DeliveryPartner.findOne({ user: req.user._id });
+  // 3. Get delivery partner profiles
+  const partnerProfiles = await DeliveryPartner.find({ user: req.user._id });
+  const profileIds = partnerProfiles.map(p => p._id.toString());
 
-  if (!partnerProfile) {
+  if (profileIds.length === 0) {
     res.status(404);
     throw new Error('Delivery partner profile not found');
   }
@@ -803,13 +793,13 @@ const requestReplacement = asyncHandler(async (req, res) => {
     throw new Error('Order not found');
   }
 
-  // 5. Verify assignment (Relaxed check if order is delivered, enabling post-delivery request)
-  // If order is delivered, any active partner *could* theoretically request, but usually it's the one who delivered.
-  // We'll stick to strict assignment check for now, assuming partner is still assigned.
-  if (!order.deliveryPartner || order.deliveryPartner.toString() !== partnerProfile._id.toString()) {
+  // 5. Verify assignment against any profile
+  if (!order.deliveryPartner || !profileIds.includes(order.deliveryPartner.toString())) {
     res.status(403);
     throw new Error('You are not authorized to request replacement for this order');
   }
+
+  const partnerProfile = partnerProfiles.find(p => p._id.toString() === order.deliveryPartner.toString());
 
   // 6. Check if replacement already requested
   const existingReplacement = await Replacement.findOne({
@@ -966,6 +956,145 @@ const redispatchReplacement = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Replacement re-dispatched successfully', order: updatedOrder });
 });
 
+// @desc    Generate Razorpay Payment Link for Delivery Partner COD collection
+// @route   POST /api/dp/orders/:orderId/generate-delivery-payment-link
+// @access  Private/DeliveryPartner
+const generateDeliveryPaymentLink = asyncHandler(async (req, res) => {
+  const { orderId } = req.params;
+  const order = await Order.findById(orderId).populate('user');
+
+  if (!order) {
+    res.status(404);
+    throw new Error('Order not found');
+  }
+
+  // Ensure this is a COD order that isn't paid fully
+  if (order.paymentMethod !== 'cod') {
+    res.status(400);
+    throw new Error('Only COD orders require payment collection on delivery');
+  }
+
+  if (order.isPaid) {
+    res.status(400);
+    throw new Error('This order is already paid entirely');
+  }
+
+  const razorpayKey = process.env.RAZORPAY_KEY_ID;
+  const razorpaySecret = process.env.RAZORPAY_KEY_SECRET;
+
+  if (!razorpayKey || !razorpaySecret) {
+    res.status(503);
+    throw new Error('Payment gateway is currently unavailable');
+  }
+
+  const Razorpay = require('razorpay');
+  const instance = new Razorpay({
+    key_id: razorpayKey,
+    key_secret: razorpaySecret,
+  });
+
+  const amountToCollect = order.remainingCodAmount > 0 ? order.remainingCodAmount : order.totalPrice;
+
+  try {
+    const paymentLink = await instance.paymentLink.create({
+      amount: Math.round(amountToCollect * 100),
+      currency: "INR",
+      accept_partial: false,
+      description: `Delivery Payment for Order #${order._id.toString().slice(-6)}`,
+      customer: {
+        name: order.user?.name || "Customer",
+        email: order.user?.email || "customer@example.com",
+        contact: order.user?.phone || ""
+      },
+      notify: { sms: false, email: false },
+      notes: {
+        order_id: order._id.toString(),
+        type: 'delivery_cod'
+      }
+    });
+
+    res.json({
+      success: true,
+      paymentLinkId: paymentLink.id,
+      paymentLinkUrl: paymentLink.short_url,
+      amount: amountToCollect
+    });
+  } catch (error) {
+    console.error('Error creating delivery payment link:', error);
+    res.status(500);
+    throw new Error('Failed to generate payment QR code');
+  }
+});
+
+// @desc    Check status of Delivery Payment Link
+// @route   GET /api/dp/orders/:orderId/check-delivery-payment/:paymentLinkId
+// @access  Private/DeliveryPartner
+const checkDeliveryPaymentStatus = asyncHandler(async (req, res) => {
+  const { orderId, paymentLinkId } = req.params;
+  const order = await Order.findById(orderId);
+
+  if (!order) {
+    res.status(404);
+    throw new Error('Order not found');
+  }
+
+  if (order.isPaid) {
+    return res.json({ success: true, isPaid: true });
+  }
+
+  const razorpayKey = process.env.RAZORPAY_KEY_ID;
+  const razorpaySecret = process.env.RAZORPAY_KEY_SECRET;
+  const Razorpay = require('razorpay');
+  const instance = new Razorpay({ key_id: razorpayKey, key_secret: razorpaySecret });
+
+  try {
+    const paymentLink = await instance.paymentLink.fetch(paymentLinkId);
+
+    if (paymentLink.status === 'paid') {
+      // Mark the order as paid internally here if webhook hasn't caught it yet
+      order.isPaid = true;
+      order.paidAt = new Date();
+      order.paymentStatus = 'completed';
+      order.codSettled = true; // No cash to settle later!
+
+      const Payment = require('../models/Payment');
+      const amountToCollect = order.remainingCodAmount > 0 ? order.remainingCodAmount : order.totalPrice;
+
+      // Create a Payment record for the exact amount collected
+      await Payment.findOneAndUpdate(
+        { order: order._id, amount: amountToCollect, method: 'razorpay' },
+        {
+          $set: {
+            status: 'completed',
+            notes: 'Delivery COD Paid via QR Link',
+            user: order.user,
+            seller: order.seller,
+            currency: 'INR',
+            commissionAmount: order.commissionAmount,
+            sellerPayoutAmount: order.sellerAmount,
+            payoutStatus: 'pending',
+          }
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+
+      await order.save();
+
+      if (req.broadcastOrderUpdate) {
+        req.broadcastOrderUpdate(orderId, { status: 'payment_completed' });
+      }
+
+      return res.json({ success: true, isPaid: true });
+    }
+
+    res.json({ success: true, isPaid: false, status: paymentLink.status });
+  } catch (error) {
+    console.error('Error fetching payment link status:', error);
+    res.status(500);
+    throw new Error('Failed to check payment status');
+  }
+});
+
 module.exports = {
   getDeliveryPartners,
   createDeliveryPartner,
@@ -983,5 +1112,7 @@ module.exports = {
   confirmDelivery,
   requestReplacement,
   reviewReplacement,
-  redispatchReplacement
+  redispatchReplacement,
+  generateDeliveryPaymentLink,
+  checkDeliveryPaymentStatus
 };

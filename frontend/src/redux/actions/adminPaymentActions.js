@@ -19,7 +19,13 @@ import {
   ADMIN_PAYMENT_FLAG_FAIL,
   ADMIN_PAYMENT_EXPORT_REQUEST,
   ADMIN_PAYMENT_EXPORT_SUCCESS,
-  ADMIN_PAYMENT_EXPORT_FAIL
+  ADMIN_PAYMENT_EXPORT_FAIL,
+  ADMIN_COD_SETTLEMENTS_REQUEST,
+  ADMIN_COD_SETTLEMENTS_SUCCESS,
+  ADMIN_COD_SETTLEMENTS_FAIL,
+  ADMIN_SETTLE_COD_REQUEST,
+  ADMIN_SETTLE_COD_SUCCESS,
+  ADMIN_SETTLE_COD_FAIL
 } from '../constants/adminPaymentConstants';
 import api from '../../utils/api';
 
@@ -257,6 +263,72 @@ export const exportPaymentReport = (exportParams) => async (dispatch, getState) 
   } catch (error) {
     dispatch({
       type: ADMIN_PAYMENT_EXPORT_FAIL,
+      payload:
+        error.response && error.response.data.message
+          ? error.response.data.message
+          : error.message,
+    });
+  }
+};
+
+// Get COD settlements
+export const getAdminCODSettlements = (filters = {}) => async (dispatch, getState) => {
+  try {
+    dispatch({ type: ADMIN_COD_SETTLEMENTS_REQUEST });
+
+    const { userLogin: { userInfo } } = getState();
+
+    const config = {
+      headers: {
+        Authorization: `Bearer ${userInfo.token}`,
+      },
+      params: filters,
+    };
+
+    const { data } = await api.get('/api/admin/payments/cod-settlements', config);
+
+    dispatch({
+      type: ADMIN_COD_SETTLEMENTS_SUCCESS,
+      payload: data,
+    });
+  } catch (error) {
+    dispatch({
+      type: ADMIN_COD_SETTLEMENTS_FAIL,
+      payload:
+        error.response && error.response.data.message
+          ? error.response.data.message
+          : error.message,
+    });
+  }
+};
+
+// Settle COD
+export const settleCOD = (orderId) => async (dispatch, getState) => {
+  try {
+    dispatch({ type: ADMIN_SETTLE_COD_REQUEST });
+
+    const { userLogin: { userInfo } } = getState();
+
+    const config = {
+      headers: {
+        Authorization: `Bearer ${userInfo.token}`,
+      },
+    };
+
+    const { data } = await api.post(`/api/admin/payments/settle-cod/${orderId}`, {}, config);
+
+    dispatch({
+      type: ADMIN_SETTLE_COD_SUCCESS,
+      payload: data,
+    });
+
+    // Refresh settlements and stats
+    dispatch(getAdminCODSettlements());
+    dispatch(getAdminPaymentStats());
+
+  } catch (error) {
+    dispatch({
+      type: ADMIN_SETTLE_COD_FAIL,
       payload:
         error.response && error.response.data.message
           ? error.response.data.message

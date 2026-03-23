@@ -98,11 +98,11 @@ const DeliveryKYCApproval = () => {
         if (imagePath.includes('\\') || imagePath.includes('uploads')) {
             // Extract filename from path
             const filename = imagePath.split(/[\\\/]/).pop();
-            return `http://localhost:5000/uploads/${filename}`;
+            return `http://localhost:5001/uploads/${filename}`;
         }
 
         // Handle relative paths (new format)
-        return `http://localhost:5000/${imagePath}`;
+        return `http://localhost:5001/${imagePath}`;
     };
 
     return (
@@ -305,3 +305,4 @@ const DeliveryKYCApproval = () => {
 };
 
 export default DeliveryKYCApproval;
+

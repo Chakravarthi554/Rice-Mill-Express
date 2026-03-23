@@ -136,7 +136,7 @@ const ProductPage = () => {
   const getImageUrl = (imagePath) => {
     if (!imagePath) return "https://via.placeholder.com/600x400/4CAF50/ffffff?text=Product+Image";
     if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) return imagePath;
-    const base = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+    const base = process.env.REACT_APP_API_URL || 'http://localhost:5001';
     return imagePath.startsWith('/uploads/') ? `${base}${imagePath}` : `${base}/uploads/${imagePath}`;
   };
 

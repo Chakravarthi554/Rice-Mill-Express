@@ -233,6 +233,11 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     updates.notificationEnabled = req.body.notificationEnabled === 'true' || req.body.notificationEnabled === true;
   }
 
+  // Handle integrations (Amazon, Zepto, Flipkart)
+  if (req.body.integrations) {
+    updates.integrations = typeof req.body.integrations === 'string' ? JSON.parse(req.body.integrations) : req.body.integrations;
+  }
+
   if (user.role === 'seller') {
     let bd = {};
     if (req.body.businessDetails) {
@@ -242,7 +247,7 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     // Handle root-level business fields sent from FormData
     const rootBusFields = ['businessName', 'businessType', 'gstNumber', 'panNumber'];
     rootBusFields.forEach(f => {
-      if (req.body[f] && req.body[f] !== 'undefined') bd[f] = req.body[f];
+      if (req.body[f] !== undefined && req.body[f] !== 'undefined') bd[f] = req.body[f];
     });
 
     // Handle flattened businessDetails from FormData (common in Multer uploads)
@@ -281,8 +286,13 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     }
   }
 
+  console.log('🔄 Profile Update: Applying updates to user:', user._id, JSON.stringify(updates, null, 2));
+
   await User.updateOne({ _id: user._id }, { $set: updates });
   const updatedUser = await User.findById(user._id).populate('addresses wishlist').select('-password -refreshToken');
+  
+  console.log('✅ Profile Update: Successful for user:', updatedUser.email);
+  
   res.json({ success: true, message: 'Profile updated', user: updatedUser });
 });
 

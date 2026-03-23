@@ -1,4 +1,4 @@
-import axios from 'axios'
+import api from '../../utils/api'
 import {
   SOCIAL_LIKE_REQUEST,
   SOCIAL_LIKE_SUCCESS,
@@ -48,8 +48,7 @@ export const likeItem = (itemType, itemId) => async (dispatch, getState) => {
       },
     }
 
-    const { data } = await axios.post(
-      `/api/social/${itemType}/${itemId}/like`,
+    const { data } = await api.post(`/api/social/${itemType}/${itemId}/like`,
       {},
       config
     )
@@ -97,11 +96,7 @@ export const addComment = (itemType, itemId, comment) => async (dispatch, getSta
       },
     }
 
-    const { data } = await axios.post(
-      `/api/social/${itemType}/${itemId}/comment`,
-      { content: comment },
-      config
-    )
+    const { data } = await api.post(`/api/social/${itemType}/${itemId}/comment`, { content: comment })
 
     dispatch({
       type: SOCIAL_COMMENT_SUCCESS,
@@ -135,9 +130,7 @@ export const getComments = (itemType, itemId, page = 1) => async (dispatch) => {
   try {
     dispatch({ type: SOCIAL_GET_COMMENTS_REQUEST })
 
-    const { data } = await axios.get(
-      `/api/social/${itemType}/${itemId}/comments?page=${page}`
-    )
+    const { data } = await api.get(`/api/social/${itemType}/${itemId}/comments?page=${page}`)
 
     dispatch({
       type: SOCIAL_GET_COMMENTS_SUCCESS,
@@ -170,11 +163,7 @@ export const approveComment = (itemType, itemId, commentId) => async (dispatch, 
       },
     }
 
-    const { data } = await axios.put(
-      `/api/social/comments/${commentId}/approve`,
-      {},
-      config
-    )
+    const { data } = await api.put(`/api/social/comments/${commentId}/approve`)
 
     dispatch({
       type: SOCIAL_APPROVE_COMMENT_SUCCESS,
@@ -218,10 +207,7 @@ export const deleteComment = (itemType, itemId, commentId) => async (dispatch, g
       },
     }
 
-    await axios.delete(
-      `/api/social/${itemType}/${itemId}/comments/${commentId}`,
-      config
-    )
+    await api.delete(`/api/social/${itemType}/${itemId}/comments/${commentId}`)
 
     dispatch({
       type: SOCIAL_DELETE_COMMENT_SUCCESS,
@@ -255,11 +241,7 @@ export const trackShare = (itemType, itemId, platform) => async (dispatch, getSt
       },
     }
 
-    const { data } = await axios.post(
-      `/api/social/${itemType}/${itemId}/share`,
-      { platform },
-      config
-    )
+    const { data } = await api.post(`/api/social/${itemType}/${itemId}/share`, { platform })
 
     dispatch({
       type: SOCIAL_SHARE_SUCCESS,
@@ -305,11 +287,7 @@ export const likeComment = (itemType, itemId, commentId) => async (dispatch, get
       },
     }
 
-    const { data } = await axios.post(
-      `/api/social/${itemType}/${itemId}/comments/${commentId}/like`,
-      {},
-      config
-    )
+    const { data } = await api.post(`/api/social/${itemType}/${itemId}/comments/${commentId}/like`)
 
     dispatch({
       type: SOCIAL_COMMENT_LIKE_SUCCESS,
@@ -343,11 +321,7 @@ export const replyToComment = (itemType, itemId, commentId, text) => async (disp
       },
     }
 
-    const { data } = await axios.post(
-      `/api/social/${itemType}/${itemId}/comments/${commentId}/reply`,
-      { content: text },
-      config
-    )
+    const { data } = await api.post(`/api/social/${itemType}/${itemId}/comments/${commentId}/reply`, { content: text })
 
     dispatch({
       type: SOCIAL_COMMENT_REPLY_SUCCESS,
@@ -382,9 +356,7 @@ export const getSortedComments = (itemType, itemId, sortBy = 'recent', page = 1)
   try {
     dispatch({ type: SOCIAL_GET_COMMENTS_REQUEST })
 
-    const { data } = await axios.get(
-      `/api/social/${itemType}/${itemId}/comments/sorted?sortBy=${sortBy}&page=${page}`
-    )
+    const { data } = await api.get(`/api/social/${itemType}/${itemId}/comments/sorted?sortBy=${sortBy}&page=${page}`)
 
     dispatch({
       type: SOCIAL_GET_COMMENTS_SUCCESS,
@@ -407,7 +379,7 @@ export const getRatingDistribution = (id) => async (dispatch) => {
   try {
     dispatch({ type: SOCIAL_RATING_DIST_REQUEST })
 
-    const { data } = await axios.get(`/api/social/recipes/${id}/rating-distribution`)
+    const { data } = await api.get(`/api/social/recipes/${id}/rating-distribution`)
 
     dispatch({
       type: SOCIAL_RATING_DIST_SUCCESS,

@@ -15,6 +15,8 @@ const {
   startDelivery,
   confirmDelivery,
   requestReplacement,
+  generateDeliveryPaymentLink,
+  checkDeliveryPaymentStatus
 } = require('../controllers/deliveryController.js');
 const router = express.Router();
 const { protect, role } = require('../middleware/auth.js');
@@ -50,6 +52,8 @@ router.get('/orders/:orderId', protect, role('deliveryPartner'), getOrderDetails
 router.post('/orders/:orderId/start', protect, role('deliveryPartner'), startDelivery);
 router.post('/orders/:orderId/confirm', protect, role('deliveryPartner'), upload.single('deliveryPhoto'), confirmDelivery);
 router.post('/orders/:orderId/replacement', protect, role('deliveryPartner'), upload.single('replacementPhoto'), requestReplacement);
+router.post('/orders/:orderId/generate-delivery-payment-link', protect, role('deliveryPartner'), generateDeliveryPaymentLink);
+router.get('/orders/:orderId/check-delivery-payment/:paymentLinkId', protect, role('deliveryPartner'), checkDeliveryPaymentStatus);
 
 // Replacement Management (Seller/Admin)
 const { reviewReplacement, redispatchReplacement } = require('../controllers/deliveryController.js');

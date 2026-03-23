@@ -1,1 +1,2 @@
-export const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.151.110.143:5000';
+// 📱 Direct Hotspot Connection (Preferred)
+export const API_URL = 'http://10.151.178.143:5001';

@@ -14,7 +14,16 @@ const getSellerDashboard = asyncHandler(async (req, res) => {
     Order.countDocuments({ seller: sellerId }),
     Product.countDocuments({ seller: sellerId }),
     Order.aggregate([
-      { $match: { seller: new mongoose.Types.ObjectId(sellerId), $or: [{ isPaid: true }, { orderStatus: 'delivered' }] } },
+      {
+        $match: {
+          seller: new mongoose.Types.ObjectId(sellerId),
+          // ✅ FIX: Use $and to properly combine: (paid OR delivered) AND not cancelled/pending_payment
+          $and: [
+            { $or: [{ isPaid: true }, { orderStatus: 'delivered' }] },
+            { orderStatus: { $nin: ['cancelled', 'pending_payment'] } }
+          ]
+        }
+      },
       { $group: { _id: null, total: { $sum: { $ifNull: ['$sellerAmount', { $multiply: ['$totalPrice', 0.85] }] } } } }
     ])
   ]);
@@ -222,12 +231,13 @@ const getSellerAnalytics = asyncHandler(async (req, res) => {
     });
   }
 
-  const totalSales = orders.reduce((sum, order) => sum + (order.productAmount || order.totalPrice || 0), 0);
+  // ✅ FIX: Use sellerAmount (actual seller earnings after commission deduction) instead of productAmount (GMV)
+  const totalSales = orders.reduce((sum, order) => sum + (order.sellerAmount || order.sellerEarnings || (order.totalPrice * 0.85) || 0), 0);
   const totalOrders = orders.length;
 
   const salesByDate = orders.reduce((acc, order) => {
     const date = new Date(order.createdAt).toISOString().split('T')[0];
-    acc[date] = (acc[date] || 0) + (order.productAmount || order.totalPrice || 0);
+    acc[date] = (acc[date] || 0) + (order.sellerAmount || order.sellerEarnings || (order.totalPrice * 0.85) || 0);
     return acc;
   }, {});
 
@@ -255,11 +265,6 @@ const getSellerAnalytics = asyncHandler(async (req, res) => {
     sales: salesData,
     popularProducts,
   });
-
-  const io = req.app.get('io');
-  if (io) {
-    io.to(`seller_${sellerId.toString()}`).emit('REFRESH_ANALYTICS', { sellerId: sellerId.toString() });
-  }
 });
 
 module.exports = {

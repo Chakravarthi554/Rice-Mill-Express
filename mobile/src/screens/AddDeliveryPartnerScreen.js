@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
 import { Button, TextInput, Card, HelperText } from 'react-native-paper';
 import { useSelector } from 'react-redux';
-import axios from 'axios';
+import api from '../services/api';
 
 const AddDeliveryPartnerScreen = ({ navigation }) => {
     const [formData, setFormData] = useState({
@@ -55,14 +55,9 @@ const AddDeliveryPartnerScreen = ({ navigation }) => {
 
         try {
             setLoading(true);
-            const config = {
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${userInfo.token}`,
-                },
-            };
-
-            await axios.post('/api/delivery-partners/partners', formData, config);
+            
+            // Note: api service automatically adds Auth header and bridge bypass headers
+            await api.post('/api/delivery-partners/partners', formData);
 
             Alert.alert('Success', 'Delivery Partner registered successfully! They can now login using their email and password.', [
                 { text: 'OK', onPress: () => navigation.goBack() }

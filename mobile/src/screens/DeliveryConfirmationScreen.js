@@ -4,6 +4,7 @@ import { Button, Card, ActivityIndicator, HelperText } from 'react-native-paper'
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { MaterialIcons } from '@expo/vector-icons';
+import QRCode from 'react-native-qrcode-svg';
 import { apiService } from '../services/api';
 
 const DeliveryConfirmationScreen = ({ route, navigation }) => {
@@ -13,11 +14,54 @@ const DeliveryConfirmationScreen = ({ route, navigation }) => {
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [order, setOrder] = useState(null);
+    const [qrLink, setQrLink] = useState(null);
+    const [paymentLinkId, setPaymentLinkId] = useState(null);
+    const [generatingQR, setGeneratingQR] = useState(false);
 
     useEffect(() => {
         fetchOrderDetails();
         requestPermissions();
     }, []);
+
+    useEffect(() => {
+        let interval;
+        if (paymentLinkId && order && !order.isPaid) {
+            interval = setInterval(() => {
+                checkPaymentStatus();
+            }, 5000); // Check every 5 seconds
+        }
+        return () => {
+            if (interval) clearInterval(interval);
+        };
+    }, [paymentLinkId, order]);
+
+    const checkPaymentStatus = async () => {
+        if (!paymentLinkId || !orderId) return;
+        try {
+            const response = await apiService.checkDeliveryPaymentStatus(orderId, paymentLinkId);
+            if (response.data.isPaid) {
+                setOrder(prev => ({ ...prev, isPaid: true }));
+                Alert.alert('Payment Verified', 'Customer payment successfully collected! You may now take the confirmation photo.');
+            }
+        } catch (error) {
+            // Silently fail during polling
+            console.log('Payment check error:', error);
+        }
+    };
+
+    const generatePaymentLink = async () => {
+        try {
+            setGeneratingQR(true);
+            const response = await apiService.generateDeliveryPaymentLink(orderId);
+            setPaymentLinkId(response.data.paymentLinkId);
+            setQrLink(response.data.paymentLinkUrl);
+        } catch (error) {
+            console.error('Error generating QR:', error);
+            Alert.alert('Error', error.response?.data?.message || 'Failed to generate payment QR');
+        } finally {
+            setGeneratingQR(false);
+        }
+    };
 
     const requestPermissions = async () => {
         const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
@@ -112,36 +156,68 @@ const DeliveryConfirmationScreen = ({ route, navigation }) => {
                     </View>
 
                     <Text style={styles.instruction}>
-                        Capture a photo of the rice bags at the customer's doorstep to confirm delivery.
+                        {order.paymentMethod === 'cod' && !order.isPaid
+                            ? "Collect the remaining cash on delivery amount by showing the QR code below."
+                            : "Capture a photo of the rice bags at the customer's doorstep to confirm delivery."}
                     </Text>
 
-                    <TouchableOpacity style={styles.photoContainer} onPress={takePhoto}>
-                        {photo ? (
-                            <Image source={{ uri: photo.uri }} style={styles.previewImage} />
-                        ) : (
-                            <View style={styles.placeholderBox}>
-                                <MaterialIcons name="camera-alt" size={48} color="#999" />
-                                <Text style={styles.placeholderText}>Tap to open camera</Text>
-                            </View>
-                        )}
-                    </TouchableOpacity>
-
-                    {location && (
-                        <View style={styles.locationTag}>
-                            <MaterialIcons name="location-searching" size={16} color="#4CAF50" />
-                            <Text style={styles.locationText}>Location Captured</Text>
+                    {order.paymentMethod === 'cod' && !order.isPaid ? (
+                        <View style={styles.qrContainer}>
+                            {!qrLink ? (
+                                <View style={styles.generateQRBox}>
+                                    <Text style={styles.qrDesc}>₹{order.remainingCodAmount > 0 ? order.remainingCodAmount : order.totalPrice} to collect</Text>
+                                    <Button
+                                        mode="contained"
+                                        onPress={generatePaymentLink}
+                                        loading={generatingQR}
+                                        disabled={generatingQR}
+                                        style={styles.qrButton}
+                                    >GENERATE PAYMENT QR</Button>
+                                </View>
+                            ) : (
+                                <View style={styles.activeQRBox}>
+                                    <View style={styles.qrCodeWrapper}>
+                                        <QRCode
+                                            value={qrLink}
+                                            size={200}
+                                        />
+                                    </View>
+                                    <Text style={styles.waitText}>Waiting for customer to pay...</Text>
+                                    <ActivityIndicator size="small" color="#4CAF50" style={{ marginTop: 10 }} />
+                                </View>
+                            )}
                         </View>
-                    )}
+                    ) : (
+                        <>
+                            <TouchableOpacity style={styles.photoContainer} onPress={takePhoto}>
+                                {photo ? (
+                                    <Image source={{ uri: photo.uri }} style={styles.previewImage} />
+                                ) : (
+                                    <View style={styles.placeholderBox}>
+                                        <MaterialIcons name="camera-alt" size={48} color="#999" />
+                                        <Text style={styles.placeholderText}>Tap to open camera</Text>
+                                    </View>
+                                )}
+                            </TouchableOpacity>
 
-                    <Button
-                        mode="contained"
-                        onPress={handleConfirmDelivery}
-                        loading={uploading}
-                        disabled={!photo || uploading}
-                        style={styles.mainButton}
-                    >
-                        CONFIRM & COMPLETE DELIVERY
-                    </Button>
+                            {location && (
+                                <View style={styles.locationTag}>
+                                    <MaterialIcons name="location-searching" size={16} color="#4CAF50" />
+                                    <Text style={styles.locationText}>Location Captured</Text>
+                                </View>
+                            )}
+
+                            <Button
+                                mode="contained"
+                                onPress={handleConfirmDelivery}
+                                loading={uploading}
+                                disabled={!photo || uploading}
+                                style={styles.mainButton}
+                            >
+                                CONFIRM & COMPLETE DELIVERY
+                            </Button>
+                        </>
+                    )}
 
                     <HelperText type="info" center>
                         No customer OTP required for this delivery.
@@ -224,6 +300,43 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
         marginBottom: 8,
     },
+    qrContainer: {
+        alignItems: 'center',
+        marginVertical: 10,
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 20,
+        elevation: 2,
+    },
+    generateQRBox: {
+        alignItems: 'center',
+        width: '100%',
+    },
+    qrDesc: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom: 15,
+        color: '#333'
+    },
+    qrButton: {
+        backgroundColor: '#4CAF50',
+        width: '100%'
+    },
+    activeQRBox: {
+        alignItems: 'center',
+    },
+    qrCodeWrapper: {
+        padding: 10,
+        backgroundColor: '#fff',
+        borderRadius: 8,
+        elevation: 1,
+    },
+    waitText: {
+        marginTop: 15,
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#4CAF50'
+    }
 });
 
 export default DeliveryConfirmationScreen;

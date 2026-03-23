@@ -53,7 +53,10 @@ const CheckoutScreen = ({ navigation }) => {
     };
 
     const calculateSubtotal = () => {
-        return cartItems.reduce((total, item) => total + (item.product?.price || 0) * (item.quantity || 1), 0);
+        return cartItems.reduce((total, item) => {
+            const price = item.product?.offerPrice || item.product?.price || 0;
+            return total + price * (item.quantity || 1);
+        }, 0);
     };
 
     const calculateDiscount = () => {
@@ -155,8 +158,6 @@ const CheckoutScreen = ({ navigation }) => {
                             text: 'OK',
                             onPress: async () => {
                                 await Linking.openURL(paymentUrl);
-                                // We don't clear cart or navigate here anymore.
-                                // We wait for the deep link or for the user to return manually.
                                 setLoading(false);
                             }
                         }
@@ -171,31 +172,79 @@ const CheckoutScreen = ({ navigation }) => {
             }
         }
 
-        try {
-            setLoading(true);
-            const orderData = {
-                shippingAddressId: selectedAddress._id,
-                paymentMethod,
-                orderItems: cartItems.map(item => ({
-                    product: item.product?._id,
-                    qty: item.quantity || item.qty || 1,
-                })),
-                useRewards // Pass flag to backend
-            };
+        // --- Handle COD ---
+        if (paymentMethod === 'cod') {
+            if (total > 5000) {
+                const advanceAmount = Math.round(total * 0.2);
+                Alert.alert(
+                    'Advance Payment Required',
+                    `COD orders over ₹5000 require a 20% advance payment (₹${advanceAmount}). You will be redirected to our secure gateway to pay this advance.`,
+                    [
+                        { text: 'Cancel', style: 'cancel', onPress: () => setLoading(false) },
+                        {
+                            text: 'Proceed to Pay',
+                            onPress: async () => {
+                                try {
+                                    setLoading(true);
+                                    // 1. Create Order as COD (Backend will put it in pending_payment)
+                                    const orderData = {
+                                        shippingAddressId: selectedAddress._id,
+                                        paymentMethod: 'cod',
+                                        orderItems: cartItems.map(item => ({
+                                            product: item.product?._id,
+                                            qty: item.quantity || item.qty || 1,
+                                        })),
+                                        useRewards
+                                    };
+                                    const response = await apiService.createOrder(orderData);
+                                    const order = Array.isArray(response.data.orders) ? response.data.orders[0] : (response.data.order || response.data);
 
-            const response = await apiService.createOrder(orderData);
+                                    // 2. Redirect to Special Advance Payment Link
+                                    const token = await apiService.getAuthToken();
+                                    const paymentUrl = `${API_URL}/api/payments/razorpay/pay-advance/${order._id}?token=${token}`;
+                                    console.log('🔗 Redirecting to advance payment URL:', paymentUrl);
 
-            // Clear cart in Redux
-            dispatch(clearCart());
+                                    await Linking.openURL(paymentUrl);
+                                    setLoading(false);
+                                } catch (error) {
+                                    console.error('Advance payment error:', error);
+                                    Alert.alert('Payment Error', error.response?.data?.message || 'Failed to initiate advance payment.');
+                                    setLoading(false);
+                                }
+                            }
+                        }
+                    ]
+                );
+                return;
+            }
 
-            // Handle multiple orders response (if backend returns array)
-            const createdOrder = Array.isArray(response.data.orders) ? response.data.orders[0] : response.data;
-            navigation.navigate('OrderSuccess', { orderId: createdOrder._id });
-        } catch (error) {
-            console.error('Order placement error:', error);
-            Alert.alert('Error', 'Failed to place order. ' + (error.response?.data?.message || error.message));
-        } finally {
-            setLoading(false);
+            // Standard COD (<= 5000)
+            try {
+                setLoading(true);
+                const orderData = {
+                    shippingAddressId: selectedAddress._id,
+                    paymentMethod,
+                    orderItems: cartItems.map(item => ({
+                        product: item.product?._id,
+                        qty: item.quantity || item.qty || 1,
+                    })),
+                    useRewards
+                };
+
+                const response = await apiService.createOrder(orderData);
+
+                // Clear cart in Redux
+                dispatch(clearCart());
+
+                // Handle multiple orders response (if backend returns array)
+                const createdOrder = Array.isArray(response.data.orders) ? response.data.orders[0] : response.data;
+                navigation.navigate('OrderSuccess', { orderId: createdOrder._id });
+            } catch (error) {
+                console.error('Order placement error:', error);
+                Alert.alert('Error', 'Failed to place order. ' + (error.response?.data?.message || error.message));
+            } finally {
+                setLoading(false);
+            }
         }
     };
 
@@ -223,7 +272,7 @@ const CheckoutScreen = ({ navigation }) => {
                     {cartItems.map((item, index) => (
                         <View key={index} style={styles.summaryItem}>
                             <Text style={styles.itemText}>{item.product?.name || 'Product'} x {item.quantity || 1}</Text>
-                            <Text style={styles.itemPrice}>₹{(item.product?.price || 0) * (item.quantity || 1)}</Text>
+                            <Text style={styles.itemPrice}>₹{(item.product?.offerPrice || item.product?.price || 0) * (item.quantity || 1)}</Text>
                         </View>
                     ))}
 

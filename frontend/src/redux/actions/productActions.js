@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from '../../utils/api';
 import {
   PRODUCT_LIST_REQUEST,
   PRODUCT_LIST_SUCCESS,
@@ -40,7 +40,6 @@ import {
   FORUM_MESSAGES_SUCCESS,
   FORUM_MESSAGES_FAIL,
 } from '../constants/productConstants';
-import api from '../../utils/api';
 import handleApiError from '../../utils/handleApiError';
 
 // =======================
@@ -168,7 +167,7 @@ export const deleteProduct = (id) => async (dispatch, getState) => {
       headers: { Authorization: `Bearer ${userInfo?.token || ''}` },
     };
 
-    await axios.delete(`/api/products/${id}`, config);
+    await api.delete(`/api/products/${id}`);
 
     dispatch({ type: PRODUCT_DELETE_SUCCESS, payload: id });
   } catch (error) {
@@ -197,7 +196,9 @@ export const createProduct = (product) => async (dispatch, getState) => {
       },
     };
 
-    const { data } = await axios.post(`/api/products`, product, config);
+    const { data } = await api.post(`/api/products`, product, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
 
     dispatch({ type: PRODUCT_CREATE_SUCCESS, payload: data });
   } catch (error) {
@@ -226,7 +227,9 @@ export const updateProduct = (productId, productData) => async (dispatch, getSta
       },
     };
 
-    const { data } = await axios.put(`/api/products/${productId}`, productData, config);
+    const { data } = await api.put(`/api/products/${productId}`, productData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
 
     dispatch({ type: PRODUCT_UPDATE_SUCCESS, payload: data });
   } catch (error) {
@@ -255,7 +258,7 @@ export const createProductReview = (productId, review) => async (dispatch, getSt
       },
     };
 
-    await axios.post(`/api/social/products/${productId}/rate`, review, config);
+    await api.post(`/api/social/products/${productId}/rate`, review);
 
     dispatch({ type: PRODUCT_CREATE_REVIEW_SUCCESS });
   } catch (error) {
@@ -285,7 +288,7 @@ export const listSellerProducts = () => async (dispatch, getState) => {
       headers: { Authorization: `Bearer ${userInfo.token || ''}` },
     };
 
-    const { data } = await axios.get('/api/products/seller', config);
+    const { data } = await api.get('/api/products/seller');
 
     dispatch({ type: PRODUCT_SELLER_LIST_SUCCESS, payload: data });
   } catch (error) {
@@ -314,7 +317,7 @@ export const bulkUploadProducts = (fileUrl) => async (dispatch, getState) => {
       },
     };
 
-    const { data } = await axios.post('/api/products/bulk', { fileUrl }, config);
+    const { data } = await api.post('/api/products/bulk', { fileUrl });
 
     dispatch({ type: PRODUCT_BULK_UPLOAD_SUCCESS, payload: data });
   } catch (error) {
@@ -340,7 +343,7 @@ export const getProductAnalytics = () => async (dispatch, getState) => {
       headers: { Authorization: `Bearer ${userInfo?.token || ''}` },
     };
 
-    const { data } = await axios.get('/api/products/analytics', config);
+    const { data } = await api.get('/api/products/analytics');
 
     dispatch({ type: PRODUCT_ANALYTICS_SUCCESS, payload: data });
   } catch (error) {
@@ -389,14 +392,7 @@ export const postForumMessage = (message) => async (dispatch, getState) => {
       userLogin: { userInfo },
     } = getState();
 
-    const config = {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${userInfo?.token || ''}`,
-      },
-    };
-
-    const { data } = await axios.post('/api/forum/post', message, config);
+    const { data } = await api.post('/api/forum/post', message);
 
     dispatch({ type: FORUM_POST_SUCCESS, payload: data });
   } catch (error) {
@@ -415,11 +411,7 @@ export const listForumMessages = () => async (dispatch, getState) => {
       userLogin: { userInfo },
     } = getState();
 
-    const config = {
-      headers: { Authorization: `Bearer ${userInfo?.token || ''}` },
-    };
-
-    const { data } = await axios.get('/api/forum/messages', config);
+    const { data } = await api.get('/api/forum/messages');
 
     dispatch({ type: FORUM_MESSAGES_SUCCESS, payload: data });
   } catch (error) {

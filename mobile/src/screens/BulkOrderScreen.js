@@ -14,6 +14,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import axios from 'axios';
+import api from '../services/api';
 import { getBulkOrders, createBulkOrder, updateBulkOrder } from '../redux/actions/bulkOrderActions';
 import { listProducts } from '../redux/actions/productActions';
 import { listMyAddresses } from '../redux/actions/addressActions';

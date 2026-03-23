@@ -88,7 +88,9 @@ const CheckoutPage = () => {
   const totalAmount = cartItems
     .filter(i => selectedItems.includes(i.product?._id))
     .reduce((sum, i) => {
-      const price = i.product?.price ?? 0;
+      const price = (i.product?.offerPrice > 0 && i.product?.offerPrice < i.product?.price) 
+        ? i.product.offerPrice 
+        : (i.product?.price ?? 0);
       const qty = i.quantity ?? 1;
       return sum + price * qty;
     }, 0);
@@ -225,26 +227,84 @@ const CheckoutPage = () => {
     razorpayRef.current = rzp;
   };
 
+  const initiateRazorpayForAdvance = async (advanceAmount) => {
+    setRzpInitiating(true);
+    const payload = {
+      amount: Math.round(advanceAmount * 100),
+      currency: 'INR',
+      receipt: `adv_${userInfo._id}_${Date.now()}`.slice(0, 40)
+    };
+    const rzpOrder = await dispatch(createRazorpayOrder(payload));
+    if (!rzpOrder?.id) throw new Error('Failed to create Razorpay advance order');
+
+    const options = {
+      key: rzpOrder.key || process.env.REACT_APP_RAZORPAY_KEY_ID,
+      amount: rzpOrder.amount,
+      currency: rzpOrder.currency,
+      name: 'RiceMill Express',
+      description: 'COD Advance Payment (20%)',
+      order_id: rzpOrder.id,
+      handler: async (response) => {
+        const selectedCartItems = cartItems.filter(i => selectedItems.includes(i.product._id));
+        const finalPayload = {
+          orderItems: selectedCartItems.map(i => ({
+            product: i.product._id,
+            qty: i.quantity
+          })),
+          shippingAddressId: selectedAddress._id,
+          paymentMethod: 'cod',
+          useRewards, // Pass flag to backend
+          isAdvancePaid: true,
+          advanceAmountPaid: advanceAmount,
+          razorpayPaymentId: response.razorpay_payment_id,
+          razorpayOrderId: response.razorpay_order_id,
+          razorpaySignature: response.razorpay_signature,
+        };
+        await dispatch(createOrder(finalPayload));
+      },
+      prefill: { name: userInfo.name, email: userInfo.email, contact: userInfo.phone },
+      theme: { color: '#4CAF50' }
+    };
+
+    const rzp = new window.Razorpay(options);
+    rzp.open();
+    rzp.on('payment.failed', () => {
+      alert('Advance Payment failed. Try again.');
+      setRzpInitiating(false);
+    });
+    razorpayRef.current = rzp;
+  };
+
   const placeOrderHandler = async () => {
     if (!selectedAddress) return alert('Select a delivery address');
     if (selectedItems.length === 0) return alert('Please select at least one item to order'); // \u2705 Validate selection
     if (paymentMethod === 'cod' && !isMinOrderMet) return alert('Minimum ₹1500 for COD');
 
-    if (paymentMethod === 'cod') await placeCODOrder();
-    else await initiateRazorpay();
+    if (paymentMethod === 'cod') {
+      if (finalTotal > 5000) {
+        const advanceAmount = Math.round(finalTotal * 0.2);
+        if (window.confirm(`COD orders over ₹5000 require a 20% advance payment (₹${advanceAmount}). Do you want to proceed to payment?`)) {
+          await initiateRazorpayForAdvance(advanceAmount);
+        }
+      } else {
+        await placeCODOrder();
+      }
+    } else {
+      await initiateRazorpay();
+    }
   };
 
   // -----------------------------------------------------------------
   // Load Razorpay script only when needed
   // -----------------------------------------------------------------
   useEffect(() => {
-    if (paymentMethod === 'razorpay' && !window.Razorpay) {
+    if ((paymentMethod === 'razorpay' || (paymentMethod === 'cod' && finalTotal > 5000)) && !window.Razorpay) {
       loadScript('https://checkout.razorpay.com/v1/checkout.js');
     }
     return () => {
       if (razorpayRef.current?.close) razorpayRef.current.close();
     };
-  }, [paymentMethod]);
+  }, [paymentMethod, finalTotal]);
 
   const isLoading = orderLoading || rzpLoading || rzpInitiating;
 
@@ -295,7 +355,9 @@ const CheckoutPage = () => {
                 <Box sx={{ flexGrow: 1 }}>
                   <Typography variant="body2">{item.product.name}</Typography>
                   <Typography variant="caption">
-                    ₹{item.product.price} × {item.quantity}
+                    ₹{(item.product.offerPrice > 0 && item.product.offerPrice < item.product.price) 
+                      ? item.product.offerPrice 
+                      : item.product.price} × {item.quantity}
                   </Typography>
                 </Box>
 
@@ -319,7 +381,9 @@ const CheckoutPage = () => {
                 </IconButton>
 
                 <Typography sx={{ ml: 2 }}>
-                  ₹{(item.product.price * item.quantity).toFixed(2)}
+                  ₹{(((item.product.offerPrice > 0 && item.product.offerPrice < item.product.price) 
+                    ? item.product.offerPrice 
+                    : item.product.price) * item.quantity).toFixed(2)}
                 </Typography>
               </Box>
             ))}

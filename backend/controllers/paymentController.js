@@ -106,6 +106,7 @@ const verifyRazorpayPayment = asyncHandler(async (req, res) => {
                         order.isPaid = true;
                         order.paidAt = new Date();
                         order.paymentStatus = 'completed';
+                        order.orderStatus = 'confirmed'; // Promote from pending_payment
                         order.paymentResult = {
                             id: razorpay_payment_id,
                             status: 'completed',
@@ -458,13 +459,30 @@ const requestPayout = asyncHandler(async (req, res) => {
         const createdPayout = await payout.save();
 
         // Notify Admin about the new payout request
-        await Notification.create({
-            user: process.env.ADMIN_USER_ID,
-            type: 'SYSTEM',
-            message: `New payout of ₹${amount.toFixed(2)} requested by ${seller.name || seller.email}.`,
-            relatedEntity: createdPayout._id,
-            entityModel: 'Payout'
-        });
+        try {
+            // Priority: .env ADMIN_USER_ID > find first super_admin > find first admin
+            let adminId = process.env.ADMIN_USER_ID;
+            if (!adminId) {
+                const adminUser = await User.findOne({ role: { $in: ['admin', 'super_admin'] } }).sort({ role: 1 }); // super_admin favored
+                adminId = adminUser?._id;
+            }
+
+            if (adminId) {
+                await Notification.create({
+                    user: adminId,
+                    type: 'SYSTEM',
+                    message: `New payout of ₹${amount.toFixed(2)} requested by ${seller.name || seller.email}.`,
+                    relatedEntity: createdPayout._id,
+                    entityModel: 'Payout'
+                });
+                console.log(`✅ Payout notification sent to admin: ${adminId}`);
+            } else {
+                console.warn('⚠️ No admin found to notify about payout request');
+            }
+        } catch (notifError) {
+            console.error('❌ Failed to send payout notification:', notifError.message);
+            // Non-blocking: We don't want to fail the payout if notification fails
+        }
 
         res.status(201).json({ message: 'Payout requested', payout: createdPayout });
     } catch (error) {
@@ -562,6 +580,7 @@ const getSellerPayments = asyncHandler(async (req, res) => {
  * @access  Public (Order ID validates it)
  */
 const renderRazorpayCheckout = asyncHandler(async (req, res) => {
+    console.log('💳 Razorpay: Creating Payment Link for Order ID:', req.params.orderId);
     const { orderId } = req.params;
     const order = await Order.findById(orderId).populate('user');
 
@@ -573,113 +592,250 @@ const renderRazorpayCheckout = asyncHandler(async (req, res) => {
         return res.send('<h1>Order is already paid!</h1><script>setTimeout(() => { window.location.href="ricemill://payment-success"; }, 2000);</script>');
     }
 
-    // Create Razorpay Order if not exists
-    let razorpayOrderId = order.razorpayOrderId;
-    if (!razorpayOrderId) {
-        if (!razorpayInstance) {
-            return res.status(503).send('Payments are currently unavailable.');
-        }
-
-        const options = {
-            amount: Math.round(order.totalPrice * 100), // convert to paisa
-            currency: 'INR',
-            receipt: order._id.toString().slice(-40),
-        };
-
-        const rzpOrder = await razorpayInstance.orders.create(options);
-        razorpayOrderId = rzpOrder.id;
-        order.razorpayOrderId = razorpayOrderId;
-        await order.save();
-    }
-
     const razorpayKey = process.env.RAZORPAY_KEY_ID;
-    const token = req.query.token;
+    const razorpaySecret = process.env.RAZORPAY_KEY_SECRET;
 
-    // Render simple checkout page
-    const html = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>RiceMill Express Payment</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style>
-          body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f4f4f4; }
-          .card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; max-width: 90%; }
-          button { background: #4CAF50; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 20px; }
-          .amount { font-size: 24px; font-weight: bold; color: #333; margin: 10px 0; }
-        </style>
-      </head>
-      <body>
-        <div class="card">
-          <img src="https://razorpay.com/favicon.png" width="50" style="margin-bottom: 10px;" />
-          <h2>Order Payment</h2>
-          <p>Order ID: #${order._id.toString().slice(-6)}</p>
-          <div class="amount">₹${order.totalPrice}</div>
-          <button id="pay-btn">Pay Now</button>
-        </div>
+    // Initialize Razorpay
+    const instance = new Razorpay({
+        key_id: razorpayKey,
+        key_secret: razorpaySecret,
+    });
 
-        <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-        <script>
-          const token = "${token}";
-          const options = {
-            key: "${razorpayKey}",
-            amount: ${Math.round(order.totalPrice * 100)},
+    try {
+        // Create a Payment Link
+        const paymentLink = await instance.paymentLink.create({
+            amount: Math.round((order.finalPaidAmount || order.totalPrice) * 100),
             currency: "INR",
-            name: "RiceMill Express",
-            description: "Order #${order._id.toString().slice(-6)}",
-            order_id: "${razorpayOrderId}",
-            handler: function (response) {
-              // On success, verify via backend
-              fetch('/api/payments/razorpay/verify', {
-                method: 'POST',
-                headers: { 
-                  'Content-Type': 'application/json',
-                  'Authorization': 'Bearer ' + token
-                },
-                body: JSON.stringify({
-                  razorpay_order_id: response.razorpay_order_id,
-                  razorpay_payment_id: response.razorpay_payment_id,
-                  razorpay_signature: response.razorpay_signature
-                })
-              })
-              .then(res => res.json())
-              .then(data => {
-                if (data.success) {
-                  window.location.href = "ricemill://payment-success?orderId=${order._id}";
-                } else {
-                  alert("Verification failed: " + data.message);
-                }
-              })
-              .catch(err => alert("Error verifying payment"));
+            accept_partial: false,
+            description: `Order #${order._id.toString().slice(-6)}`,
+            customer: {
+                name: order.user?.name || "Customer",
+                email: order.user?.email || "customer@example.com",
+                contact: order.user?.phone || ""
             },
-            prefill: {
-              name: "${order.user?.name || ''}",
-              email: "${order.user?.email || ''}",
-              contact: "${order.user?.phone || ''}"
+            notify: {
+                sms: true,
+                email: true
             },
-            theme: { color: "#4CAF50" }
-          };
+            reminder_enable: true,
+            notes: {
+                order_id: order._id.toString()
+            },
+            callback_url: `http://10.151.178.143:5001/api/payments/razorpay/verify-link?orderId=${order._id}`,
+            callback_method: "get"
+        });
 
-          const rzp = new Razorpay(options);
-          
-          document.getElementById('pay-btn').onclick = function() {
-            rzp.open();
-          };
-
-          // Auto-open on load
-          window.onload = function() {
-            rzp.open();
-          };
-        </script>
-      </body>
-    </html>
-  `;
-
-    res.send(html);
+        console.log('✅ Razorpay Payment Link Created:', paymentLink.short_url);
+        res.redirect(paymentLink.short_url);
+    } catch (error) {
+        console.error('❌ Razorpay Payment Link Error:', error);
+        res.status(500).send(`
+            <html>
+                <body style="font-family: sans-serif; padding: 20px; text-align: center;">
+                    <h2>Payment Initialization Failed</h2>
+                    <p>${error.description || error.message || 'Unknown error'}</p>
+                    <button onclick="window.location.reload()">Try Again</button>
+                </body>
+            </html>
+        `);
+    }
 });
 
+/**
+ * @desc    Render a Razorpay checkout page for a 20% advance payment (Mobile/Web redirect)
+ * @route   GET /api/payments/razorpay/pay-advance/:orderId
+ * @access  Public (Order ID validates it)
+ */
+const renderRazorpayAdvanceCheckout = asyncHandler(async (req, res) => {
+    console.log('💳 Razorpay: Creating Advance Payment Link for Order ID:', req.params.orderId);
+    const { orderId } = req.params;
+    const order = await Order.findById(orderId).populate('user');
 
+    if (!order) {
+        return res.status(404).send('Order not found');
+    }
 
+    if (order.isAdvancePaid || order.isPaid) {
+        return res.send('<h1>Advance is already paid!</h1><script>setTimeout(() => { window.location.href="ricemill://payment-success"; }, 2000);</script>');
+    }
+
+    const advanceAmount = Math.round(order.totalPrice * 0.2);
+
+    const razorpayKey = process.env.RAZORPAY_KEY_ID;
+    const razorpaySecret = process.env.RAZORPAY_KEY_SECRET;
+
+    // Initialize Razorpay
+    const instance = new Razorpay({
+        key_id: razorpayKey,
+        key_secret: razorpaySecret,
+    });
+
+    try {
+        // Create a Payment Link
+        const paymentLink = await instance.paymentLink.create({
+            amount: advanceAmount * 100,
+            currency: "INR",
+            accept_partial: false,
+            description: `Advance 20% for COD Order #${order._id.toString().slice(-6)}`,
+            customer: {
+                name: order.user?.name || "Customer",
+                email: order.user?.email || "customer@example.com",
+                contact: order.user?.phone || ""
+            },
+            notify: {
+                sms: true,
+                email: true
+            },
+            reminder_enable: true,
+            notes: {
+                order_id: order._id.toString(),
+                is_advance: 'true'
+            },
+            callback_url: `http://10.151.178.143:5001/api/payments/razorpay/verify-advance-link?orderId=${order._id}`,
+            callback_method: "get"
+        });
+
+        console.log('✅ Razorpay Advance Payment Link Created:', paymentLink.short_url);
+        res.redirect(paymentLink.short_url);
+    } catch (error) {
+        console.error('❌ Razorpay Advance Payment Link Error:', error);
+        res.status(500).send(`
+            <html>
+                <body style="font-family: sans-serif; padding: 20px; text-align: center;">
+                    <h2>Payment Initialization Failed</h2>
+                    <p>${error.description || error.message || 'Unknown error'}</p>
+                    <button onclick="window.location.reload()">Try Again</button>
+                </body>
+            </html>
+        `);
+    }
+});
+
+const verifyRazorpayLink = asyncHandler(async (req, res) => {
+    console.log('🔄 Razorpay: Verifying Payment Link Callback:', req.query);
+    const { orderId, razorpay_payment_id, razorpay_payment_link_status } = req.query;
+
+    if (razorpay_payment_link_status === 'paid') {
+        const order = await Order.findById(orderId);
+        if (order) {
+            // Update Order Status
+            order.isPaid = true;
+            order.paidAt = Date.now();
+            order.paymentStatus = 'completed';
+            order.orderStatus = 'confirmed'; // ✅ FIX: Move from pending_payment to confirmed
+            order.paymentResult = {
+                id: razorpay_payment_id,
+                status: 'completed',
+                update_time: new Date()
+            };
+            await order.save();
+            console.log('✅ Order Payment Verified & Confirmed via Link:', orderId);
+            
+            // ✅ Trigger Socket Broadcast to update Mobile UI immediately
+            if (req.broadcastOrderUpdate) {
+                await req.broadcastOrderUpdate(orderId, { status: 'confirmed' });
+            }
+
+            // ✅ Clear User Cart (since order is now fully confirmed)
+            try {
+                await User.findByIdAndUpdate(order.user, { $set: { cartItems: [] } });
+                console.log('🛒 Cart cleared for user:', order.user);
+            } catch (cartErr) {
+                console.error('⚠️ Failed to clear cart after payment:', cartErr);
+            }
+            
+            // Redirect to mobile app success deep link
+            // We'll use both common deep link schemes for maximum compatibility
+            return res.send(`
+                <html>
+                    <head><title>Payment Success</title></head>
+                    <body style="font-family: sans-serif; text-align: center; padding: 50px;">
+                        <div style="color: #4CAF50; font-size: 48px;">✔</div>
+                        <h2>Payment Successful!</h2>
+                        <p>Updating your order status...</p>
+                        <p>Redirecting you back to the app...</p>
+                        <script>
+                            // Try multiple schemes
+                            const orderId = "${orderId}";
+                            setTimeout(() => {
+                                window.location.href = "ricemill://payment-success?orderId=" + orderId;
+                                // Fallback for Expo Go
+                                setTimeout(() => {
+                                    window.location.href = "exp://10.151.178.143:8081/--/payment-success?orderId=" + orderId;
+                                }, 1000);
+                            }, 1000);
+                        </script>
+                    </body>
+                </html>
+            `);
+        }
+    }
+
+    // If failed or status not paid
+    res.redirect(`ricemill://payment-failed?orderId=${orderId}`);
+});
+
+const verifyRazorpayAdvanceLink = asyncHandler(async (req, res) => {
+    console.log('🔄 Razorpay: Verifying Advance Payment Link Callback:', req.query);
+    const { orderId, razorpay_payment_id, razorpay_payment_link_status } = req.query;
+
+    if (razorpay_payment_link_status === 'paid') {
+        const order = await Order.findById(orderId);
+        if (order) {
+            const advanceAmount = Math.round(order.totalPrice * 0.2);
+            // Update Order Status
+            order.isAdvancePaid = true;
+            order.advanceAmountPaid = advanceAmount;
+            order.remainingCodAmount = order.totalPrice - advanceAmount;
+            order.paymentStatus = 'partial';
+            order.orderStatus = 'confirmed'; // Confirmed now that advance is paid
+            
+            await order.save();
+            console.log('✅ Order Advance Payment Verified & Confirmed via Link:', orderId);
+            
+            // ✅ Trigger Socket Broadcast to update Mobile UI immediately
+            if (req.broadcastOrderUpdate) {
+                await req.broadcastOrderUpdate(orderId, { status: 'confirmed' });
+            }
+
+            // ✅ Clear User Cart (since order is now fully confirmed)
+            try {
+                await User.findByIdAndUpdate(order.user, { $set: { cartItems: [] } });
+                console.log('🛒 Cart cleared for user:', order.user);
+            } catch (cartErr) {
+                console.error('⚠️ Failed to clear cart after payment:', cartErr);
+            }
+            
+            // Redirect to mobile app success deep link
+            // We'll use both common deep link schemes for maximum compatibility
+            return res.send(`
+                <html>
+                    <head><title>Payment Success</title></head>
+                    <body style="font-family: sans-serif; text-align: center; padding: 50px;">
+                        <div style="color: #4CAF50; font-size: 48px;">✔</div>
+                        <h2>Advance Payment Successful!</h2>
+                        <p>Updating your order status...</p>
+                        <p>Redirecting you back to the app...</p>
+                        <script>
+                            // Try multiple schemes
+                            const orderId = "${orderId}";
+                            setTimeout(() => {
+                                window.location.href = "ricemill://payment-success?orderId=" + orderId;
+                                // Fallback for Expo Go
+                                setTimeout(() => {
+                                    window.location.href = "exp://10.151.178.143:8081/--/payment-success?orderId=" + orderId;
+                                }, 1000);
+                            }, 1000);
+                        </script>
+                    </body>
+                </html>
+            `);
+        }
+    }
+
+    // If failed or status not paid
+    res.redirect(`ricemill://payment-failed?orderId=${orderId}`);
+});
 
 module.exports = {
     createRazorpayOrder,
@@ -689,4 +845,7 @@ module.exports = {
     requestPayout,
     getSellerPayments,
     renderRazorpayCheckout,
+    verifyRazorpayLink,
+    renderRazorpayAdvanceCheckout,
+    verifyRazorpayAdvanceLink
 };

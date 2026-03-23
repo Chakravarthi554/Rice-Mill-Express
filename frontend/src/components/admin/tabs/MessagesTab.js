@@ -47,7 +47,7 @@ import io from 'socket.io-client';
 import AdminChatWindow from '../AdminChatWindow';
 import { Add as AddIcon } from '@mui/icons-material';
 
-const socketUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const socketUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 
 const MessagesTab = () => {
   const { userInfo } = useSelector(state => state.userLogin);

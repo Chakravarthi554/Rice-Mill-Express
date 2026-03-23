@@ -118,7 +118,7 @@ const LoginPage = () => {
       // ✅ Get Firebase ID token and send to backend
       const idToken = await result.user.getIdToken();
 
-      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
       const response = await fetch(`${API_BASE_URL}/api/auth/google-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -448,3 +448,4 @@ const LoginPage = () => {
 };
 
 export default LoginPage;
+

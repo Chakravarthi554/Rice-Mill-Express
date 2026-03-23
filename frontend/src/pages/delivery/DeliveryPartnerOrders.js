@@ -148,7 +148,7 @@ const DeliveryPartnerOrders = () => {
                     <Card>
                         <CardContent>
                             <Typography variant="h4" color="warning.main">
-                                {orders.filter((o) => o.deliveryPartnerStatus === 'in_transit').length}
+                                {orders.filter((o) => ['picked_up', 'in_transit'].includes(o.deliveryPartnerStatus)).length}
                             </Typography>
                             <Typography variant="body2" color="textSecondary">
                                 In Transit

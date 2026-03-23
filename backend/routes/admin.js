@@ -93,14 +93,6 @@ const {
 
 // ✅ FIXED: Extract payment controller functions with fallbacks
 const {
-  getAdminPaymentStats = (req, res) => res.status(501).json({ message: 'Function not available' }),
-  getAdminTransactions = (req, res) => res.status(501).json({ message: 'Function not available' }),
-  processRefund = (req, res) => res.status(501).json({ message: 'Function not available' }),
-  releasePayout = (req, res) => res.status(501).json({ message: 'Function not available' }),
-  getPayoutsList = (req, res) => res.status(501).json({ message: 'Function not available' }),
-  flagPayment = (req, res) => res.status(501).json({ message: 'Function not available' }),
-  exportPaymentReport = (req, res) => res.status(501).json({ message: 'Function not available' }),
-  getSellerPaymentHistory = (req, res) => res.status(501).json({ message: 'Function not available' }),
   getCustomerWithdrawals = (req, res) => res.status(501).json({ message: 'Function not available' }),
   moderateCustomerWithdrawal = (req, res) => res.status(501).json({ message: 'Function not available' })
 } = adminPaymentController;
@@ -160,16 +152,8 @@ router.get('/engagement/recipes', protect, admin, getAdminRecipesEngagement);
 router.post('/comments/moderate', protect, admin, moderateComment);
 
 // ----------------------------
-// ADMIN PAYMENT ROUTES
+// ADMIN WITHDRAWAL ROUTES (Keep these as they are not in adminPaymentRoutes yet)
 // ----------------------------
-router.get('/payments/stats', protect, admin, getAdminPaymentStats);
-router.get('/payments/transactions', protect, admin, getAdminTransactions);
-router.post('/payments/refund/:paymentId', protect, admin, processRefund);
-router.post('/payments/payout/:payoutId/release', protect, admin, releasePayout);
-router.get('/payments/payouts', protect, admin, getPayoutsList);
-router.post('/payments/flag/:paymentId', protect, admin, flagPayment);
-router.get('/payments/export', protect, admin, exportPaymentReport);
-router.get('/payments/seller/:sellerId', protect, admin, getSellerPaymentHistory);
 router.get('/payments/withdrawals', protect, admin, getCustomerWithdrawals);
 router.put('/payments/withdrawals/:id', protect, admin, moderateCustomerWithdrawal);
 

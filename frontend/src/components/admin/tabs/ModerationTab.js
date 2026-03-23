@@ -76,7 +76,7 @@ const ModerationTab = () => {
 
   useEffect(() => {
     // Setup socket for real-time updates with proper URL fallback and error handling
-    const socketUrl = process.env.REACT_APP_SOCKET_URL || process.env.REACT_APP_API_URL || "http://localhost:5000";
+    const socketUrl = process.env.REACT_APP_SOCKET_URL || process.env.REACT_APP_API_URL || "http://localhost:5001";
 
     try {
       socketRef.current = io(socketUrl, {

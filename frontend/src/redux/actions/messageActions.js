@@ -1,4 +1,4 @@
-import axios from "axios";
+import api from "../../utils/api";
 import {
   MESSAGE_SEND_REQUEST,
   MESSAGE_SEND_SUCCESS,
@@ -34,7 +34,9 @@ export const sendMessage = (messageData) => async (dispatch, getState) => {
         "Content-Type": "multipart/form-data",
       },
     };
-    const { data } = await axios.post("/api/messages/send", messageData, config);
+    const { data } = await api.post("/api/messages/send", messageData, {
+      headers: { "Content-Type": "multipart/form-data" }
+    });
     dispatch({ type: MESSAGE_SEND_SUCCESS, payload: data });
   } catch (error) {
     const errorMessage = error.response && error.response.data.message
@@ -53,7 +55,7 @@ export const getChatHistory = (receiverId, page = 1, limit = 10) => async (dispa
     dispatch({ type: MESSAGE_HISTORY_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await axios.get(`/api/messages/history/${receiverId}?page=${page}&limit=${limit}`, config);
+    const { data } = await api.get(`/api/messages/history/${receiverId}?page=${page}&limit=${limit}`);
     dispatch({ type: MESSAGE_HISTORY_SUCCESS, payload: data });
   } catch (error) {
     dispatch({
@@ -68,7 +70,7 @@ export const getAllChatsForAdmin = (page = 1, limit = 10) => async (dispatch, ge
     dispatch({ type: MESSAGE_ADMIN_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await axios.get(`/api/messages/admin/chats?page=${page}&limit=${limit}`, config);
+    const { data } = await api.get(`/api/messages/admin/chats?page=${page}&limit=${limit}`);
     dispatch({ type: MESSAGE_ADMIN_SUCCESS, payload: data });
   } catch (error) {
     dispatch({
@@ -83,7 +85,7 @@ export const flagMessage = (messageId) => async (dispatch, getState) => {
     dispatch({ type: MESSAGE_FLAG_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await axios.put(`/api/messages/flag/${messageId}`, {}, config);
+    const { data } = await api.put(`/api/messages/flag/${messageId}`, {});
     dispatch({ type: MESSAGE_FLAG_SUCCESS, payload: data });
     dispatch(getAllChatsForAdmin()); // Refresh admin chats after flagging
   } catch (error) {
@@ -99,7 +101,7 @@ export const deleteMessage = (messageId) => async (dispatch, getState) => {
     dispatch({ type: MESSAGE_DELETE_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await axios.delete(`/api/messages/delete/${messageId}`, config);
+    const { data } = await api.delete(`/api/messages/delete/${messageId}`);
     dispatch({ type: MESSAGE_DELETE_SUCCESS, payload: data });
     dispatch(getAllChatsForAdmin()); // Refresh admin chats after deletion
   } catch (error) {
@@ -115,7 +117,7 @@ export const blockUser = (userId) => async (dispatch, getState) => {
     dispatch({ type: MESSAGE_BLOCK_USER_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await axios.put(`/api/messages/block/${userId}`, {}, config);
+    const { data } = await api.put(`/api/messages/block/${userId}`, {});
     dispatch({ type: MESSAGE_BLOCK_USER_SUCCESS, payload: data });
     dispatch(getAllChatsForAdmin()); // Refresh admin chats after blocking
   } catch (error) {
@@ -132,7 +134,7 @@ export const getMessages = (postId) => async (dispatch, getState) => {
     dispatch({ type: MESSAGE_GET_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await axios.get(`/api/messages/post/${postId}`, config);
+    const { data } = await api.get(`/api/messages/post/${postId}`);
     dispatch({ type: MESSAGE_GET_SUCCESS, payload: data });
   } catch (error) {
     dispatch({

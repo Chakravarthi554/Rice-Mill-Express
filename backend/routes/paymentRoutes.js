@@ -31,7 +31,14 @@ router.get('/health', (req, res) => {
   });
 });
 
-// All routes require admin authentication
+const paymentController = require('../controllers/paymentController');
+
+// 🌐 PUBLIC ROUTES (MUST be before protect middleweare)
+router.get('/razorpay/pay/:orderId', paymentController.renderRazorpayCheckout);
+router.get('/razorpay/verify-link', paymentController.verifyRazorpayLink);
+router.get('/razorpay/pay-advance/:orderId', paymentController.renderRazorpayAdvanceCheckout);
+router.get('/razorpay/verify-advance-link', paymentController.verifyRazorpayAdvanceLink);
+
 // All routes require authentication
 router.use(protect);
 
@@ -47,11 +54,9 @@ const validateController = (controller, functionName) => {
 router.post('/add-card', validateController(userController, 'addPaymentMethod'));
 router.delete('/cards/:id', validateController(userController, 'deletePaymentMethod'));
 
-// ✅ FIXED: Razorpay routes for customers (MUST be before admin authorization)
-const paymentController = require('../controllers/paymentController');
+// ✅ FIXED: Razorpay routes for customers (Secure)
 router.post('/razorpay/order', paymentController.createRazorpayOrder);
 router.post('/razorpay/verify', paymentController.verifyRazorpayPayment);
-router.get('/razorpay/pay/:orderId', paymentController.renderRazorpayCheckout);
 
 // ✅ NEW: Seller payment routes
 router.get('/seller', authorize('seller'), paymentController.getSellerPayments);

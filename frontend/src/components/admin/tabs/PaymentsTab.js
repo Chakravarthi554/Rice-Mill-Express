@@ -46,16 +46,20 @@ import {
   getAdminPaymentStats,
   getAdminTransactions,
   processRefund,
-  releasePayout,
   getPayoutsList,
   flagPayment,
-  exportPaymentReport
+  exportPaymentReport,
+  releasePayout,
+  getAdminCODSettlements,
+  settleCOD
 } from '../../../redux/actions/adminPaymentActions';
 
-// ✅ ADDED: Import selectors or create them
 const selectAdminPaymentStats = (state) => state.adminPaymentStats || {};
+
 const selectAdminTransactions = (state) => state.adminTransactions || {};
 const selectAdminPayoutsList = (state) => state.adminPayoutsList || {};
+const selectAdminCODSettlements = (state) => state.adminCODSettlements || {};
+const selectAdminSettleCOD = (state) => state.adminSettleCOD || {};
 
 const PaymentsTab = () => {
   const dispatch = useDispatch();
@@ -71,8 +75,10 @@ const PaymentsTab = () => {
   });
 
   const { stats = {}, loading: statsLoading } = useSelector(selectAdminPaymentStats);
-  const { transactions = [], loading: transactionsLoading, total = 0, totalPages = 0 } = useSelector(selectAdminTransactions);
+  const { transactions = [], loading: transactionsLoading, total = 0 } = useSelector(selectAdminTransactions);
   const { payouts = [], loading: payoutsLoading } = useSelector(selectAdminPayoutsList);
+  const { settlements = [], loading: settlementsLoading, total: settlementsTotal } = useSelector(selectAdminCODSettlements);
+  const { success: settleSuccess } = useSelector(selectAdminSettleCOD);
 
   useEffect(() => {
     loadData();
@@ -85,6 +91,8 @@ const PaymentsTab = () => {
       dispatch(getAdminTransactions(filters));
     } else if (activeTab === 1) {
       dispatch(getPayoutsList(filters));
+    } else if (activeTab === 3) {
+      dispatch(getAdminCODSettlements(filters));
     }
   };
 
@@ -115,6 +123,12 @@ const PaymentsTab = () => {
     const { payout } = payoutDialog;
     dispatch(releasePayout(payout._id, { notes: 'Payout released by admin' }));
     setPayoutDialog({ open: false, payout: null });
+  };
+
+  const handleSettleCOD = (orderId) => {
+    if (window.confirm('Are you sure you want to mark this COD as settled?')) {
+      dispatch(settleCOD(orderId));
+    }
   };
 
   const confirmFlag = () => {
@@ -538,7 +552,7 @@ const PaymentsTab = () => {
       {activeTab === 3 && (
         <Box>
           <Alert severity="info" sx={{ mb: 3 }}>
-            Review and settle cash collected by delivery partners.
+            Review and settle cash collected by delivery partners. Outstand settlement: ₹{stats?.codSettlements?.totalAmount?.toLocaleString('en-IN') || 0} ({stats?.codSettlements?.count || 0} orders)
           </Alert>
           <TableContainer component={Paper}>
             <Table>
@@ -546,19 +560,67 @@ const PaymentsTab = () => {
                 <TableRow>
                   <TableCell>Order ID</TableCell>
                   <TableCell>Delivery Partner</TableCell>
+                  <TableCell>Customer</TableCell>
                   <TableCell>Amount</TableCell>
                   <TableCell>Collected At</TableCell>
                   <TableCell>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                <TableRow>
-                  <TableCell colSpan={5} align="center">
-                    <Typography color="textSecondary">COD Settlement feature requires backend integration. Please use the API for now.</Typography>
-                  </TableCell>
-                </TableRow>
+                {settlementsLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} align="center">
+                      <CircularProgress />
+                    </TableCell>
+                  </TableRow>
+                ) : settlements.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} align="center">
+                      <Typography color="textSecondary">No outstanding COD settlements</Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  settlements.map((settlement) => (
+                    <TableRow key={settlement._id}>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                          #{settlement._id?.slice(-8).toUpperCase()}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        {settlement.deliveryPartner?.name || 'N/A'}
+                      </TableCell>
+                      <TableCell>
+                        {settlement.user?.name || 'N/A'}
+                      </TableCell>
+                      <TableCell>₹{settlement.totalPrice?.toLocaleString('en-IN') || 0}</TableCell>
+                      <TableCell>
+                        {settlement.codCollectedAt ? new Date(settlement.codCollectedAt).toLocaleString() : settlement.deliveredAt ? new Date(settlement.deliveredAt).toLocaleString() : 'N/A'}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          color="success"
+                          onClick={() => handleSettleCOD(settlement._id)}
+                        >
+                          Settle Now
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
+            <TablePagination
+              rowsPerPageOptions={[5, 10, 25]}
+              component="div"
+              count={settlementsTotal || 0}
+              rowsPerPage={filters.limit}
+              page={filters.page - 1}
+              onPageChange={(e, newPage) => setFilters({ ...filters, page: newPage + 1 })}
+              onRowsPerPageChange={(e) => setFilters({ ...filters, limit: parseInt(e.target.value), page: 1 })}
+            />
           </TableContainer>
         </Box>
       )}

@@ -1,5 +1,4 @@
-// src/redux/actions/cartActions.js
-import axios from 'axios';
+import api from '../../utils/api';
 import {
   CART_ADD_ITEM,
   CART_REMOVE_ITEM,
@@ -20,7 +19,7 @@ export const addToCart = (productId, qty) => async (dispatch, getState) => {
         Authorization: `Bearer ${userInfo.token}`,
       },
     };
-    const { data } = await axios.post('/api/cart', { product: productId, qty }, config);
+    const { data } = await api.post('/api/cart', { product: productId, qty });
     // data = array of { product: { _id, name, price, ... }, qty }
     dispatch({ type: CART_REPLACE_ITEMS, payload: data });
     localStorage.setItem('cartItems', JSON.stringify(data));
@@ -39,8 +38,8 @@ export const removeFromCart = (productId) => async (dispatch, getState) => {
     const config = {
       headers: { Authorization: `Bearer ${userInfo.token}` },
     };
-    await axios.delete(`/api/cart/${productId}`, config);
-    const { data } = await axios.get('/api/cart', config); // Refresh cart
+    await api.delete(`/api/cart/${productId}`);
+    const { data } = await api.get('/api/cart'); // Refresh cart
     dispatch({ type: CART_REPLACE_ITEMS, payload: data });
     localStorage.setItem('cartItems', JSON.stringify(data));
   } catch (error) {
@@ -56,7 +55,7 @@ export const listMyCart = () => async (dispatch, getState) => {
     const config = {
       headers: { Authorization: `Bearer ${userInfo.token}` },
     };
-    const { data } = await axios.get('/api/cart', config);
+    const { data } = await api.get('/api/cart');
     dispatch({ type: CART_REPLACE_ITEMS, payload: data });
     localStorage.setItem('cartItems', JSON.stringify(data));
   } catch (error) {
@@ -72,7 +71,7 @@ export const clearCart = () => async (dispatch, getState) => {
     const config = {
       headers: { Authorization: `Bearer ${userInfo.token}` },
     };
-    await axios.delete('/api/cart', config);
+    await api.delete('/api/cart');
     dispatch({ type: CART_CLEAR_ITEMS });
     localStorage.removeItem('cartItems');
   } catch (error) {

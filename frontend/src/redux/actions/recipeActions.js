@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from '../../utils/api';
 import {
   RECIPE_SUBMIT_REQUEST, RECIPE_SUBMIT_SUCCESS, RECIPE_SUBMIT_FAIL,
   RECIPE_LIST_REQUEST, RECIPE_LIST_SUCCESS, RECIPE_LIST_FAIL,
@@ -28,7 +28,9 @@ export const submitRecipe = (formData) => async (dispatch, getState) => {
     };
 
     console.log('📝 Submitting recipe...');
-    const { data } = await axios.post('/api/recipes/submit', formData, config);
+    const { data } = await api.post('/api/recipes/submit', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
 
     dispatch({
       type: RECIPE_SUBMIT_SUCCESS,
@@ -52,7 +54,7 @@ export const submitRecipe = (formData) => async (dispatch, getState) => {
 export const listRecipes = (query = {}) => async (dispatch) => {
   try {
     dispatch({ type: RECIPE_LIST_REQUEST });
-    const { data } = await axios.get('/api/recipes', { params: query });
+    const { data } = await api.get('/api/recipes', { params: query });
     dispatch({ type: RECIPE_LIST_SUCCESS, payload: data });
   } catch (error) {
     dispatch({
@@ -71,7 +73,7 @@ export const listMyRecipes = (query = {}) => async (dispatch, getState) => {
       headers: { Authorization: `Bearer ${userInfo.token}` },
       params: query
     };
-    const { data } = await axios.get('/api/recipes/myrecipes', config);
+    const { data } = await api.get('/api/recipes/myrecipes', { params: query });
     dispatch({ type: RECIPE_LIST_MY_SUCCESS, payload: data });
   } catch (error) {
     dispatch({
@@ -90,7 +92,7 @@ export const listPendingRecipes = (query = {}) => async (dispatch, getState) => 
       headers: { Authorization: `Bearer ${userInfo.token}` },
       params: query
     };
-    const { data } = await axios.get('/api/recipes/pending', config);
+    const { data } = await api.get('/api/recipes/pending', { params: query });
     dispatch({ type: RECIPE_LIST_PENDING_SUCCESS, payload: data });
   } catch (error) {
     dispatch({
@@ -104,7 +106,7 @@ export const listPendingRecipes = (query = {}) => async (dispatch, getState) => 
 export const getRecipeDetails = (id) => async (dispatch) => {
   try {
     dispatch({ type: RECIPE_DETAILS_REQUEST });
-    const { data } = await axios.get(`/api/recipes/${id}`);
+    const { data } = await api.get(`/api/recipes/${id}`);
     dispatch({ type: RECIPE_DETAILS_SUCCESS, payload: data });
   } catch (error) {
     dispatch({
@@ -131,7 +133,7 @@ export const approveRecipe = (id, status, rejectionReason = '') => async (dispat
       requestBody.rejectionReason = rejectionReason;
     }
 
-    const { data } = await axios.put(`/api/recipes/${id}/approve`, requestBody, config);
+    const { data } = await api.put(`/api/recipes/${id}/approve`, requestBody);
     dispatch({ type: RECIPE_APPROVE_SUCCESS, payload: data });
     return Promise.resolve(data);
   } catch (error) {
@@ -147,7 +149,7 @@ export const rateRecipe = (id, rating) => async (dispatch, getState) => {
     dispatch({ type: RECIPE_RATE_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await axios.post(`/api/social/recipes/${id}/rate`, { rating }, config);
+    const { data } = await api.post(`/api/social/recipes/${id}/rate`, { rating });
     dispatch({ type: RECIPE_RATE_SUCCESS, payload: data });
     dispatch(getRecipeDetails(id));
     return Promise.resolve(data);
@@ -164,7 +166,7 @@ export const commentOnRecipe = (id, comment) => async (dispatch, getState) => {
     dispatch({ type: RECIPE_COMMENT_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await axios.post(`/api/social/recipes/${id}/comment`, { content: comment }, config);
+    const { data } = await api.post(`/api/social/recipes/${id}/comment`, { content: comment });
     dispatch({ type: RECIPE_DETAILS_SUCCESS, payload: data });
     dispatch({ type: RECIPE_COMMENT_SUCCESS });
     return Promise.resolve(data);
@@ -181,7 +183,7 @@ export const deleteRecipe = (id) => async (dispatch, getState) => {
     dispatch({ type: RECIPE_DELETE_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    await axios.delete(`/api/recipes/${id}`, config);
+    await api.delete(`/api/recipes/${id}`);
     dispatch({ type: RECIPE_DELETE_SUCCESS, payload: id });
     return Promise.resolve();
   } catch (error) {
@@ -204,11 +206,7 @@ export const moderateRecipeComment = (recipeId, commentId, action) => async (dis
       },
     };
 
-    const { data } = await axios.put(
-      `/api/social/comments/${commentId}/moderate`,
-      { action },
-      config
-    );
+    const { data } = await api.put(`/api/social/comments/${commentId}/moderate`, { action });
 
     dispatch({
       type: RECIPE_COMMENT_MODERATE_SUCCESS,
@@ -239,11 +237,7 @@ export const reportRecipeComment = (recipeId, commentId, reason = '') => async (
       },
     };
 
-    const { data } = await axios.post(
-      `/api/social/recipes/${recipeId}/comments/${commentId}/report`,
-      { reason },
-      config
-    );
+    const { data } = await api.post(`/api/social/recipes/${recipeId}/comments/${commentId}/report`, { reason });
 
     dispatch({
       type: RECIPE_COMMENT_REPORT_SUCCESS,
@@ -271,9 +265,8 @@ export const getFlaggedRecipeComments = (page = 1, limit = 20) => async (dispatc
       headers: { Authorization: `Bearer ${userInfo.token}` },
     };
 
-    const { data } = await axios.get('/api/social/flagged', {
-      params: { page, limit, type: 'recipes' },
-      ...config
+    const { data } = await api.get('/api/social/flagged', {
+      params: { page, limit, type: 'recipes' }
     });
 
     dispatch({
