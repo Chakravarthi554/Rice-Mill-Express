@@ -1,451 +1,188 @@
-import React, { useState, useEffect, useCallback } from 'react';
+// [AI: Premium UI Polish - Rounded inputs, pill buttons, high-contrast branding]
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Container,
-  Box,
-  Typography,
-  TextField,
-  Button,
-  Paper,
-  Divider,
-  Alert,
-  CircularProgress,
-  IconButton,
-  Checkbox,
-  FormControlLabel
+  Container, Box, Typography, TextField, Button, Paper, Divider, Alert, CircularProgress, IconButton, Checkbox, FormControlLabel, InputAdornment
 } from '@mui/material';
-import {
-  Google as GoogleIcon,
-  Close as CloseIcon
-} from '@mui/icons-material';
-import { auth, db } from '../firebase';
-import {
-  signInWithEmailAndPassword,
-  signInWithPhoneNumber,
-  RecaptchaVerifier,
-  signInWithPopup,
-  GoogleAuthProvider
-} from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { Close as CloseIcon, Google as GoogleIcon, Visibility, VisibilityOff, EmailOutlined, LockOutlined, PhoneOutlined } from '@mui/icons-material';
+import { auth } from '../firebase';
+import { signInWithEmailAndPassword, signInWithPhoneNumber, RecaptchaVerifier, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 
 const LoginPage = () => {
   const navigate = useNavigate();
-
-  const [step, setStep] = useState(1); // 1: Email/Phone, 2: Password/OTP
+  const [step, setStep] = useState(1);
   const [emailOrPhone, setEmailOrPhone] = useState('');
   const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
   const [isEmail, setIsEmail] = useState(true);
   const [rememberMe, setRememberMe] = useState(false);
-
+  const [showPassword, setShowPassword] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [confirmationResult, setConfirmationResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
-  // Redirection is now handled centrally by AuthContext
-  // This prevents race conditions where a user might be redirected 
-  // before their role is securely hashed in MongoDB.
-
   const recaptchaRef = React.useRef(null);
 
-  // Setup reCAPTCHA
   useEffect(() => {
     if (!recaptchaRef.current) {
-      try {
-        console.log('🛡️ Recaptcha: Initializing...');
-        recaptchaRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
-          size: 'invisible',
-          callback: () => console.log('✅ reCAPTCHA solved'),
-          'expired-callback': () => {
-            console.log('⚠️ reCAPTCHA expired');
-            if (recaptchaRef.current) recaptchaRef.current.clear();
-            recaptchaRef.current = null;
-          }
-        });
-      } catch (error) {
-        console.error('❌ reCAPTCHA setup error:', error);
-      }
+      try { recaptchaRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible' }); } catch (error) {}
     }
-
-    return () => {
-      // Don't clear on unmount as it might be needed for the async flow, 
-      // but if the app is truly leaving the page, we might want cleanup.
-    };
   }, []);
 
-  // Manual role resolution is now handled by AuthContext listener
-  // We just let the listener in AuthContext handle the sync and redirect
-
   const handleInitialContinue = () => {
-    if (!emailOrPhone.trim()) {
-      setMessage('Please enter your email or phone number');
-      return;
-    }
-
-    // Check if it's email or phone
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const phoneRegex = /^[0-9]{10}$/; // 10 digit phone number
-
-    const isE = emailRegex.test(emailOrPhone.trim());
-    const isP = phoneRegex.test(emailOrPhone.trim());
-
-    console.log('📧 LoginPage: Input:', emailOrPhone);
-    console.log('📧 LoginPage: Is Email?', isE);
-    console.log('📱 LoginPage: Is Phone?', isP);
-
+    if (!emailOrPhone.trim()) { setMessage('Please enter your email or phone number'); return; }
+    const isE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailOrPhone.trim());
     setIsEmail(isE);
-
-    setStep(2);
-    setMessage('');
-  };
-
-  const handleUseDifferentEmail = () => {
-    setStep(1);
-    setPassword('');
-    setOtp('');
-    setOtpSent(false);
+    setStep(2); setMessage('');
   };
 
   const handleGoogleSignIn = async () => {
     try {
-      setLoading(true);
-      setMessage('');
-
+      setLoading(true); setMessage('');
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
-
-      // ✅ Get Firebase ID token and send to backend
       const idToken = await result.user.getIdToken();
-
       const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
       const response = await fetch(`${API_BASE_URL}/api/auth/google-login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken })
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken })
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Google sign-in failed');
-      }
-
-      // Success! AuthContext will handle the redirect.
-      console.log('✅ Google sign-in successful');
-
+      if (!response.ok) throw new Error((await response.json()).message || 'Google sign-in failed');
     } catch (error) {
-      console.error('Google sign-in error:', error);
-      if (error.code === 'auth/popup-blocked') {
-        setMessage('Popup blocked. Please allow popups for this site.');
-      } else if (error.code === 'auth/popup-closed-by-user') {
-        setMessage('Sign-in cancelled.');
-      } else {
-        setMessage(error.message || 'Failed to sign in with Google');
-      }
-    } finally {
-      setLoading(false);
-    }
+      setMessage(error.message || 'Failed to sign in with Google');
+    } finally { setLoading(false); }
   };
 
   const handleFinalContinue = async () => {
-    setLoading(true);
-    setMessage('');
-
+    setLoading(true); setMessage('');
     try {
       if (isEmail) {
-        // Email/Password login
-        console.log('🔐 LoginPage: Attempting email/password login for:', emailOrPhone);
         await signInWithEmailAndPassword(auth, emailOrPhone, password);
-        console.log('✅ LoginPage: Firebase authentication successful');
-        // Success! AuthContext will handle the redirect.
       } else {
-        // Phone OTP flow
         if (!otpSent) {
           const formattedPhone = emailOrPhone.startsWith('+') ? emailOrPhone : `+91${emailOrPhone}`;
-          const appVerifier = recaptchaRef.current;
-
-          if (!appVerifier) {
-            throw new Error('reCAPTCHA not initialized. Please refresh.');
-          }
-
-          const confirmation = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
-          setConfirmationResult(confirmation);
-          setOtpSent(true);
-          setMessage('OTP sent successfully!');
+          setConfirmationResult(await signInWithPhoneNumber(auth, formattedPhone, recaptchaRef.current));
+          setOtpSent(true); setMessage('OTP sent successfully!');
         } else {
           await confirmationResult.confirm(otp);
-          // Success! AuthContext will handle the redirect.
         }
       }
     } catch (error) {
-      console.error('❌ LoginPage: Login error:', error);
-
-      // Provide user-friendly error messages
       let errorMessage = 'Authentication failed. Please try again.';
-
-      if (error.code === 'auth/user-not-found') {
-        errorMessage = 'No account found with this email. Please register first.';
-      } else if (error.code === 'auth/wrong-password') {
-        errorMessage = 'Incorrect password. Please try again.';
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage = 'Invalid email address format.';
-      } else if (error.code === 'auth/user-disabled') {
-        errorMessage = 'This account has been disabled. Please contact support.';
-      } else if (error.code === 'auth/too-many-requests') {
-        errorMessage = 'Too many failed attempts. Please try again later.';
-      } else if (error.code === 'auth/billing-not-enabled') {
-        errorMessage = 'Phone authentication requires a paid plan. Please use Google or Email.';
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-
+      if (error.code === 'auth/user-not-found') errorMessage = 'No account found. Please register.';
+      else if (error.code === 'auth/wrong-password') errorMessage = 'Incorrect password.';
+      else if (error.message) errorMessage = error.message;
       setMessage(errorMessage);
-    } finally {
-      setLoading(false);
+    } finally { setLoading(false); }
+  };
+
+  // UI Styles
+  const inputSx = {
+    '& .MuiOutlinedInput-root': {
+      borderRadius: '16px', bgcolor: '#F9FAFB', transition: 'all 0.2s',
+      '& fieldset': { borderColor: '#E5E7EB', borderWidth: 1 },
+      '&:hover fieldset': { borderColor: '#16A34A' },
+      '&.Mui-focused fieldset': { borderColor: '#16A34A', borderWidth: 2 },
     }
   };
 
   return (
-    <Container component="main" maxWidth={false} disableGutters sx={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: '#f5f5f5',
-      background: 'url("https://images.unsplash.com/photo-1586201375761-83865001e31c?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80")', // Example rice background
-      backgroundSize: 'cover'
-    }}>
-      <Paper elevation={3} sx={{
-        p: 0,
-        width: '100%',
-        maxWidth: 450,
-        borderRadius: 2,
-        overflow: 'hidden',
-        position: 'relative'
-      }}>
-        {/* Close Button */}
-        <IconButton sx={{ position: 'absolute', right: 8, top: 8, color: '#333' }}>
-          <CloseIcon />
-        </IconButton>
+    <Box sx={{ minHeight: '100vh', display: 'flex', bgcolor: '#fff' }}>
+      {/* Left side Image branding */}
+      <Box sx={{ display: { xs: 'none', md: 'flex' }, flex: 1, position: 'relative', bgcolor: '#0D9488', overflow: 'hidden' }}>
+        <img src="https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=1350&q=80" alt="Rice Fields" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.4 }} />
+        <Box sx={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(13,148,136,0.9), transparent)' }} />
+        <Box sx={{ position: 'absolute', bottom: 60, left: 60, color: '#fff', pr: 4 }}>
+          <Box sx={{ width: 48, height: 48, bgcolor: '#fff', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 3 }}>
+            <Typography fontSize={24}>🌾</Typography>
+          </Box>
+          <Typography variant="h3" fontWeight={800} gutterBottom lineHeight={1.2}>Fresh Rice,<br />Delivered Fast.</Typography>
+          <Typography variant="body1" sx={{ opacity: 0.8, maxWidth: 400 }}>Experience premium quality grains sourced directly from local farmers, delivered to your doorstep.</Typography>
+        </Box>
+      </Box>
 
-        <Box sx={{ p: 4 }}>
+      {/* Right side Form */}
+      <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', p: { xs: 3, sm: 6, md: 8 } }}>
+        <Box sx={{ width: '100%', maxWidth: 420 }}>
+          
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 5 }}>
+            <Typography variant="h4" fontWeight={800} color="#111827">Welcome Back</Typography>
+            <IconButton onClick={() => navigate('/')} sx={{ bgcolor: '#F3F4F6', color: '#6B7280', '&:hover': { bgcolor: '#E5E7EB' } }}><CloseIcon /></IconButton>
+          </Box>
+
           {step === 1 ? (
-            <>
-              <Typography variant="h6" sx={{
-                mb: 3,
-                fontWeight: 600,
-                fontSize: '15px',
-                letterSpacing: '0.1em',
-                color: '#333'
-              }}>
-                SIGN IN / CREATE AN ACCOUNT
-              </Typography>
-
-              <Typography variant="body2" sx={{ mb: 4, color: '#666' }}>
-                Enter your email or phone number to sign in or create a new account.
-              </Typography>
-
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="caption" sx={{ display: 'block', mb: 1, fontWeight: 500, color: '#333' }}>
-                  Email or Phone Number <span style={{ color: 'red' }}>*</span>
-                </Typography>
-                <TextField
-                  fullWidth
-                  variant="outlined"
-                  value={emailOrPhone}
-                  onChange={(e) => setEmailOrPhone(e.target.value)}
-                  placeholder="name@email.com or 9876543210"
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '0px',
-                      height: '45px'
-                    }
-                  }}
-                />
-              </Box>
-
-              <Button
-                fullWidth
-                variant="contained"
-                onClick={handleInitialContinue}
-                disabled={loading}
-                sx={{
-                  py: 1.5,
-                  bgcolor: '#000',
-                  color: '#fff',
-                  borderRadius: '0px',
-                  textTransform: 'none',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  '&:hover': {
-                    bgcolor: '#333'
-                  },
-                  mb: 4
-                }}
-              >
-                CONTINUE
+            <Box>
+              <Typography variant="body1" color="text.secondary" mb={4}>Enter your email or phone to continue.</Typography>
+              
+              <TextField fullWidth placeholder="Email or Phone Number" value={emailOrPhone} onChange={(e) => setEmailOrPhone(e.target.value)} sx={{ ...inputSx, mb: 3 }}
+                InputProps={{ startAdornment: <InputAdornment position="start"><EmailOutlined sx={{ color: '#9CA3AF' }} /></InputAdornment> }}
+              />
+              
+              <Button fullWidth variant="contained" onClick={handleInitialContinue} disabled={loading}
+                sx={{ py: 1.8, bgcolor: '#16A34A', color: '#fff', borderRadius: '50px', textTransform: 'none', fontSize: 16, fontWeight: 700, boxShadow: '0 8px 16px -4px rgba(22, 163, 74, 0.3)', '&:hover': { bgcolor: '#15803D', boxShadow: '0 12px 20px -4px rgba(22, 163, 74, 0.4)' }, mb: 4 }}>
+                Continue
               </Button>
 
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 4, opacity: 0.6 }}>
                 <Divider sx={{ flex: 1 }} />
-                <Typography sx={{ px: 2, color: '#ccc', fontSize: '12px' }}>OR</Typography>
+                <Typography sx={{ px: 2, fontSize: 13, fontWeight: 600 }}>OR</Typography>
                 <Divider sx={{ flex: 1 }} />
               </Box>
 
-              <Button
-                fullWidth
-                variant="outlined"
-                onClick={handleGoogleSignIn}
-                disabled={loading}
-                startIcon={<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" style={{ width: 18 }} />}
-                sx={{
-                  py: 1.5,
-                  color: '#333',
-                  borderColor: '#ddd',
-                  borderRadius: '0px',
-                  textTransform: 'none',
-                  fontSize: '14px',
-                  fontWeight: 400,
-                  '&:hover': {
-                    borderColor: '#999',
-                    bgcolor: 'transparent'
-                  },
-                  mb: 3
-                }}
-              >
-                Continue with google
+              <Button fullWidth variant="outlined" onClick={handleGoogleSignIn} disabled={loading} startIcon={<GoogleIcon sx={{ color: '#EA4335' }} />}
+                sx={{ py: 1.5, borderRadius: '50px', color: '#374151', borderColor: '#E5E7EB', textTransform: 'none', fontSize: 15, fontWeight: 600, '&:hover': { bgcolor: '#F9FAFB', borderColor: '#D1D5DB' }, mb: 4 }}>
+                Continue with Google
               </Button>
 
-              <Box sx={{ textAlign: 'center', mt: 2 }}>
-                <Typography variant="body2" sx={{ color: '#666' }}>
-                  New here? <a href="/register" onClick={(e) => { e.preventDefault(); navigate('/register'); }} style={{ color: '#000', fontWeight: 600, textDecoration: 'none' }}>Create an Account</a>
-                </Typography>
-              </Box>
-
-              <Typography variant="caption" sx={{ display: 'block', textAlign: 'center', mt: 4, color: '#999', fontSize: '10px' }}>
-                By continuing, you agree to our <a href="#" style={{ color: '#999' }}>Terms of Service</a> and <a href="#" style={{ color: '#999' }}>Privacy Policy</a>
+              <Typography variant="body2" textAlign="center" fontWeight={500} color="text.secondary">
+                Don't have an account? <span onClick={() => navigate('/register')} style={{ color: '#F97316', cursor: 'pointer', fontWeight: 700 }}>Sign up</span>
               </Typography>
-            </>
+            </Box>
           ) : (
-            <>
-              <Typography variant="h6" sx={{
-                mb: 3,
-                fontWeight: 600,
-                fontSize: '15px',
-                color: '#333'
-              }}>
-                SIGN IN
+            <Box>
+              <Typography variant="body1" color="text.secondary" mb={4}>
+                Please enter your {isEmail ? 'password' : 'OTP'} for <strong style={{ color: '#111827' }}>{emailOrPhone}</strong>.
               </Typography>
-
-              <Typography variant="body2" sx={{ mb: 4, color: '#666' }}>
-                Please sign in with your {isEmail ? 'email and password' : 'OTP'}.
-              </Typography>
-
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="caption" sx={{ display: 'block', mb: 1, fontWeight: 500, color: '#333' }}>
-                  {isEmail ? 'Email' : 'Phone'} <span style={{ color: 'red' }}>*</span>
-                </Typography>
-                <TextField
-                  fullWidth
-                  variant="outlined"
-                  value={emailOrPhone}
-                  disabled
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '0px',
-                      height: '45px',
-                      backgroundColor: '#f9f9f9'
-                    }
-                  }}
-                />
-              </Box>
-
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="caption" sx={{ display: 'block', mb: 1, fontWeight: 500, color: '#333' }}>
-                  {isEmail ? 'Password' : 'Enter OTP'} <span style={{ color: 'red' }}>*</span>
-                </Typography>
-                <TextField
-                  fullWidth
-                  type={isEmail ? 'password' : 'text'}
-                  variant="outlined"
-                  value={isEmail ? password : otp}
-                  onChange={(e) => isEmail ? setPassword(e.target.value) : setOtp(e.target.value)}
-                  placeholder={isEmail ? 'Enter your password' : 'Enter 6-digit OTP'}
-                  autoFocus
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '0px',
-                      height: '45px'
-                    }
-                  }}
-                />
-              </Box>
+              
+              <TextField fullWidth type={isEmail && !showPassword ? 'password' : 'text'} placeholder={isEmail ? 'Password' : 'Enter 6-digit OTP'} value={isEmail ? password : otp} onChange={(e) => isEmail ? setPassword(e.target.value) : setOtp(e.target.value)} sx={{ ...inputSx, mb: 1.5 }}
+                InputProps={{
+                  startAdornment: <InputAdornment position="start">{isEmail ? <LockOutlined sx={{ color: '#9CA3AF' }} /> : <PhoneOutlined sx={{ color: '#9CA3AF' }} />}</InputAdornment>,
+                  endAdornment: isEmail && (
+                    <InputAdornment position="end">
+                      <IconButton onClick={() => setShowPassword(!showPassword)} edge="end" size="small" sx={{ color: '#9CA3AF' }}>{showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}</IconButton>
+                    </InputAdornment>
+                  )
+                }}
+              />
 
               {isEmail && (
-                <FormControlLabel
-                  control={<Checkbox checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} color="primary" />}
-                  label={<Typography variant="body2" sx={{ fontSize: '13px' }}>Remember me</Typography>}
-                  sx={{ mb: 3 }}
-                />
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                  <FormControlLabel control={<Checkbox size="small" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} sx={{ color: '#D1D5DB', '&.Mui-checked': { color: '#16A34A' } }} />} label={<Typography variant="body2" color="text.secondary" fontWeight={500}>Remember me</Typography>} />
+                  <Typography variant="body2" color="#F97316" fontWeight={600} sx={{ cursor: 'pointer' }}>Forgot Password?</Typography>
+                </Box>
               )}
 
-              <Button
-                fullWidth
-                variant="contained"
-                onClick={handleFinalContinue}
-                disabled={loading}
-                sx={{
-                  py: 1.5,
-                  bgcolor: '#000',
-                  color: '#fff',
-                  borderRadius: '0px',
-                  textTransform: 'none',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  '&:hover': {
-                    bgcolor: '#333'
-                  },
-                  mb: 2
-                }}
-              >
-                {loading ? <CircularProgress size={24} color="inherit" /> : 'CONTINUE'}
+              <Button fullWidth variant="contained" onClick={handleFinalContinue} disabled={loading}
+                sx={{ py: 1.8, bgcolor: '#16A34A', color: '#fff', borderRadius: '50px', textTransform: 'none', fontSize: 16, fontWeight: 700, mt: isEmail ? 1 : 2, mb: 2, boxShadow: '0 8px 16px -4px rgba(22, 163, 74, 0.3)', '&:hover': { bgcolor: '#15803D' }}}>
+                {loading ? <CircularProgress size={24} color="inherit" /> : 'Log In'}
               </Button>
 
-              <Button
-                fullWidth
-                variant="outlined"
-                onClick={handleUseDifferentEmail}
-                disabled={loading}
-                sx={{
-                  py: 1.5,
-                  color: '#333',
-                  borderColor: '#ddd',
-                  borderRadius: '0px',
-                  textTransform: 'none',
-                  fontSize: '14px',
-                  fontWeight: 400,
-                  '&:hover': {
-                    borderColor: '#999',
-                    bgcolor: 'transparent'
-                  }
-                }}
-              >
-                USE A DIFFERENT EMAIL
+              <Button fullWidth onClick={() => { setStep(1); setPassword(''); setOtp(''); }} sx={{ color: '#6B7280', textTransform: 'none', fontWeight: 600, py: 1 }}>
+                Use a different account
               </Button>
-            </>
+            </Box>
           )}
 
-          {message && (
-            <Alert severity={message.includes('success') ? 'success' : 'error'} sx={{ mt: 3 }}>
-              {message}
-            </Alert>
-          )}
+          {message && <Alert severity={message.includes('success') ? 'success' : 'error'} sx={{ mt: 3, borderRadius: 3, fontWeight: 500 }}>{message}</Alert>}
+          
+          <Typography variant="caption" display="block" textAlign="center" color="text.disabled" sx={{ mt: 6 }}>
+            By continuing, you agree to our Terms of Service & Privacy Policy.
+          </Typography>
         </Box>
-      </Paper>
+      </Box>
       <div id="recaptcha-container"></div>
-    </Container>
+    </Box>
   );
 };
 
 export default LoginPage;
-

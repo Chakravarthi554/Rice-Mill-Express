@@ -1,31 +1,22 @@
+// [AI: Premium Mobile Polish - Luxury grouped settings, Feather icons, Squircles]
 import React, { useEffect } from 'react';
 import {
-    View,
-    Text,
-    StyleSheet,
-    ScrollView,
-    TouchableOpacity,
-    Alert,
-    SafeAreaView,
+    View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, SafeAreaView, Platform
 } from 'react-native';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
-import { useTranslation } from 'react-i18next';
 import { fetchSettings } from '../../redux/slices/settingsSlice';
 import { logoutUser } from '../../redux/actions/userActions';
 
 const SettingsScreen = ({ navigation }) => {
     const dispatch = useDispatch();
-    const { t } = useTranslation();
     const { userInfo } = useSelector(state => state.userLogin);
     const user = userInfo?.user || {};
 
-    useEffect(() => {
-        dispatch(fetchSettings());
-    }, [dispatch]);
+    useEffect(() => { dispatch(fetchSettings()); }, [dispatch]);
 
     const handleLogout = () => {
-        Alert.alert('Logout', 'Are you sure you want to logout?', [
+        Alert.alert('Logout', 'Are you sure you want to log out?', [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Logout', style: 'destructive', onPress: () => dispatch(logoutUser()) }
         ]);
@@ -33,112 +24,88 @@ const SettingsScreen = ({ navigation }) => {
 
     const settingGroups = [
         {
-            title: 'Account',
+            title: 'Account & Security',
             items: [
-                { title: 'Personal Information', icon: 'person-outline', iconBg: '#EEF2FF', iconColor: '#4F46E5', onPress: () => navigation.navigate('EditProfile') },
-                { title: 'Addresses', icon: 'location-on', iconBg: '#F0FDF4', iconColor: '#16A34A', onPress: () => navigation.navigate('Addresses') },
-                { title: 'Security', icon: 'security', iconBg: '#FFF7ED', iconColor: '#EA580C', onPress: () => navigation.navigate('Security') },
-                { title: 'Privacy', icon: 'lock-outline', iconBg: '#FDF2F8', iconColor: '#9333EA', onPress: () => navigation.navigate('Privacy') },
+                { title: 'Personal Information', icon: 'user', iconBg: '#EEF2FF', iconColor: '#4F46E5', onPress: () => navigation.navigate('EditProfile') },
+                { title: 'Saved Addresses', icon: 'map-pin', iconBg: '#F0FDF4', iconColor: '#16A34A', onPress: () => navigation.navigate('Addresses') },
+                { title: 'Security & Passwords', icon: 'shield', iconBg: '#FFF7ED', iconColor: '#EA580C', onPress: () => navigation.navigate('Security') },
+                { title: 'Privacy Preferences', icon: 'lock', iconBg: '#FDF2F8', iconColor: '#9333EA', onPress: () => navigation.navigate('Privacy') },
             ]
         },
         {
             title: 'Orders & Rewards',
             items: [
-                { title: 'My Orders', icon: 'receipt-long', iconBg: '#F0FDF4', iconColor: '#16A34A', onPress: () => navigation.navigate('Orders') },
-                { title: 'Rewards & Points', icon: 'stars', iconBg: '#FEFCE8', iconColor: '#CA8A04', onPress: () => navigation.navigate('Rewards') },
-                { title: 'Refer & Earn', icon: 'card-giftcard', iconBg: '#FFF0F5', iconColor: '#DB2777', onPress: () => navigation.navigate('Referral') },
-                { title: 'My Reviews', icon: 'rate-review', iconBg: '#F0F9FF', iconColor: '#0284C7', onPress: () => navigation.navigate('MyReviews') },
+                { title: 'Order History', icon: 'package', iconBg: '#F0FDF4', iconColor: '#16A34A', onPress: () => navigation.navigate('Orders') },
+                { title: 'Rewards & Points', icon: 'star', iconBg: '#FEFCE8', iconColor: '#CA8A04', onPress: () => navigation.navigate('Rewards') },
+                { title: 'Refer & Earn', icon: 'gift', iconBg: '#FFF7ED', iconColor: '#F97316', onPress: () => navigation.navigate('Referral') },
+                { title: 'My Reviews', icon: 'edit-3', iconBg: '#F0F9FF', iconColor: '#0284C7', onPress: () => navigation.navigate('MyReviews') },
             ]
         },
         {
             title: 'Preferences',
             items: [
-                { title: 'Notifications', icon: 'notifications-none', iconBg: '#FFF7ED', iconColor: '#EA580C', onPress: () => navigation.navigate('Notifications') },
-                { title: 'Language', icon: 'language', iconBg: '#F5F3FF', iconColor: '#7C3AED', onPress: () => navigation.navigate('Language') },
-                { title: 'Theme', icon: 'palette', iconBg: '#F0FDFA', iconColor: '#0D9488', onPress: () => navigation.navigate('Theme') },
-                { title: 'Accessibility', icon: 'accessibility', iconBg: '#FFF0F5', iconColor: '#DB2777', onPress: () => navigation.navigate('Accessibility') },
+                { title: 'Notifications', icon: 'bell', iconBg: '#FFF7ED', iconColor: '#EA580C', onPress: () => navigation.navigate('Notifications') },
+                { title: 'Language', icon: 'globe', iconBg: '#F5F3FF', iconColor: '#7C3AED', onPress: () => navigation.navigate('Language') },
+                { title: 'Theme', icon: 'moon', iconBg: '#F0FDFA', iconColor: '#0D9488', onPress: () => navigation.navigate('Theme') },
             ]
         },
         {
             title: 'Support',
             items: [
-                { title: 'Help Center', icon: 'help-outline', iconBg: '#F0FDF4', iconColor: '#16A34A', onPress: () => navigation.navigate('HelpCenter') },
-                { title: 'Legal & Policies', icon: 'policy', iconBg: '#EEF2FF', iconColor: '#4F46E5', onPress: () => navigation.navigate('Legal') },
+                { title: 'Help Center', icon: 'help-circle', iconBg: '#F1F5F9', iconColor: '#475569', onPress: () => navigation.navigate('HelpCenter') },
+                { title: 'Legal & Policies', icon: 'file-text', iconBg: '#F8FAFC', iconColor: '#64748B', onPress: () => navigation.navigate('Legal') },
             ]
         }
     ];
 
     return (
         <SafeAreaView style={styles.container}>
-            {/* Hero Profile Header */}
-            <View style={styles.heroHeader}>
-                <View style={styles.avatarContainer}>
-                    <View style={styles.avatarCircle}>
-                        <Ionicons name="person" size={44} color="#fff" />
-                    </View>
-                    <TouchableOpacity style={styles.editAvatarBtn} onPress={() => navigation.navigate('EditProfile')}>
-                        <Ionicons name="camera" size={12} color="#fff" />
-                    </TouchableOpacity>
-                </View>
-                <Text style={styles.heroName}>{user.name || 'Customer'}</Text>
-                <Text style={styles.heroRole}>Rice Mill Express Member</Text>
-                <View style={styles.heroBadgeRow}>
-                    <View style={styles.heroBadge}>
-                        <Ionicons name="mail-outline" size={13} color="#A7F3D0" />
-                        <Text style={styles.heroBadgeText}>{user.email || 'email@example.com'}</Text>
-                    </View>
-                    {user.phone && (
-                        <View style={styles.heroBadge}>
-                            <Ionicons name="call-outline" size={13} color="#A7F3D0" />
-                            <Text style={styles.heroBadgeText}>{user.phone}</Text>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+                
+                {/* Profile Header */}
+                <View style={styles.header}>
+                    <View style={styles.avatarWrap}>
+                        <View style={styles.avatar}>
+                            <Text style={styles.avatarText}>{user.name ? user.name.charAt(0).toUpperCase() : 'C'}</Text>
                         </View>
-                    )}
+                        <TouchableOpacity style={styles.editBadge} onPress={() => navigation.navigate('EditProfile')}>
+                            <Feather name="camera" size={12} color="#fff" />
+                        </TouchableOpacity>
+                    </View>
+                    <View style={styles.headerInfo}>
+                        <Text style={styles.name}>{user.name || 'Customer'}</Text>
+                        <Text style={styles.email}>{user.email || 'customer@ricemill.com'}</Text>
+                    </View>
                 </View>
-            </View>
 
-            {/* Quick Stats */}
-            <View style={styles.statsBar}>
-                <TouchableOpacity style={styles.statItem} onPress={() => navigation.navigate('Orders')}>
-                    <Text style={styles.statValue}>0</Text>
-                    <Text style={styles.statLabel}>Orders</Text>
-                </TouchableOpacity>
-                <View style={styles.statDivider} />
-                <TouchableOpacity style={styles.statItem} onPress={() => navigation.navigate('Rewards')}>
-                    <Text style={styles.statValue}>0</Text>
-                    <Text style={styles.statLabel}>Points</Text>
-                </TouchableOpacity>
-                <View style={styles.statDivider} />
-                <TouchableOpacity style={styles.statItem} onPress={() => navigation.navigate('WishList')}>
-                    <Text style={styles.statValue}>0</Text>
-                    <Text style={styles.statLabel}>Wishlist</Text>
-                </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-                {settingGroups.map((group, gi) => (
-                    <View key={gi} style={styles.section}>
-                        <Text style={styles.sectionTitle}>{group.title}</Text>
-                        <View style={styles.sectionCard}>
-                            {group.items.map((item, idx) => (
-                                <TouchableOpacity key={idx} style={[styles.menuRow, idx < group.items.length - 1 && styles.menuRowBorder]} onPress={item.onPress}>
-                                    <View style={[styles.menuIcon, { backgroundColor: item.iconBg }]}>
-                                        <MaterialIcons name={item.icon} size={22} color={item.iconColor} />
-                                    </View>
-                                    <Text style={styles.menuTitle}>{item.title}</Text>
-                                    <Ionicons name="chevron-forward" size={20} color="#D1D5DB" />
-                                </TouchableOpacity>
+                {/* Settings Groups */}
+                {settingGroups.map((group, gIndex) => (
+                    <View key={gIndex} style={styles.groupContainer}>
+                        <Text style={styles.groupTitle}>{group.title}</Text>
+                        <View style={styles.card}>
+                            {group.items.map((item, iIndex) => (
+                                <View key={iIndex}>
+                                    <TouchableOpacity style={styles.itemRow} onPress={item.onPress} activeOpacity={0.7}>
+                                        <View style={[styles.iconBox, { backgroundColor: item.iconBg }]}>
+                                            <Feather name={item.icon} size={20} color={item.iconColor} />
+                                        </View>
+                                        <Text style={styles.itemTitle}>{item.title}</Text>
+                                        <Feather name="chevron-right" size={20} color="#D1D5DB" />
+                                    </TouchableOpacity>
+                                    {iIndex < group.items.length - 1 && <View style={styles.divider} />}
+                                </View>
                             ))}
                         </View>
                     </View>
                 ))}
 
-                {/* Logout */}
+                {/* Logout Button */}
                 <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-                    <MaterialIcons name="logout" size={20} color="#EF4444" />
+                    <Feather name="log-out" size={20} color="#EF4444" />
                     <Text style={styles.logoutText}>Log Out</Text>
                 </TouchableOpacity>
 
-                <Text style={styles.version}>Rice Mill Express v1.0.0</Text>
+                <Text style={styles.version}>App Version 2.0.0</Text>
             </ScrollView>
         </SafeAreaView>
     );
@@ -146,61 +113,25 @@ const SettingsScreen = ({ navigation }) => {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F9FAFB' },
-    heroHeader: {
-        backgroundColor: '#16A34A',
-        paddingTop: 24,
-        paddingBottom: 28,
-        alignItems: 'center',
-        paddingHorizontal: 20,
-    },
-    avatarContainer: { position: 'relative', marginBottom: 12 },
-    avatarCircle: {
-        width: 88, height: 88, borderRadius: 44,
-        backgroundColor: 'rgba(255,255,255,0.25)',
-        justifyContent: 'center', alignItems: 'center',
-        borderWidth: 3, borderColor: 'rgba(255,255,255,0.5)',
-    },
-    editAvatarBtn: {
-        position: 'absolute', bottom: 2, right: 2,
-        width: 24, height: 24, borderRadius: 12,
-        backgroundColor: '#0F9547', justifyContent: 'center', alignItems: 'center',
-        borderWidth: 2, borderColor: '#fff',
-    },
-    heroName: { fontSize: 22, fontWeight: '800', color: '#fff', marginBottom: 4 },
-    heroRole: { fontSize: 14, color: 'rgba(255,255,255,0.8)', marginBottom: 12 },
-    heroBadgeRow: { gap: 8 },
-    heroBadge: {
-        flexDirection: 'row', alignItems: 'center',
-        backgroundColor: 'rgba(0,0,0,0.15)',
-        paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20,
-    },
-    heroBadgeText: { color: '#fff', fontSize: 12, marginLeft: 6, fontWeight: '500' },
-    statsBar: {
-        flexDirection: 'row', backgroundColor: '#fff',
-        marginHorizontal: 16, borderRadius: 16,
-        paddingVertical: 16,
-        marginTop: -24, elevation: 6,
-        shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8,
-    },
-    statItem: { flex: 1, alignItems: 'center' },
-    statValue: { fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 2 },
-    statLabel: { fontSize: 12, color: '#6B7280', fontWeight: '500' },
-    statDivider: { width: 1, backgroundColor: '#F3F4F6' },
-    scroll: { marginTop: 16 },
-    section: { marginHorizontal: 16, marginBottom: 20 },
-    sectionTitle: { fontSize: 13, fontWeight: '700', color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginLeft: 4 },
-    sectionCard: { backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#F3F4F6' },
-    menuRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 },
-    menuRowBorder: { borderBottomWidth: 1, borderBottomColor: '#F9FAFB' },
-    menuIcon: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
-    menuTitle: { flex: 1, fontSize: 15, fontWeight: '500', color: '#111827' },
-    logoutBtn: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-        marginHorizontal: 16, marginBottom: 16, paddingVertical: 14,
-        backgroundColor: '#FEF2F2', borderRadius: 14, borderWidth: 1, borderColor: '#FECACA',
-    },
-    logoutText: { fontSize: 15, fontWeight: '700', color: '#EF4444', marginLeft: 8 },
-    version: { textAlign: 'center', color: '#9CA3AF', fontSize: 12, marginBottom: 8 },
+    scrollContent: { padding: 20, paddingBottom: 40 },
+    header: { flexDirection: 'row', alignItems: 'center', marginBottom: 32, backgroundColor: '#fff', padding: 20, borderRadius: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+    avatarWrap: { position: 'relative', marginRight: 16 },
+    avatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#16A34A', alignItems: 'center', justifyContent: 'center' },
+    avatarText: { fontSize: 28, fontWeight: '800', color: '#fff' },
+    editBadge: { position: 'absolute', bottom: -4, right: -4, backgroundColor: '#F97316', width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
+    headerInfo: { flex: 1 },
+    name: { fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 4 },
+    email: { fontSize: 14, color: '#6B7280' },
+    groupContainer: { marginBottom: 24 },
+    groupTitle: { fontSize: 14, fontWeight: '700', color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12, marginLeft: 8 },
+    card: { backgroundColor: '#fff', borderRadius: 20, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 1 },
+    itemRow: { flexDirection: 'row', alignItems: 'center', padding: 16 },
+    iconBox: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
+    itemTitle: { flex: 1, fontSize: 16, fontWeight: '500', color: '#111827' },
+    divider: { height: 1, backgroundColor: '#F3F4F6', marginLeft: 72 },
+    logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 16, backgroundColor: '#FEF2F2', borderRadius: 50, marginTop: 12 },
+    logoutText: { marginLeft: 8, fontSize: 16, fontWeight: '700', color: '#EF4444' },
+    version: { textAlign: 'center', marginTop: 32, fontSize: 13, color: '#9CA3AF', fontWeight: '500' }
 });
 
 export default SettingsScreen;

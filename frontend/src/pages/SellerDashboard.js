@@ -338,7 +338,7 @@ const AssignDPDialog = ({ open, onClose, onAssign, partners, loading, selectedOr
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                     {filteredPartners.map(p => {
                         const isOnline = p.isOnline ?? p.status === 'active';
-                        return (
+                                    return (
                             <Box key={p._id} onClick={() => setSelectedId(p._id)}
                                 sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 1.5, borderRadius: 2, cursor: 'pointer', border: '1px solid', borderColor: selectedId === p._id ? ACCENT : '#F3F4F6', bgcolor: selectedId === p._id ? '#F0FDF4' : '#FAFAFA', '&:hover': { borderColor: ACCENT } }}>
                                 <Avatar sx={{ width: 42, height: 42 }}>{p.name?.[0]}</Avatar>
@@ -442,7 +442,7 @@ const SellerDashboard = () => {
                 <Box sx={{ px: 3, py: 3, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
                     <Typography variant="h6" fontWeight={800} color="#fff" fontSize="1rem">🌾 Rice Mill Express</Typography>
                     <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>Seller Portal</Typography>
-                </Box>
+                            </Box>
 
                 {/* Nav Items */}
                 <Box sx={{ flex: 1, py: 2, overflowY: 'auto' }}>
@@ -460,9 +460,9 @@ const SellerDashboard = () => {
                     <Box onClick={handleLogout} sx={{ display: 'flex', alignItems: 'center', gap: 2, cursor: 'pointer', color: 'rgba(255,255,255,0.55)', '&:hover': { color: '#fff' } }}>
                         <Logout fontSize="small" />
                         <Typography variant="body2" fontWeight={500}>Logout</Typography>
-                    </Box>
+                                                </Box>
                 </Box>
-            </Box>
+                </Box>
 
             {/* Main Content */}
             <Box sx={{ ml: '220px', flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -480,8 +480,8 @@ const SellerDashboard = () => {
                                 <Typography variant="body2" fontWeight={700} lineHeight={1}>{user?.name || 'Seller'}</Typography>
                                 <Typography variant="caption" color="text.secondary">Seller Portal</Typography>
                             </Box>
-                        </Box>
-                    </Box>
+                </Box>
+                </Box>
                 </Box>
 
                 {/* Page Content */}
@@ -492,7 +492,7 @@ const SellerDashboard = () => {
                     {ordersError && <Alert severity="error" sx={{ mb: 2 }}>{ordersError}</Alert>}
                     {renderContent()}
                 </Box>
-            </Box>
+                </Box>
 
             {/* Assign DP Dialog */}
             <AssignDPDialog

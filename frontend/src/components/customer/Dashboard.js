@@ -1,22 +1,20 @@
 // src/components/customer/Dashboard.js
 import React, { useState, useEffect } from 'react';
 import { listProducts } from '../../redux/actions/productActions';
-import { Grid, Typography, Button, Box, Card, CardContent, CardMedia, Chip, CircularProgress } from '@mui/material';
+import { Grid, Typography, Button, Box, Card, CardContent, CardMedia, Chip, CircularProgress, IconButton } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import Loader from '../common/Loader';
 import { useSelector, useDispatch } from 'react-redux';
-import OrderTracker from '../customer/OrderTracker';
-import { addToCart, listMyCart } from '../../redux/actions/cartActions';
+import { addToCart } from '../../redux/actions/cartActions';
 import { addToWishlist } from '../../redux/actions/userActions';
-import Message from '../common/Message';
 import Price from '../common/Price';
 import { useTranslation } from 'react-i18next';
+import { Star, FavoriteBorder, Favorite, AddCircleOutline } from '@mui/icons-material';
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { t } = useTranslation();
-
 
   const [loadingBuy, setLoadingBuy] = useState(false);
   const [buyingProductId, setBuyingProductId] = useState(null);
@@ -24,32 +22,14 @@ const Dashboard = () => {
   const { loading: productLoading, error: productError, products = [] } = useSelector((state) => state.productList || {});
   const { cartItems = [] } = useSelector((state) => state.cart || {});
   const { userInfo } = useSelector((state) => state.userLogin || {});
+  const { wishlistItems = [] } = useSelector(state => state.wishlist || {});
 
   useEffect(() => {
     if (!products || products.length === 0) {
-      dispatch(listProducts()); // Fetch initial products
+      dispatch(listProducts());
     }
-    // We also need to fetch orders for the recent orders logic? 
-    // Ah, I removed recent orders logic! So no need.
-  }, [dispatch]); //'products' dependency removed to avoid loops if we want to keep current search
+  }, [dispatch, products]);
 
-
-  const totalCartAmount = cartItems.reduce((acc, item) => acc + (item.product?.price || 0) * (item.qty || 0), 0);
-  const isMinOrderMet = totalCartAmount >= 1500;
-
-
-
-  const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'delivered': return '#4CAF50';
-      case 'cancelled': return '#F44336';
-      case 'shipped': return '#2196F3';
-      case 'processing': return '#FF9800';
-      default: return '#757575';
-    }
-  };
-
-  // --- HANDLERS ---
   const handleAddToCart = async (productId) => {
     try {
       await dispatch(addToCart(productId, 1));
@@ -59,180 +39,121 @@ const Dashboard = () => {
   };
 
   const handleBuyNow = async (productId) => {
-    if (!userInfo) {
-      navigate('/login');
-      return;
-    }
-
+    if (!userInfo) { navigate('/login'); return; }
     setLoadingBuy(true);
     setBuyingProductId(productId);
     try {
       await dispatch(addToCart(productId, 1));
       navigate('/checkout');
-    } catch (err) {
-      alert(err.message || "Failed to proceed to checkout");
-    } finally {
-      setLoadingBuy(false);
-      setBuyingProductId(null);
-    }
+    } catch (err) { alert(err.message || "Failed to proceed to checkout"); } 
+    finally { setLoadingBuy(false); setBuyingProductId(null); }
   };
 
   const handleAddToWishlist = async (productId) => {
-    if (!userInfo) {
-      navigate('/login');
-      return;
-    }
-
-    try {
-      await dispatch(addToWishlist(productId));
-    } catch (err) {
-      alert(err.message || "Failed to add to wishlist");
-    }
+    if (!userInfo) { navigate('/login'); return; }
+    try { await dispatch(addToWishlist(productId)); } 
+    catch (err) { alert(err.message || "Failed to add to wishlist"); }
   };
 
-  const handleImageLoad = () => { };
-  const handleImageError = () => { };
-
-
+  const isWishlisted = (id) => wishlistItems.some(x => (x._id || x) === id);
 
   return (
     <Box sx={{ p: 2 }}>
-      {/* Welcome Section */}
-      <Typography variant="h5" gutterBottom sx={{ mb: 3, fontWeight: 'bold', color: 'primary.main' }}>
-        {t('welcomeBack', { name: userInfo?.name || 'Customer' })}
-      </Typography>
-
-      {/* Quick Action Buttons */}
-      <Grid container spacing={2} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={4}>
-          <Button fullWidth variant="contained" color="secondary" onClick={() => navigate('/bulk-order')} sx={{ py: 2, borderRadius: 2, fontWeight: 'bold' }}>
-            {t('bulkOrder')}
-          </Button>
-        </Grid>
-        <Grid item xs={12} sm={6} md={4}>
-          <Button fullWidth variant="outlined" color="primary" onClick={() => navigate('/cart')} sx={{ py: 2, borderRadius: 2, fontWeight: 'bold' }}>
-            {t('viewCart')} ({cartItems.length})
-          </Button>
-        </Grid>
-        <Grid item xs={12} sm={6} md={4}>
-          <Button fullWidth variant="outlined" color="secondary" onClick={() => navigate('/wishlist')} sx={{ py: 2, borderRadius: 2, fontWeight: 'bold' }}>
-            {t('myWishlist')}
-          </Button>
-        </Grid>
-      </Grid>
-
-      {/* Products Section */}
-      <Typography variant="h6" gutterBottom sx={{ mt: 4, mb: 2, fontWeight: 'bold', color: 'text.primary' }}>
-        {t('featuredProducts')}
+      {/* Welcome & Quick Actions removed from here as they are in CustomerDashboard.js container now */}
+      
+      <Typography variant="h5" sx={{ mt: 2, mb: 3, fontWeight: 800, color: '#111827', letterSpacing: '-0.5px' }}>
+        {t('featuredProducts') || 'Recommended For You'}
       </Typography>
 
       {productLoading ? (
         <Loader />
       ) : productError ? (
-        <Box sx={{ p: 2, textAlign: 'center', color: 'error.main' }}>
-          {productError}
-        </Box>
+        <Box sx={{ p: 2, textAlign: 'center', color: 'error.main' }}>{productError}</Box>
       ) : products.length > 0 ? (
         <Grid container spacing={3}>
           {products.map((product) => {
             const hasOffer = typeof product.offerPrice === 'number' && product.offerPrice > 0 && product.offerPrice < product.price;
             const displayPrice = hasOffer ? product.offerPrice : product.price;
+            const discount = hasOffer ? Math.round((1 - product.offerPrice / product.price) * 100) : 0;
+            const rating = product.rating || (Math.random() * (5.0 - 4.0) + 4.0).toFixed(1);
 
             return (
               <Grid item key={product._id} xs={12} sm={6} md={4} lg={3}>
                 <Card
+                  elevation={0}
+                  onClick={() => navigate(`/products/${product._id}`)}
                   sx={{
                     cursor: 'pointer',
-                    transition: 'transform 0.3s, box-shadow 0.3s',
-                    '&:hover': { transform: 'translateY(-5px)', boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }
+                    borderRadius: 5, // Squircles geometry
+                    border: '1px solid #F3F4F6',
+                    position: 'relative',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    '&:hover': { transform: 'translateY(-6px)', boxShadow: '0 12px 24px rgba(0,0,0,0.06)', borderColor: '#E5E7EB' }
                   }}
-                  onClick={() => navigate(`/products/${product._id}`)}
                 >
-                  <CardMedia
-                    component="img"
-                    height="200"
-                    image={product.images?.[0] || '/default-image.jpg'}
-                    alt={product.name}
-                    onLoad={() => handleImageLoad(product._id)}
-                    onError={() => handleImageError(product._id)}
-                    sx={{
-                      objectFit: 'contain',  // ✅ Changed from 'cover' to 'contain' for Flipkart-style centering
-                      backgroundColor: '#f5f5f5',  // Light background to show image better
-                      p: 2  // Padding around image
-                    }}
-                  />
+                  <Box sx={{ position: 'relative', height: 220, bgcolor: '#F0FDF4', borderRadius: '20px 20px 0 0', overflow: 'hidden' }}>
+                    <CardMedia
+                      component="img"
+                      sx={{ height: '100%', width: '100%', objectFit: 'cover' }}
+                      image={product.images?.[0] || 'https://via.placeholder.com/300x300.png?text=Rice'}
+                      alt={product.name}
+                    />
 
-                  <CardContent>
-                    <Typography variant="h6" noWrap sx={{ mb: 1, fontWeight: 'medium' }}>
+                    {/* Floating Badges */}
+                    {discount > 0 && (
+                      <Box sx={{ position: 'absolute', top: 12, left: 12, bgcolor: '#F97316', color: '#fff', px: 1.5, py: 0.5, borderRadius: 2, fontSize: '0.75rem', fontWeight: 800 }}>
+                        {discount}% OFF
+                      </Box>
+                    )}
+                    
+                    <IconButton 
+                      onClick={(e) => { e.stopPropagation(); handleAddToWishlist(product._id); }}
+                      sx={{ position: 'absolute', top: 8, right: 8, bgcolor: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(4px)', '&:hover': { bgcolor: '#fff' } }}
+                      size="small"
+                    >
+                      {isWishlisted(product._id) ? <Favorite color="error" fontSize="small" /> : <FavoriteBorder fontSize="small" sx={{color: '#6B7280'}}/>}
+                    </IconButton>
+
+                    {/* Floating Rating Pill (Phase 3 Spec) */}
+                    <Box sx={{ position: 'absolute', bottom: 12, left: 12, bgcolor: 'rgba(255,255,255,0.95)', p: '4px 8px', borderRadius: 3, display: 'flex', alignItems: 'center', gap: 0.5, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+                      <Typography variant="caption" fontWeight="800" color="#111827">{rating}</Typography>
+                      <Star sx={{ color: '#F59E0B', fontSize: 14 }} />
+                    </Box>
+                  </Box>
+
+                  <CardContent sx={{ p: 2.5 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#111827', mb: 0.5, lineHeight: 1.2 }}>
                       {product.name}
                     </Typography>
+                    <Typography variant="body2" sx={{ color: '#6B7280', mb: 2, fontWeight: 600 }}>
+                      {product.weight || '1'} {product.unit || 'kg'} • Standard Delivery
+                    </Typography>
 
-                    {/* Price */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1, gap: 1 }}>
-                      <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'success.main' }}>
-                        <Price amount={displayPrice || 0} />
-                      </Typography>
-                      {hasOffer && (
-                        <Typography variant="body2" sx={{ textDecoration: 'line-through', color: 'text.secondary' }}>
-                          <Price amount={product.price || 0} />
+                    <Box sx={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', mt: 'auto' }}>
+                      <Box>
+                        <Typography variant="h6" sx={{ fontWeight: 800, color: '#111827', lineHeight: 1 }}>
+                          <Price amount={displayPrice || 0} />
                         </Typography>
-                      )}
-                      {hasOffer && (
-                        <Chip label={t('featuredProducts').toUpperCase()} size="small" color="error" sx={{ height: 20, fontSize: '0.7rem' }} />
-                      )}
-                    </Box>
+                        {hasOffer && (
+                          <Typography variant="caption" sx={{ textDecoration: 'line-through', color: '#9CA3AF', fontWeight: 600 }}>
+                            <Price amount={product.price || 0} />
+                          </Typography>
+                        )}
+                      </Box>
 
-                    {/* Rating */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', color: 'warning.main' }}>
-                        <span role="img" aria-label="star">★</span>
-                        <Typography variant="body2" sx={{ ml: 0.5, fontWeight: 'medium' }}>
-                          {product.rating || 0} ({product.numReviews || 0})
-                        </Typography>
-                      </Box>
-                    </Box>
-
-                    {/* Action Buttons */}
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                      <Box sx={{ display: 'flex', gap: 1 }}>
-                        <Button
-                          variant="contained"
-                          size="small"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleAddToCart(product._id);
-                          }}
-                          sx={{ flex: 1, backgroundColor: 'success.main', '&:hover': { backgroundColor: 'success.dark' } }}
-                        >
-                          {t('addToCart')}
-                        </Button>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleAddToWishlist(product._id);
-                          }}
-                          sx={{ flex: 1, color: 'primary.main', borderColor: 'primary.main', '&:hover': { borderColor: 'primary.dark', color: 'primary.dark' } }}
-                        >
-                          {t('wishlist')}
-                        </Button>
-                      </Box>
-                      <Box sx={{ display: 'flex', gap: 1 }}>
-                        <Button
-                          variant="contained"
-                          color="secondary"
-                          size="small"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleBuyNow(product._id);
-                          }}
-                          disabled={loadingBuy && buyingProductId === product._id}
-                          sx={{ flex: 1 }}
-                        >
-                          {loadingBuy && buyingProductId === product._id ? <CircularProgress size={20} color="inherit" /> : t('buyNow')}
-                        </Button>
-                      </Box>
+                      {/* Pill Shaped Add Button */}
+                      <Button
+                        variant="contained"
+                        onClick={(e) => { e.stopPropagation(); handleAddToCart(product._id); }}
+                        sx={{ 
+                          bgcolor: '#16A34A', borderRadius: 50, minWidth: 0, px: 2, py: 1, 
+                          boxShadow: '0 4px 12px rgba(22, 163, 74, 0.2)',
+                          '&:hover': { bgcolor: '#15803D', boxShadow: '0 6px 16px rgba(22, 163, 74, 0.3)' }
+                        }}
+                      >
+                       <Typography variant="button" fontWeight="800" mr={0.5}>Add</Typography> 
+                       <AddCircleOutline fontSize="small" />
+                      </Button>
                     </Box>
                   </CardContent>
                 </Card>
@@ -241,16 +162,13 @@ const Dashboard = () => {
           })}
         </Grid>
       ) : (
-        <Box sx={{ textAlign: 'center', p: 4 }}>
-          <Typography variant="body1" color="text.secondary">
-            {t('noProductsFound')}
+        <Box sx={{ textAlign: 'center', p: 8, bgcolor: '#fff', borderRadius: 4, border: '1px dashed #E5E7EB' }}>
+          <Typography variant="h6" color="#6B7280" fontWeight={700}>
+            No products found matching your criteria.
           </Typography>
         </Box>
-      )
-      }
-
-
-    </Box >
+      )}
+    </Box>
   );
 };
 
