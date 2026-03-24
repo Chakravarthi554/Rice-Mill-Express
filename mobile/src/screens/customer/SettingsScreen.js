@@ -6,19 +6,18 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchSettings } from '../../redux/slices/settingsSlice';
-import { logoutUser } from '../../redux/actions/userActions';
+import { logout } from '../../redux/slices/authSlice';
 
 const SettingsScreen = ({ navigation }) => {
     const dispatch = useDispatch();
-    const { userInfo } = useSelector(state => state.userLogin);
-    const user = userInfo?.user || {};
+    const { user } = useSelector(state => state.auth);
 
     useEffect(() => { dispatch(fetchSettings()); }, [dispatch]);
 
     const handleLogout = () => {
         Alert.alert('Logout', 'Are you sure you want to log out?', [
             { text: 'Cancel', style: 'cancel' },
-            { text: 'Logout', style: 'destructive', onPress: () => dispatch(logoutUser()) }
+            { text: 'Logout', style: 'destructive', onPress: () => dispatch(logout()) }
         ]);
     };
 
@@ -61,20 +60,20 @@ const SettingsScreen = ({ navigation }) => {
     return (
         <SafeAreaView style={styles.container}>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-                
+
                 {/* Profile Header */}
                 <View style={styles.header}>
                     <View style={styles.avatarWrap}>
                         <View style={styles.avatar}>
-                            <Text style={styles.avatarText}>{user.name ? user.name.charAt(0).toUpperCase() : 'C'}</Text>
+                            <Text style={styles.avatarText}>{user?.name ? user.name.charAt(0).toUpperCase() : 'C'}</Text>
                         </View>
                         <TouchableOpacity style={styles.editBadge} onPress={() => navigation.navigate('EditProfile')}>
                             <Feather name="camera" size={12} color="#fff" />
                         </TouchableOpacity>
                     </View>
                     <View style={styles.headerInfo}>
-                        <Text style={styles.name}>{user.name || 'Customer'}</Text>
-                        <Text style={styles.email}>{user.email || 'customer@ricemill.com'}</Text>
+                        <Text style={styles.name}>{user?.name || 'Customer'}</Text>
+                        <Text style={styles.email}>{user?.email || 'customer@ricemill.com'}</Text>
                     </View>
                 </View>
 

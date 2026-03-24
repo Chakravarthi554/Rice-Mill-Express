@@ -16,7 +16,6 @@ const AddDeliveryPartnerScreen = ({ navigation }) => {
     });
     const [loading, setLoading] = useState(false);
 
-    const { userInfo } = useSelector(state => state.userLogin);
 
     const handleInputChange = (name, value) => {
         setFormData({ ...formData, [name]: value });

@@ -48,6 +48,7 @@ export default function HomeScreen({ navigation }) {
     const cart = useSelector(state => state.cart);
     const cartCount = (cart?.cartItems || []).reduce((s, i) => s + (i.qty || 1), 0);
 
+
     useEffect(() => { fetchProducts(); dispatch(getWishlist()); dispatch(getCart()); }, [dispatch]);
 
     const fetchProducts = async () => {
