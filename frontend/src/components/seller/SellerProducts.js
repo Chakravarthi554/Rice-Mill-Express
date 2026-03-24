@@ -216,7 +216,9 @@ const SellerProducts = () => {
     }
 
     if (editingProduct) {
-      dispatch(updateProduct(editingProduct._id, formData));
+      dispatch(updateProduct(editingProduct._id, formData)).then(() => {
+        dispatch(listProducts());
+      });
     } else {
       const data = new FormData();
 
@@ -235,7 +237,9 @@ const SellerProducts = () => {
         data.append('images', image);
       });
 
-      dispatch(createProduct(data));
+      dispatch(createProduct(data)).then(() => {
+        dispatch(listProducts());
+      });
     }
     handleCloseDialog();
   };
@@ -412,9 +416,9 @@ const SellerProducts = () => {
               onChange={handleChange}
               fullWidth
             >
-              <MenuItem value="kg">Kg</MenuItem>
-              <MenuItem value="g">Gram</MenuItem>
-              <MenuItem value="packet">Packet</MenuItem>
+              {UNIT_OPTIONS.map((option) => (
+                <MenuItem key={option} value={option}>{option}</MenuItem>
+              ))}
             </TextField>
             <TextField
               select
@@ -551,7 +555,7 @@ const SellerProducts = () => {
                 {viewImages.map((img, index) => (
                   <Box key={index} sx={{ display: 'flex !important', justifyContent: 'center', alignItems: 'center', height: '400px', outline: 'none' }}>
                     <img
-                      src={img}
+                      src={img?.startsWith('http') ? img : `${process.env.REACT_APP_API_URL || ''}${img}`}
                       alt={`Product ${index + 1}`}
                       style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }}
                     />

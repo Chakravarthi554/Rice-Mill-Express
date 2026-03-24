@@ -9,6 +9,7 @@ import { Remove, Add } from '@mui/icons-material';
 import AddressManager from '../../components/customer/AddressManager';
 import PaymentMethodSelector from '../../components/common/PaymentMethodSelector';
 import Loader from '../../components/common/Loader';
+import { EmptyState } from '../../components/common/PageStates';
 import { createOrder } from '../../redux/actions/orderActions';
 import { listMyCart, addToCart } from '../../redux/actions/cartActions';
 import { getRewards } from '../../redux/actions/rewardsActions';
@@ -68,7 +69,9 @@ const CheckoutPage = () => {
   // Redirect when cart becomes empty
   // -----------------------------------------------------------------
   useEffect(() => {
-    if (cartItems.length === 0) navigate('/cart');
+    if (cartItems.length === 0) {
+      dispatch(listMyCart());
+    }
   }, [cartItems, navigate]);
 
   // -----------------------------------------------------------------
@@ -318,6 +321,14 @@ const CheckoutPage = () => {
       {orderError && <Alert severity="error" sx={{ mb: 2 }}>{orderError}</Alert>}
       {rzpError && <Alert severity="error" sx={{ mb: 2 }}>{rzpError}</Alert>}
 
+      {cartItems.length === 0 ? (
+        <EmptyState
+          title="Your cart is empty"
+          description="Add products to continue checkout."
+          actionLabel="Go to Cart"
+          onAction={() => navigate('/cart')}
+        />
+      ) : (
       <Grid container spacing={3}>
         {/* ---------- LEFT COLUMN ---------- */}
         <Grid item xs={12} md={8}>
@@ -448,6 +459,7 @@ const CheckoutPage = () => {
           </Paper>
         </Grid>
       </Grid>
+      )}
     </Container>
   );
 };

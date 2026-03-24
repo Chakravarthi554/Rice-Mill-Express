@@ -68,9 +68,12 @@ const NotificationCenter = () => {
   const fetchNotifications = async () => {
     setLoading(true);
     try {
-      const url = filter === 'all'
-        ? '/api/notifications?limit=50'
-        : `/api/notifications?type=${filter}&limit=50`;
+      let url = '/api/notifications?limit=50';
+      if (filter === 'unread') {
+        url = '/api/notifications?read=false&limit=50';
+      } else if (filter !== 'all') {
+        url = `/api/notifications?type=${filter}&limit=50`;
+      }
 
       const response = await fetch(url, {
         headers: {
@@ -105,8 +108,10 @@ const NotificationCenter = () => {
       setNotifications(prev => prev.map(n =>
         n._id === notificationId ? { ...n, read: true } : n
       ));
+      return true;
     } catch (error) {
       console.error('Error marking notification as read:', error);
+      return false;
     }
   };
 
@@ -290,7 +295,10 @@ const NotificationCenter = () => {
                         {!notification.read && (
                           <IconButton
                             size="small"
-                            onClick={() => markAsRead(notification._id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              markAsRead(notification._id);
+                            }}
                             color="primary"
                           >
                             <CheckIcon />
@@ -298,7 +306,10 @@ const NotificationCenter = () => {
                         )}
                         <IconButton
                           size="small"
-                          onClick={() => deleteNotification(notification._id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteNotification(notification._id);
+                          }}
                           color="error"
                         >
                           <DeleteIcon />
@@ -307,7 +318,10 @@ const NotificationCenter = () => {
                           <Button
                             size="small"
                             variant="outlined"
-                            onClick={() => handleNotificationAction(notification)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleNotificationAction(notification);
+                            }}
                           >
                             {notification.actionLabel || 'View'}
                           </Button>

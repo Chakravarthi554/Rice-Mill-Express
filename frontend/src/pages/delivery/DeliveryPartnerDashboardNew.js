@@ -39,6 +39,7 @@ import {
     History,
 } from '@mui/icons-material';
 import { styled, keyframes } from '@mui/material/styles';
+import { LoadingState, EmptyState, ErrorState } from '../../components/common/PageStates';
 
 // Animated gradient background
 const pulse = keyframes`
@@ -234,15 +235,7 @@ const DeliveryPartnerDashboard = () => {
         return (
             <DashboardContainer>
                 <Container maxWidth="lg">
-                    <Box display="flex" justifyContent="center" alignItems="center" minHeight="80vh">
-                        <Box textAlign="center">
-                            <LocalShipping sx={{ fontSize: 80, color: '#ffffff', mb: 2 }} />
-                            <Typography variant="h5" color="#ffffff">
-                                Loading Dashboard...
-                            </Typography>
-                            <LinearProgress sx={{ mt: 2, width: 200 }} />
-                        </Box>
-                    </Box>
+                    <LoadingState message="Loading delivery dashboard..." />
                 </Container>
             </DashboardContainer>
         );
@@ -317,9 +310,14 @@ const DeliveryPartnerDashboard = () => {
                 {/* Error Alert */}
                 {error && (
                     <Fade in>
-                        <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }} onClose={() => setError(null)}>
-                            {error}
-                        </Alert>
+                        <Box sx={{ mb: 3 }}>
+                            <ErrorState
+                                title="Unable to load dashboard"
+                                description={error}
+                                actionLabel="Retry"
+                                onAction={fetchData}
+                            />
+                        </Box>
                     </Fade>
                 )}
 
@@ -519,22 +517,12 @@ const DeliveryPartnerDashboard = () => {
                         </Box>
 
                         {orders.length === 0 ? (
-                            <Paper
-                                sx={{
-                                    p: 6,
-                                    textAlign: 'center',
-                                    background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
-                                    borderRadius: 3,
-                                }}
-                            >
-                                <LocalShipping sx={{ fontSize: 80, color: '#cbd5e1', mb: 2 }} />
-                                <Typography variant="h6" color="textSecondary">
-                                    No active orders at the moment
-                                </Typography>
-                                <Typography variant="body2" color="textSecondary" mt={1}>
-                                    New orders will appear here when assigned by sellers
-                                </Typography>
-                            </Paper>
+                            <EmptyState
+                                title="No active orders"
+                                description="New orders will appear here when assigned by sellers."
+                                actionLabel="Refresh"
+                                onAction={fetchData}
+                            />
                         ) : (
                             <Grid container spacing={3}>
                                 {orders.map((order, index) => (

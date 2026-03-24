@@ -4,7 +4,7 @@ import Header from '../components/common/Header';
 import Dashboard from '../components/customer/Dashboard';
 import ProductFilter from '../components/common/ProductFilter';
 import SettingsBanner from '../components/common/SettingsBanner';
-import { Box, Tabs, Tab, Container } from '@mui/material';
+import { Box, Tabs, Tab, Container, Button } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
 
 const CustomerDashboard = () => {
@@ -52,27 +52,26 @@ const CustomerDashboard = () => {
           {/* 🛡️ DEV HELPERS - Only visible if NO admin exists in system */}
           {userInfo?.canBootstrap && (
             <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
-              <button
+              <Button
                 onClick={handleBootstrapAdmin}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#d32f2f',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold'
-                }}
+                color="error"
+                variant="contained"
+                size="small"
               >
                 🛡️ Activate Admin Access
-              </button>
+              </Button>
             </Box>
           )}
 
           <Tabs
             value={activeTab}
             onChange={handleTabChange}
-            sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
+            sx={{
+              mb: 2,
+              borderBottom: 1,
+              borderColor: 'divider',
+              '& .MuiTab-root': { textTransform: 'none', minHeight: 44, fontWeight: 600 }
+            }}
           >
             <Tab label="Dashboard" />
             <Tab label="Browse All Products" />

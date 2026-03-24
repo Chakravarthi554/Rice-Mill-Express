@@ -88,9 +88,9 @@ const AdminLayout = ({ tabs, title }) => {
           onChange={(_, v) => setTabValue(v)}
           variant="scrollable"
           sx={{
-            mb: 2,
+            mb: 3,
             '& .MuiTab-root': {
-              textTransform: 'none', fontWeight: 600, borderRadius: '12px',
+              textTransform: 'none', fontWeight: 600, borderRadius: '12px', minHeight: 44,
               margin: '0 6px', color: 'rgba(255,255,255,0.7)',
               transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
               '&.Mui-selected': {
@@ -118,7 +118,7 @@ const AdminLayout = ({ tabs, title }) => {
             exit={{ opacity: 0, x: -50 }}
             transition={{ duration: 0.3 }}
           >
-            <Box sx={{ mt: 3 }}>
+            <Box sx={{ mt: 2 }}>
               {tabs[tabValue].component}
             </Box>
           </motion.div>

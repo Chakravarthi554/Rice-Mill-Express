@@ -20,6 +20,8 @@ import {
 import { listOrders, getOrderDetails } from '../../../redux/actions/adminActions';
 import Loader from '../../common/Loader';
 import Message from '../../common/Message';
+import { EmptyState } from '../../common/PageStates';
+import { PaymentStatusChip, PriceBreakdown } from '../../common/FinancialUI';
 
 const OrdersTab = () => {
     const dispatch = useDispatch();
@@ -166,10 +168,13 @@ const OrdersTab = () => {
                     <TableBody>
                         {filteredOrders.length === 0 && !loading ? (
                             <TableRow>
-                                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                                    <Typography variant="body1" color="rgba(255,255,255,0.4)">
-                                        {searchTerm ? 'No orders match your search' : 'No orders found'}
-                                    </Typography>
+                                <TableCell colSpan={6} sx={{ py: 2 }}>
+                                    <EmptyState
+                                        title={searchTerm ? 'No matching orders' : 'No orders found'}
+                                        description={searchTerm ? 'Try broader search terms.' : 'New orders will appear here.'}
+                                        actionLabel="Refresh"
+                                        onAction={handleRefresh}
+                                    />
                                 </TableCell>
                             </TableRow>
                         ) : (
@@ -342,17 +347,24 @@ const OrdersTab = () => {
                                             <Typography variant="body2" sx={{ mb: 1 }}>
                                                 Method: <strong>{selectedOrder.paymentMethod}</strong>
                                             </Typography>
-                                            <Chip
-                                                label={selectedOrder.isPaid ? 'Paid' : 'Unpaid'}
-                                                color={selectedOrder.isPaid ? 'success' : 'warning'}
-                                                size="small"
-                                                sx={{ fontWeight: 'bold' }}
-                                            />
+                                            <PaymentStatusChip status={selectedOrder.isPaid ? 'paid' : 'unpaid'} />
                                             {selectedOrder.isPaid && (
                                                 <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'rgba(255,255,255,0.5)' }}>
                                                     On {new Date(selectedOrder.paidAt).toLocaleString()}
                                                 </Typography>
                                             )}
+                                            <Box sx={{ mt: 2 }}>
+                                                <PriceBreakdown
+                                                    dense
+                                                    rows={[
+                                                        { label: 'Items', value: Number(selectedOrder.itemsPrice || 0) },
+                                                        { label: 'Tax', value: Number(selectedOrder.taxPrice || 0) },
+                                                        { label: 'Shipping', value: Number(selectedOrder.shippingPrice || 0) },
+                                                    ]}
+                                                    totalLabel="Order Total"
+                                                    totalValue={Number(selectedOrder.totalPrice || 0)}
+                                                />
+                                            </Box>
                                         </Paper>
                                     </Box>
                                 </Box>

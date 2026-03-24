@@ -1,5 +1,5 @@
 // [AI: Three-dot menu bookmark logic and Redux connect added]
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -28,7 +28,6 @@ const ForumPostCard = ({ post, onUpdate }) => {
   const [shareOpen, setShareOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
-  const [isBookmarked, setIsBookmarked] = useState(false);
 
   useEffect(() => setCurrentPost(post), [post]);
 
@@ -62,19 +61,22 @@ const ForumPostCard = ({ post, onUpdate }) => {
         }
       }
     };
-    window.addEventListener('socialUpdate', (e) => handler(e.detail));
+    const eventHandler = (e) => handler(e.detail);
+    window.addEventListener('socialUpdate', eventHandler);
 
     // Join room for this post
     joinPostRoom(currentPost._id);
 
     return () => {
-      window.removeEventListener('socialUpdate', handler);
+      window.removeEventListener('socialUpdate', eventHandler);
       leavePostRoom(currentPost._id);
     };
-  }, [currentPost._id]);
+  }, [currentPost._id, userInfo?._id]);
 
   const hasLiked = currentPost.userLiked;
-  const isBookmarkedInPost = currentPost.isBookmarked;
+  const isBookmarkedInPost = Array.isArray(currentPost.bookmarkedBy)
+    ? currentPost.bookmarkedBy.includes(userInfo?._id)
+    : Boolean(currentPost.isBookmarked);
   const isOwner = userInfo?._id === currentPost.userId?._id;
   const isAdmin = userInfo?.role === 'admin';
 

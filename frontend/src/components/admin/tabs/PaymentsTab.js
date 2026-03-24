@@ -53,6 +53,8 @@ import {
   getAdminCODSettlements,
   settleCOD
 } from '../../../redux/actions/adminPaymentActions';
+import { EmptyState, LoadingState } from '../../common/PageStates';
+import { PaymentStatusChip, PayoutStatusChip } from '../../common/FinancialUI';
 
 const selectAdminPaymentStats = (state) => state.adminPaymentStats || {};
 
@@ -172,31 +174,6 @@ const PaymentsTab = () => {
     </Card>
   );
 
-  const PaymentStatusChip = ({ status }) => {
-    const statusConfig = {
-      completed: { color: 'success', label: 'Completed' },
-      pending: { color: 'warning', label: 'Pending' },
-      failed: { color: 'error', label: 'Failed' },
-      refunded: { color: 'info', label: 'Refunded' },
-      partially_refunded: { color: 'info', label: 'Partial Refund' }
-    };
-
-    const config = statusConfig[status] || { color: 'default', label: status };
-    return <Chip label={config.label} color={config.color} size="small" />;
-  };
-
-  const PayoutStatusChip = ({ status }) => {
-    const statusConfig = {
-      completed: { color: 'success', label: 'Paid' },
-      pending: { color: 'warning', label: 'Pending' },
-      processing: { color: 'info', label: 'Processing' },
-      failed: { color: 'error', label: 'Failed' }
-    };
-
-    const config = statusConfig[status] || { color: 'default', label: status };
-    return <Chip label={config.label} color={config.color} size="small" />;
-  };
-
   return (
     <Box>
       {/* Stats Cards */}
@@ -238,6 +215,7 @@ const PaymentsTab = () => {
           />
         </Grid>
       </Grid>
+      {statsLoading && <LoadingState message="Refreshing payment stats..." />}
 
       {/* Tabs and Controls */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
@@ -323,8 +301,13 @@ const PaymentsTab = () => {
                 </TableRow>
               ) : transactions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} align="center">
-                    <Typography color="textSecondary">No transactions found</Typography>
+                  <TableCell colSpan={9}>
+                    <EmptyState
+                      title="No transactions found"
+                      description="Try changing filters or refresh data."
+                      actionLabel="Refresh"
+                      onAction={loadData}
+                    />
                   </TableCell>
                 </TableRow>
               ) : (
@@ -421,8 +404,13 @@ const PaymentsTab = () => {
                 </TableRow>
               ) : payouts.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} align="center">
-                    <Typography color="textSecondary">No payouts found</Typography>
+                  <TableCell colSpan={7}>
+                    <EmptyState
+                      title="No payouts found"
+                      description="Pending seller payouts will appear here."
+                      actionLabel="Refresh"
+                      onAction={loadData}
+                    />
                   </TableCell>
                 </TableRow>
               ) : (
@@ -575,8 +563,13 @@ const PaymentsTab = () => {
                   </TableRow>
                 ) : settlements.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} align="center">
-                      <Typography color="textSecondary">No outstanding COD settlements</Typography>
+                    <TableCell colSpan={6}>
+                      <EmptyState
+                        title="No outstanding COD settlements"
+                        description="All collected COD amounts are settled."
+                        actionLabel="Refresh"
+                        onAction={loadData}
+                      />
                     </TableCell>
                   </TableRow>
                 ) : (

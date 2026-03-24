@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import {
   Container,
@@ -17,6 +17,7 @@ import {
   InputAdornment,
   CircularProgress,
   Alert,
+  Snackbar,
   Paper,
   Divider
 } from '@mui/material';
@@ -26,18 +27,19 @@ import {
   Search,
   Visibility,
   Delete,
-  Share,
   Comment,
   Favorite
 } from '@mui/icons-material';
+import axiosInstance from '../../utils/axiosInstance';
 
 const BookmarksPage = () => {
-  const dispatch = useDispatch();
   const navigate = useNavigate();
   const { userInfo } = useSelector((state) => state.userLogin);
 
   const [bookmarks, setBookmarks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -50,24 +52,16 @@ const BookmarksPage = () => {
 
   const fetchBookmarks = async () => {
     setLoading(true);
+    setError('');
     try {
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
-      const response = await fetch(`${apiUrl}/api/forum/bookmarks?page=${page}&limit=20`, {
-        headers: {
-          'Authorization': `Bearer ${userInfo.token}`,
-          'Content-Type': 'application/json'
-        }
+      const { data } = await axiosInstance.get(`/api/forum/bookmarks?page=${page}&limit=20`, {
+        headers: { Authorization: `Bearer ${userInfo.token}` }
       });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch bookmarks: ${response.statusText}`);
-      }
-
-      const data = await response.json();
       setBookmarks(data.posts || []);
       setTotalPages(data.pages || 1);
-    } catch (error) {
-      console.error('Error fetching bookmarks:', error);
+    } catch (fetchError) {
+      console.error('Error fetching bookmarks:', fetchError);
+      setError(fetchError.response?.data?.message || 'Failed to load bookmarks');
       setBookmarks([]);
     } finally {
       setLoading(false);
@@ -76,21 +70,14 @@ const BookmarksPage = () => {
 
   const handleUnbookmark = async (postId) => {
     try {
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
-      const response = await fetch(`${apiUrl}/api/forum/${postId}/bookmark`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${userInfo.token}`,
-          'Content-Type': 'application/json'
-        }
+      await axiosInstance.post(`/api/forum/${postId}/bookmark`, {}, {
+        headers: { Authorization: `Bearer ${userInfo.token}` }
       });
-
-      if (response.ok) {
-        // Remove from local state
-        setBookmarks(bookmarks.filter(post => post._id !== postId));
-      }
-    } catch (error) {
-      console.error('Error unbookmarking:', error);
+      setBookmarks((prev) => prev.filter((post) => post._id !== postId));
+      setSnackbar({ open: true, message: 'Bookmark removed', severity: 'success' });
+    } catch (unbookmarkError) {
+      console.error('Error unbookmarking:', unbookmarkError);
+      setSnackbar({ open: true, message: 'Failed to remove bookmark', severity: 'error' });
     }
   };
 
@@ -154,6 +141,8 @@ const BookmarksPage = () => {
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
           <CircularProgress />
         </Box>
+      ) : error ? (
+        <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
       ) : filteredBookmarks.length === 0 ? (
         /* Empty State */
         <Paper sx={{ p: 8, textAlign: 'center', bgcolor: 'grey.50' }}>
@@ -313,6 +302,19 @@ const BookmarksPage = () => {
           )}
         </>
       )}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={2500}
+        onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+      >
+        <Alert
+          severity={snackbar.severity}
+          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 };

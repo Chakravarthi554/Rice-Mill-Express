@@ -12,8 +12,7 @@ import {
     Chip,
     Button,
     Avatar,
-    Divider,
-    Alert
+    Divider
 } from '@mui/material';
 import {
     LocalShipping,
@@ -24,6 +23,7 @@ import {
 } from '@mui/icons-material';
 import { logoutUser } from '../redux/actions/userActions';
 import Loader from '../components/common/Loader';
+import { EmptyState, ErrorState } from '../components/common/PageStates';
 
 const DeliveryPartnerDashboard = () => {
     const dispatch = useDispatch();
@@ -186,21 +186,23 @@ const DeliveryPartnerDashboard = () => {
                 <Divider sx={{ mb: 2 }} />
 
                 {error && (
-                    <Alert severity="error" sx={{ mb: 2 }}>
-                        {error}
-                    </Alert>
+                    <Box sx={{ mb: 2 }}>
+                        <ErrorState
+                            title="Failed to load deliveries"
+                            description={error}
+                            actionLabel="Retry"
+                            onAction={() => window.location.reload()}
+                        />
+                    </Box>
                 )}
 
                 {orders.length === 0 ? (
-                    <Box textAlign="center" py={4}>
-                        <Assignment sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-                        <Typography variant="h6" color="textSecondary">
-                            No orders assigned yet
-                        </Typography>
-                        <Typography variant="body2" color="textSecondary">
-                            Check back later for new deliveries
-                        </Typography>
-                    </Box>
+                    <EmptyState
+                        title="No orders assigned yet"
+                        description="Check back later for new deliveries."
+                        actionLabel="Refresh"
+                        onAction={() => window.location.reload()}
+                    />
                 ) : (
                     <Grid container spacing={2}>
                         {orders.map((order) => (

@@ -99,6 +99,57 @@ const getAppTheme = (mode) => {
   };
   return createTheme({
     palette: mode === 'dark' ? darkPalette : lightPalette,
+    shape: {
+      borderRadius: 12,
+    },
+    spacing: 8,
+    typography: {
+      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+      h1: { fontSize: '2rem', fontWeight: 700, lineHeight: 1.25 },
+      h2: { fontSize: '1.75rem', fontWeight: 700, lineHeight: 1.3 },
+      h3: { fontSize: '1.5rem', fontWeight: 700, lineHeight: 1.35 },
+      h4: { fontSize: '1.25rem', fontWeight: 700, lineHeight: 1.4 },
+      h5: { fontSize: '1.125rem', fontWeight: 600, lineHeight: 1.45 },
+      h6: { fontSize: '1rem', fontWeight: 600, lineHeight: 1.5 },
+      body1: { fontSize: '1rem', lineHeight: 1.6 },
+      body2: { fontSize: '0.875rem', lineHeight: 1.55 },
+    },
+    components: {
+      MuiContainer: {
+        styleOverrides: {
+          root: {
+            paddingLeft: 16,
+            paddingRight: 16,
+          },
+        },
+      },
+      MuiCard: {
+        styleOverrides: {
+          root: {
+            borderRadius: 12,
+          },
+        },
+      },
+      MuiButton: {
+        defaultProps: {
+          disableElevation: true,
+        },
+        styleOverrides: {
+          root: {
+            textTransform: 'none',
+            borderRadius: 10,
+            fontWeight: 600,
+          },
+        },
+      },
+      MuiPaper: {
+        styleOverrides: {
+          root: {
+            borderRadius: 12,
+          },
+        },
+      },
+    },
   });
 };
 

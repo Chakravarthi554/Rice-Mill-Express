@@ -38,6 +38,7 @@ import Message from '../components/common/Message';
 import { RECIPE_SUBMIT_RESET } from '../redux/constants/RecipeConstants';
 import RecipeEngagementDashboard from '../components/seller/RecipeEngagementDashboard';
 import SettingsBanner from '../components/common/SettingsBanner';
+import { EmptyState } from '../components/common/PageStates';
 
 // ✅ Backend-driven Invoice handled via Redux actions
 
@@ -673,6 +674,14 @@ const SellerDashboard = () => {
                         <Message severity="error">{ordersError}</Message>
                     ) : (
                         viewMode === 'table' ? (
+                            orders?.length === 0 ? (
+                                <EmptyState
+                                    title="No seller orders yet"
+                                    description="Orders will appear here once customers start purchasing."
+                                    actionLabel="Refresh"
+                                    onAction={() => dispatch(listSellerOrders())}
+                                />
+                            ) : (
                             <TableContainer component={Paper} elevation={3} sx={{ mt: 2, borderRadius: 2 }}>
                                 <Table>
                                     <TableHead>
@@ -735,14 +744,10 @@ const SellerDashboard = () => {
                                                 </TableCell>
                                             </TableRow>
                                         ))}
-                                        {orders?.length === 0 && (
-                                            <TableRow>
-                                                <TableCell colSpan={9} align="center">No orders found.</TableCell>
-                                            </TableRow>
-                                        )}
                                     </TableBody>
                                 </Table>
                             </TableContainer>
+                            )
                         ) : (
                             <OrderKanban orders={orders} onUpdateStatus={handleUpdateStatus} onAssignPartner={handleOpenDialog} onViewDetails={handleViewDetails} />
                         )
