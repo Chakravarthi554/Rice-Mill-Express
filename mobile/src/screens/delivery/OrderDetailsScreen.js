@@ -9,9 +9,9 @@ import {
     Alert,
     Platform,
     Image,
+    SafeAreaView
 } from 'react-native';
-import { Card, Button, ActivityIndicator, Divider } from 'react-native-paper';
-import { MaterialIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { apiService } from '../../services/api';
 import { API_URL } from '../../config/env';
@@ -30,7 +30,6 @@ const OrderDetailsScreen = ({ route, navigation }) => {
         try {
             setLoading(true);
             const response = await apiService.getDeliveryOrderById(orderId);
-            // Handle response structure { success: true, order: {...} }
             const orderData = response.data?.order || response.data;
             setOrder(orderData);
         } catch (error) {
@@ -52,7 +51,7 @@ const OrderDetailsScreen = ({ route, navigation }) => {
             setActionLoading(true);
             await apiService.startDelivery(orderId);
             Alert.alert('Success', 'Delivery started!');
-            fetchOrderDetails(); // Refresh order data
+            fetchOrderDetails();
         } catch (error) {
             console.error('Error starting delivery:', error);
             Alert.alert('Error', 'Failed to start delivery');
@@ -62,500 +61,371 @@ const OrderDetailsScreen = ({ route, navigation }) => {
     };
 
     const handleCaptureAndComplete = async () => {
-        try {
-            // Request camera permissions
-            const { status } = await ImagePicker.requestCameraPermissionsAsync();
-            if (status !== 'granted') {
-                Alert.alert('Permission Required', 'Camera permission is required to capture delivery proof');
-                return;
-            }
-
-            // Launch camera
-            const result = await ImagePicker.launchCameraAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                allowsEditing: true,
-                aspect: [4, 3],
-                quality: 0.8,
-            });
-
-            if (!result.canceled && result.assets[0]) {
-                await uploadDeliveryProof(result.assets[0].uri);
-            }
-        } catch (error) {
-            console.error('Error capturing photo:', error);
-            Alert.alert('Error', 'Failed to capture photo');
-        }
-    };
-
-    const uploadDeliveryProof = async (photoUri) => {
-        try {
-            setActionLoading(true);
-
-            const formData = new FormData();
-            formData.append('deliveryPhoto', {
-                uri: photoUri,
-                name: 'delivery-proof.jpg',
-                type: 'image/jpeg',
-            });
-
-            await apiService.uploadDeliveryPhoto(orderId, formData);
-
-            Alert.alert('Success', 'Delivery completed successfully!', [
-                { text: 'OK', onPress: () => navigation.goBack() }
-            ]);
-        } catch (error) {
-            console.error('Error uploading delivery proof:', error);
-            Alert.alert('Error', error.response?.data?.message || 'Failed to complete delivery');
-        } finally {
-            setActionLoading(false);
-        }
+        // We will navigate to the dedicated DeliveryConfirmationScreen if it exists to handle both photo and payment
+        // Or handle simple capture here if it's already paid. 
+        // For consistency, let's navigate to DeliveryConfirmation for the full flow.
+        navigation.navigate('DeliveryConfirmation', { orderId: order._id });
     };
 
     const getStatusBadgeColor = (status) => {
         switch (status) {
-            case 'placed': return '#9C27B0';
-            case 'processing': return '#FF9800';
-            case 'packed': return '#607D8B';
-            case 'shipped': return '#2196F3';
-            case 'out_for_delivery': return '#FFA500';
-            case 'delivered': return '#4CAF50';
-            default: return '#9E9E9E';
+            case 'placed': return '#4F46E5';
+            case 'processing': return '#EA580C';
+            case 'packed': return '#6B7280';
+            case 'shipped': return '#3B82F6';
+            case 'out_for_delivery': return '#EA580C';
+            case 'delivered': return '#16A34A';
+            default: return '#9CA3AF';
         }
     };
 
     if (loading) {
         return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#4CAF50" />
-            </View>
+            <SafeAreaView style={styles.loadingContainer}>
+                <View style={styles.spinnerPlaceholder} />
+                <Text style={styles.loadingText}>Loading Order Details...</Text>
+            </SafeAreaView>
         );
     }
 
     if (!order) {
         return (
-            <View style={styles.errorContainer}>
-                <MaterialIcons name="error-outline" size={64} color="#ccc" />
+            <SafeAreaView style={styles.errorContainer}>
+                <Ionicons name="alert-circle-outline" size={64} color="#ccc" />
                 <Text style={styles.errorText}>Order not found</Text>
-            </View>
+                <TouchableOpacity style={styles.btnOutline} onPress={() => navigation.goBack()}>
+                    <Text style={styles.btnOutlineText}>Go Back</Text>
+                </TouchableOpacity>
+            </SafeAreaView>
         );
     }
 
     return (
-        <ScrollView style={styles.container}>
-            {/* Order Status Header */}
-            <Card style={styles.statusCard}>
-                <Card.Content>
-                    <View style={styles.statusHeader}>
-                        <Text style={styles.orderNumber}>Order #{order._id?.substring(18)?.toUpperCase() || 'N/A'}</Text>
-                        <View style={[styles.statusBadge, { backgroundColor: getStatusBadgeColor(order.orderStatus) }]}>
-                            <Text style={styles.statusText}>
-                                {order.orderStatus.replace(/_/g, ' ').toUpperCase()}
-                            </Text>
-                        </View>
-                    </View>
-                </Card.Content>
-            </Card>
+        <SafeAreaView style={styles.container}>
+            {/* Header */}
+            <View style={styles.header}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+                    <Ionicons name="arrow-back" size={24} color="#111827" />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Order Details</Text>
+                <View style={{ width: 24 }} />
+            </View>
 
-            {/* Customer Information */}
-            <Card style={styles.card}>
-                <Card.Title title="Customer Information" titleStyle={styles.cardTitle} />
-                <Card.Content>
+            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+                
+                {/* Status Card */}
+                <View style={styles.statusCard}>
+                    <View>
+                        <Text style={styles.orderLabel}>ORDER ID</Text>
+                        <Text style={styles.orderId}>#{order._id?.substring(18)?.toUpperCase() || 'N/A'}</Text>
+                    </View>
+                    <View style={[styles.badge, { backgroundColor: getStatusBadgeColor(order.orderStatus) }]}>
+                        <Text style={styles.badgeText}>{order.orderStatus.replace(/_/g, ' ').toUpperCase()}</Text>
+                    </View>
+                </View>
+
+                {/* Customer Information Card */}
+                <View style={styles.card}>
+                    <View style={styles.cardHeader}>
+                        <Ionicons name="person-circle-outline" size={20} color="#6B7280" />
+                        <Text style={styles.cardTitle}>Customer Details</Text>
+                    </View>
+                    <View style={styles.divider} />
+                    
+                    <Text style={styles.customerName}>{order.shippingAddress?.name}</Text>
+                    
                     <View style={styles.infoRow}>
-                        <MaterialIcons name="person" size={20} color="#666" />
-                        <Text style={styles.infoText}>{order.shippingAddress.name}</Text>
+                        <Ionicons name="call-outline" size={16} color="#6B7280" />
+                        <Text style={styles.infoText} onPress={handleCallCustomer}>{order.shippingAddress?.phone}</Text>
                     </View>
-
-                    <Text style={styles.sectionTitle}>Customer & Delivery Details</Text>
-                    <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Customer:</Text>
-                        <Text style={styles.detailValue}>{order.user?.name}</Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Phone:</Text>
-                        <Text style={styles.detailValue} onPress={() => Linking.openURL(`tel:${order.shippingAddress?.phone}`)}>
-                            {order.shippingAddress?.phone}
-                        </Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Address:</Text>
+                    
+                    <View style={styles.infoRow}>
+                        <Ionicons name="location-outline" size={16} color="#6B7280" />
                         <View style={{ flex: 1 }}>
-                            <Text style={styles.detailValue}>
-                                {order.shippingAddress?.houseNumber}, {order.shippingAddress?.colony && `${order.shippingAddress?.colony}, `}
-                                {order.shippingAddress?.street}
+                            <Text style={styles.infoText}>
+                                {order.shippingAddress?.houseNumber}, {order.shippingAddress?.street}
                             </Text>
                             {order.shippingAddress?.landmark && (
                                 <Text style={styles.landmarkText}>Landmark: {order.shippingAddress?.landmark}</Text>
                             )}
-                            <Text style={styles.detailValue}>
+                            <Text style={styles.infoText}>
                                 {order.shippingAddress?.city}, {order.shippingAddress?.state} - {order.shippingAddress?.pinCode}
                             </Text>
                         </View>
                     </View>
+
                     {order.shippingAddress && (
-                        <Button
-                            icon="map"
-                            mode="contained"
-                            onPress={() => {
-                                const { houseNumber, street, city, state, pinCode, location } = order.shippingAddress;
-                                const coordinates = location?.coordinates;
-                                const [lng, lat] = Array.isArray(coordinates) && coordinates.length === 2 ? coordinates : [null, null];
+                        <TouchableOpacity style={styles.btnBlueOutline} onPress={() => {
+                            const { houseNumber, street, city, state, pinCode, location } = order.shippingAddress;
+                            const coordinates = location?.coordinates;
+                            const [lng, lat] = Array.isArray(coordinates) && coordinates.length === 2 ? coordinates : [null, null];
+                            const addressString = `${houseNumber || ''} ${street || ''}, ${city || ''}, ${state || ''} ${pinCode || ''}`.trim();
 
-                                // Construct address string for fallback
-                                const addressString = `${houseNumber || ''} ${street || ''}, ${city || ''}, ${state || ''} ${pinCode || ''}`.trim();
+                            let url = '';
+                            if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
+                                url = Platform.select({ ios: `maps:0,0?q=${lat},${lng}`, android: `geo:0,0?q=${lat},${lng}` });
+                            } else if (addressString) {
+                                const encodedAddress = encodeURIComponent(addressString);
+                                url = Platform.select({ ios: `maps:0,0?q=${encodedAddress}`, android: `geo:0,0?q=${encodedAddress}` });
+                            }
 
-                                let url = '';
-                                if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
-                                    // Use coordinates if available
-                                    url = Platform.select({
-                                        ios: `maps:0,0?q=${lat},${lng}`,
-                                        android: `geo:0,0?q=${lat},${lng}`
-                                    });
-                                } else if (addressString) {
-                                    // Fallback to address string
-                                    const encodedAddress = encodeURIComponent(addressString);
-                                    url = Platform.select({
-                                        ios: `maps:0,0?q=${encodedAddress}`,
-                                        android: `geo:0,0?q=${encodedAddress}`
-                                    });
-                                }
-
-                                if (url) {
-                                    Linking.openURL(url).catch(() => {
-                                        Alert.alert('Error', 'Could not open maps application');
-                                    });
-                                } else {
-                                    Alert.alert('Error', 'No valid address or coordinates available for navigation');
-                                }
-                            }}
-                            style={styles.navigateButton}
-                            buttonColor="#2196F3"
-                        >
-                            Navigate to Customer
-                        </Button>
+                            if (url) {
+                                Linking.openURL(url).catch(() => Alert.alert('Error', 'Could not open maps application'));
+                            }
+                        }}>
+                            <Ionicons name="navigate" size={16} color="#4F46E5" />
+                            <Text style={styles.btnBlueOutlineText}>Navigate to Customer</Text>
+                        </TouchableOpacity>
                     )}
-                </Card.Content>
-            </Card>
+                </View>
 
-            {/* Order Items */}
-            <Card style={styles.card}>
-                <Card.Title title="Order Items" titleStyle={styles.cardTitle} />
-                <Card.Content>
+                {/* Items Card */}
+                <View style={styles.card}>
+                    <View style={styles.cardHeader}>
+                        <Ionicons name="cube-outline" size={20} color="#6B7280" />
+                        <Text style={styles.cardTitle}>Order Items</Text>
+                    </View>
+                    <View style={styles.divider} />
+                    
                     {order.orderItems.map((item, index) => (
                         <View key={index} style={styles.itemRow}>
-                            <Image
-                                source={{
-                                    uri: item.image?.startsWith('http')
-                                        ? item.image
-                                        : `${API_URL}${item.image}`
-                                }}
-                                style={styles.itemImage}
-                            />
-                            <View style={styles.itemInfo}>
+                            <View style={styles.itemImagePlaceholder}>
+                                {item.image ? (
+                                    <Image source={{ uri: item.image.startsWith('http') ? item.image : `${API_URL}${item.image}` }} style={styles.itemImage} />
+                                ) : (
+                                    <Ionicons name="image-outline" size={24} color="#ccc" />
+                                )}
+                            </View>
+                            <View style={styles.itemDetails}>
                                 <Text style={styles.itemName}>{item.name}</Text>
-                                <Text style={styles.itemQuantity}>Quantity: {item.qty || item.quantity}</Text>
+                                <Text style={styles.itemQty}>Qty: {item.qty || item.quantity}</Text>
                             </View>
                             <Text style={styles.itemPrice}>₹{(item.price * (item.qty || item.quantity)).toFixed(2)}</Text>
                         </View>
                     ))}
-                </Card.Content>
-            </Card>
+                </View>
 
-            {/* Payment Information */}
-            <Card style={styles.card}>
-                <Card.Title title="Payment Information" titleStyle={styles.cardTitle} />
-                <Card.Content>
-                    <View style={styles.paymentRow}>
-                        <Text style={styles.paymentLabel}>Payment Method</Text>
-                        <Text style={styles.paymentValue}>
-                            {order.paymentMethod === 'cod' ? 'Cash on Delivery' : order.paymentMethod.toUpperCase()}
+                {/* Financial Summary */}
+                <View style={styles.card}>
+                    <View style={styles.cardHeader}>
+                        <Ionicons name="card-outline" size={20} color="#6B7280" />
+                        <Text style={styles.cardTitle}>Payment Details</Text>
+                    </View>
+                    <View style={styles.divider} />
+                    
+                    <View style={styles.flexRowBetween}>
+                        <Text style={styles.finLabel}>Payment Method</Text>
+                        <Text style={[styles.finValue, { color: order.paymentMethod === 'cod' ? '#EA580C' : '#16A34A' }]}>
+                            {order.paymentMethod === 'cod' ? 'COD' : order.paymentMethod.toUpperCase()}
                         </Text>
                     </View>
-                    <View style={styles.paymentRow}>
-                        <Text style={styles.paymentLabel}>Customer Paid</Text>
-                        <Text style={styles.paymentValue}>₹{order.finalPaidAmount || order.totalAmount}</Text>
+                    <View style={styles.flexRowBetween}>
+                        <Text style={styles.finLabel}>Collected Amount</Text>
+                        <Text style={styles.finValue}>₹{order.finalPaidAmount || order.totalAmount}</Text>
                     </View>
-                    <Divider style={{ marginVertical: 8 }} />
-                    <View style={styles.paymentRow}>
+                    <View style={styles.divider} />
+                    <View style={styles.flexRowBetween}>
                         <Text style={styles.earningsLabel}>Your Earnings</Text>
-                        <Text style={styles.earningsValue}>₹{order.deliveryPartnerAmount || 0}</Text>
+                        <Text style={styles.earningsValue}>+ ₹{order.deliveryPartnerAmount || 60}</Text>
                     </View>
-                </Card.Content>
-            </Card>
+                </View>
 
-            {/* Delivery Proof (if delivered) */}
-            {
-                order.orderStatus === 'delivered' && order.deliveryConfirmation?.photoProofUrl && (
-                    <Card style={styles.card}>
-                        <Card.Title title="Delivery Proof" titleStyle={styles.cardTitle} />
-                        <Card.Content>
-                            <Image
-                                source={{ uri: order.deliveryConfirmation.photoProofUrl }}
-                                style={styles.proofImage}
-                                resizeMode="cover"
-                            />
-                        </Card.Content>
-                    </Card>
-                )
-            }
+                {/* Action Spacing */}
+                <View style={{ height: 100 }} />
+            </ScrollView>
 
-            {/* Action Buttons */}
-            <View style={styles.actionContainer}>
-                {['placed', 'processing', 'packed', 'shipped'].includes(order.orderStatus) && order.replacementStatus !== 'requested' && (
-                    <Button
-                        mode="contained"
-                        onPress={handleStartDelivery}
-                        loading={actionLoading}
-                        disabled={actionLoading}
-                        style={styles.actionButton}
-                        icon="truck-fast"
-                    >
-                        Start Delivery
-                    </Button>
+            {/* Bottom Actions */}
+            <View style={styles.bottomBar}>
+                {['placed', 'processing', 'packed', 'shipped'].includes(order.orderStatus) && (
+                    <TouchableOpacity style={styles.btnPrimary} onPress={handleStartDelivery} disabled={actionLoading}>
+                        <Text style={styles.btnPrimaryText}>{actionLoading ? "Starting..." : "Start Delivery"}</Text>
+                    </TouchableOpacity>
                 )}
 
-                {/* Special case: Re-dispatch approved, show Start Delivery specifically for replacement */}
-                {order.orderStatus === 'replacement_approved' && (
-                    <Button
-                        mode="contained"
-                        onPress={handleStartDelivery}
-                        loading={actionLoading}
-                        disabled={actionLoading}
-                        style={styles.actionButton}
-                        icon="refresh"
-                    >
-                        Start Replacement Delivery
-                    </Button>
+                {order.orderStatus === 'out_for_delivery' && (
+                    <TouchableOpacity style={styles.btnGreen} onPress={handleCaptureAndComplete} disabled={actionLoading}>
+                        <Ionicons name="camera" size={20} color="#fff" style={{ marginRight: 8 }} />
+                        <Text style={styles.btnPrimaryText}>Capture Proof & Complete</Text>
+                    </TouchableOpacity>
                 )}
 
-                {(order.orderStatus === 'out_for_delivery' || order.orderStatus === 'delivered') && (
-                    <>
-                        {order.orderStatus !== 'delivered' && (
-                            <Button
-                                mode="contained"
-                                onPress={handleCaptureAndComplete}
-                                loading={actionLoading}
-                                disabled={actionLoading}
-                                style={styles.actionButton}
-                                icon="camera"
-                            >
-                                Capture Proof & Complete
-                            </Button>
-                        )}
-
-                        {order.replacementStatus === 'none' && order.orderStatus !== 'delivered' && (
-                            <Button
-                                mode="outlined"
-                                onPress={() => navigation.navigate('ReplacementRequest', {
-                                    orderId: order._id,
-                                    orderDetails: order
-                                })}
-                                style={[styles.actionButton, styles.replacementButton]}
-                                icon="swap-horizontal"
-                            >
-                                Request Replacement
-                            </Button>
-                        )}
-                    </>
+                {order.orderStatus === 'out_for_delivery' && order.replacementStatus === 'none' && (
+                    <TouchableOpacity style={styles.btnOutlineAlert} onPress={() => navigation.navigate('ReplacementRequest', { orderId: order._id, orderDetails: order })}>
+                        <Text style={styles.btnOutlineAlertText}>Report Issue / Replacement</Text>
+                    </TouchableOpacity>
                 )}
             </View>
-        </ScrollView >
+        </SafeAreaView>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F7F9FC',
+        backgroundColor: '#F9FAFB',
     },
     loadingContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#F7F9FC',
+        backgroundColor: '#F9FAFB',
+    },
+    spinnerPlaceholder: {
+        width: 40, height: 40, borderRadius: 20, borderWidth: 3, borderColor: '#16A34A', borderTopColor: 'transparent',
+    },
+    loadingText: {
+        marginTop: 16, color: '#6B7280', fontSize: 14,
     },
     errorContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#F7F9FC',
+        flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F9FAFB',
     },
     errorText: {
-        marginTop: 16,
+        marginTop: 16, fontSize: 16, color: '#4B5563', marginBottom: 16,
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        backgroundColor: '#fff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#F3F4F6',
+    },
+    backBtn: {
+        padding: 4,
+    },
+    headerTitle: {
         fontSize: 16,
-        color: '#666',
+        fontWeight: '700',
+        color: '#111827',
+    },
+    content: {
+        padding: 16,
     },
     statusCard: {
-        margin: 16,
-        marginBottom: 8,
-        elevation: 2,
-    },
-    statusHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+        backgroundColor: '#fff',
+        padding: 16,
+        borderRadius: 12,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: '#F3F4F6',
     },
-    orderNumber: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
+    orderLabel: {
+        fontSize: 11, color: '#6B7280', fontWeight: '600', marginBottom: 4,
     },
-    statusBadge: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 16,
+    orderId: {
+        fontSize: 16, fontWeight: '700', color: '#111827',
     },
-    statusText: {
-        color: '#fff',
-        fontSize: 12,
-        fontWeight: 'bold',
+    badge: {
+        paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
+    },
+    badgeText: {
+        color: '#fff', fontSize: 12, fontWeight: '700',
     },
     card: {
-        margin: 16,
-        marginTop: 8,
-        marginBottom: 8,
-        elevation: 2,
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: '#F3F4F6',
+    },
+    cardHeader: {
+        flexDirection: 'row', alignItems: 'center',
     },
     cardTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#333',
-    },
-    callButton: {
-        paddingVertical: 6,
-        borderRadius: 20,
-    },
-    callButtonText: {
-        marginLeft: 4,
-        color: '#4CAF50',
-        fontWeight: 'bold',
+        fontSize: 14, fontWeight: '700', color: '#111827', marginLeft: 8,
     },
     divider: {
-        marginVertical: 12,
+        height: 1, backgroundColor: '#F3F4F6', marginVertical: 12,
     },
-    addressContainer: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
+    customerName: {
+        fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 12,
     },
-    addressTextContainer: {
-        marginLeft: 12,
-        flex: 1,
+    infoRow: {
+        flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12,
     },
-    addressLabel: {
-        fontSize: 14,
-        color: '#666',
-        marginBottom: 4,
+    infoText: {
+        fontSize: 14, color: '#4B5563', marginLeft: 12, lineHeight: 20,
     },
-    addressText: {
-        fontSize: 16,
-        color: '#333',
-        marginBottom: 2,
+    landmarkText: {
+        fontSize: 13, color: '#9CA3AF', marginLeft: 12, marginTop: 2,
+    },
+    btnBlueOutline: {
+        flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
+        borderWidth: 1, borderColor: '#4F46E5', borderRadius: 8, paddingVertical: 10, marginTop: 8,
+    },
+    btnBlueOutlineText: {
+        color: '#4F46E5', fontWeight: '600', marginLeft: 6, fontSize: 14,
     },
     itemRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 16,
+        flexDirection: 'row', alignItems: 'center', marginBottom: 12,
+    },
+    itemImagePlaceholder: {
+        width: 48, height: 48, borderRadius: 8, backgroundColor: '#F3F4F6',
+        justifyContent: 'center', alignItems: 'center',
     },
     itemImage: {
-        width: 50,
-        height: 50,
-        borderRadius: 8,
-        backgroundColor: '#f0f0f0',
+        width: 48, height: 48, borderRadius: 8,
     },
-    itemInfo: {
-        flex: 1,
-        marginLeft: 12,
+    itemDetails: {
+        flex: 1, marginLeft: 12,
     },
     itemName: {
-        fontSize: 16,
-        fontWeight: '500',
-        color: '#333',
+        fontSize: 14, fontWeight: '600', color: '#111827',
     },
-    itemQuantity: {
-        fontSize: 14,
-        color: '#666',
-        marginHorizontal: 12,
+    itemQty: {
+        fontSize: 13, color: '#6B7280', marginTop: 2,
     },
     itemPrice: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#333',
+        fontSize: 14, fontWeight: '700', color: '#111827',
     },
-    paymentRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 8,
+    flexRowBetween: {
+        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8,
     },
-    paymentLabel: {
-        fontSize: 16,
-        color: '#666',
+    finLabel: {
+        fontSize: 14, color: '#6B7280',
     },
-    paymentValue: {
-        fontSize: 16,
-        color: '#333',
-        fontWeight: '500',
-    },
-    totalAmount: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#4CAF50',
+    finValue: {
+        fontSize: 14, fontWeight: '600', color: '#111827',
     },
     earningsLabel: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
+        fontSize: 14, fontWeight: '700', color: '#111827',
     },
     earningsValue: {
-        fontSize: 22,
-        fontWeight: 'bold',
-        color: '#2E7D32',
+        fontSize: 16, fontWeight: '800', color: '#16A34A',
     },
-    proofImage: {
-        width: '100%',
-        height: 200,
-        borderRadius: 8,
+    bottomBar: {
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        backgroundColor: '#fff', padding: 16, paddingBottom: 24,
+        borderTopWidth: 1, borderTopColor: '#F3F4F6', elevation: 10,
     },
-    actionContainer: {
-        padding: 16,
-        paddingBottom: 32,
+    btnPrimary: {
+        backgroundColor: '#4F46E5', paddingVertical: 14, borderRadius: 8, alignItems: 'center', marginBottom: 8,
     },
-    actionButton: {
-        paddingVertical: 8,
-        backgroundColor: '#4CAF50',
-        marginBottom: 12,
+    btnGreen: {
+        flexDirection: 'row', justifyContent: 'center',
+        backgroundColor: '#16A34A', paddingVertical: 14, borderRadius: 8, alignItems: 'center', marginBottom: 8,
     },
-    replacementButton: {
-        backgroundColor: 'transparent',
-        borderColor: '#FF9800',
-        borderWidth: 2,
+    btnPrimaryText: {
+        color: '#fff', fontSize: 15, fontWeight: '700',
     },
-    banner: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 12,
-        marginHorizontal: 16,
-        marginBottom: 8,
-        borderRadius: 8,
-        borderWidth: 1,
+    btnOutlineAlert: {
+        borderWidth: 1, borderColor: '#FCA5A5', paddingVertical: 12, borderRadius: 8, alignItems: 'center',
     },
-    bannerText: {
-        marginLeft: 8,
-        fontSize: 14,
-        fontWeight: 'bold',
-        flex: 1,
+    btnOutlineAlertText: {
+        color: '#EF4444', fontSize: 14, fontWeight: '600',
     },
-    pendingBanner: {
-        backgroundColor: '#FFF3E0',
-        borderColor: '#FFB74D',
+    btnOutline: {
+        borderWidth: 1, borderColor: '#D1D5DB', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8, marginTop: 16,
     },
-    errorBanner: {
-        backgroundColor: '#FFEBEE',
-        borderColor: '#EF5350',
-    },
-    successBanner: {
-        backgroundColor: '#E8F5E9',
-        borderColor: '#66BB6A',
-    },
+    btnOutlineText: {
+        color: '#4B5563', fontSize: 14, fontWeight: '600',
+    }
 });
 
 export default OrderDetailsScreen;

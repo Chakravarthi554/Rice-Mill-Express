@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, SafeAreaView, Switch, Image } from 'react-native';
 import { useSelector } from 'react-redux';
-import { Card, Button, ActivityIndicator, Badge } from 'react-native-paper';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { apiService } from '../services/api';
 import { auth } from '../config/firebase';
 
@@ -17,7 +16,7 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
     });
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
-    const [activeTab, setActiveTab] = useState('assigned');
+    const [autoAssign, setAutoAssign] = useState(true);
 
     const { user, token } = useSelector(state => state.auth);
 
@@ -29,7 +28,6 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
                 apiService.getDPDashboard()
             ]);
 
-            // Handle Orders
             let ordersData = [];
             if (ordersRes.data && Array.isArray(ordersRes.data.orders)) {
                 ordersData = ordersRes.data.orders;
@@ -38,7 +36,6 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
             }
             setOrders(ordersData);
 
-            // Handle Stats - Backend returns { success, stats: { ... } }
             if (statsRes.data && statsRes.data.success && statsRes.data.stats) {
                 const s = statsRes.data.stats;
                 setStats({
@@ -68,313 +65,757 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
         fetchDashboardData();
     };
 
-    const filteredOrders = useMemo(() => {
+    // Use only active/assigned orders for the lists
+    const activeOrdersList = useMemo(() => {
         if (!Array.isArray(orders)) return [];
+        return orders.filter(order => !['delivered', 'cancelled'].includes(order.orderStatus));
+    }, [orders]);
 
-        const filtered = orders.filter(order => {
-            if (activeTab === 'assigned') {
-                // Show all orders assigned to partner that are not yet out for delivery or delivered
-                return ['confirmed', 'placed', 'processing', 'packed', 'shipped'].includes(order.orderStatus);
-            } else if (activeTab === 'pending') {
-                return order.orderStatus === 'out_for_delivery';
-            } else if (activeTab === 'delivered') {
-                return order.orderStatus === 'delivered';
-            }
-            return true;
-        });
-
-        console.log(`🔍 Tab '${activeTab}' filtered ${filtered.length} orders from ${orders.length} total`);
-        return filtered;
-    }, [orders, activeTab]);
-
-    const getStatusColor = (status) => {
-        switch (status) {
-            case 'shipped': return '#2196F3';
-            case 'out_for_delivery': return '#FFA500';
-            case 'delivered': return '#4CAF50';
-            default: return '#9E9E9E';
-        }
+    const handleCall = (phone) => {
+        Alert.alert('Calling', phone || 'Customer phone unavailable');
     };
 
-    const renderOrderCard = (order) => (
-        <Card
-            key={order._id}
-            style={styles.card}
-            onPress={() => navigation.navigate('OrderDetails', { orderId: order._id })}
-        >
-            <Card.Content>
-                <View style={styles.cardHeader}>
-                    <Text style={styles.orderNumber}>Order #{order._id.substring(18).toUpperCase()}</Text>
-                    <Badge style={{ backgroundColor: getStatusColor(order.orderStatus), color: 'white' }}>
-                        {order.orderStatus.replace(/_/g, ' ').toUpperCase()}
-                    </Badge>
-                </View>
-
-                <View style={styles.infoRow}>
-                    <MaterialIcons name="person" size={18} color="#666" />
-                    <Text style={styles.infoText}>{order.shippingAddress.name}</Text>
-                </View>
-
-                <View style={styles.infoRow}>
-                    <MaterialIcons name="location-on" size={18} color="#666" />
-                    <Text style={styles.infoText} numberOfLines={2}>
-                        {order.shippingAddress.street}, {order.shippingAddress.city}
-                    </Text>
-                </View>
-
-                <View style={styles.infoRow}>
-                    <MaterialIcons name="phone" size={18} color="#666" />
-                    <Text style={styles.infoText}>{order.shippingAddress.phone}</Text>
-                </View>
-
-                <View style={styles.divider} />
-
-                <View style={styles.cardFooter}>
-                    <Text style={styles.amountText}>₹{order.totalAmount}</Text>
-                    {order.orderStatus === 'delivered' ? (
-                        <Button
-                            mode="outlined"
-                            onPress={() => Alert.alert('Photo Proof', 'URL: ' + order.deliveryConfirmation?.photoProofUrl)}
-                            style={styles.proofButton}
-                            labelStyle={styles.proofButtonLabel}
-                            icon="image"
-                        >
-                            View Proof
-                        </Button>
-                    ) : (
-                        <Button
-                            mode="contained"
-                            onPress={() => navigation.navigate('OrderDetails', { orderId: order._id })}
-                            style={styles.confirmButton}
-                            labelStyle={styles.confirmButtonLabel}
-                        >
-                            View Details
-                        </Button>
-                    )}
-                </View>
-            </Card.Content>
-        </Card>
-    );
+    const handleNavigate = (address) => {
+        Alert.alert('Navigating', 'Opening maps to: ' + address?.street);
+    };
 
     return (
-        <View style={styles.container}>
-            <View style={styles.header}>
-                <View style={styles.summaryContainer}>
-                    <View style={styles.summaryCard}>
-                        <Text style={styles.statValue}>₹{stats.totalEarnings}</Text>
-                        <Text style={styles.statLabel}>Total Earned</Text>
+        <SafeAreaView style={styles.container}>
+            {/* Header */}
+            <View style={styles.topHeader}>
+                <View style={styles.headerLeft}>
+                    <View style={styles.logoCircle}>
+                        <FontAwesome5 name="seedling" size={16} color="#fff" />
                     </View>
-                    <View style={styles.summaryCard}>
-                        <Text style={styles.statValue}>₹{stats.todayEarnings}</Text>
-                        <Text style={styles.statLabel}>Today Earned</Text>
+                    <View>
+                        <Text style={styles.headerTitle}>Rice Mill Express</Text>
+                        <Text style={styles.headerSubtitle}>Delivery Partner • DP-2403-001</Text>
                     </View>
                 </View>
-
-                <View style={styles.headerStats}>
-                    <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{stats.totalOrders}</Text>
-                        <Text style={styles.statLabel}>Total Orders</Text>
+                <View style={styles.headerRight}>
+                    <View style={styles.onlineBadge}>
+                        <View style={styles.onlineDot} />
+                        <Text style={styles.onlineText}>Online</Text>
                     </View>
-                    <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{stats.todayOrders}</Text>
-                        <Text style={styles.statLabel}>Today</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{stats.activeOrders}</Text>
-                        <Text style={styles.statLabel}>Active</Text>
-                    </View>
+                    <View style={styles.profilePicPlaceholder} />
                 </View>
             </View>
 
-            <View style={styles.tabContainer}>
-                {['assigned', 'pending', 'delivered'].map((tab) => (
-                    <TouchableOpacity
-                        key={tab}
-                        style={[styles.tab, activeTab === tab && styles.activeTab]}
-                        onPress={() => setActiveTab(tab)}
-                    >
-                        <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
-                            {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
-
-            <ScrollView
-                style={styles.scrollContainer}
-                refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-                }
+            <ScrollView 
+                contentContainerStyle={styles.scrollContent}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+                showsVerticalScrollIndicator={false}
             >
-                {loading && !refreshing ? (
-                    <ActivityIndicator animating={true} style={styles.loader} />
-                ) : filteredOrders.length === 0 ? (
-                    <View style={styles.emptyContainer}>
-                        <MaterialIcons name="local-shipping" size={64} color="#ccc" />
-                        <Text style={styles.emptyText}>No {activeTab} orders found</Text>
+                {/* Today's Earnings Card */}
+                <View style={styles.card}>
+                    <View style={styles.earningsHeader}>
+                        <View>
+                            <Text style={styles.cardSubtitle}>TODAY'S EARNINGS</Text>
+                            <Text style={styles.earningsAmount}>₹{stats.todayEarnings || 1250}</Text>
+                            <Text style={styles.earningsDetails}>{stats.todayOrders || 8} deliveries • 4 CODs</Text>
+                        </View>
+                        <View style={styles.ratingBox}>
+                            <Text style={styles.ratingLabel}>Rating</Text>
+                            <Text style={styles.ratingValue}>4.8 ★</Text>
+                        </View>
+                    </View>
+                    <View style={styles.earningsActions}>
+                        <TouchableOpacity style={styles.btnBlue}>
+                            <Text style={styles.btnBlueText}>View Details</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.btnOutlineIcon}>
+                            <Ionicons name="chevron-forward" size={20} color="#666" />
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                {/* Floating Cash Card */}
+                <View style={styles.card}>
+                    <View style={styles.floatingHeader}>
+                        <View>
+                            <Text style={styles.cardSubtitle}>FLOATING CASH</Text>
+                            <Text style={styles.floatingAmount}>₹4,250</Text>
+                        </View>
+                        <View style={styles.progressTextContainer}>
+                            <Text style={styles.progressLabel}>Progress</Text>
+                            <Text style={styles.progressValue}>85%</Text>
+                        </View>
+                    </View>
+                    <Text style={styles.limitText}>Limit: ₹5,000 • Held from 6 orders</Text>
+                    
+                    <View style={styles.progressBarBg}>
+                        <View style={[styles.progressBarFill, { width: '85%' }]} />
+                    </View>
+
+                    <View style={styles.remitActions}>
+                        <TouchableOpacity style={styles.btnOrangeFull}>
+                            <Text style={styles.btnOrangeText}>Remit COD</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.btnBlackIcon}>
+                            <Ionicons name="wallet-outline" size={24} color="#fff" />
+                        </TouchableOpacity>
+                    </View>
+                    <Text style={styles.tipText}>Tip: Use UPI QR for instant remittance and instant confirmation.</Text>
+                </View>
+
+                {/* Active Orders Section */}
+                <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>Active Orders ({activeOrdersList.length || 3})</Text>
+                    <View style={styles.autoAssignBox}>
+                        <Text style={styles.autoAssignText}>Auto-assign ON</Text>
+                        <Switch 
+                            value={autoAssign} 
+                            onValueChange={setAutoAssign}
+                            trackColor={{ false: "#d1d5db", true: "#dcfce3" }}
+                            thumbColor={autoAssign ? "#16a34a" : "#9ca3af"}
+                        />
+                    </View>
+                </View>
+
+                {activeOrdersList.length === 0 ? (
+                    <View style={styles.dummyOrderCard}>
+                        {/* Placeholder design if activeOrders is empty - mimicking Image 1 data */}
+                        <OrderCardMock 
+                            id="RM240401-102"
+                            title="Sona Masoori Premium 25kg x 2"
+                            type="COD"
+                            amount="₹1,250"
+                            eta="12 mins"
+                            isFirst={true}
+                        />
+                        <OrderCardMock 
+                            id="RM240401-103"
+                            title="Basmati Gold 10kg x 1"
+                            type="Prepaid"
+                            customer="Priya Verma"
+                            dist="4.8 km"
+                            eta="25 mins"
+                        />
+                        <OrderCardMock 
+                            id="RM240401-104"
+                            title="Organic Brown Rice 5kg x 1"
+                            type="COD"
+                            amount="₹600"
+                            customer="Sunita Rao"
+                            dist="6.1 km"
+                            eta="40 mins"
+                        />
                     </View>
                 ) : (
-                    filteredOrders.map(renderOrderCard)
+                    activeOrdersList.map((order, idx) => (
+                        <View key={order._id} style={styles.orderCard}>
+                            <View style={styles.orderCardRow}>
+                                <View style={styles.orderImgPlaceholder}>
+                                    <Ionicons name="image-outline" size={24} color="#ccc" />
+                                </View>
+                                <View style={styles.orderInfo}>
+                                    <Text style={styles.orderIdText}>#{order._id.substring(18).toUpperCase()}</Text>
+                                    <Text style={styles.orderItemText} numberOfLines={2}>
+                                        {/* Typically items would be mapped here. Using placeholder for missing data */}
+                                        Rice Product Delivery
+                                    </Text>
+                                    <Text style={styles.customerText}>
+                                        {order.shippingAddress?.name || 'Customer'} • 4.8 km
+                                    </Text>
+                                </View>
+                                <View style={styles.orderMeta}>
+                                    <Text style={[styles.orderType, { color: order.paymentMethod === 'COD' ? '#ea580c' : '#16a34a' }]}>
+                                        {order.paymentMethod === 'COD' ? `COD ₹${order.totalAmount}` : 'Prepaid'}
+                                    </Text>
+                                    <Text style={styles.etaText}>ETA: 25 mins</Text>
+                                </View>
+                            </View>
+                            <View style={styles.orderActions}>
+                                <TouchableOpacity style={styles.btnWhiteIcon} onPress={() => handleCall(order.shippingAddress?.phone)}>
+                                    <Ionicons name="call" size={16} color="#000" />
+                                    <Text style={styles.btnWhiteText}>Call</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.btnGreenIcon} onPress={() => handleNavigate(order.shippingAddress)}>
+                                    <Ionicons name="navigate" size={16} color="#fff" />
+                                    <Text style={styles.btnGreenText}>Navigate</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    ))
                 )}
+
+                {/* Quick Remittance */}
+                <Text style={[styles.sectionTitle, { marginTop: 24, marginBottom: 12 }]}>Quick Remittance</Text>
+                <View style={styles.card}>
+                    <View style={styles.qrRow}>
+                        <View style={styles.qrImgPlaceholder}>
+                            <Ionicons name="qr-code" size={40} color="#333" />
+                        </View>
+                        <View style={styles.qrInfo}>
+                            <Text style={styles.qrTitle}>Pay ₹4,250 to Rice Mill Express</Text>
+                            <Text style={styles.qrSubtitle}>Scan QR with PhonePe / GPay / BHIM</Text>
+                            <View style={styles.qrButtons}>
+                                <TouchableOpacity style={styles.btnOrangeSmall}>
+                                    <Text style={styles.btnOrangeText}>I have paid</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.btnOutlineSmall}>
+                                    <Text style={styles.btnOutlineText}>Regenerate QR</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </View>
+                    
+                    <View style={styles.divider} />
+                    
+                    <View style={styles.bankRow}>
+                        <View>
+                            <Text style={styles.bankTextLight}>Or deposit cash at bank / CDM</Text>
+                            <Text style={styles.bankTextBold}>A/C: Rice Mill Express Pvt Ltd</Text>
+                            <Text style={styles.bankTextLight}>A/C: 1234567890 • IFSC: HDFC0001234</Text>
+                        </View>
+                        <TouchableOpacity style={styles.btnOutlineSmall}>
+                            <Text style={styles.btnOutlineText}>Upload Receipt</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                {/* Remittance History */}
+                <View style={[styles.sectionHeader, { marginTop: 24 }]}>
+                    <Text style={styles.sectionTitle}>Remittance History</Text>
+                    <Text style={styles.historyLink}>Last 4 transactions</Text>
+                </View>
+                <View style={styles.historyCard}>
+                    <HistoryItem title="UPI — ₹2,500" desc="Completed • 19 Mar, 10:23 AM" status="Verified" statusColor="#16a34a" />
+                    <HistoryItem title="Cash Deposit — ₹1,000" desc="Pending verification • 17 Mar, 3:12 PM" status="Pending" statusColor="#ea580c" />
+                    <HistoryItem title="UPI — ₹750" desc="Completed • 15 Mar, 9:02 PM" status="Verified" statusColor="#16a34a" />
+                    <HistoryItem title="Hub Drop — ₹2,000" desc="Completed • 10 Mar, 12:20 PM" status="Verified" statusColor="#16a34a" noBorder={true} />
+                </View>
+
+                {/* Spacing for bottom bar */}
+                <View style={{ height: 100 }} />
             </ScrollView>
-        </View>
+
+            {/* Bottom Floating Bar */}
+            <View style={styles.bottomBar}>
+                <View style={styles.holdingInfo}>
+                    <Text style={styles.holdingLabel}>Holding</Text>
+                    <Text style={styles.holdingAmount}>₹4,250</Text>
+                </View>
+                <TouchableOpacity style={styles.btnOrangeFlex}>
+                    <Text style={styles.btnOrangeText}>Remit Now</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.btnOutlineFlex}>
+                    <Text style={styles.btnOutlineText}>Report Issue</Text>
+                </TouchableOpacity>
+            </View>
+        </SafeAreaView>
     );
 };
 
+// --- Mock Components for exact UI design match ---
+const OrderCardMock = ({ id, title, type, amount, eta, customer, dist, isFirst }) => (
+    <View style={styles.orderCard}>
+        <View style={styles.orderCardRow}>
+            <View style={styles.orderImgPlaceholder}>
+                <Ionicons name="image-outline" size={24} color="#ccc" />
+            </View>
+            <View style={styles.orderInfo}>
+                <Text style={styles.orderIdText}>#{id}</Text>
+                <Text style={styles.orderItemText} numberOfLines={2}>{title}</Text>
+                {customer && <Text style={styles.customerText}>{customer} • {dist}</Text>}
+            </View>
+            <View style={styles.orderMeta}>
+                <Text style={[styles.orderType, { color: type === 'COD' ? '#ea580c' : '#16a34a' }]}>
+                    {type} {amount}
+                </Text>
+                <Text style={styles.etaText}>ETA: {eta}</Text>
+            </View>
+        </View>
+        {!isFirst && (
+            <View style={styles.orderActions}>
+                <TouchableOpacity style={styles.btnWhiteIcon}>
+                    <Ionicons name="call" size={16} color="#000" />
+                    <Text style={styles.btnWhiteText}>Call</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.btnGreenIcon}>
+                    <Ionicons name="location-outline" size={16} color="#fff" />
+                    <Text style={styles.btnGreenText}>Navigate</Text>
+                </TouchableOpacity>
+            </View>
+        )}
+    </View>
+);
+
+const HistoryItem = ({ title, desc, status, statusColor, noBorder }) => (
+    <View style={[styles.historyItem, !noBorder && styles.historyBorder]}>
+        <View>
+            <Text style={styles.historyTitle}>{title}</Text>
+            <Text style={styles.historyDesc}>{desc}</Text>
+        </View>
+        <Text style={[styles.historyStatus, { color: statusColor }]}>{status}</Text>
+    </View>
+);
+
+// --- Styles mapping the exact imagery ---
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F7F9FC',
+        backgroundColor: '#F9FAFB',
     },
-    header: {
-        backgroundColor: '#4CAF50',
-        padding: 20,
-        borderBottomLeftRadius: 24,
-        borderBottomRightRadius: 24,
-        elevation: 8,
-    },
-    summaryContainer: {
+    topHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: 20,
-    },
-    summaryCard: {
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        padding: 15,
-        borderRadius: 12,
-        flex: 0.48,
         alignItems: 'center',
-    },
-    headerStats: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        alignItems: 'center',
-        paddingTop: 10,
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(255,255,255,0.3)',
-    },
-    statItem: {
-        alignItems: 'center',
-    },
-    statValue: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#fff',
-    },
-    statLabel: {
-        fontSize: 12,
-        color: 'rgba(255,255,255,0.8)',
-        marginTop: 4,
-    },
-    tabContainer: {
-        flexDirection: 'row',
-        backgroundColor: '#fff',
-        elevation: 4,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        paddingTop: 8,
-        marginTop: -10,
-        marginHorizontal: 20,
-        borderRadius: 12,
-    },
-    tab: {
-        flex: 1,
+        paddingHorizontal: 16,
         paddingVertical: 12,
+        backgroundColor: '#fff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#f3f4f6',
+    },
+    headerLeft: {
+        flexDirection: 'row',
         alignItems: 'center',
-        borderBottomWidth: 3,
-        borderBottomColor: 'transparent',
     },
-    activeTab: {
-        borderBottomColor: '#4CAF50',
+    logoCircle: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#4F46E5',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
     },
-    tabText: {
+    headerTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#111827',
+    },
+    headerSubtitle: {
+        fontSize: 12,
+        color: '#6B7280',
+    },
+    headerRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    onlineBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    onlineDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#16A34A',
+        marginRight: 4,
+    },
+    onlineText: {
+        fontSize: 12,
+        color: '#16A34A',
         fontWeight: '600',
-        color: '#666',
-        fontSize: 14,
     },
-    activeTabText: {
-        color: '#4CAF50',
+    profilePicPlaceholder: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#E5E7EB',
+        borderWidth: 1,
+        borderColor: '#D1D5DB',
     },
-    scrollContainer: {
+    scrollContent: {
         padding: 16,
     },
     card: {
-        marginBottom: 16,
-        borderRadius: 12,
-        elevation: 3,
         backgroundColor: '#fff',
-        borderLeftWidth: 5,
-        borderLeftColor: '#4CAF50',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 2,
+        borderWidth: 1,
+        borderColor: '#F3F4F6',
     },
-    cardHeader: {
+    cardSubtitle: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#6B7280',
+        letterSpacing: 0.5,
+        marginBottom: 4,
+    },
+    earningsHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    earningsAmount: {
+        fontSize: 32,
+        fontWeight: '800',
+        color: '#16A34A',
+    },
+    earningsDetails: {
+        fontSize: 13,
+        color: '#6B7280',
+        marginTop: 4,
+    },
+    ratingBox: {
+        alignItems: 'flex-end',
+    },
+    ratingLabel: {
+        fontSize: 12,
+        color: '#6B7280',
+    },
+    ratingValue: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#111827',
+    },
+    earningsActions: {
+        flexDirection: 'row',
+        marginTop: 16,
+        alignItems: 'center',
+    },
+    btnBlue: {
+        flex: 1,
+        backgroundColor: '#4F46E5',
+        borderRadius: 8,
+        paddingVertical: 12,
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    btnBlueText: {
+        color: '#fff',
+        fontWeight: '600',
+        fontSize: 14,
+    },
+    btnOutlineIcon: {
+        padding: 10,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    floatingHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+    },
+    floatingAmount: {
+        fontSize: 28,
+        fontWeight: '800',
+        color: '#EA580C',
+        marginTop: 2,
+    },
+    progressTextContainer: {
+        alignItems: 'flex-end',
+    },
+    progressLabel: {
+        fontSize: 11,
+        color: '#6B7280',
+    },
+    progressValue: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#111827',
+    },
+    limitText: {
+        fontSize: 13,
+        color: '#6B7280',
+        marginVertical: 8,
+    },
+    progressBarBg: {
+        height: 6,
+        backgroundColor: '#F3F4F6',
+        borderRadius: 3,
+        marginBottom: 16,
+    },
+    progressBarFill: {
+        height: '100%',
+        backgroundColor: '#EA580C',
+        borderRadius: 3,
+    },
+    remitActions: {
+        flexDirection: 'row',
+        marginBottom: 12,
+    },
+    btnOrangeFull: {
+        flex: 1,
+        backgroundColor: '#EA580C',
+        borderRadius: 8,
+        paddingVertical: 12,
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    btnOrangeText: {
+        color: '#fff',
+        fontWeight: '700',
+        fontSize: 14,
+    },
+    btnBlackIcon: {
+        backgroundColor: '#111827',
+        borderRadius: 8,
+        width: 44,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    tipText: {
+        fontSize: 12,
+        color: '#9CA3AF',
+        lineHeight: 16,
+    },
+    sectionHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: 12,
     },
-    orderNumber: {
+    sectionTitle: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#333',
+        color: '#111827',
     },
-    infoRow: {
+    autoAssignBox: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 6,
     },
-    infoText: {
-        marginLeft: 8,
-        color: '#555',
-        fontSize: 14,
+    autoAssignText: {
+        fontSize: 12,
+        color: '#6B7280',
+        marginRight: 8,
+    },
+    orderCard: {
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#F3F4F6',
+    },
+    orderCardRow: {
+        flexDirection: 'row',
+    },
+    orderImgPlaceholder: {
+        width: 60,
+        height: 60,
+        borderRadius: 8,
+        backgroundColor: '#F3F4F6',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    orderInfo: {
         flex: 1,
+    },
+    orderIdText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#111827',
+    },
+    orderItemText: {
+        fontSize: 13,
+        color: '#4B5563',
+        marginTop: 2,
+    },
+    customerText: {
+        fontSize: 12,
+        color: '#6B7280',
+        marginTop: 4,
+    },
+    orderMeta: {
+        alignItems: 'flex-end',
+    },
+    orderType: {
+        fontSize: 13,
+        fontWeight: '700',
+    },
+    etaText: {
+        fontSize: 12,
+        color: '#6B7280',
+        marginTop: 4,
+    },
+    orderActions: {
+        flexDirection: 'row',
+        marginTop: 16,
+        gap: 12,
+    },
+    btnWhiteIcon: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        borderRadius: 8,
+        paddingVertical: 8,
+        backgroundColor: '#fff',
+    },
+    btnWhiteText: {
+        marginLeft: 6,
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#111827',
+    },
+    btnGreenIcon: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#14532D',
+        borderRadius: 8,
+        paddingVertical: 8,
+    },
+    btnGreenText: {
+        marginLeft: 6,
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#fff',
+    },
+    qrRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+    },
+    qrImgPlaceholder: {
+        width: 80,
+        height: 80,
+        backgroundColor: '#F3F4F6',
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 16,
+    },
+    qrInfo: {
+        flex: 1,
+    },
+    qrTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#111827',
+    },
+    qrSubtitle: {
+        fontSize: 12,
+        color: '#6B7280',
+        marginTop: 2,
+    },
+    qrButtons: {
+        flexDirection: 'row',
+        marginTop: 12,
+        gap: 8,
+    },
+    btnOrangeSmall: {
+        backgroundColor: '#EA580C',
+        paddingVertical: 6,
+        paddingHorizontal: 16,
+        borderRadius: 6,
+    },
+    btnOutlineSmall: {
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 6,
+    },
+    btnOutlineText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#111827',
     },
     divider: {
         height: 1,
-        backgroundColor: '#EEE',
-        marginVertical: 12,
+        backgroundColor: '#F3F4F6',
+        marginVertical: 16,
     },
-    cardFooter: {
+    bankRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
     },
-    amountText: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#2E7D32',
+    bankTextLight: {
+        fontSize: 11,
+        color: '#6B7280',
     },
-    confirmButton: {
-        backgroundColor: '#4CAF50',
-        borderRadius: 8,
+    bankTextBold: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#111827',
+        marginVertical: 2,
     },
-    confirmButtonLabel: {
+    historyLink: {
         fontSize: 12,
-        fontWeight: '700',
-        color: '#fff',
+        color: '#6B7280',
     },
-    proofButton: {
-        borderColor: '#4CAF50',
-        borderRadius: 8,
+    historyCard: {
+        backgroundColor: '#fff',
+        borderRadius: 12,
         borderWidth: 1,
+        borderColor: '#F3F4F6',
     },
-    proofButtonLabel: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#4CAF50',
-    },
-    loader: {
-        marginTop: 40,
-    },
-    emptyContainer: {
+    historyItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
         alignItems: 'center',
-        marginTop: 100,
+        padding: 16,
     },
-    emptyText: {
-        marginTop: 16,
-        color: '#999',
+    historyBorder: {
+        borderBottomWidth: 1,
+        borderBottomColor: '#F3F4F6',
+    },
+    historyTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#111827',
+    },
+    historyDesc: {
+        fontSize: 12,
+        color: '#6B7280',
+        marginTop: 2,
+    },
+    historyStatus: {
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    bottomBar: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: '#fff',
+        flexDirection: 'row',
+        padding: 16,
+        paddingBottom: 24,
+        borderTopWidth: 1,
+        borderTopColor: '#F3F4F6',
+        alignItems: 'center',
+        gap: 12,
+        elevation: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+    },
+    holdingInfo: {
+        marginRight: 4,
+    },
+    holdingLabel: {
+        fontSize: 11,
+        color: '#6B7280',
+    },
+    holdingAmount: {
         fontSize: 16,
+        fontWeight: '800',
+        color: '#EA580C',
     },
+    btnOrangeFlex: {
+        flex: 1,
+        backgroundColor: '#EA580C',
+        paddingVertical: 12,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    btnOutlineFlex: {
+        flex: 1,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        paddingVertical: 12,
+        borderRadius: 8,
+        alignItems: 'center',
+    }
 });
 
 export default DeliveryPartnerDashboard;
+

@@ -1,15 +1,6 @@
 import React, { useState } from 'react';
-import {
-    View,
-    Text,
-    StyleSheet,
-    ScrollView,
-    Image,
-    Alert,
-    TouchableOpacity,
-} from 'react-native';
-import { Card, Button, TextInput, ActivityIndicator } from 'react-native-paper';
-import { MaterialIcons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, ScrollView, Image, Alert, TouchableOpacity, SafeAreaView, TextInput, ActivityIndicator } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { apiService } from '../../services/api';
 
@@ -35,19 +26,13 @@ const ReplacementRequestScreen = ({ route, navigation }) => {
                 Alert.alert('Permission Required', 'Camera permission is required');
                 return;
             }
-
             const result = await ImagePicker.launchCameraAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                allowsEditing: true,
-                aspect: [4, 3],
-                quality: 0.8,
+                mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [4, 3], quality: 0.8,
             });
-
             if (!result.canceled && result.assets[0]) {
                 setPhotoUri(result.assets[0].uri);
             }
         } catch (error) {
-            console.error('Error capturing photo:', error);
             Alert.alert('Error', 'Failed to capture photo');
         }
     };
@@ -59,19 +44,13 @@ const ReplacementRequestScreen = ({ route, navigation }) => {
                 Alert.alert('Permission Required', 'Gallery permission is required');
                 return;
             }
-
             const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                allowsEditing: true,
-                aspect: [4, 3],
-                quality: 0.8,
+                mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [4, 3], quality: 0.8,
             });
-
             if (!result.canceled && result.assets[0]) {
                 setPhotoUri(result.assets[0].uri);
             }
         } catch (error) {
-            console.error('Error selecting photo:', error);
             Alert.alert('Error', 'Failed to select photo');
         }
     };
@@ -81,7 +60,6 @@ const ReplacementRequestScreen = ({ route, navigation }) => {
             Alert.alert('Photo Required', 'Please capture or select a photo of the damaged item');
             return;
         }
-
         if (!description.trim()) {
             Alert.alert('Description Required', 'Please provide details about the issue');
             return;
@@ -89,33 +67,17 @@ const ReplacementRequestScreen = ({ route, navigation }) => {
 
         try {
             setLoading(true);
-
             const formData = new FormData();
-            formData.append('replacementPhoto', {
-                uri: photoUri,
-                name: 'replacement-proof.jpg',
-                type: 'image/jpeg',
-            });
+            formData.append('replacementPhoto', { uri: photoUri, name: 'replacement-proof.jpg', type: 'image/jpeg' });
             formData.append('reason', selectedReason);
             formData.append('description', description.trim());
 
-            // Check if the API method exists, if not use a generic approach
-            const response = await apiService.requestReplacement?.(orderId, formData) ||
-                await fetch(`${apiService.baseURL}/api/delivery-partners/orders/${orderId}/replacement`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${apiService.token}`,
-                    },
-                    body: formData,
-                });
+            await (apiService.requestReplacement?.(orderId, formData) || fetch(`${apiService.baseURL}/api/delivery-partners/orders/${orderId}/replacement`, {
+                method: 'POST', headers: { 'Authorization': `Bearer ${apiService.token}` }, body: formData,
+            }));
 
-            Alert.alert(
-                'Success',
-                'Replacement request submitted successfully',
-                [{ text: 'OK', onPress: () => navigation.goBack() }]
-            );
+            Alert.alert('Success', 'Replacement request submitted successfully', [{ text: 'OK', onPress: () => navigation.goBack() }]);
         } catch (error) {
-            console.error('Error submitting replacement request:', error);
             Alert.alert('Error', error.response?.data?.message || 'Failed to submit replacement request');
         } finally {
             setLoading(false);
@@ -123,255 +85,139 @@ const ReplacementRequestScreen = ({ route, navigation }) => {
     };
 
     return (
-        <ScrollView style={styles.container}>
-            {/* Order Info */}
-            <Card style={styles.card}>
-                <Card.Content>
-                    <Text style={styles.orderNumber}>
-                        Order #{orderId.substring(18).toUpperCase()}
-                    </Text>
+        <SafeAreaView style={styles.container}>
+            <View style={styles.header}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+                    <Ionicons name="arrow-back" size={24} color="#111827" />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Report Issue</Text>
+                <View style={{ width: 24 }} />
+            </View>
+
+            <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 100 }}>
+                {/* Order Info */}
+                <View style={styles.infoCard}>
+                    <Text style={styles.orderLabel}>ORDER ID</Text>
+                    <Text style={styles.orderNumber}>#{orderId.substring(18).toUpperCase()}</Text>
                     {orderDetails && (
                         <>
                             <Text style={styles.customerName}>{orderDetails.shippingAddress?.name}</Text>
                             <Text style={styles.amount}>₹{orderDetails.totalAmount}</Text>
                         </>
                     )}
-                </Card.Content>
-            </Card>
+                </View>
 
-            {/* Instructions */}
-            <Card style={styles.card}>
-                <Card.Content>
-                    <View style={styles.instructionHeader}>
-                        <MaterialIcons name="info" size={24} color="#2196F3" />
-                        <Text style={styles.instructionTitle}>Replacement Request</Text>
-                    </View>
+                {/* Instructions */}
+                <View style={styles.instructionBox}>
+                    <Ionicons name="information-circle-outline" size={24} color="#EA580C" />
                     <Text style={styles.instructionText}>
-                        Please select a reason, describe the issue, and provide photo proof.
+                        Select a reason, describe the issue, and provide photo proof.
                     </Text>
-                </Card.Content>
-            </Card>
+                </View>
 
-            {/* Reason Selection */}
-            <Card style={styles.card}>
-                <Card.Title title="Select Reason" titleStyle={styles.cardTitle} />
-                <Card.Content>
+                {/* Reason Selection */}
+                <View style={styles.card}>
+                    <Text style={styles.cardTitle}>Why are you reporting this?</Text>
                     <View style={styles.chipContainer}>
                         {REASONS.map((item) => (
                             <TouchableOpacity
                                 key={item.value}
-                                style={[
-                                    styles.chip,
-                                    selectedReason === item.value && styles.chipSelected
-                                ]}
-                                onPress={() => setSelectedReason(item.value)}
-                            >
-                                <Text style={[
-                                    styles.chipText,
-                                    selectedReason === item.value && styles.chipTextSelected
-                                ]}>
+                                style={[styles.chip, selectedReason === item.value && styles.chipSelected]}
+                                onPress={() => setSelectedReason(item.value)}>
+                                <Text style={[styles.chipText, selectedReason === item.value && styles.chipTextSelected]}>
                                     {item.label}
                                 </Text>
                             </TouchableOpacity>
                         ))}
                     </View>
-                </Card.Content>
-            </Card>
+                </View>
 
-            {/* Photo Capture */}
-            <Card style={styles.card}>
-                <Card.Title title="Photo Evidence" titleStyle={styles.cardTitle} />
-                <Card.Content>
+                {/* Photo Capture */}
+                <View style={styles.card}>
+                    <Text style={styles.cardTitle}>Photo Evidence</Text>
                     {photoUri ? (
-                        <View>
+                        <View style={styles.previewContainer}>
                             <Image source={{ uri: photoUri }} style={styles.previewImage} />
-                            <Button
-                                mode="outlined"
-                                onPress={() => setPhotoUri(null)}
-                                style={styles.retakeButton}
-                                icon="close"
-                            >
-                                Remove Photo
-                            </Button>
+                            <TouchableOpacity onPress={() => setPhotoUri(null)} style={styles.removePhotoBtn}>
+                                <Ionicons name="close-circle" size={24} color="#EF4444" />
+                                <Text style={styles.removePhotoTxt}>Remove</Text>
+                            </TouchableOpacity>
                         </View>
                     ) : (
                         <View style={styles.photoButtonsContainer}>
-                            <TouchableOpacity
-                                style={styles.photoButton}
-                                onPress={handleCapturePhoto}
-                            >
-                                <MaterialIcons name="camera-alt" size={40} color="#4CAF50" />
-                                <Text style={styles.photoButtonText}>Take Photo</Text>
+                            <TouchableOpacity style={styles.photoButton} onPress={handleCapturePhoto}>
+                                <Ionicons name="camera" size={32} color="#16A34A" />
+                                <Text style={styles.photoButtonText}>Camera</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.photoButton}
-                                onPress={handleSelectFromGallery}
-                            >
-                                <MaterialIcons name="photo-library" size={40} color="#2196F3" />
+                            <TouchableOpacity style={styles.photoButton} onPress={handleSelectFromGallery}>
+                                <Ionicons name="images" size={32} color="#4F46E5" />
                                 <Text style={styles.photoButtonText}>Gallery</Text>
                             </TouchableOpacity>
                         </View>
                     )}
-                </Card.Content>
-            </Card>
+                </View>
 
-            {/* Description Input */}
-            <Card style={styles.card}>
-                <Card.Title title="Detailed Description" titleStyle={styles.cardTitle} />
-                <Card.Content>
+                {/* Description Input */}
+                <View style={styles.card}>
+                    <Text style={styles.cardTitle}>Detailed Description</Text>
                     <TextInput
-                        mode="outlined"
-                        placeholder="Describe the issue (e.g., damaged packaging, wrong item, expired product)"
+                        style={styles.reasonInput}
+                        placeholder="Describe the issue in detail..."
+                        placeholderTextColor="#9CA3AF"
                         value={description}
                         onChangeText={setDescription}
                         multiline
                         numberOfLines={4}
-                        style={styles.reasonInput}
+                        textAlignVertical="top"
                     />
                     <Text style={styles.characterCount}>{description.length}/500 chars</Text>
-                </Card.Content>
-            </Card>
+                </View>
+            </ScrollView>
 
-            {/* Submit Button */}
-            <View style={styles.submitContainer}>
-                <Button
-                    mode="contained"
+            <View style={styles.bottomBar}>
+                <TouchableOpacity 
+                    style={[styles.submitButton, (loading || !photoUri || !description.trim()) && { opacity: 0.5 }]} 
                     onPress={handleSubmitRequest}
-                    loading={loading}
-                    disabled={loading || !photoUri || !description.trim()}
-                    style={styles.submitButton}
-                    icon="send"
-                >
-                    Submit Replacement Request
-                </Button>
+                    disabled={loading || !photoUri || !description.trim()}>
+                    {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitButtonText}>Submit Request</Text>}
+                </TouchableOpacity>
             </View>
-        </ScrollView>
+        </SafeAreaView>
     );
 };
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#F7F9FC',
-    },
-    card: {
-        margin: 16,
-        marginBottom: 8,
-        elevation: 2,
-    },
-    cardTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#333',
-    },
-    orderNumber: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 4,
-    },
-    customerName: {
-        fontSize: 14,
-        color: '#666',
-        marginTop: 4,
-    },
-    amount: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#4CAF50',
-        marginTop: 4,
-    },
-    instructionHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    instructionTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#333',
-        marginLeft: 8,
-    },
-    instructionText: {
-        fontSize: 14,
-        color: '#666',
-        lineHeight: 20,
-    },
-    photoButtonsContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        paddingVertical: 16,
-    },
-    photoButton: {
-        alignItems: 'center',
-        padding: 20,
-        backgroundColor: '#F5F5F5',
-        borderRadius: 12,
-        borderWidth: 2,
-        borderColor: '#E0E0E0',
-        borderStyle: 'dashed',
-        width: '45%',
-    },
-    photoButtonText: {
-        marginTop: 8,
-        fontSize: 12,
-        color: '#666',
-        textAlign: 'center',
-    },
-    previewImage: {
-        width: '100%',
-        height: 200,
-        borderRadius: 8,
-        marginBottom: 12,
-    },
-    retakeButton: {
-        marginTop: 8,
-    },
-    reasonInput: {
-        backgroundColor: '#fff',
-        fontSize: 14,
-    },
-    characterCount: {
-        fontSize: 12,
-        color: '#999',
-        textAlign: 'right',
-        marginTop: 4,
-    },
-    submitContainer: {
-        padding: 16,
-        paddingBottom: 32,
-    },
-    submitButton: {
-        paddingVertical: 8,
-        backgroundColor: '#FF9800',
-    },
-    chipContainer: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        marginVertical: 8,
-    },
-    chip: {
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 20,
-        backgroundColor: '#F5F5F5',
-        marginRight: 8,
-        marginBottom: 8,
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
-    },
-    chipSelected: {
-        backgroundColor: '#FFF3E0',
-        borderColor: '#FF9800',
-    },
-    chipText: {
-        color: '#666',
-        fontSize: 14,
-    },
-    chipTextSelected: {
-        color: '#E65100',
-        fontWeight: 'bold',
-    },
+    container: { flex: 1, backgroundColor: '#F9FAFB' },
+    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+    backBtn: { padding: 4 },
+    headerTitle: { fontSize: 16, fontWeight: '700', color: '#111827' },
+    content: { padding: 16 },
+    infoCard: { backgroundColor: '#fff', padding: 16, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#F3F4F6' },
+    orderLabel: { fontSize: 11, color: '#6B7280', fontWeight: '600', marginBottom: 4 },
+    orderNumber: { fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 8 },
+    customerName: { fontSize: 14, color: '#4B5563' },
+    amount: { fontSize: 16, fontWeight: '700', color: '#16A34A', marginTop: 4 },
+    instructionBox: { flexDirection: 'row', backgroundColor: '#FFF7ED', padding: 16, borderRadius: 12, alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: '#FFEDD5' },
+    instructionText: { flex: 1, fontSize: 14, color: '#9A3412', lineHeight: 20, marginLeft: 12 },
+    card: { backgroundColor: '#fff', padding: 16, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#F3F4F6' },
+    cardTitle: { fontSize: 15, fontWeight: '700', color: '#111827', marginBottom: 12 },
+    chipContainer: { flexDirection: 'row', flexWrap: 'wrap' },
+    chip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, backgroundColor: '#F3F4F6', marginRight: 8, marginBottom: 8, borderWidth: 1, borderColor: '#E5E7EB' },
+    chipSelected: { backgroundColor: '#FEFCE8', borderColor: '#EAB308' },
+    chipText: { color: '#4B5563', fontSize: 14, fontWeight: '500' },
+    chipTextSelected: { color: '#CA8A04', fontWeight: '700' },
+    photoButtonsContainer: { flexDirection: 'row', gap: 12 },
+    photoButton: { flex: 1, alignItems: 'center', padding: 20, backgroundColor: '#F9FAFB', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', borderStyle: 'dashed' },
+    photoButtonText: { marginTop: 8, fontSize: 14, color: '#4B5563', fontWeight: '500' },
+    previewContainer: { alignItems: 'center' },
+    previewImage: { width: '100%', height: 200, borderRadius: 8, marginBottom: 12 },
+    removePhotoBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF2F2', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 20 },
+    removePhotoTxt: { color: '#EF4444', fontWeight: '600', marginLeft: 4 },
+    reasonInput: { backgroundColor: '#F9FAFB', borderRadius: 8, padding: 12, fontSize: 14, color: '#111827', borderWidth: 1, borderColor: '#E5E7EB', minHeight: 100 },
+    characterCount: { fontSize: 12, color: '#9CA3AF', textAlign: 'right', marginTop: 8 },
+    bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#fff', padding: 16, paddingBottom: 24, borderTopWidth: 1, borderTopColor: '#F3F4F6', elevation: 10 },
+    submitButton: { backgroundColor: '#EA580C', paddingVertical: 14, borderRadius: 8, alignItems: 'center' },
+    submitButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' }
 });
 
 export default ReplacementRequestScreen;
