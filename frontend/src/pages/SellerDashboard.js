@@ -1,857 +1,508 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
-    Container, Typography, Tabs, Tab, Box, Paper, Table, TableBody,
-    TableCell, TableContainer, TableHead, TableRow, Button, Dialog, DialogTitle,
-    DialogContent, DialogActions, FormControl, InputLabel, Select, MenuItem,
-    useTheme, Divider, Alert, CircularProgress, TextField, IconButton, Pagination, Chip,
-    AppBar, Toolbar, Card, CardContent, Grid
+    Box, Typography, Grid, Paper, Table, TableBody, TableCell,
+    TableContainer, TableHead, TableRow, Button, Dialog, DialogTitle,
+    DialogContent, DialogActions, FormControl, InputLabel, Select,
+    MenuItem, Alert, CircularProgress, TextField, IconButton, Chip,
+    Avatar, Divider, Badge, LinearProgress, Tooltip
 } from '@mui/material';
-import { grey } from '@mui/material/colors';
 import {
-    Add as AddIcon,
-    Edit as EditIcon,
-    Delete as DeleteIcon,
-    Chat as ChatIcon,
-    Download as DownloadIcon,
-    Logout as LogoutIcon,
-    Support as SupportIcon,
-    Visibility as VisibilityIcon
+    Dashboard as DashboardIcon, ShoppingBag, Inventory2, AccountBalanceWallet,
+    LocalShipping, BarChart, Settings, Logout, Notifications, Search,
+    TrendingUp, TrendingDown, Add, Edit, Delete, Download, Visibility,
+    Chat, Warning, CheckCircle, Cancel, ArrowForward, PeopleAlt
 } from '@mui/icons-material';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { listSellerOrders, updateOrderStatus, downloadInvoice } from '../redux/actions/orderActions';
 import { listDeliveryPartners, assignDeliveryPartner } from '../redux/actions/deliveryActions';
-import { listMyRecipes, submitRecipe, deleteRecipe } from '../redux/actions/recipeActions';
 import { listSellerProducts } from '../redux/actions/productActions';
 import { OrderTrackingSocket } from '../utils/socket';
-import Loader from '../components/common/Loader';
 import SellerProfile from '../components/seller/SellerProfile';
 import SellerProducts from '../components/seller/SellerProducts';
 import SellerPayments from '../components/seller/SellerPayments';
 import SellerDelivery from '../components/seller/SellerDelivery';
 import AnalyticsDashboard from '../components/seller/AnalyticsDashboard';
-import Forum from '../components/common/Forum';
 import OrderKanban from '../components/seller/OrderKanban';
-import OrderTimeline from '../components/common/OrderTimeline';
-import { useAuth } from '../context/AuthContext';
-import SellerChatWidget from '../components/seller/SellerChatWidget';
 import Message from '../components/common/Message';
 import { RECIPE_SUBMIT_RESET } from '../redux/constants/RecipeConstants';
-import RecipeEngagementDashboard from '../components/seller/RecipeEngagementDashboard';
-import SettingsBanner from '../components/common/SettingsBanner';
-import { EmptyState } from '../components/common/PageStates';
 
-// ✅ Backend-driven Invoice handled via Redux actions
+// ────────────────────────────────────────────────────────────
+// Design Tokens (matching image: dark navy sidebar)
+// ────────────────────────────────────────────────────────────
+const SIDEBAR_BG = '#1E2B4A';
+const SIDEBAR_ACTIVE = '#2D4073';
+const ACCENT = '#16A34A';
+const ACCENT_ORANGE = '#F97316';
 
-// 🔥 NEW: Logout Component for Seller Dashboard
-const SellerLogoutButton = () => {
-    const { logout } = useAuth();
+const NAV_ITEMS = (tab) => [
+    { label: 'Dashboard', icon: <DashboardIcon fontSize="small" />, id: 0 },
+    { label: 'Products', icon: <Inventory2 fontSize="small" />, id: 1 },
+    { label: 'Orders', icon: <ShoppingBag fontSize="small" />, id: 2 },
+    { label: 'Payments', icon: <AccountBalanceWallet fontSize="small" />, id: 3 },
+    { label: 'Delivery Partners', icon: <LocalShipping fontSize="small" />, id: 4 },
+    { label: 'Analytics', icon: <BarChart fontSize="small" />, id: 5 },
+    { label: 'Settings', icon: <Settings fontSize="small" />, id: 6 },
+];
 
-    const handleLogout = () => {
-        if (window.confirm('Are you sure you want to logout?')) {
-            logout();
-        }
+// ────────────────────────────────────────────────────────────
+// Stat Card
+// ────────────────────────────────────────────────────────────
+const StatCard = ({ title, value, change, changeDir, suffix = '', cta, onCta }) => (
+    <Paper variant="outlined" sx={{ borderRadius: 3, p: 2.5, border: '1px solid #F3F4F6', height: '100%' }}>
+        <Typography variant="body2" color="text.secondary" fontWeight={600} gutterBottom>{title}</Typography>
+        <Typography variant="h4" fontWeight={800} sx={{ my: 0.5 }}>{suffix}{value}</Typography>
+        {change !== undefined && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                {changeDir === 'up'
+                    ? <TrendingUp sx={{ fontSize: 16, color: '#16A34A' }} />
+                    : <TrendingDown sx={{ fontSize: 16, color: '#EF4444' }} />}
+                <Typography variant="caption" sx={{ color: changeDir === 'up' ? '#16A34A' : '#EF4444', fontWeight: 700 }}>{change}</Typography>
+                <Typography variant="caption" color="text.secondary">vs yesterday</Typography>
+            </Box>
+        )}
+        {cta && (
+            <Button size="small" variant="contained" onClick={onCta}
+                sx={{ mt: 1.5, bgcolor: ACCENT, '&:hover': { bgcolor: '#15803D' }, borderRadius: 1.5, fontWeight: 700, fontSize: '0.75rem' }}>
+                {cta}
+            </Button>
+        )}
+    </Paper>
+);
+
+// ────────────────────────────────────────────────────────────
+// Overview / Home Panel
+// ────────────────────────────────────────────────────────────
+const OverviewPanel = ({ orders, products, onTabChange }) => {
+    const pending = orders.filter(o => o.orderStatus === 'placed' || o.orderStatus === 'pending').length;
+    const todayOrders = orders.filter(o => {
+        const d = new Date(o.createdAt);
+        const now = new Date();
+        return d.toDateString() === now.toDateString();
+    }).length;
+    const revenue = orders.filter(o => o.orderStatus === 'delivered').reduce((s, o) => s + (o.totalPrice || 0), 0);
+    const balance = revenue * 0.85; // after 15% platform commission
+    const lowStock = (products || []).filter(p => (p.countInStock || 0) < 10);
+    const recent = [...orders].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5);
+
+    const statusChip = (s) => {
+        const map = {
+            placed: { label: 'New', color: '#DBEAFE', text: '#1E40AF' },
+            pending: { label: 'New', color: '#DBEAFE', text: '#1E40AF' },
+            processing: { label: 'Processing', color: '#FEF3C7', text: '#92400E' },
+            packed: { label: 'Packed', color: '#F5F3FF', text: '#6D28D9' },
+            shipped: { label: 'Shipped', color: '#E0F2FE', text: '#0369A1' },
+            delivered: { label: 'Delivered', color: '#DCFCE7', text: '#166534' },
+            cancelled: { label: 'Cancelled', color: '#FEE2E2', text: '#B91C1C' },
+        };
+        const cfg = map[s] || { label: s, color: '#F3F4F6', text: '#374151' };
+        return <Chip label={cfg.label} size="small" sx={{ bgcolor: cfg.color, color: cfg.text, fontWeight: 700, fontSize: '0.7rem' }} />;
     };
 
     return (
-        <IconButton
-            color="inherit"
-            onClick={handleLogout}
-            sx={{ ml: 'auto' }}
-            title="Logout"
-        >
-            <LogoutIcon />
-        </IconButton>
+        <Box>
+            {/* Stat Cards */}
+            <Grid container spacing={2.5} sx={{ mb: 3 }}>
+                <Grid item xs={12} sm={6} md={3}>
+                    <StatCard title="Today's Orders" value={todayOrders} change="12%" changeDir="up" />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                    <StatCard title="Pending Orders" value={pending} change={pending > 5 ? '5%' : '0%'} changeDir={pending > 5 ? 'down' : 'up'} />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                    <StatCard title="Total Revenue" value={revenue.toLocaleString('en-IN')} suffix="₹" change="8%" changeDir="up" />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                    <StatCard title="Available Balance" value={balance.toLocaleString('en-IN')} suffix="₹" cta="Request Payout" onCta={() => onTabChange(3)} />
+                </Grid>
+            </Grid>
+
+            <Grid container spacing={3}>
+                {/* Recent Orders */}
+                <Grid item xs={12} md={8}>
+                    <Paper variant="outlined" sx={{ borderRadius: 3, border: '1px solid #F3F4F6', overflow: 'hidden' }}>
+                        <Box sx={{ px: 3, py: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #F9FAFB' }}>
+                            <Typography fontWeight={800}>Recent Orders</Typography>
+                            <Button size="small" endIcon={<ArrowForward fontSize="small" />} onClick={() => onTabChange(2)} sx={{ color: ACCENT, fontWeight: 700 }}>View All</Button>
+                        </Box>
+                        <TableContainer>
+                            <Table size="small">
+                                <TableHead>
+                                    <TableRow sx={{ bgcolor: '#FAFAFA' }}>
+                                        {['Order ID', 'Customer', 'Items', 'Amount', 'Status', 'Actions'].map(h => (
+                                            <TableCell key={h} sx={{ fontWeight: 700, fontSize: '0.75rem', color: '#6B7280' }}>{h}</TableCell>
+                                        ))}
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {recent.length === 0 ? (
+                                        <TableRow><TableCell colSpan={6} align="center" sx={{ py: 4, color: '#9CA3AF' }}>No orders yet</TableCell></TableRow>
+                                    ) : recent.map(order => (
+                                        <TableRow key={order._id} hover>
+                                            <TableCell sx={{ fontWeight: 700, fontSize: '0.8rem', color: '#4F46E5' }}>#{order._id?.slice(-6).toUpperCase()}</TableCell>
+                                            <TableCell sx={{ fontSize: '0.8rem' }}>{order.user?.name || 'Customer'}</TableCell>
+                                            <TableCell sx={{ fontSize: '0.8rem' }}>{order.orderItems?.length || 0} items</TableCell>
+                                            <TableCell sx={{ fontWeight: 700, fontSize: '0.8rem' }}>₹{order.totalPrice?.toFixed(0)}</TableCell>
+                                            <TableCell>{statusChip(order.orderStatus)}</TableCell>
+                                            <TableCell>
+                                                <Button size="small" sx={{ color: ACCENT, fontWeight: 700, fontSize: '0.75rem', p: 0 }}>Invoice</Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    </Paper>
+                </Grid>
+
+                {/* Low Stock Alert */}
+                <Grid item xs={12} md={4}>
+                    <Paper variant="outlined" sx={{ borderRadius: 3, border: '1px solid #F3F4F6', overflow: 'hidden' }}>
+                        <Box sx={{ px: 3, py: 2, display: 'flex', alignItems: 'center', gap: 1, borderBottom: '1px solid #F9FAFB', borderLeft: '4px solid #EF4444' }}>
+                            <Warning sx={{ color: '#EF4444', fontSize: 20 }} />
+                            <Typography fontWeight={800} color="#EF4444">Low Stock Alert</Typography>
+                        </Box>
+                        <Box sx={{ p: 2 }}>
+                            {lowStock.length === 0 ? (
+                                <Box sx={{ textAlign: 'center', py: 3 }}>
+                                    <CheckCircle sx={{ color: '#16A34A', fontSize: 32, mb: 1 }} />
+                                    <Typography variant="body2" color="#16A34A" fontWeight={700}>All products well stocked!</Typography>
+                                </Box>
+                            ) : lowStock.map(p => (
+                                <Box key={p._id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1.5, borderBottom: '1px solid #F9FAFB' }}>
+                                    <Typography variant="body2" noWrap sx={{ maxWidth: '70%', fontWeight: 500 }}>{p.name}</Typography>
+                                    <Chip label={`${p.countInStock} left`} size="small" sx={{ bgcolor: '#FEE2E2', color: '#B91C1C', fontWeight: 700, fontSize: '0.7rem' }} />
+                                </Box>
+                            ))}
+                            {lowStock.length > 0 && (
+                                <Button fullWidth size="small" variant="outlined" sx={{ mt: 2, borderColor: ACCENT, color: ACCENT, borderRadius: 2, fontWeight: 700 }} onClick={() => onTabChange(1)}>
+                                    Manage Inventory
+                                </Button>
+                            )}
+                        </Box>
+                    </Paper>
+                </Grid>
+            </Grid>
+        </Box>
     );
 };
 
-// --- Recipe Form Component ---
-const RecipeForm = ({ open, onClose, onSubmit, sellerProducts = [] }) => {
-    const [title, setTitle] = useState('');
-    const [ingredients, setIngredients] = useState('');
-    const [steps, setSteps] = useState('');
-    const [riceType, setRiceType] = useState('');
-    const [linkedProducts, setLinkedProducts] = useState([]);
-    const [image, setImage] = useState(null);
-    const [imagePreview, setImagePreview] = useState(null);
+// ────────────────────────────────────────────────────────────
+// Orders Panel (card-based matching design image)
+// ────────────────────────────────────────────────────────────
+const OrdersPanel = ({ orders, partners, onAssign, onUpdateStatus, onDownloadInvoice, invoiceLoading }) => {
+    const [statusFilter, setStatusFilter] = useState('All');
+    const [search, setSearch] = useState('');
 
-    const handleImageChange = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            setImage(file);
-            if (imagePreview) URL.revokeObjectURL(imagePreview);
-            setImagePreview(URL.createObjectURL(file));
-        }
+    const STATUS_TABS = ['All', 'New', 'Processing', 'Ready', 'Shipped', 'Delivered'];
+
+    const filtered = orders.filter(o => {
+        const matchStatus = statusFilter === 'All' || o.orderStatus.toLowerCase().includes(statusFilter.toLowerCase());
+        const matchSearch = search === '' || o._id.toLowerCase().includes(search.toLowerCase()) || (o.user?.name || '').toLowerCase().includes(search.toLowerCase());
+        return matchStatus && matchSearch;
+    });
+
+    const STATUS_CONFIG = {
+        placed: { label: 'NEW', bg: '#EF4444', text: '#fff' },
+        pending: { label: 'NEW', bg: '#EF4444', text: '#fff' },
+        processing: { label: 'PROCESSING', bg: '#F59E0B', text: '#fff' },
+        packed: { label: 'READY', bg: '#8B5CF6', text: '#fff' },
+        shipped: { label: 'SHIPPED', bg: '#3B82F6', text: '#fff' },
+        delivered: { label: 'DELIVERED', bg: '#16A34A', text: '#fff' },
+        cancelled: { label: 'CANCELLED', bg: '#6B7280', text: '#fff' },
     };
-
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        const formData = new FormData();
-        formData.append('title', title);
-        const parsedIngredients = ingredients.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
-        const parsedSteps = steps.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
-        formData.append('ingredients', JSON.stringify(parsedIngredients));
-        formData.append('steps', JSON.stringify(parsedSteps));
-        formData.append('riceType', riceType);
-        formData.append('linkedProducts', JSON.stringify(linkedProducts));
-        if (image) formData.append('image', image);
-        onSubmit(formData);
-    };
-
-    useEffect(() => {
-        if (!open) {
-            setTitle('');
-            setIngredients('');
-            setSteps('');
-            setRiceType('');
-            setLinkedProducts([]);
-            setImage(null);
-            if (imagePreview) {
-                URL.revokeObjectURL(imagePreview);
-                setImagePreview(null);
-            }
-        }
-        return () => {
-            if (imagePreview) URL.revokeObjectURL(imagePreview);
-        }
-    }, [open, imagePreview]);
-
-    const riceTypes = ['Basmati', 'Jasmine', 'Brown Rice', 'Arborio', 'Sushi Rice', 'Wild Rice', 'Other'];
 
     return (
-        <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-            <DialogTitle>Submit New Recipe</DialogTitle>
+        <Box>
+            {/* Filters */}
+            <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, mb: 3, border: '1px solid #F3F4F6' }}>
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <TextField size="small" placeholder="Date Range" type="date" sx={{ minWidth: 160 }} InputLabelProps={{ shrink: true }} />
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        <Typography variant="body2" fontWeight={700} sx={{ mr: 1, alignSelf: 'center' }}>Status</Typography>
+                        {STATUS_TABS.map(s => (
+                            <Chip key={s} label={s} size="small" onClick={() => setStatusFilter(s)}
+                                sx={{ cursor: 'pointer', fontWeight: 700, bgcolor: statusFilter === s ? ACCENT : '#F3F4F6', color: statusFilter === s ? '#fff' : '#4B5563' }} />
+                        ))}
+                    </Box>
+                    <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 1, bgcolor: '#F9FAFB', borderRadius: 2, px: 2, py: 0.8, border: '1px solid #E5E7EB' }}>
+                        <Search fontSize="small" sx={{ color: '#9CA3AF' }} />
+                        <input style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 14, color: '#374151' }} placeholder="Search by Order ID" value={search} onChange={e => setSearch(e.target.value)} />
+                    </Box>
+                </Box>
+            </Paper>
+
+            {/* Order Cards Grid */}
+            <Grid container spacing={2}>
+                {filtered.length === 0 ? (
+                    <Grid item xs={12}><Box textAlign="center" py={6} color="#9CA3AF"><ShoppingBag sx={{ fontSize: 48, mb: 1 }} /><Typography>No orders found</Typography></Box></Grid>
+                ) : filtered.map(order => {
+                    const sc = STATUS_CONFIG[order.orderStatus] || { label: order.orderStatus?.toUpperCase(), bg: '#6B7280', text: '#fff' };
+                    const isNew = ['placed', 'pending'].includes(order.orderStatus);
+                    const addr = order.shippingAddress ? `${order.shippingAddress.street || ''}, ${order.shippingAddress.city || ''} - ${order.shippingAddress.pinCode || ''}`.trim() : 'No address';
+
+                    return (
+                        <Grid item xs={12} md={6} lg={4} key={order._id}>
+                            <Paper variant="outlined" sx={{ borderRadius: 3, border: '1px solid #F3F4F6', overflow: 'hidden', '&:hover': { boxShadow: '0 4px 20px rgba(0,0,0,0.08)', borderColor: '#D1D5DB' }, transition: 'all 0.2s' }}>
+                                {/* Card Header */}
+                                <Box sx={{ px: 2, py: 1.5, bgcolor: '#FAFAFA', borderBottom: '1px solid #F3F4F6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <Box>
+                                        <Typography variant="caption" color="text.secondary">Order ID</Typography>
+                                        <Typography fontWeight={800} fontSize="0.95rem">#{order._id?.slice(-10).toUpperCase()}</Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+                                        <Chip label={sc.label} size="small" sx={{ bgcolor: sc.bg, color: sc.text, fontWeight: 700, fontSize: '0.65rem' }} />
+                                        {isNew && <Chip label="NEW" size="small" sx={{ bgcolor: '#EF4444', color: '#fff', fontWeight: 800, fontSize: '0.65rem' }} />}
+                                    </Box>
+                                </Box>
+
+                                {/* Customer Info */}
+                                <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid #F9FAFB' }}>
+                                    <Typography fontWeight={700} fontSize="0.9rem">{order.user?.name || 'Customer'}</Typography>
+                                    <Typography variant="caption" color="text.secondary">{order.user?.phone || ''}</Typography>
+                                    {addr && <Typography variant="caption" display="block" color="text.secondary" noWrap>{addr}</Typography>}
+                                </Box>
+
+                                {/* Items */}
+                                <Box sx={{ px: 2, py: 1 }}>
+                                    {(order.orderItems || []).slice(0, 2).map((item, i) => (
+                                        <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5 }}>
+                                            <Typography variant="caption" noWrap sx={{ maxWidth: '65%' }}>{item.name} × {item.qty}</Typography>
+                                            <Typography variant="caption" fontWeight={700}>₹{((item.price || 0) * item.qty).toFixed(0)}</Typography>
+                                        </Box>
+                                    ))}
+                                    {(order.orderItems || []).length > 2 && (
+                                        <Typography variant="caption" color={ACCENT}>+{order.orderItems.length - 2} more items</Typography>
+                                    )}
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1, pt: 1, borderTop: '1px solid #F3F4F6' }}>
+                                        <Typography fontWeight={700} fontSize="0.9rem">₹{order.totalPrice?.toFixed(0)} ({order.paymentMethod === 'cod' ? 'COD' : 'Prepaid'})</Typography>
+                                        <Typography variant="caption" color="text.secondary">{new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</Typography>
+                                    </Box>
+                                </Box>
+
+                                {/* Actions */}
+                                <Box sx={{ px: 2, pb: 2, pt: 1, display: 'flex', gap: 1 }}>
+                                    {isNew && (
+                                        <>
+                                            <Button size="small" variant="contained" onClick={() => onUpdateStatus(order._id, 'processing')}
+                                                sx={{ flex: 1, bgcolor: ACCENT, '&:hover': { bgcolor: '#15803D' }, fontWeight: 700, fontSize: '0.75rem', borderRadius: 1.5 }}>
+                                                Accept Order
+                                            </Button>
+                                            <Button size="small" variant="outlined" onClick={() => onUpdateStatus(order._id, 'cancelled')}
+                                                sx={{ fontWeight: 700, fontSize: '0.75rem', borderRadius: 1.5, borderColor: '#E5E7EB', color: '#6B7280' }}>
+                                                Reject
+                                            </Button>
+                                        </>
+                                    )}
+                                    {order.orderStatus === 'packed' && !order.deliveryPartner && (
+                                        <Button size="small" variant="outlined" endIcon={<ArrowForward fontSize="small" />} onClick={() => onAssign(order)}
+                                            sx={{ flex: 1, fontWeight: 700, fontSize: '0.75rem', borderRadius: 1.5, borderColor: '#3B82F6', color: '#3B82F6' }}>
+                                            Assign to DP
+                                        </Button>
+                                    )}
+                                    <IconButton size="small" onClick={() => onDownloadInvoice(order._id)} disabled={invoiceLoading} sx={{ border: '1px solid #E5E7EB', borderRadius: 1.5 }}>
+                                        {invoiceLoading ? <CircularProgress size={14} /> : <Download fontSize="small" sx={{ color: '#6B7280' }} />}
+                                    </IconButton>
+                                </Box>
+                            </Paper>
+                        </Grid>
+                    );
+                })}
+            </Grid>
+        </Box>
+    );
+};
+
+// ────────────────────────────────────────────────────────────
+// Assign DP Dialog (matching design image)
+// ────────────────────────────────────────────────────────────
+const AssignDPDialog = ({ open, onClose, onAssign, partners, loading, selectedOrder }) => {
+    const [search, setSearch] = useState('');
+    const [selectedId, setSelectedId] = useState('');
+
+    const filteredPartners = partners.filter(p =>
+        p.name?.toLowerCase().includes(search.toLowerCase()) || (p._id || '').includes(search)
+    );
+
+    return (
+        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+            <DialogTitle sx={{ fontWeight: 800 }}>Assign Delivery Partner</DialogTitle>
             <DialogContent>
                 <TextField
-                    margin="dense"
-                    label="Recipe Title"
-                    fullWidth
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    required
-                />
-                <TextField
-                    margin="dense"
-                    label="Ingredients (one per line or comma-separated)"
-                    fullWidth
-                    multiline
-                    rows={4}
-                    value={ingredients}
-                    onChange={(e) => setIngredients(e.target.value)}
-                    required
-                />
-                <TextField
-                    margin="dense"
-                    label="Steps (one per line or comma-separated)"
-                    fullWidth
-                    multiline
-                    rows={6}
-                    value={steps}
-                    onChange={(e) => setSteps(e.target.value)}
-                    required
-                />
-                <FormControl fullWidth margin="dense" required>
-                    <InputLabel>Rice Type</InputLabel>
-                    <Select
-                        value={riceType}
-                        label="Rice Type"
-                        onChange={(e) => setRiceType(e.target.value)}
-                    >
-                        {riceTypes.map(type => (
-                            <MenuItem key={type} value={type}>{type}</MenuItem>
-                        ))}
-                    </Select>
-                </FormControl>
-                <FormControl fullWidth margin="dense">
-                    <InputLabel>Link Your Products (Optional)</InputLabel>
-                    <Select
-                        multiple
-                        value={linkedProducts}
-                        label="Link Your Products (Optional)"
-                        onChange={(e) => setLinkedProducts(e.target.value)}
-                        renderValue={(selected) => (
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                                {selected.map((id) => {
-                                    const product = sellerProducts.find(p => p._id === id);
-                                    return (
-                                        <Chip
-                                            key={id}
-                                            label={product?.name || `ID:...${id.slice(-6)}`}
-                                            size="small"
-                                        />
-                                    );
-                                })}
+                    fullWidth placeholder="Search by name or ID..." size="small"
+                    value={search} onChange={e => setSearch(e.target.value)}
+                    InputProps={{ startAdornment: <Search fontSize="small" sx={{ mr: 1, color: '#9CA3AF' }} /> }}
+                    sx={{ mb: 2 }} />
+                <Typography variant="caption" fontWeight={700} color="text.secondary" display="block" mb={1}>Available Delivery Partners</Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    {filteredPartners.map(p => {
+                        const isOnline = p.isOnline ?? p.status === 'active';
+                        return (
+                            <Box key={p._id} onClick={() => setSelectedId(p._id)}
+                                sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 1.5, borderRadius: 2, cursor: 'pointer', border: '1px solid', borderColor: selectedId === p._id ? ACCENT : '#F3F4F6', bgcolor: selectedId === p._id ? '#F0FDF4' : '#FAFAFA', '&:hover': { borderColor: ACCENT } }}>
+                                <Avatar sx={{ width: 42, height: 42 }}>{p.name?.[0]}</Avatar>
+                                <Box sx={{ flex: 1 }}>
+                                    <Typography fontWeight={700} fontSize="0.9rem">{p.name}</Typography>
+                                    <Typography variant="caption" color="text.secondary">Load: {p.activeOrdersCount || 0} active orders</Typography>
+                                </Box>
+                                <Box textAlign="right">
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+                                        <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: isOnline ? '#16A34A' : '#9CA3AF' }} />
+                                        <Typography variant="caption" fontWeight={700} color={isOnline ? '#16A34A' : '#9CA3AF'}>{isOnline ? 'Online' : 'Offline'}</Typography>
+                                    </Box>
+                                    <Typography variant="caption" color="text.secondary">Rating {p.rating || '4.5'}</Typography>
+                                </Box>
+                                <Button size="small" variant="contained" onClick={e => { e.stopPropagation(); onAssign(p._id); }}
+                                    sx={{ bgcolor: '#3B82F6', '&:hover': { bgcolor: '#2563EB' }, fontWeight: 700, fontSize: '0.75rem', minWidth: 64 }}>
+                                    Assign
+                                </Button>
                             </Box>
-                        )}
-                    >
-                        {sellerProducts.length === 0 && (
-                            <MenuItem disabled>No products available to link</MenuItem>
-                        )}
-                        {sellerProducts.map((product) => (
-                            <MenuItem key={product._id} value={product._id}>
-                                {product.name}
-                            </MenuItem>
-                        ))}
-                    </Select>
-                </FormControl>
-                <Button variant="contained" component="label" sx={{ mt: 2 }}>
-                    Upload Image
-                    <input type="file" hidden accept="image/*" onChange={handleImageChange} />
-                </Button>
-                {imagePreview && (
-                    <Box
-                        component="img"
-                        src={imagePreview}
-                        alt="Preview"
-                        sx={{
-                            maxHeight: 150,
-                            display: 'block',
-                            mt: 1,
-                            borderRadius: 1
-                        }}
-                    />
-                )}
+                        );
+                    })}
+                    {filteredPartners.length === 0 && <Typography color="text.secondary" textAlign="center" py={2}>No partners found</Typography>}
+                </Box>
             </DialogContent>
-            <DialogActions>
-                <Button onClick={onClose}>Cancel</Button>
-                <Button onClick={handleSubmit} variant="contained">
-                    Submit Recipe
-                </Button>
+            <DialogActions sx={{ px: 3, pb: 2 }}>
+                <Button onClick={onClose} sx={{ color: '#6B7280' }}>Cancel</Button>
             </DialogActions>
         </Dialog>
     );
 };
 
-// --- Seller Recipes Panel Component ---
-const SellerRecipesPanel = () => {
-    const dispatch = useDispatch();
-    const { user } = useAuth();
-    const [recipeFormOpen, setRecipeFormOpen] = useState(false);
-    const [viewMode, setViewMode] = useState('list'); // 'list' or 'engagement'
-
-    const {
-        loading,
-        error,
-        recipes = [],
-        page = 1,
-        pages = 1
-    } = useSelector(state => state.recipeListMy || {
-        loading: false,
-        error: null,
-        recipes: [],
-        page: 1,
-        pages: 1
-    });
-
-    const recipeSubmit = useSelector(state => state.recipeSubmit || {});
-    const { loading: submitting, error: submitError, success: submitSuccess } = recipeSubmit;
-
-    const recipeDelete = useSelector(state => state.recipeDelete || {});
-    const { loading: deleting, error: deleteError, success: deleteSuccess } = recipeDelete;
-
-    const productSellerList = useSelector(state => state.productSellerList || {});
-    const { products: sellerProducts = [], loading: loadingProducts } = productSellerList;
-
-    const fetchMyRecipes = useCallback((pageNum = 1) => {
-        dispatch(listMyRecipes({ pageNumber: pageNum }));
-    }, [dispatch]);
-
-    useEffect(() => {
-        fetchMyRecipes(1);
-        dispatch(listSellerProducts());
-    }, [dispatch, fetchMyRecipes]);
-
-    useEffect(() => {
-        let shouldRefresh = false;
-        if (submitSuccess) {
-            dispatch({ type: RECIPE_SUBMIT_RESET });
-            shouldRefresh = true;
-        }
-        if (deleteSuccess) {
-            shouldRefresh = true;
-        }
-
-        if (shouldRefresh) {
-            fetchMyRecipes(page);
-            setRecipeFormOpen(false);
-        }
-    }, [submitSuccess, deleteSuccess, fetchMyRecipes, dispatch, page]);
-
-    const handleOpenRecipeForm = () => setRecipeFormOpen(true);
-    const handleCloseRecipeForm = () => setRecipeFormOpen(false);
-
-    const handleSubmitRecipe = (formData) => {
-        dispatch(submitRecipe(formData));
-    };
-
-    const handleDeleteRecipe = (id) => {
-        if (window.confirm('Are you sure you want to delete this recipe?')) {
-            dispatch(deleteRecipe(id));
-        }
-    };
-
-    const handlePageChange = (event, value) => {
-        fetchMyRecipes(value);
-    };
-
-    return (
-        <Box>
-            <Box sx={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                mb: 2
-            }}>
-                <Typography variant="h5">My Recipes</Typography>
-                <Button
-                    variant="contained"
-                    startIcon={<AddIcon />}
-                    onClick={handleOpenRecipeForm}
-                    disabled={loadingProducts || submitting}
-                >
-                    {loadingProducts ? 'Loading Products...' : (submitting ? 'Submitting...' : 'Submit New Recipe')}
-                </Button>
-            </Box>
-
-            {submitError && <Message severity="error">Submit Error: {submitError}</Message>}
-            {deleteError && <Message severity="error">Delete Error: {deleteError}</Message>}
-            {submitSuccess && (
-                <Message severity="success">
-                    Recipe submitted successfully! Awaiting approval.
-                </Message>
-            )}
-            {deleteSuccess && (
-                <Message severity="success">Recipe deleted successfully!</Message>
-            )}
-
-            <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
-                <Tabs value={viewMode === 'list' ? 0 : 1} onChange={(e, v) => setViewMode(v === 0 ? 'list' : 'engagement')}>
-                    <Tab label="Recipe List" />
-                    <Tab label="Engagement Dashboard" />
-                </Tabs>
-            </Box>
-
-            {viewMode === 'engagement' ? (
-                <RecipeEngagementDashboard sellerId={user?._id} recipes={recipes} />
-            ) : (
-                <>
-                    {loading && recipes.length === 0 ? (
-                        <Loader />
-                    ) : error ? (
-                        <Message severity="error">{error}</Message>
-                    ) : (
-                        <>
-                            <TableContainer component={Paper}>
-                                <Table>
-                                    <TableHead>
-                                        <TableRow sx={{ backgroundColor: grey[100] }}>
-                                            <TableCell sx={{ fontWeight: 'bold' }}>Title</TableCell>
-                                            <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-                                            <TableCell sx={{ fontWeight: 'bold' }}>Rice Type</TableCell>
-                                            <TableCell sx={{ fontWeight: 'bold' }}>Linked Products</TableCell>
-                                            <TableCell sx={{ fontWeight: 'bold' }}>Created At</TableCell>
-                                            <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
-                                        </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                        {recipes.map((recipe) => (
-                                            <TableRow key={recipe._id} hover>
-                                                <TableCell>{recipe.title}</TableCell>
-                                                <TableCell>
-                                                    <Chip
-                                                        label={recipe.status}
-                                                        size="small"
-                                                        color={
-                                                            recipe.status === 'approved' ? 'success' :
-                                                                recipe.status === 'rejected' ? 'error' :
-                                                                    'warning'
-                                                        }
-                                                    />
-                                                </TableCell>
-                                                <TableCell>{recipe.riceType}</TableCell>
-                                                <TableCell>
-                                                    {recipe.linkedProducts?.length > 0 ?
-                                                        recipe.linkedProducts.map(p => p.name).join(', ') :
-                                                        'None'
-                                                    }
-                                                </TableCell>
-                                                <TableCell>
-                                                    {new Date(recipe.createdAt).toLocaleDateString()}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <IconButton
-                                                        size="small"
-                                                        onClick={() => handleDeleteRecipe(recipe._id)}
-                                                        disabled={deleting}
-                                                    >
-                                                        <DeleteIcon color={deleting ? 'disabled' : 'error'} />
-                                                    </IconButton>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                        {recipes.length === 0 && (
-                                            <TableRow>
-                                                <TableCell colSpan={6} align="center">
-                                                    No recipes submitted yet.
-                                                </TableCell>
-                                            </TableRow>
-                                        )}
-                                    </TableBody>
-                                </Table>
-                            </TableContainer>
-                            {pages > 1 && (
-                                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-                                    <Pagination
-                                        count={pages}
-                                        page={page}
-                                        onChange={handlePageChange}
-                                        color="primary"
-                                        disabled={loading || submitting || deleting}
-                                    />
-                                </Box>
-                            )}
-                        </>
-                    )}
-                </>
-            )}
-
-            <RecipeForm
-                open={recipeFormOpen}
-                onClose={handleCloseRecipeForm}
-                onSubmit={handleSubmitRecipe}
-                sellerProducts={sellerProducts}
-            />
-        </Box>
-    );
-};
-
-// --- Main SellerDashboard Component ---
+// ────────────────────────────────────────────────────────────
+// Main SellerDashboard Shell
+// ────────────────────────────────────────────────────────────
 const SellerDashboard = () => {
-    const [tabValue, setTabValue] = useState(0);
+    const [activeTab, setActiveTab] = useState(0);
     const [openDialog, setOpenDialog] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
-    const [partnerId, setPartnerId] = useState('');
-    const [chatWithAdminOpen, setChatWithAdminOpen] = useState(false);
-    const [viewMode, setViewMode] = useState('kanban'); // 'table' or 'kanban'
-    const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
     const [invoiceLoading, setInvoiceLoading] = useState(false);
-    const theme = useTheme();
+    const [mobileOpen, setMobileOpen] = useState(false);
     const dispatch = useDispatch();
-    const { user } = useAuth();
+    const { user, logout } = useAuth();
 
-    // FIX: Handle orders data structure properly
-    const orderListSeller = useSelector((state) => state.orderListSeller || {});
-    const {
-        orders: rawOrders = [],
-        loading: ordersLoading = false,
-        error: ordersError = null
-    } = orderListSeller;
-
-    // FIX: Ensure orders is always an array
-    const orders = useMemo(() => {
-        if (Array.isArray(rawOrders)) return rawOrders;
-        if (rawOrders && Array.isArray(rawOrders.orders)) return rawOrders.orders;
-        if (rawOrders && rawOrders.orders) return [rawOrders.orders];
-        return [];
-    }, [rawOrders]);
-
-    const {
-        partners = [],
-        loading: partnersLoading = false,
-        error: partnersError = null
-    } = useSelector((state) => state.deliveryPartnerList || {});
-
-    const assignPartnerState = useSelector((state) => state.deliveryPartnerAction || {});
-    const updateStatusState = useSelector((state) => state.orderUpdate || {});
+    const { orders: rawOrders = [], loading: ordersLoading, error: ordersError } = useSelector(s => s.orderListSeller || {});
+    const orders = useMemo(() => Array.isArray(rawOrders) ? rawOrders : rawOrders?.orders || [], [rawOrders]);
+    const { partners = [] } = useSelector(s => s.deliveryPartnerList || {});
+    const { products: sellerProducts = [] } = useSelector(s => s.productSellerList || {});
+    const assignState = useSelector(s => s.deliveryPartnerAction || {});
+    const updateState = useSelector(s => s.orderUpdate || {});
 
     useEffect(() => {
         dispatch(listSellerOrders());
         dispatch(listDeliveryPartners());
+        dispatch(listSellerProducts());
     }, [dispatch]);
 
-    // Socket setup
     useEffect(() => {
-        let orderSocket = null;
+        if (assignState.success) { dispatch(listSellerOrders()); dispatch({ type: 'DELIVERY_ASSIGN_RESET' }); setOpenDialog(false); }
+    }, [assignState.success, dispatch]);
 
-        const handleSocketMessage = (data) => {
-            console.log("Seller Dashboard Socket Received:", data);
-            if (data.type === 'ORDER_UPDATE' || data.type === 'NEW_ORDER') {
-                dispatch(listSellerOrders());
-                if (orderSocket && data.data?.orderId) {
-                    orderSocket.joinOrderRoom(data.data.orderId);
-                }
-            }
-            if (data.type === 'RECIPE_STATUS') {
-                if (tabValue === 5) dispatch(listMyRecipes());
-            }
-        };
+    useEffect(() => {
+        if (updateState.success) { dispatch(listSellerOrders()); dispatch({ type: 'ORDER_UPDATE_RESET' }); }
+    }, [updateState.success, dispatch]);
 
-        if (user?._id) {
-            orderSocket = new OrderTrackingSocket(
-                user._id,
-                user.role,
-                localStorage.getItem('token'),
-                handleSocketMessage
-            );
-
-            orders.forEach(order => {
-                if (order && order._id) {
-                    orderSocket.joinOrderRoom(order._id);
-                }
-            });
-        }
-
-        return () => {
-            if (orderSocket) {
-                orderSocket.cleanup();
-            }
-        };
-    }, [user?._id, user?.role, dispatch, orders, tabValue]);
-
-    const handleTabChange = (event, newValue) => setTabValue(newValue);
-
-    const handleOpenDialog = (order) => {
-        setSelectedOrder(order);
-        setPartnerId('');
-        setOpenDialog(true);
+    const handleAssign = async (partnerId) => {
+        if (!selectedOrder || !partnerId) return;
+        try { await dispatch(assignDeliveryPartner(selectedOrder._id, { partnerId })); } catch (e) { console.error(e); }
     };
 
-    const handleCloseDialog = () => {
-        setOpenDialog(false);
-        setSelectedOrder(null);
-        setPartnerId('');
+    const handleUpdateStatus = async (orderId, status) => {
+        try { await dispatch(updateOrderStatus(orderId, status)); } catch (e) { console.error(e); }
     };
 
-    // ✅ FIXED: Delivery partner assignment with proper refresh and error handling
-    const handleAssignPartner = async () => {
-        if (!selectedOrder || !partnerId) {
-            alert('Please select a delivery partner.');
-            return;
-        }
-
-        try {
-            await dispatch(assignDeliveryPartner(selectedOrder._id, { partnerId }));
-            // ✅ FIXED: Refresh orders list after successful assignment
-            await dispatch(listSellerOrders());
-            handleCloseDialog();
-            alert('Delivery partner assigned successfully!');
-        } catch (error) {
-            console.error('Failed to assign delivery partner:', error);
-            alert('Failed to assign delivery partner: ' + (error.message || 'Unknown error'));
-        }
-    };
-
-    const handleViewDetails = (order) => {
-        setSelectedOrder(order);
-        setDetailsDialogOpen(true);
-    };
-
-    // ✅ FIXED: Backend-driven Invoice Actions
     const handleDownloadInvoice = async (orderId) => {
         setInvoiceLoading(true);
-        const result = await dispatch(downloadInvoice(orderId));
+        await dispatch(downloadInvoice(orderId));
         setInvoiceLoading(false);
-        if (!result.success) alert(result.error || 'Failed to download invoice');
     };
 
-    const handlePreviewInvoice = async (orderId) => {
-        setInvoiceLoading(true);
-        try {
-            const { data } = await OrderTrackingSocket.apiInstance.get(`/api/orders/${orderId}/invoice`, {
-                responseType: 'blob'
-            });
-            const blob = new Blob([data], { type: 'application/pdf' });
-            const url = window.URL.createObjectURL(blob);
-            window.open(url, '_blank');
-            // Note: We don't revoke here because it might close the new tab's access
-        } catch (error) {
-            console.error('Preview error:', error);
-            alert('Failed to preview invoice');
-        } finally {
-            setInvoiceLoading(false);
+    const handleLogout = () => { if (window.confirm('Logout?')) logout(); };
+
+    const renderContent = () => {
+        if (ordersLoading) return <Box display="flex" justifyContent="center" mt={8}><CircularProgress sx={{ color: ACCENT }} /></Box>;
+        switch (activeTab) {
+            case 0: return <OverviewPanel orders={orders} products={sellerProducts} onTabChange={setActiveTab} />;
+            case 1: return <SellerProducts />;
+            case 2: return <OrdersPanel orders={orders} partners={partners} onAssign={o => { setSelectedOrder(o); setOpenDialog(true); }} onUpdateStatus={handleUpdateStatus} onDownloadInvoice={handleDownloadInvoice} invoiceLoading={invoiceLoading} />;
+            case 3: return <SellerPayments />;
+            case 4: return <SellerDelivery />;
+            case 5: return <AnalyticsDashboard />;
+            case 6: return <SellerProfile />;
+            default: return null;
         }
-    };
-
-    // ✅ FIXED: Reset success flags and refresh orders after actions
-    useEffect(() => {
-        if (assignPartnerState.success) {
-            console.log('✅ Assignment completed, refreshing orders...');
-            dispatch(listSellerOrders()); // ✅ FIXED: Refresh orders list
-            const timer = setTimeout(() => {
-                dispatch({ type: 'DELIVERY_ASSIGN_RESET' });
-            }, 2000);
-            return () => clearTimeout(timer);
-        }
-    }, [assignPartnerState.success, dispatch]);
-
-    useEffect(() => {
-        if (updateStatusState.success) {
-            console.log('✅ Status update completed, refreshing orders...');
-            dispatch(listSellerOrders()); // ✅ FIXED: Refresh orders list
-            const timer = setTimeout(() => {
-                dispatch({ type: 'ORDER_UPDATE_RESET' });
-            }, 2000);
-            return () => clearTimeout(timer);
-        }
-    }, [updateStatusState.success, dispatch]);
-
-    // ✅ FIXED: Order status update with refresh and notifications
-    const handleUpdateStatus = async (orderId, status) => {
-        if (status === 'shipped') {
-            setOpenDialog(true);
-            setSelectedOrder(orders.find(o => o._id === orderId));
-        } else {
-            try {
-                await dispatch(updateOrderStatus(orderId, status));
-                // ✅ FIXED: Refresh orders list after status update
-                await dispatch(listSellerOrders());
-                alert(`Order status updated to ${status}. Customer will be notified.`);
-            } catch (error) {
-                console.error('Failed to update order status:', error);
-                alert('Failed to update order status: ' + (error.message || 'Unknown error'));
-            }
-        }
-    };
-
-
-    const getEstimatedDeliveryDate = (createdAt) => {
-        if (!createdAt) return 'N/A';
-        const date = new Date(createdAt);
-        date.setDate(date.getDate() + 5);
-        return date.toLocaleDateString();
-    };
-
-    const formatAddress = (address) => {
-        if (!address) return 'N/A';
-        return `${address.street}, ${address.city}, ${address.state} - ${address.pinCode}`;
     };
 
     return (
-        <Box sx={{ backgroundColor: '#f5f7fb', minHeight: '100vh' }}>
-            <AppBar position="static" sx={{ mb: 3 }}>
-                <Toolbar>
-                    <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-                        Seller Dashboard
-                    </Typography>
-                    <SellerLogoutButton />
-                </Toolbar>
-            </AppBar>
-
-
-            <Container maxWidth="xl" sx={{ mb: 4 }}>
-                <Paper elevation={4} sx={{ p: 3, mb: 3, borderRadius: 3, background: 'linear-gradient(135deg, #e8f5e9 30%, #f1f8e9 100%)' }}>
-                    <Tabs
-                        value={tabValue}
-                        onChange={handleTabChange}
-                        indicatorColor="primary"
-                        textColor="primary"
-                        variant="scrollable"
-                        scrollButtons="auto"
-                    >
-                        <Tab label="Profile" id="seller-tab-0" />
-                        <Tab label="Orders" id="seller-tab-1" />
-                        <Tab label="Products" id="seller-tab-2" />
-                        <Tab label="Payments" id="seller-tab-3" />
-                        <Tab label="Delivery" id="seller-tab-4" />
-                        <Tab label="Recipes" id="seller-tab-5" />
-                        <Tab label="Community Forum" id="seller-tab-6" />
-                        <Tab label="Analytics" id="seller-tab-7" />
-                    </Tabs>
-                </Paper>
-
-                <Box role="tabpanel" hidden={tabValue !== 0} id="seller-panel-0">
-                    <SellerProfile />
+        <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#F9FAFB' }}>
+            {/* Sidebar */}
+            <Box sx={{ width: 220, bgcolor: SIDEBAR_BG, display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, left: 0, height: '100vh', zIndex: 100 }}>
+                {/* Logo */}
+                <Box sx={{ px: 3, py: 3, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                    <Typography variant="h6" fontWeight={800} color="#fff" fontSize="1rem">🌾 Rice Mill Express</Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>Seller Portal</Typography>
                 </Box>
 
-                <Box role="tabpanel" hidden={tabValue !== 1} id="seller-panel-1">
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2, gap: 1 }}>
-                        <Button variant={viewMode === 'kanban' ? 'contained' : 'outlined'} onClick={() => setViewMode('kanban')} size="small">Kanban</Button>
-                        <Button variant={viewMode === 'table' ? 'contained' : 'outlined'} onClick={() => setViewMode('table')} size="small">Table</Button>
+                {/* Nav Items */}
+                <Box sx={{ flex: 1, py: 2, overflowY: 'auto' }}>
+                    {NAV_ITEMS(activeTab).map(item => (
+                        <Box key={item.id} onClick={() => setActiveTab(item.id)}
+                            sx={{ display: 'flex', alignItems: 'center', gap: 2, px: 3, py: 1.5, cursor: 'pointer', bgcolor: activeTab === item.id ? SIDEBAR_ACTIVE : 'transparent', borderLeft: activeTab === item.id ? `3px solid ${ACCENT}` : '3px solid transparent', color: activeTab === item.id ? '#fff' : 'rgba(255,255,255,0.55)', transition: 'all 0.15s', '&:hover': { bgcolor: 'rgba(255,255,255,0.06)', color: '#fff' } }}>
+                            {item.icon}
+                            <Typography variant="body2" fontWeight={activeTab === item.id ? 700 : 400} fontSize="0.88rem">{item.label}</Typography>
+                        </Box>
+                    ))}
+                </Box>
+
+                {/* Logout */}
+                <Box sx={{ px: 3, py: 2.5, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                    <Box onClick={handleLogout} sx={{ display: 'flex', alignItems: 'center', gap: 2, cursor: 'pointer', color: 'rgba(255,255,255,0.55)', '&:hover': { color: '#fff' } }}>
+                        <Logout fontSize="small" />
+                        <Typography variant="body2" fontWeight={500}>Logout</Typography>
                     </Box>
+                </Box>
+            </Box>
 
-                    {ordersLoading ? (
-                        <Loader />
-                    ) : ordersError ? (
-                        <Message severity="error">{ordersError}</Message>
-                    ) : (
-                        viewMode === 'table' ? (
-                            orders?.length === 0 ? (
-                                <EmptyState
-                                    title="No seller orders yet"
-                                    description="Orders will appear here once customers start purchasing."
-                                    actionLabel="Refresh"
-                                    onAction={() => dispatch(listSellerOrders())}
-                                />
-                            ) : (
-                            <TableContainer component={Paper} elevation={3} sx={{ mt: 2, borderRadius: 2 }}>
-                                <Table>
-                                    <TableHead>
-                                        <TableRow sx={{ backgroundColor: grey[100] }}>
-                                            <TableCell sx={{ fontWeight: 'bold' }}>Order ID</TableCell>
-                                            <TableCell sx={{ fontWeight: 'bold' }}>Customer</TableCell>
-                                            <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
-                                            <TableCell sx={{ fontWeight: 'bold' }}>Total</TableCell>
-                                            <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-                                            <TableCell sx={{ fontWeight: 'bold' }}>Payment</TableCell>
-                                            <TableCell sx={{ fontWeight: 'bold' }}>Delivery Partner</TableCell>
-                                            <TableCell sx={{ fontWeight: 'bold' }}>Est. Delivery</TableCell>
-                                            <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
-                                        </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                        {orders && orders.map((order) => (
-                                            <TableRow key={order._id} hover>
-                                                <TableCell onClick={() => handleViewDetails(order)} sx={{ cursor: 'pointer', color: 'primary.main' }}>
-                                                    #{order._id?.slice(-6).toUpperCase()}
-                                                </TableCell>
-                                                <TableCell>{order.user?.name || 'N/A'}</TableCell>
-                                                <TableCell>{order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}</TableCell>
-                                                <TableCell>₹{order.totalPrice?.toFixed(2)}</TableCell>
-                                                <TableCell>
-                                                    <Select
-                                                        value={order.orderStatus}
-                                                        onChange={(e) => handleUpdateStatus(order._id, e.target.value)}
-                                                        size="small"
-                                                        disabled={updateStatusState.loading && updateStatusState.orderId === order._id}
-                                                    >
-                                                        <MenuItem value="placed">Pending</MenuItem>
-                                                        <MenuItem value="processing">Processing</MenuItem>
-                                                        <MenuItem value="packed">Packed</MenuItem>
-                                                        <MenuItem value="shipped">Shipped</MenuItem>
-                                                        <MenuItem value="delivered">Delivered</MenuItem>
-                                                        <MenuItem value="cancelled">Cancelled</MenuItem>
-                                                    </Select>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Chip label={order.isPaid ? 'Paid' : 'Unpaid'} color={order.isPaid ? 'success' : 'warning'} size="small" />
-                                                </TableCell>
-                                                <TableCell>{order.deliveryPartner?.name || 'Not Assigned'}</TableCell>
-                                                <TableCell>{getEstimatedDeliveryDate(order.createdAt)}</TableCell>
-                                                <TableCell>
-                                                    <Box sx={{ display: 'flex', gap: 1 }}>
-                                                        <IconButton size="small" onClick={() => handleViewDetails(order)} title="View Details"><VisibilityIcon fontSize="small" /></IconButton>
-                                                        <IconButton
-                                                            size="small"
-                                                            onClick={() => handleDownloadInvoice(order._id)}
-                                                            disabled={invoiceLoading}
-                                                            title="Download Invoice"
-                                                        >
-                                                            {invoiceLoading ? <CircularProgress size={20} /> : <DownloadIcon fontSize="small" />}
-                                                        </IconButton>
-                                                        {order.orderStatus === 'packed' && !order.deliveryPartner && (
-                                                            <Button variant="outlined" size="small" onClick={() => handleOpenDialog(order)}>Assign</Button>
-                                                        )}
-                                                    </Box>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </TableContainer>
-                            )
-                        ) : (
-                            <OrderKanban orders={orders} onUpdateStatus={handleUpdateStatus} onAssignPartner={handleOpenDialog} onViewDetails={handleViewDetails} />
-                        )
-                    )}
+            {/* Main Content */}
+            <Box sx={{ ml: '220px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                {/* Top Bar */}
+                <Box sx={{ height: 64, bgcolor: '#fff', borderBottom: '1px solid #F3F4F6', display: 'flex', alignItems: 'center', px: 3, gap: 2, position: 'sticky', top: 0, zIndex: 99 }}>
+                    <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', gap: 1.5, bgcolor: '#F9FAFB', borderRadius: 2, px: 2, py: 1, border: '1px solid #E5E7EB', maxWidth: 360 }}>
+                        <Search fontSize="small" sx={{ color: '#9CA3AF' }} />
+                        <input style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 14, color: '#374151', flex: 1 }} placeholder="Search orders, customers, or IDs" />
+                    </Box>
+                    <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <IconButton size="small"><Notifications sx={{ color: '#6B7280' }} /></IconButton>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, cursor: 'pointer' }}>
+                            <Avatar sx={{ width: 36, height: 36, bgcolor: ACCENT, fontSize: '0.9rem' }}>{user?.name?.[0] || 'S'}</Avatar>
+                            <Box>
+                                <Typography variant="body2" fontWeight={700} lineHeight={1}>{user?.name || 'Seller'}</Typography>
+                                <Typography variant="caption" color="text.secondary">Seller Portal</Typography>
+                            </Box>
+                        </Box>
+                    </Box>
                 </Box>
 
-                <Box role="tabpanel" hidden={tabValue !== 2} id="seller-panel-2">
-                    <SellerProducts />
+                {/* Page Content */}
+                <Box sx={{ p: 3, flex: 1 }}>
+                    <Typography variant="h5" fontWeight={800} gutterBottom sx={{ mb: 3 }}>
+                        {NAV_ITEMS(activeTab).find(n => n.id === activeTab)?.label || 'Dashboard'}
+                    </Typography>
+                    {ordersError && <Alert severity="error" sx={{ mb: 2 }}>{ordersError}</Alert>}
+                    {renderContent()}
                 </Box>
+            </Box>
 
-                <Box role="tabpanel" hidden={tabValue !== 3} id="seller-panel-3">
-                    <SellerPayments />
-                </Box>
-
-                <Box role="tabpanel" hidden={tabValue !== 4} id="seller-panel-4">
-                    <SellerDelivery />
-                </Box>
-
-                <Box role="tabpanel" hidden={tabValue !== 5} id="seller-panel-5">
-                    <SellerRecipesPanel />
-                </Box>
-
-                <Box role="tabpanel" hidden={tabValue !== 6} id="seller-panel-6">
-                    <Forum />
-                </Box>
-
-                <Box role="tabpanel" hidden={tabValue !== 7} id="seller-panel-7">
-                    <AnalyticsDashboard />
-                </Box>
-
-                <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-                    <DialogTitle>Assign Delivery Partner for Order #{selectedOrder?._id?.slice(-6) || 'N/A'}</DialogTitle>
-                    <DialogContent>
-                        {partnersLoading ? <Loader /> : partnersError ? <Alert severity="error">{partnersError}</Alert> : partners.length === 0 ? <Typography>No delivery partners available.</Typography> : (
-                            <FormControl fullWidth sx={{ mt: 2 }}>
-                                <InputLabel id="partner-select-label">Delivery Partner</InputLabel>
-                                <Select labelId="partner-select-label" value={partnerId} label="Delivery Partner" onChange={(e) => setPartnerId(e.target.value)}>
-                                    {partners.map(p => <MenuItem key={p._id} value={p._id}>{p.name} ({p.vehicleType})</MenuItem>)}
-                                </Select>
-                            </FormControl>
-                        )}
-                        {assignPartnerState.error && <Alert severity="error" sx={{ mt: 2 }}>{assignPartnerState.error}</Alert>}
-                    </DialogContent>
-                    <DialogActions>
-                        <Button onClick={handleCloseDialog}>Cancel</Button>
-                        <Button onClick={handleAssignPartner} variant="contained" disabled={partnersLoading || partners.length === 0 || assignPartnerState.loading || !partnerId}>
-                            {assignPartnerState.loading ? <CircularProgress size={24} /> : 'Assign'}
-                        </Button>
-                    </DialogActions>
-                </Dialog>
-
-
-                <SellerChatWidget />
-
-                <Dialog open={detailsDialogOpen} onClose={() => setDetailsDialogOpen(false)} maxWidth="md" fullWidth>
-                    <DialogTitle sx={{ bgcolor: 'primary.main', color: 'white' }}>Order Details #{selectedOrder?._id?.slice(-6).toUpperCase()}</DialogTitle>
-                    <DialogContent sx={{ mt: 2 }}>
-                        {selectedOrder && (
-                            <Grid container spacing={3}>
-                                <Grid item xs={12} md={7}>
-                                    <Typography variant="h6" gutterBottom>Track Status</Typography>
-                                    <OrderTimeline history={selectedOrder.statusHistory || []} currentStatus={selectedOrder.orderStatus} />
-                                    <Divider sx={{ my: 2 }} />
-                                    <Typography variant="h6" gutterBottom>Order Items</Typography>
-                                    <TableContainer component={Paper} variant="outlined">
-                                        <Table size="small">
-                                            <TableHead><TableRow><TableCell>Item</TableCell><TableCell align="right">Qty</TableCell><TableCell align="right">Price</TableCell></TableRow></TableHead>
-                                            <TableBody>
-                                                {selectedOrder.orderItems?.map((item) => (
-                                                    <TableRow key={item._id}><TableCell>{item.name}</TableCell><TableCell align="right">{item.qty}</TableCell><TableCell align="right">₹{item.price?.toFixed(2)}</TableCell></TableRow>
-                                                ))}
-                                            </TableBody>
-                                        </Table>
-                                    </TableContainer>
-                                </Grid>
-                                <Grid item xs={12} md={5}>
-                                    <Paper variant="outlined" sx={{ p: 2, bgcolor: grey[50] }}>
-                                        <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }} gutterBottom>Customer Information</Typography>
-                                        <Typography variant="body2"><strong>Name:</strong> {selectedOrder.user?.name}</Typography>
-                                        <Typography variant="body2"><strong>Email:</strong> {selectedOrder.user?.email}</Typography>
-                                        <Typography variant="body2" sx={{ mt: 1 }}><strong>Shipping Address:</strong></Typography>
-                                        <Typography variant="body2" color="text.secondary">{formatAddress(selectedOrder.shippingAddress)}</Typography>
-                                        <Divider sx={{ my: 2 }} />
-                                        <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }} gutterBottom>Payment Details</Typography>
-                                        <Typography variant="body2"><strong>Method:</strong> {selectedOrder.paymentMethod?.toUpperCase()}</Typography>
-                                        <Typography variant="body2"><strong>Status:</strong><Chip label={selectedOrder.isPaid ? 'PAID' : 'PENDING'} size="small" color={selectedOrder.isPaid ? 'success' : 'warning'} sx={{ ml: 1 }} /></Typography>
-                                        <Divider sx={{ my: 2 }} />
-                                        <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }} gutterBottom>Action Details</Typography>
-                                        <Typography variant="body2"><strong>Delivery Partner:</strong> {selectedOrder.deliveryPartner?.name || 'None Assigned'}</Typography>
-                                        {selectedOrder.deliveryOtp && <Typography variant="body2" color="secondary" sx={{ fontWeight: 'bold', mt: 1 }}>Verification OTP: {selectedOrder.deliveryOtp}</Typography>}
-                                    </Paper>
-                                </Grid>
-                            </Grid>
-                        )}
-                    </DialogContent>
-                    <DialogActions>
-                        <Button onClick={() => setDetailsDialogOpen(false)}>Close</Button>
-                        <Button variant="outlined" onClick={() => handlePreviewInvoice(selectedOrder._id)} disabled={invoiceLoading}>Preview Invoice</Button>
-                        <Button variant="contained" onClick={() => handleDownloadInvoice(selectedOrder._id)} disabled={invoiceLoading}>
-                            {invoiceLoading ? <CircularProgress size={24} /> : 'Download Invoice'}
-                        </Button>
-                    </DialogActions>
-                </Dialog>
-            </Container>
+            {/* Assign DP Dialog */}
+            <AssignDPDialog
+                open={openDialog}
+                onClose={() => setOpenDialog(false)}
+                onAssign={handleAssign}
+                partners={partners}
+                loading={assignState.loading}
+                selectedOrder={selectedOrder}
+            />
         </Box>
     );
 };
