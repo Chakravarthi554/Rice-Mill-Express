@@ -70,7 +70,15 @@ const OrderDetailScreen = ({ route, navigation }) => {
                     <View style={styles.headerRow}>
                         <View>
                             <Text style={styles.orderId}>Order #{order._id.slice(-6).toUpperCase()}</Text>
-                            <Text style={styles.date}>Placed on {new Date(order.createdAt).toLocaleDateString()}</Text>
+                            <Text style={styles.date}>
+                                Placed on {(() => {
+                                    try {
+                                        const d = new Date(order.createdAt);
+                                        if (isNaN(d.getTime())) return String(order.createdAt).substring(0, 10);
+                                        return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+                                    } catch(e) { return String(order.createdAt).substring(0,10); }
+                                })()}
+                            </Text>
                             <Text style={styles.itemCountText}>{order.orderItems?.length || 0} items in this order</Text>
                         </View>
                         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.orderStatus) }]}>

@@ -1,5 +1,6 @@
 // [AI: Premium UI Polish - Rounded inputs, pill buttons, high-contrast branding]
 import React, { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import {
   Container, Box, Typography, TextField, Button, Paper, Divider, Alert, CircularProgress, IconButton, Checkbox, FormControlLabel, InputAdornment
@@ -22,7 +23,28 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
+  const { userInfo, error: loginError, loading: authLoading } = useSelector((state) => state.userLogin || {});
   const recaptchaRef = React.useRef(null);
+
+  // ✅ PROACTIVE REDIRECTION: If already logged in, get out of here immediately!
+  useEffect(() => {
+    if (userInfo && !authLoading) {
+      console.log('🚀 LoginPage: User already detected in Redux, redirecting...');
+      const role = userInfo.role;
+      let path = '/customer/dashboard';
+      if (role === 'admin') path = '/admin/dashboard';
+      else if (role === 'seller') path = '/seller/dashboard';
+      else if (role === 'delivery') path = '/delivery/dashboard';
+      navigate(path, { replace: true });
+    }
+  }, [userInfo, authLoading, navigate]);
+
+  // ✅ SYNC ERROR MESSAGES: Show errors from AuthContext/Redux
+  useEffect(() => {
+    if (loginError) {
+      setMessage(loginError);
+    }
+  }, [loginError]);
 
   useEffect(() => {
     if (!recaptchaRef.current) {

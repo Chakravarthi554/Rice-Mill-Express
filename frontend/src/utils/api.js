@@ -1,12 +1,21 @@
 import axios from 'axios';
-import { USER_LOGOUT } from '../redux/constants/userConstants';
+import { USER_LOGOUT, USER_LOGIN_SUCCESS } from '../redux/constants/userConstants';
 import store from '../redux/store';
+import { auth } from '../firebase';
+import { updateSocketToken } from './socket';
+import { refreshFirebaseToken } from './authUtils';
+
+// ✅ CRITICAL FIX: baseURL must be the server root ONLY.
+// Action files already include /api/ in their paths.
+// REACT_APP_API_URL may contain /api suffix — strip it here.
+const rawBaseURL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
+const API_BASE_URL = rawBaseURL.replace(/\/api\/?$/, '');
 
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5001/api',
+  baseURL: API_BASE_URL,
   withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
-  timeout: 10000, // 10 second timeout
+  timeout: 15000,
 });
 
 let isRefreshing = false;
@@ -19,12 +28,22 @@ const processQueue = (error, token = null) => {
 
 api.interceptors.request.use(
   (config) => {
+    const path = config.url || '';
+    const isAuthEndpoint =
+      path.includes('/auth/login') ||
+      path.includes('/auth/register') ||
+      path.includes('/auth/logout') ||
+      path.includes('/auth/refresh-token') ||
+      path.includes('/auth/firebase-login');
+
     const token = localStorage.getItem('token') || store.getState().userLogin?.userInfo?.token;
-    if (token) {
+    
+    // Don't attach token to auth endpoints if we are doing a fresh login or sync
+    if (token && !isAuthEndpoint) {
       config.headers.Authorization = `Bearer ${token}`;
-      console.log(`✅ API: Attached token to ${config.method?.toUpperCase()} ${config.url}`);
-    } else {
-      console.warn(`⚠️ API: No token found for ${config.method?.toUpperCase()} ${config.url}`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`✅ API: Attached token to ${config.method?.toUpperCase()} ${config.url}`);
+      }
     }
     return config;
   },
@@ -51,7 +70,8 @@ api.interceptors.response.use(
       path.includes('/auth/login') ||
       path.includes('/auth/register') ||
       path.includes('/auth/logout') ||
-      path.includes('/auth/refresh-token');
+      path.includes('/auth/refresh-token') ||
+      path.includes('/auth/firebase-login'); // ✅ Added firebase-login
 
     // Handle 401 Unauthorized (token expired)
     if (status === 401 && !originalRequest._retry && !isAuthEndpoint) {
@@ -70,6 +90,37 @@ api.interceptors.response.use(
       originalRequest._retry = true;
       isRefreshing = true;
 
+      // 1. FIREBASE AUTH REFRESH FLOW
+      if (store.getState().userLogin?.userInfo?.firebaseUid || (auth && auth.currentUser)) {
+        try {
+          console.log('🔄 API: Refreshing token via authUtils...');
+          const accessToken = await refreshFirebaseToken();
+          
+          if (!accessToken) throw new Error('Token refresh returned empty');
+
+          processQueue(null, accessToken);
+          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+          console.log('✅ API: Global refresh successful');
+          return api(originalRequest);
+        } catch (refreshErr) {
+          console.error('❌ API: Firebase Token refresh failed:', refreshErr.message);
+          store.dispatch({ type: USER_LOGOUT });
+          localStorage.removeItem('token');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('userInfo');
+          processQueue(refreshErr);
+          isRefreshing = false;
+          
+          if (!window.location.pathname.includes('/login')) {
+            window.location.href = '/login';
+          }
+          return Promise.reject(refreshErr);
+        } finally {
+          isRefreshing = false;
+        }
+      }
+
+      // 2. LEGACY JWT REFRESH FLOW FALLBACK
       const refreshToken = localStorage.getItem('refreshToken');
       if (!refreshToken) {
         console.error('❌ API: No refresh token available');
@@ -80,12 +131,10 @@ api.interceptors.response.use(
       }
 
       try {
-        console.log('🔄 API: Attempting token refresh...');
+        console.log('🔄 API: Attempting Legacy JWT token refresh...');
         
-        // Use the base URL without /api for auth endpoints
-        const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
         const res = await axios.post(
-          `${baseURL}/api/auth/refresh-token`,
+          `${API_BASE_URL}/api/auth/refresh-token`,
           { refreshToken },
           { 
             withCredentials: true,
@@ -103,24 +152,26 @@ api.interceptors.response.use(
         
         // Update Redux store if needed
         const currentState = store.getState();
-        if (currentState.userLogin.userInfo) {
+        if (currentState.userLogin && currentState.userLogin.userInfo) {
           const updatedUserInfo = { 
             ...currentState.userLogin.userInfo, 
             token: accessToken 
           };
           localStorage.setItem('userInfo', JSON.stringify(updatedUserInfo));
           store.dispatch({ 
-            type: 'USER_LOGIN_SUCCESS', 
+            type: USER_LOGIN_SUCCESS, 
             payload: updatedUserInfo 
           });
+          // Update Socket auth dynamically
+          updateSocketToken(accessToken);
         }
 
         processQueue(null, accessToken);
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-        console.log('✅ API: Token refresh successful');
+        console.log('✅ API: Legacy Token refresh successful');
         return api(originalRequest);
       } catch (refreshErr) {
-        console.error('❌ API: Token refresh failed:', refreshErr.response?.data || refreshErr.message);
+        console.error('❌ API: Legacy Token refresh failed:', refreshErr.response?.data || refreshErr.message);
         store.dispatch({ type: USER_LOGOUT });
         localStorage.removeItem('token');
         localStorage.removeItem('refreshToken');
@@ -176,8 +227,7 @@ api.interceptors.response.use(
 // Helper function to check if API is reachable
 export const checkAPIHealth = async () => {
   try {
-    const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
-    const response = await axios.get(`${baseURL}/api/health`, { timeout: 5000 });
+    const response = await axios.get(`${API_BASE_URL}/api/health`, { timeout: 5000 });
     return { 
       success: true, 
       data: response.data,

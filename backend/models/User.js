@@ -93,6 +93,14 @@ const userSchema = mongoose.Schema(
       totalEarnings: { type: Number, default: 0 },
     },
     walletBalance: { type: Number, default: 0 },
+    savedBanks: [{
+      bankName: { type: String, required: true },
+      branchName: { type: String },
+      accountNumber: { type: String, required: true },
+      ifscCode: { type: String, required: true },
+      accountHolderName: { type: String, required: true },
+      isDefault: { type: Boolean, default: false }
+    }],
     referredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     isReferralRewardClaimed: { type: Boolean, default: false },
     paymentMethods: [{

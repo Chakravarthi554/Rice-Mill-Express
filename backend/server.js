@@ -100,17 +100,18 @@ const getLocalIPs = () => {
   return results;
 };
 
+const PORT = process.env.PORT || 5000;
 const localIPs = getLocalIPs();
 console.log("\n" + "=".repeat(50));
 console.log("📡 SERVER DETECTED THESE NETWORK ADDRESSES:");
 localIPs.forEach(ip => {
-    console.log(`   👉 http://${ip}:5000`);
+    console.log(`   👉 http://${ip}:${PORT}`);
 });
 console.log("\n📱 TO FIX YOUR MOBILE APP:");
 console.log("1. Open: mobile/src/config/env.js");
 console.log("2. Copy/Paste this line:");
 if (localIPs.length > 0) {
-    console.log(`   export const API_URL = 'http://${localIPs[0]}:5000';`);
+    console.log(`   export const API_URL = 'http://${localIPs[0]}:${PORT}';`);
 } else {
     console.log("   (No external IPs found! Connect to Hotspot or WiFi)");
 }
@@ -128,8 +129,9 @@ app.use(
       "http://localhost:3000",
       "http://127.0.0.1:3000",
       "http://localhost:3001",
-      ...localIPs.map(ip => `http://${ip}:5000`),
+      ...localIPs.map(ip => `http://${ip}:${PORT}`),
       ...localIPs.map(ip => `http://${ip}:8081`),
+      ...localIPs.map(ip => `exp://${ip}:${PORT}`),
       ...localIPs.map(ip => `exp://${ip}:8081`),
       /^exp:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/,
       /^http:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/,
@@ -154,10 +156,10 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        imgSrc: ["'self'", "data:", "http://localhost:5000", "https:", "blob:", "*.loca.lt", "*.ngrok-free.app", "*.lhr.life", "*.localhost.run"],
+        imgSrc: ["'self'", "data:", `http://localhost:${PORT}`, "https:", "blob:", "*.loca.lt", "*.ngrok-free.app", "*.lhr.life", "*.localhost.run"],
         scriptSrc: ["'self'", "'unsafe-inline'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
-        connectSrc: ["'self'", "ws://localhost:5000", "http://localhost:5000", "https://*.loca.lt", "wss://*.loca.lt", "https://*.ngrok-free.app", "wss://*.ngrok-free.app", "https://*.lhr.life", "wss://*.lhr.life", "https://*.localhost.run", "wss://*.localhost.run"],
+        connectSrc: ["'self'", `ws://localhost:${PORT}`, `http://localhost:${PORT}`, "https://*.loca.lt", "wss://*.loca.lt", "https://*.ngrok-free.app", "wss://*.ngrok-free.app", "https://*.lhr.life", "wss://*.lhr.life", "https://*.localhost.run", "wss://*.localhost.run"],
       },
     },
     crossOriginEmbedderPolicy: false,

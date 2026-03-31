@@ -159,6 +159,12 @@ export const apiService = {
     getDPDashboard: () => api.get('/api/dp/dashboard'),
     generateDeliveryPaymentLink: (orderId) => api.post(`/api/delivery-partners/orders/${orderId}/generate-delivery-payment-link`),
     checkDeliveryPaymentStatus: (orderId, paymentLinkId) => api.get(`/api/delivery-partners/orders/${orderId}/check-delivery-payment/${paymentLinkId}`),
+    remitCash: () => api.post('/api/dp/remit-cash'),
+    raiseIssue: (orderId, data) => api.post(`/api/dp/raise-issue/${orderId}`, data),
+    getWalletData: () => api.get('/api/dp/wallet'),
+    requestWithdrawal: (data) => api.post('/api/dp/withdraw', data),
+    getWithdrawalHistory: () => api.get('/api/dp/withdrawals'),
+    saveBankAccount: (data) => api.post('/api/dp/saved-banks', data),
 
     // ============ Seller ============
     getSellerOrders: () => api.get('/api/seller/orders'),

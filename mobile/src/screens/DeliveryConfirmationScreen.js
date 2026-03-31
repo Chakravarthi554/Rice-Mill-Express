@@ -182,7 +182,7 @@ const DeliveryConfirmationScreen = ({ route, navigation }) => {
                     <Ionicons name="information-circle-outline" size={24} color="#6B7280" />
                     <Text style={styles.instructionText}>
                         {order.paymentMethod === 'cod' && !order.isPaid
-                            ? "Collect the remaining cash on delivery amount by showing the QR code below."
+                            ? "Collect the remaining 80% ONLY via UPI scanning the QR code below. Cash is not accepted."
                             : "Capture a photo of the item at the destination to confirm completion."}
                     </Text>
                 </View>
@@ -212,7 +212,7 @@ const DeliveryConfirmationScreen = ({ route, navigation }) => {
                                 </View>
                                 <View style={styles.waitRow}>
                                     <ActivityIndicator size="small" color="#EA580C" />
-                                    <Text style={styles.waitText}>Waiting for successful payment...</Text>
+                                    <Text style={styles.waitText}>Waiting for UPI payment verification...</Text>
                                 </View>
                             </View>
                         )}

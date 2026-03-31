@@ -283,8 +283,8 @@ const CheckoutScreen = ({ navigation }) => {
                     </View>
                     <View style={styles.summaryItem}>
                         <Text style={styles.itemText}>Delivery Fee</Text>
-                        <Text style={[styles.itemPrice, freeDelivery ? { color: '#4CAF50' } : {}]}>
-                            {freeDelivery ? 'FREE' : `₹${deliveryFee}`}
+                        <Text style={styles.itemPrice}>
+                            ₹{deliveryFee}
                         </Text>
                     </View>
 

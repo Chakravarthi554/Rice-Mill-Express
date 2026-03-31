@@ -2,6 +2,7 @@ import React, { createContext, useState, useEffect, useContext, useCallback } fr
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import axios from 'axios';
+import api from '../utils/api';
 import {
   USER_LOGIN_REQUEST,
   USER_LOGIN_SUCCESS,
@@ -177,113 +178,81 @@ export const AuthProvider = ({ children }) => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       console.log('🔥 AuthContext: Firebase Auth State Changed:', firebaseUser?.uid);
 
-      if (firebaseUser) {
-        // ✅ ROBUST GUARD: Prevent multiple fetches for the same UID
-        if (fetchingUidRef.current === firebaseUser.uid) {
-          console.log('⏩ AuthContext: Already fetching profile for UID:', firebaseUser.uid);
-          return;
-        }
+      try {
+        if (firebaseUser) {
+          // ✅ ROBUST GUARD: Prevent multiple fetches for the same UID
+          if (fetchingUidRef.current === firebaseUser.uid) {
+            console.log('⏩ AuthContext: Already fetching profile for UID:', firebaseUser.uid);
+            setLoading(false);
+            return;
+          }
 
-        // Check if we already have this user loaded
-        const storedUser = localStorage.getItem('userInfo');
-        if (storedUser) {
-          try {
-            const parsed = JSON.parse(storedUser);
-            if (parsed.uid === firebaseUser.uid && parsed.token) {
-              console.log('⏩ AuthContext: User profile already in localStorage for UID:', firebaseUser.uid);
-              // Update Redux if needed
-              if (!userInfo || userInfo.uid !== firebaseUser.uid) {
-                dispatch({ type: USER_LOGIN_SUCCESS, payload: parsed });
-                updateUser(parsed);
-              }
-              setLoading(false);
-              return;
+          // Check if we already have this user loaded
+          const storedUser = localStorage.getItem('userInfo');
+          if (storedUser) {
+            try {
+              const parsed = JSON.parse(storedUser);
+              if (parsed.uid === firebaseUser.uid && parsed.token) {
+                console.log('⏩ AuthContext: User profile already in localStorage for UID:', firebaseUser.uid);
+                  if (!userInfo || userInfo.token !== parsed.token) {
+                    dispatch({ type: USER_LOGIN_SUCCESS, payload: parsed });
+                    updateUser(parsed);
+                  }
+                  setLoading(false);
+                  return;
+                }
+            } catch (e) {
+              console.warn('⚠️ AuthContext: Failed to parse stored user, will fetch fresh');
             }
-          } catch (e) {
-            console.warn('⚠️ AuthContext: Failed to parse stored user, will fetch fresh');
-          }
-        }
-
-        // Mark this UID as being fetched
-        fetchingUidRef.current = firebaseUser.uid;
-
-        try {
-          console.log('🔄 AuthContext: Fetching profile for UID:', firebaseUser.uid);
-
-          // Get Firebase ID token
-          const idToken = await firebaseUser.getIdToken();
-          const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
-
-          console.log('📡 AuthContext: Calling API:', `${API_BASE_URL}/api/auth/firebase-login`);
-
-          // ✅ Use unified Firebase login endpoint
-          const response = await axios.post(`${API_BASE_URL}/api/auth/firebase-login`, { idToken });
-
-          console.log('📦 AuthContext: API Response received:', response.status, response.data);
-
-          const profile = response.data;
-
-          const userData = {
-            ...profile,
-            uid: firebaseUser.uid,
-            emailVerified: firebaseUser.emailVerified,
-            token: idToken
-          };
-
-          console.log('👤 AuthContext: User data prepared:', { role: userData.role, email: userData.email });
-
-          // ✅ Check email verification for sellers/customers
-          if (['seller', 'customer'].includes(userData.role) && firebaseUser.email && !firebaseUser.emailVerified) {
-            console.log(`🚫 AuthContext: ${userData.role} email not verified in Firebase`);
-            userData.requiresVerification = true;
           }
 
-          localStorage.setItem('userInfo', JSON.stringify(userData));
-          localStorage.setItem('token', userData.token);
-          axios.defaults.headers.common['Authorization'] = `Bearer ${userData.token}`;
+          // Mark this UID as being fetched
+          fetchingUidRef.current = firebaseUser.uid;
+          setLoading(true);
 
-          console.log('💾 AuthContext: Saved to localStorage');
+          try {
+            console.log('🔄 AuthContext: Fetching profile for UID:', firebaseUser.uid);
+            // ✅ Force refresh so we never send an expired token
+            const idToken = await firebaseUser.getIdToken(true);
+            
+            // ✅ Correct path: /api/auth/firebase-login (not /auth/firebase-login)
+            const response = await api.post('/api/auth/firebase-login', { idToken });
+            console.log('📦 AuthContext: Sync successful');
 
-          dispatch({ type: USER_LOGIN_SUCCESS, payload: userData });
-          updateUser(userData);
+            const userData = {
+              ...response.data,
+              uid: firebaseUser.uid,
+              token: idToken
+            };
 
-          console.log('✅ AuthContext: Profile loaded successfully, Role:', userData.role);
-
-          // Clear the fetching ref
+            localStorage.setItem('userInfo', JSON.stringify(userData));
+            localStorage.setItem('token', userData.token);
+            
+            dispatch({ type: USER_LOGIN_SUCCESS, payload: userData });
+            updateUser(userData);
+          } catch (syncError) {
+            console.error('❌ AuthContext: Sync failed:', syncError.message);
+            const errMsg = syncError.response?.data?.message || syncError.message || 'Login synchronization failed';
+            dispatch({ type: USER_LOGIN_FAIL, payload: errMsg });
+            setUser(firebaseUser); // Fallback to raw firebase user
+          } finally {
+            fetchingUidRef.current = null;
+          }
+        } else {
+          console.log('❌ AuthContext: No Firebase user');
+          setUser(null);
           fetchingUidRef.current = null;
-        } catch (error) {
-          console.error('❌ AuthContext: Error fetching profile:', error);
-          console.error('❌ AuthContext: Error details:', {
-            message: error.message,
-            response: error.response?.data,
-            status: error.response?.status
-          });
-
-          // Clear the fetching ref on error too
-          fetchingUidRef.current = null;
-
-          // Set user-visible error message
-          const errorMsg = error.response?.data?.message || error.message || 'Failed to load user profile';
-          setMessage(errorMsg);
-
-          // If user not found in MongoDB, they need to complete registration
-          if (error.response?.status === 404) {
-            console.log('⚠️ AuthContext: User not found in MongoDB');
-            setMessage('Account not found. Please register first.');
-            // Sign out from Firebase to allow re-registration
-            await auth.signOut();
-          } else if (error.response?.status === 401) {
-            console.log('⚠️ AuthContext: Authentication failed');
-            setMessage('Authentication failed. Please try logging in again.');
-            await auth.signOut();
+          if (userInfo) {
+             dispatch({ type: USER_LOGOUT });
           }
+          localStorage.removeItem('userInfo');
+          localStorage.removeItem('token');
         }
-      } else {
-        console.log('❌ AuthContext: No Firebase user found');
-        // Clear the ref when user logs out
-        fetchingUidRef.current = null;
+      } catch (globalError) {
+        console.error('❌ AuthContext Global Error:', globalError);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();
@@ -301,39 +270,6 @@ export const AuthProvider = ({ children }) => {
     }
   }, [dispatch, updateUser, user, userInfo]);
 
-  // Response interceptor for token refresh
-  useEffect(() => {
-    const interceptor = axios.interceptors.response.use(
-      (response) => response,
-      async (error) => {
-        const originalRequest = error.config;
-
-        if (error.response?.status === 401 && !originalRequest._retry) {
-          console.log('🔐 AuthContext: 401 detected in interceptor, refreshing token...');
-          originalRequest._retry = true;
-          const newToken = await refreshToken();
-          if (newToken) {
-            originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
-            return axios(originalRequest);
-          } else {
-            // Refresh failed, logout user
-            logout(false);
-            return Promise.reject(error);
-          }
-        }
-
-        // Handle 404 errors for missing endpoints gracefully
-        if (error.response?.status === 404) {
-          console.warn('⚠️ API endpoint not found:', originalRequest.url);
-          // Don't throw for 404s, let components handle them
-        }
-
-        return Promise.reject(error);
-      }
-    );
-
-    return () => axios.interceptors.response.eject(interceptor);
-  }, [refreshToken, logout]);
 
   // Redirect logic
   useEffect(() => {

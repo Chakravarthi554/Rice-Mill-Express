@@ -321,7 +321,7 @@ const firebaseLogin = asyncHandler(async (req, res) => {
       user = await User.create({
         name: name || email?.split('@')[0] || phone_number || 'User',
         email: email || null,
-        phone: sanitisedPhone || null,
+        phone: sanitisedPhone || undefined,
         firebaseUid: uid,
         role: 'customer', // Default role - ALWAYS from MongoDB
         isVerified: email_verified || false,

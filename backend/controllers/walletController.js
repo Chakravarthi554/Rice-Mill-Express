@@ -7,7 +7,7 @@ const WithdrawalRequest = require('../models/WithdrawalRequest');
 // @route   GET /api/rewards/wallet
 // @access  Private
 const getWalletData = asyncHandler(async (req, res) => {
-    const user = await User.findById(req.user._id).select('walletBalance referralStats');
+    const user = await User.findById(req.user._id).select('walletBalance referralStats savedBanks');
 
     const transactions = await WalletTransaction.find({ user: req.user._id })
         .sort({ createdAt: -1 })
@@ -16,6 +16,7 @@ const getWalletData = asyncHandler(async (req, res) => {
     res.json({
         balance: user.walletBalance || 0,
         stats: user.referralStats,
+        savedBanks: user.savedBanks || [],
         transactions
     });
 });
@@ -38,11 +39,19 @@ const requestWithdrawal = asyncHandler(async (req, res) => {
         throw new Error('Insufficient wallet balance');
     }
 
-    // Create withdrawal request
-    const withdrawal = await WithdrawalRequest.create({
-        user: req.user._id,
+    const Payout = require('../models/payoutModel');
+
+    // Create withdrawal request using Payout model for Admin dashboard visibility
+    const withdrawal = await Payout.create({
+        seller: req.user._id,
         amount,
-        bankDetails,
+        bankDetailsSnapshot: {
+            accountHolderName: bankDetails.accountHolderName,
+            accountNumber: bankDetails.accountNumber,
+            ifsc: bankDetails.ifscCode,
+            bankName: bankDetails.bankName,
+            branch: bankDetails.branchName,
+        },
         status: 'pending'
     });
 
@@ -73,14 +82,55 @@ const requestWithdrawal = asyncHandler(async (req, res) => {
 // @route   GET /api/rewards/withdrawals
 // @access  Private
 const getWithdrawalHistory = asyncHandler(async (req, res) => {
-    const withdrawals = await WithdrawalRequest.find({ user: req.user._id })
+    const Payout = require('../models/payoutModel');
+    const withdrawals = await Payout.find({ seller: req.user._id })
         .sort({ createdAt: -1 });
 
     res.json(withdrawals);
 });
 
+// @desc    Save a new bank account
+// @route   POST /api/dp/saved-banks
+// @access  Private
+const saveBankAccount = asyncHandler(async (req, res) => {
+    const { bankName, branchName, accountNumber, ifscCode, accountHolderName, isDefault } = req.body;
+
+    if (!bankName || !accountNumber || !ifscCode || !accountHolderName) {
+        res.status(400);
+        throw new Error('Please provide all required bank details');
+    }
+
+    const user = await User.findById(req.user._id);
+
+    // If making default, unset others
+    if (isDefault && user.savedBanks && user.savedBanks.length > 0) {
+        user.savedBanks.forEach(bank => bank.isDefault = false);
+    }
+
+    // If first bank, make it default
+    const setAsDefault = isDefault || !user.savedBanks || user.savedBanks.length === 0;
+
+    user.savedBanks.push({
+        bankName,
+        branchName: branchName || '',
+        accountNumber,
+        ifscCode,
+        accountHolderName,
+        isDefault: setAsDefault
+    });
+
+    await user.save();
+
+    res.status(201).json({
+        success: true,
+        message: 'Bank account saved successfully',
+        savedBanks: user.savedBanks
+    });
+});
+
 module.exports = {
     getWalletData,
     requestWithdrawal,
-    getWithdrawalHistory
+    getWithdrawalHistory,
+    saveBankAccount
 };

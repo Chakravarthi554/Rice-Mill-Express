@@ -157,6 +157,24 @@ const updatePayoutStatus = asyncHandler(async (req, res) => {
     throw new Error('Payout request not found');
   }
 
+  if (payout.status !== 'completed' && status === 'completed') {
+    const admin = await User.findOne({ role: 'admin' });
+    if (admin) {
+        admin.walletBalance -= payout.amount;
+        await admin.save();
+        
+        const WalletTransaction = require('../models/WalletTransaction');
+        await WalletTransaction.create({
+            user: admin._id,
+            amount: -payout.amount,
+            type: 'withdrawal',
+            status: 'completed',
+            description: `Processed payout #${payout._id.toString().slice(-6)}`,
+            balanceAfter: admin.walletBalance
+        });
+    }
+  }
+
   payout.status = status || 'completed';
   if (transactionId) payout.transactionId = transactionId;
   if (processingNotes) payout.processingNotes = processingNotes;

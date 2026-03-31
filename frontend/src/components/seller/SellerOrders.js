@@ -314,7 +314,7 @@ const SellerOrders = () => {
                     <Box sx={{ mt: 1 }}>
                       <Typography variant="subtitle2">Proof Photo:</Typography>
                       <img
-                        src={`http://localhost:5001${selectedOrder.replacementPhotoUrl}`}
+                        src={`${(process.env.REACT_APP_API_URL || 'http://localhost:5001').replace(/\/api\/?$/, '')}${selectedOrder.replacementPhotoUrl}`}
                         alt="Damage Proof"
                         style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 4, marginTop: 4 }}
                       />

@@ -66,7 +66,16 @@ export default function OrdersScreen({ navigation }) {
 
     const filteredOrders = filter === 'all' ? orders : orders.filter(o => o.orderStatus === filter);
 
-    const formatDate = (ds) => new Date(ds).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    const formatDate = (ds) => {
+        try {
+            if (!ds) return 'N/A';
+            const d = new Date(ds);
+            if (isNaN(d.getTime())) return String(ds).substring(0, 10);
+            return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+        } catch (e) {
+            return String(ds).substring(0, 10);
+        }
+    };
 
     const renderOrder = ({ item }) => {
         const status = STATUS_CONFIG[item.orderStatus] || STATUS_CONFIG['pending'];
@@ -106,7 +115,7 @@ export default function OrdersScreen({ navigation }) {
                         )}
                         <Text style={styles.itemCount}>{item.orderItems?.length || 1} item{item.orderItems?.length !== 1 ? 's' : ''}</Text>
                     </View>
-                    <Text style={styles.orderTotal}>₹{item.totalPrice}</Text>
+                    <Text style={styles.orderTotal}>₹{item.finalPaidAmount || item.totalPrice}</Text>
                 </View>
 
                 {/* Footer Action */}

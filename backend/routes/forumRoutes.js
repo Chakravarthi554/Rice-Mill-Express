@@ -64,6 +64,7 @@ router.get('/:id', getPostById);
 router.post('/', protect, applyPostLimiter, createPost);
 router.post('/:id/reply', protect, replyToPost);
 router.post('/:id/like', protect, likePost);
+router.post('/:id/share', sharePost); // Allow public share count increment
 router.post('/:id/report', protect, reportPost);
 router.delete('/:id', protect, deletePost); // Allow post owners to delete their own posts
 

@@ -1000,7 +1000,7 @@ const generateDeliveryPaymentLink = asyncHandler(async (req, res) => {
       amount: Math.round(amountToCollect * 100),
       currency: "INR",
       accept_partial: false,
-      description: `Delivery Payment for Order #${order._id.toString().slice(-6)}`,
+      description: `PAYMENT FOR RICE MILL: ₹${amountToCollect} (STRICTLY UPI ONLY)`,
       customer: {
         name: order.user?.name || "Customer",
         email: order.user?.email || "customer@example.com",
@@ -1009,7 +1009,8 @@ const generateDeliveryPaymentLink = asyncHandler(async (req, res) => {
       notify: { sms: false, email: false },
       notes: {
         order_id: order._id.toString(),
-        type: 'delivery_cod'
+        type: 'delivery_cod',
+        instruction: 'STRICTLY_UPI'
       }
     });
 

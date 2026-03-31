@@ -39,7 +39,8 @@ export default function HomeScreen({ navigation }) {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    const [activeCategory, setActiveCategory] = useState('basmati');
+    const [activeCategory, setActiveCategory] = useState('');
+    const [userAddress, setUserAddress] = useState(null);
     const dispatch = useDispatch();
     const flashTimer = useCountdown(2 * 3600 + 14 * 60 + 22);
 
@@ -49,19 +50,23 @@ export default function HomeScreen({ navigation }) {
     const cartCount = (cart?.cartItems || []).reduce((s, i) => s + (i.qty || 1), 0);
 
 
-    useEffect(() => { fetchProducts(); dispatch(getWishlist()); dispatch(getCart()); }, [dispatch]);
+    useEffect(() => { fetchEverything(); dispatch(getWishlist()); dispatch(getCart()); }, [dispatch]);
 
-    const fetchProducts = async () => {
+    const fetchEverything = async () => {
         try {
             setLoading(true);
             const response = await apiService.getProducts();
             setProducts(response.data.products || []);
+            const addrRes = await apiService.getAddresses();
+            if (addrRes.data && addrRes.data.length > 0) {
+                setUserAddress(addrRes.data[0]);
+            }
         } catch (e) {
-            console.error('Error fetching products:', e);
+            console.error('Error fetching data:', e);
         } finally { setLoading(false); setRefreshing(false); }
     };
 
-    const onRefresh = () => { setRefreshing(true); fetchProducts(); };
+    const onRefresh = () => { setRefreshing(true); fetchEverything(); };
 
     const isWishlisted = (id) => wishlistItems.some(x => (x._id || x) === id);
     const toggleWishlist = (product) => {
@@ -72,7 +77,17 @@ export default function HomeScreen({ navigation }) {
     const handleAddToCart = (productId) => dispatch(addToCart(productId, 1));
     const handleNavigation = (id) => navigation.navigate('ProductDetail', { productId: id });
 
-    const filteredProducts = products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    // Sort by active category first, then filter by search
+    const sortedProducts = [...products].sort((a, b) => {
+        if (!activeCategory) return 0;
+        const isACat = a.category?.toLowerCase() === activeCategory.toLowerCase() || a.name?.toLowerCase().includes(activeCategory.toLowerCase());
+        const isBCat = b.category?.toLowerCase() === activeCategory.toLowerCase() || b.name?.toLowerCase().includes(activeCategory.toLowerCase());
+        if (isACat && !isBCat) return -1;
+        if (!isACat && isBCat) return 1;
+        return 0;
+    });
+
+    const filteredProducts = sortedProducts.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
     const getImageUri = (item) => {
         const img = item.images?.[0];
@@ -150,7 +165,9 @@ export default function HomeScreen({ navigation }) {
                     <View style={{ flex: 1, marginLeft: 10 }}>
                         <Text style={styles.deliveryLabel}>Delivering to</Text>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Text style={styles.locationText} numberOfLines={1}>Home - 12B, Green Valley Apts...</Text>
+                            <Text style={styles.locationText} numberOfLines={1}>
+                                {userAddress ? `${userAddress.houseNumber || ''} ${userAddress.street || ''}, ${userAddress.city || ''}` : 'Select Delivery Location'}
+                            </Text>
                             <Feather name="chevron-down" size={14} color="#111827" style={{ marginLeft: 4 }} />
                         </View>
                     </View>

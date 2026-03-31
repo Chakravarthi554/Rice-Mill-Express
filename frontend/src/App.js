@@ -7,7 +7,7 @@ import {
   CssBaseline,
 } from '@mui/material';
 import { useSelector } from 'react-redux';
-import { AuthProvider } from './context/AuthContext';
+
 import { ThemeProvider as CustomThemeProvider } from './context/ThemeContext';
 import { I18nProvider } from './context/i18nContext';
 import ProtectedRoute from './components/common/RoleRoute';
@@ -170,7 +170,6 @@ function App() {
       <CssBaseline />
       <CustomThemeProvider>
         <I18nProvider>
-          <AuthProvider>
             <SocketInitializer />
             <Routes>
 
@@ -294,7 +293,6 @@ function App() {
               <Route path="/" element={<LoginPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
-          </AuthProvider>
         </I18nProvider>
       </CustomThemeProvider>
     </ThemeProvider>

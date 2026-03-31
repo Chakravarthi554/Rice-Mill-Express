@@ -26,7 +26,7 @@ import {
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip,
     ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell
 } from 'recharts';
-import axios from 'axios';
+import api from '../../utils/api';
 import { formatDistanceToNow } from 'date-fns';
 
 const COLORS = ['#4caf50', '#ff9800', '#f44336']; // Positive, Neutral, Negative
@@ -45,20 +45,16 @@ const RecipeEngagementDashboard = ({ sellerId, recipes = [] }) => {
     const { userInfo } = useSelector((state) => state.userLogin);
 
     const fetchData = useCallback(async () => {
-        if (!userInfo?.token) return;
+        if (!userInfo) return;
 
         try {
             setLoading(true);
             setError(null);
 
-            const config = {
-                headers: { Authorization: `Bearer ${userInfo.token}` }
-            };
-
             const [ov, tr, ac] = await Promise.all([
-                axios.get('/api/seller/engagement/overview', config),
-                axios.get('/api/seller/engagement/trends?period=7days', config),
-                axios.get('/api/seller/engagement/activity', config)
+                api.get('/api/seller/engagement/overview'),
+                api.get('/api/seller/engagement/trends?period=7days'),
+                api.get('/api/seller/engagement/activity')
             ]);
 
             setOverview(ov.data);
@@ -72,7 +68,7 @@ const RecipeEngagementDashboard = ({ sellerId, recipes = [] }) => {
         } finally {
             setLoading(false);
         }
-    }, [userInfo?.token]);
+    }, [userInfo]);
 
     useEffect(() => {
         fetchData();
@@ -406,25 +402,30 @@ const RecipeEngagementDashboard = ({ sellerId, recipes = [] }) => {
                         </Grid>
                     ) : recipes.map(recipe => (
                         <Grid item xs={12} sm={6} md={4} key={recipe._id}>
-                            <Card sx={{ transition: 'transform 0.2s', '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 } }}>
+                            <Card sx={{ transition: 'transform 0.2s', '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 }, borderRadius: 3, border: '1px solid #F3F4F6' }}>
                                 <CardContent>
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                                        <Typography variant="subtitle1" fontWeight="bold" noWrap sx={{ maxWidth: '80%' }}>
-                                            {recipe.title}
-                                        </Typography>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                                        <Box>
+                                            <Typography variant="subtitle1" fontWeight={800} sx={{ lineHeight: 1.2, mb: 0.5 }}>
+                                                {recipe.title}
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary">
+                                                Submitted: {new Date(recipe.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                            </Typography>
+                                        </Box>
                                         <Tooltip title="Detailed Analytics">
-                                            <IconButton size="small" color="primary">
-                                                <DetailsIcon />
+                                            <IconButton size="small" color="primary" sx={{ bgcolor: 'rgba(59, 130, 246, 0.05)' }}>
+                                                <DetailsIcon fontSize="small" />
                                             </IconButton>
                                         </Tooltip>
                                     </Box>
-                                    <Divider sx={{ mb: 2 }} />
+                                    <Divider sx={{ my: 1.5, opacity: 0.6 }} />
                                     <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
                                         <Box>
-                                            <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 0.5 }}>Rating</Typography>
+                                            <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 0.3, fontWeight: 600 }}>Rating</Typography>
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                                 <StarIcon sx={{ fontSize: 16, color: '#ffc107' }} />
-                                                <Typography variant="body2" fontWeight="bold">
+                                                <Typography variant="body2" fontWeight={700}>
                                                     {recipe.averageRating?.toFixed(1) || '0.0'}
                                                     <Typography component="span" variant="caption" color="textSecondary" sx={{ fontWeight: 'normal', ml: 0.5 }}>
                                                         ({recipe.numReviews || 0})
@@ -433,24 +434,24 @@ const RecipeEngagementDashboard = ({ sellerId, recipes = [] }) => {
                                             </Box>
                                         </Box>
                                         <Box>
-                                            <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 0.5 }}>Likes</Typography>
+                                            <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 0.3, fontWeight: 600 }}>Likes</Typography>
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                                 <LikeIcon sx={{ fontSize: 16, color: '#f44336' }} />
-                                                <Typography variant="body2" fontWeight="bold">{recipe.likesCount || 0}</Typography>
+                                                <Typography variant="body2" fontWeight={700}>{recipe.likesCount || 0}</Typography>
                                             </Box>
                                         </Box>
                                         <Box>
-                                            <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 0.5 }}>Comments</Typography>
+                                            <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 0.3, fontWeight: 600 }}>Comments</Typography>
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                <CommentIcon sx={{ fontSize: 16, color: theme.palette.secondary.main }} />
-                                                <Typography variant="body2" fontWeight="bold">{recipe.commentsCount || 0}</Typography>
+                                                <CommentIcon sx={{ fontSize: 16, color: '#8B5CF6' }} />
+                                                <Typography variant="body2" fontWeight={700}>{recipe.commentsCount || 0}</Typography>
                                             </Box>
                                         </Box>
                                         <Box>
-                                            <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 0.5 }}>Shares</Typography>
+                                            <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 0.3, fontWeight: 600 }}>Shares</Typography>
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                <ShareIcon sx={{ fontSize: 16, color: theme.palette.info.main }} />
-                                                <Typography variant="body2" fontWeight="bold">{recipe.sharesCount || 0}</Typography>
+                                                <ShareIcon sx={{ fontSize: 16, color: '#3B82F6' }} />
+                                                <Typography variant="body2" fontWeight={700}>{recipe.sharesCount || 0}</Typography>
                                             </Box>
                                         </Box>
                                     </Box>

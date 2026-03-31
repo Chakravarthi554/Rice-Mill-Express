@@ -26,6 +26,8 @@ import { useSelector, useDispatch } from 'react-redux';
 import { getCurrentSocket, setupSocialListeners } from '../../utils/socket';
 import { motion, AnimatePresence } from 'framer-motion';
 
+import api from '../../utils/api';
+
 const NotificationBadge = () => {
   const [anchorEl, setAnchorEl] = useState(null);
   const [notifications, setNotifications] = useState([]);
@@ -81,20 +83,13 @@ const NotificationBadge = () => {
 
   const fetchNotifications = async () => {
     try {
-      if (!userInfo?.token) return;
+      if (!userInfo) return;
 
-      const response = await fetch('/api/notifications?limit=10', {
-        headers: {
-          'Authorization': `Bearer ${userInfo.token}`
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setNotifications(data.notifications || []);
-          setUnreadCount(data.unreadCount || 0);
-        }
+      const { data } = await api.get('/notifications?limit=10');
+      
+      if (data.success) {
+        setNotifications(data.notifications || []);
+        setUnreadCount(data.unreadCount || 0);
       }
     } catch (error) {
       console.error('Error fetching notifications:', error);
@@ -114,15 +109,9 @@ const NotificationBadge = () => {
 
   const markAllAsRead = async () => {
     try {
-      if (!userInfo?.token) return;
+      if (!userInfo) return;
 
-      await fetch('/api/notifications/read-all', {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${userInfo.token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      await api.put('/notifications/read-all');
     } catch (error) {
       console.error('Error marking notifications as read:', error);
     }

@@ -1344,6 +1344,37 @@ const getUserBookmarks = asyncHandler(async (req, res) => {
   }
 });
 
+// ✅ NEW: Increment share count
+const sharePost = asyncHandler(async (req, res) => {
+  try {
+    const post = await ForumPost.findByIdAndUpdate(
+      req.params.id,
+      { $inc: { sharesCount: 1 } },
+      { new: true }
+    );
+    if (!post) return res.status(404).json({ message: 'Post not found' });
+
+    if (req.io) {
+      req.io.to(`forum_${post._id}`).emit('SOCIAL_UPDATE', {
+        type: 'SHARE',
+        itemId: post._id,
+        itemType: 'forum',
+        sharesCount: post.sharesCount
+      });
+      req.io.emit('SOCIAL_UPDATE', {
+        type: 'SHARE',
+        itemId: post._id,
+        itemType: 'forum',
+        sharesCount: post.sharesCount
+      });
+    }
+
+    res.json({ success: true, sharesCount: post.sharesCount });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error incrementing share count' });
+  }
+});
+
 module.exports = {
   createPost,
   getPosts,
@@ -1369,6 +1400,7 @@ module.exports = {
   // Bookmark functions
   bookmarkPost,
   getUserBookmarks,
+  sharePost,
   customerLimiter,
   sellerLimiter
 };

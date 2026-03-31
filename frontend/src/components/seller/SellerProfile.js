@@ -18,7 +18,7 @@ import {
   Settings as SettingsIcon,
   Person as PersonIcon
 } from '@mui/icons-material';
-import { updateSellerProfile } from '../../redux/actions/userActions';
+import { updateSellerProfile, getUserDetails } from '../../redux/actions/userActions';
 import FileUpload from '../common/FileUpload';
 import Message from '../common/Message';
 
@@ -49,23 +49,28 @@ const SellerProfile = () => {
   });
 
   useEffect(() => {
-    if (userInfo) {
+    dispatch(getUserDetails('profile'));
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (userInfo || updatedUserInfo) {
+      const user = updatedUserInfo || userInfo;
       setProfileData({
-        businessName: userInfo.businessDetails?.businessName || '',
-        businessType: userInfo.businessDetails?.businessType || '',
-        gstNumber: userInfo.businessDetails?.gstNumber || '',
-        panNumber: userInfo.businessDetails?.panNumber || '',
-        address: userInfo.businessDetails?.address || { street: '', city: '', state: '', pinCode: '' },
-        phone: userInfo.phone || '',
-        email: userInfo.email || '',
-        profileImage: userInfo.profileImage || '/uploads/default_avatar.jpg',
-        productAvailability: userInfo.productAvailability !== false,
-        notificationEnabled: userInfo.notificationEnabled !== false,
-        bankAccount: userInfo.businessDetails?.bankAccount || { accountNumber: '', ifscCode: '', accountHolderName: '' },
-        integrations: userInfo.integrations || { amazon: '', zepto: '', flipkart: '' },
+        businessName: user.businessDetails?.businessName || '',
+        businessType: user.businessDetails?.businessType || '',
+        gstNumber: user.businessDetails?.gstNumber || '',
+        panNumber: user.businessDetails?.panNumber || '',
+        address: user.businessDetails?.address || { street: '', city: '', state: '', pinCode: '' },
+        phone: user.phone || '',
+        email: user.email || '',
+        profileImage: user.profileImage || '/uploads/default_avatar.jpg',
+        productAvailability: user.productAvailability !== false,
+        notificationEnabled: user.notificationEnabled !== false,
+        bankAccount: user.businessDetails?.bankAccount || { accountNumber: '', ifscCode: '', accountHolderName: '' },
+        integrations: user.integrations || { amazon: '', zepto: '', flipkart: '' },
       });
     }
-  }, [userInfo]);
+  }, [userInfo, updatedUserInfo]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;

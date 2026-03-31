@@ -29,8 +29,7 @@ const {
     confirmCOD,
     uploadDeliveryPhotoAndComplete,
     requestReplacement,
-    requestWithdrawal,
-    getWithdrawalHistory,
+    remitCash,
 } = require('../controllers/deliveryPartnerController.js');
 
 const {
@@ -44,6 +43,12 @@ const {
     updateActivity,
     registerFCMToken,
 } = require('../controllers/deliveryPartnerSupportController.js');
+const {
+    getWalletData,
+    requestWithdrawal,
+    getWithdrawalHistory,
+    saveBankAccount,
+} = require('../controllers/walletController.js');
 
 // Dashboard & Orders
 router.get('/dashboard', protect, role('deliveryPartner'), getDashboard);
@@ -68,6 +73,7 @@ router.post(
     upload.single('replacementPhoto'),
     requestReplacement
 );
+router.post('/remit-cash', protect, role('deliveryPartner'), remitCash);
 
 // History & Profile
 router.get('/history', protect, role('deliveryPartner'), getHistory);
@@ -77,6 +83,12 @@ router.put('/profile', protect, role('deliveryPartner'), updateProfile);
 // Device Management
 router.get('/devices', protect, role('deliveryPartner'), getDevices);
 router.post('/logout-all', protect, role('deliveryPartner'), logoutAllDevices);
+
+// Wallet & Withdrawals
+router.get('/wallet', protect, role('deliveryPartner'), getWalletData);
+router.post('/withdraw', protect, role('deliveryPartner'), requestWithdrawal);
+router.get('/withdrawals', protect, role('deliveryPartner'), getWithdrawalHistory);
+router.post('/saved-banks', protect, role('deliveryPartner'), saveBankAccount);
 
 // Support & Safety
 router.post('/emergency-alert', protect, role('deliveryPartner'), sendEmergencyAlert);

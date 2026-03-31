@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, SafeAreaView, Switch, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, SafeAreaView, Switch, Image, Linking, Platform } from 'react-native';
 import { useSelector } from 'react-redux';
 import { MaterialIcons, Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { apiService } from '../services/api';
@@ -11,8 +11,11 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
         totalOrders: 0,
         todayOrders: 0,
         activeOrders: 0,
+        totalOrdersCount: 0,
         totalEarnings: 0,
-        todayEarnings: 0
+        todayEarnings: 0,
+        floatingCash: 0,
+        walletBalance: 0
     });
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
@@ -23,9 +26,13 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
     const fetchDashboardData = async () => {
         try {
             setLoading(true);
-            const [ordersRes, statsRes] = await Promise.all([
+            const [ordersRes, statsRes, walletRes] = await Promise.all([
                 apiService.getAssignedOrders(),
-                apiService.getDPDashboard()
+                apiService.getDPDashboard(),
+                apiService.getWalletData().catch(err => {
+                    console.log('Wallet fetch warning:', err.message);
+                    return { data: { balance: 0 } };
+                })
             ]);
 
             let ordersData = [];
@@ -36,18 +43,29 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
             }
             setOrders(ordersData);
 
-            if (statsRes.data && statsRes.data.success && statsRes.data.stats) {
+            if (statsRes.data && statsRes.data.stats) {
                 const s = statsRes.data.stats;
                 setStats({
                     totalOrders: s.totalDeliveries || 0,
                     todayOrders: s.todayOrders || 0,
                     activeOrders: s.activeDeliveries || 0,
+                    totalOrdersCount: s.totalOrdersCount || 0,
                     totalEarnings: s.totalEarnings || 0,
-                    todayEarnings: s.todayEarnings || 0
+                    todayEarnings: s.todayEarnings || 0,
+                    floatingCash: s.floatingCash || 0,
+                    walletBalance: walletRes.data?.balance || 0
                 });
             }
         } catch (error) {
             console.error('Error fetching dashboard data:', error);
+            // Don't show alert on every interval refresh to avoid spamming, 
+            // but for the initial load it's helpful.
+            if (!refreshing) {
+                // Silent failure for periodic updates is often better in mobile,
+                // but let's log the full URL to help debug
+                const fullUrl = error.config ? `${error.config.baseURL}${error.config.url}` : 'unknown';
+                console.log(`❌ Dashboard fetch failed for: ${fullUrl}`);
+            }
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -72,11 +90,115 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
     }, [orders]);
 
     const handleCall = (phone) => {
-        Alert.alert('Calling', phone || 'Customer phone unavailable');
+        if (!phone) {
+            Alert.alert('Error', 'Customer phone number unavailable');
+            return;
+        }
+        Linking.openURL(`tel:${phone}`).catch(err => {
+            console.error('Error opening dialer:', err);
+            Alert.alert('Error', 'Could not open phone dialer');
+        });
     };
 
     const handleNavigate = (address) => {
-        Alert.alert('Navigating', 'Opening maps to: ' + address?.street);
+        if (!address || (!address.street && !address.city)) {
+            Alert.alert('Error', 'Address location unavailable');
+            return;
+        }
+        
+        const fullAddress = `${address.houseNumber || ''} ${address.street || ''}, ${address.city || ''}, ${address.state || ''} ${address.pinCode || ''}`;
+        const encodedAddress = encodeURIComponent(fullAddress);
+        
+        let url = Platform.select({
+            ios: `maps:0,0?q=${encodedAddress}`,
+            android: `geo:0,0?q=${encodedAddress}`,
+        });
+
+        // Fallback to google maps url
+        const webUrl = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
+
+        Linking.canOpenURL(url).then(supported => {
+            if (supported) {
+                Linking.openURL(url);
+            } else {
+                Linking.openURL(webUrl);
+            }
+        }).catch(err => {
+            console.error('Error opening maps:', err);
+            Linking.openURL(webUrl);
+        });
+    };
+
+    const handleRemitNow = async () => {
+        if (stats.floatingCash <= 0) {
+            Alert.alert('No Cash', 'You have no floating cash to remit.');
+            return;
+        }
+
+        Alert.alert(
+            'Remit COD Cash',
+            `Are you sure you want to remit ₹${stats.floatingCash} collected from COD orders?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Yes, Remit',
+                    onPress: async () => {
+                        try {
+                            setLoading(true);
+                            const res = await apiService.remitCash();
+                            if (res.data && res.data.success) {
+                                Alert.alert('Success', res.data.message || 'Remittance completed successfully');
+                                fetchDashboardData();
+                            }
+                        } catch (error) {
+                            console.error('Remittance error:', error);
+                            Alert.alert('Error', error.response?.data?.message || 'Failed to process remittance');
+                        } finally {
+                            setLoading(false);
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    const handleRaiseIssue = (orderId) => {
+        if (!orderId) {
+            Alert.alert('Error', 'Please select an order first');
+            return;
+        }
+        
+        Alert.alert(
+            'Report Problem',
+            'What is the issue with this delivery?',
+            [
+                { text: 'Customer Not Home', onPress: () => submitIssue(orderId, 'Customer Not Home') },
+                { text: 'Location Wrong', onPress: () => submitIssue(orderId, 'Location Wrong') },
+                { text: 'Order Damaged', onPress: () => submitIssue(orderId, 'Order Damaged') },
+                { text: 'Cancel', style: 'cancel' }
+            ]
+        );
+    };
+
+    const submitIssue = async (orderId, reason) => {
+        try {
+            setLoading(true);
+            await apiService.raiseIssue(orderId, {
+                issueType: reason,
+                description: `Issue reported by partner: ${reason}`
+            });
+            Alert.alert('Success', 'Problem reported to supervisor');
+        } catch (error) {
+            Alert.alert('Error', 'Could not report problem');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleViewDetails = (orderId) => {
+        if (orderId) {
+            navigation.navigate('OrderDetails', { orderId });
+        }
     };
 
     return (
@@ -92,13 +214,15 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
                         <Text style={styles.headerSubtitle}>Delivery Partner • DP-2403-001</Text>
                     </View>
                 </View>
-                <View style={styles.headerRight}>
+                <TouchableOpacity style={styles.headerRight} onPress={() => navigation.navigate('DeliveryProfile')}>
                     <View style={styles.onlineBadge}>
                         <View style={styles.onlineDot} />
-                        <Text style={styles.onlineText}>Online</Text>
+                        <Text style={styles.onlineText}>Working</Text>
                     </View>
-                    <View style={styles.profilePicPlaceholder} />
-                </View>
+                    <View style={styles.profilePicPlaceholder}>
+                        <Ionicons name="person" size={20} color="#666" />
+                    </View>
+                </TouchableOpacity>
             </View>
 
             <ScrollView 
@@ -106,13 +230,22 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Today's Earnings Card */}
+                {/* Earnings & Wallet Card */}
                 <View style={styles.card}>
                     <View style={styles.earningsHeader}>
                         <View>
-                            <Text style={styles.cardSubtitle}>TODAY'S EARNINGS</Text>
-                            <Text style={styles.earningsAmount}>₹{stats.todayEarnings || 1250}</Text>
-                            <Text style={styles.earningsDetails}>{stats.todayOrders || 8} deliveries • 4 CODs</Text>
+                            <Text style={styles.cardSubtitle}>MY EARNINGS TODAY & WALLET</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 4 }}>
+                                <Text style={styles.earningsAmount}>₹{stats.todayEarnings || 0}</Text>
+                                <Text style={{ fontSize: 13, color: '#6B7280', marginLeft: 8 }}>Today</Text>
+                            </View>
+                            
+                            <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 8 }}>
+                                <Text style={[styles.earningsAmount, { color: '#4F46E5', fontSize: 24 }]}>₹{stats.walletBalance || 0}</Text>
+                                <Text style={{ fontSize: 13, color: '#6B7280', marginLeft: 8 }}>To Withdraw</Text>
+                            </View>
+                            
+                            <Text style={[styles.earningsDetails, { marginTop: 8 }]}>{stats.todayOrders || 0} assigned • {stats.totalOrders || 0} delivered all-time</Text>
                         </View>
                         <View style={styles.ratingBox}>
                             <Text style={styles.ratingLabel}>Rating</Text>
@@ -120,11 +253,17 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
                         </View>
                     </View>
                     <View style={styles.earningsActions}>
-                        <TouchableOpacity style={styles.btnBlue}>
-                            <Text style={styles.btnBlueText}>View Details</Text>
+                         <TouchableOpacity style={styles.btnBlue} onPress={() => navigation.navigate('DeliveryHistory')}>
+                            <Text style={styles.btnBlueText}>My Work History</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.btnOutlineIcon}>
+                        <TouchableOpacity style={styles.btnOutlineIcon} onPress={() => navigation.navigate('DeliveryHistory')}>
                             <Ionicons name="chevron-forward" size={20} color="#666" />
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                            style={[styles.btnGreenIcon, { marginLeft: 8, paddingHorizontal: 16 }]} 
+                            onPress={() => navigation.navigate('Withdraw')}
+                        >
+                            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>Withdraw Money</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -133,25 +272,25 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
                 <View style={styles.card}>
                     <View style={styles.floatingHeader}>
                         <View>
-                            <Text style={styles.cardSubtitle}>FLOATING CASH</Text>
-                            <Text style={styles.floatingAmount}>₹4,250</Text>
+                             <Text style={styles.cardSubtitle}>CASH TO PAY BACK</Text>
+                            <Text style={{ ...styles.floatingAmount, color: '#EA580C' }}>₹{stats.floatingCash || 0}</Text>
                         </View>
                         <View style={styles.progressTextContainer}>
-                            <Text style={styles.progressLabel}>Progress</Text>
-                            <Text style={styles.progressValue}>85%</Text>
+                            <Text style={styles.progressLabel}>My Limit</Text>
+                            <Text style={styles.progressValue}>{Math.min(100, Math.round(((stats.floatingCash || 0) / 5000) * 100))}%</Text>
                         </View>
                     </View>
-                    <Text style={styles.limitText}>Limit: ₹5,000 • Held from 6 orders</Text>
+                     <Text style={styles.limitText}>Limit: ₹5,000 • Amount you have from cash orders</Text>
                     
                     <View style={styles.progressBarBg}>
-                        <View style={[styles.progressBarFill, { width: '85%' }]} />
+                        <View style={[styles.progressBarFill, { width: `${Math.min(100, Math.round(((stats.floatingCash || 0) / 5000) * 100))}%` }]} />
                     </View>
 
                     <View style={styles.remitActions}>
-                        <TouchableOpacity style={styles.btnOrangeFull}>
-                            <Text style={styles.btnOrangeText}>Remit COD</Text>
+                         <TouchableOpacity style={styles.btnOrangeFull} onPress={handleRemitNow}>
+                            <Text style={styles.btnOrangeText}>Pay to Office Now</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.btnBlackIcon}>
+                         <TouchableOpacity style={styles.btnBlackIcon} onPress={handleRemitNow}>
                             <Ionicons name="wallet-outline" size={24} color="#fff" />
                         </TouchableOpacity>
                     </View>
@@ -160,7 +299,7 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
 
                 {/* Active Orders Section */}
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Active Orders ({activeOrdersList.length || 3})</Text>
+                    <Text style={styles.sectionTitle}>My Deliveries ({activeOrdersList.length || 0})</Text>
                     <View style={styles.autoAssignBox}>
                         <Text style={styles.autoAssignText}>Auto-assign ON</Text>
                         <Switch 
@@ -203,7 +342,12 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
                     </View>
                 ) : (
                     activeOrdersList.map((order, idx) => (
-                        <View key={order._id} style={styles.orderCard}>
+                        <TouchableOpacity 
+                            key={order._id} 
+                            style={styles.orderCard} 
+                            onPress={() => handleViewDetails(order._id)}
+                            activeOpacity={0.7}
+                        >
                             <View style={styles.orderCardRow}>
                                 <View style={styles.orderImgPlaceholder}>
                                     <Ionicons name="image-outline" size={24} color="#ccc" />
@@ -235,7 +379,7 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
                                     <Text style={styles.btnGreenText}>Navigate</Text>
                                 </TouchableOpacity>
                             </View>
-                        </View>
+                        </TouchableOpacity>
                     ))
                 )}
 
@@ -247,14 +391,14 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
                             <Ionicons name="qr-code" size={40} color="#333" />
                         </View>
                         <View style={styles.qrInfo}>
-                            <Text style={styles.qrTitle}>Pay ₹4,250 to Rice Mill Express</Text>
+                            <Text style={styles.qrTitle}>Pay ₹{stats.floatingCash || 0} to Rice Mill Office</Text>
                             <Text style={styles.qrSubtitle}>Scan QR with PhonePe / GPay / BHIM</Text>
                             <View style={styles.qrButtons}>
-                                <TouchableOpacity style={styles.btnOrangeSmall}>
+                                 <TouchableOpacity style={styles.btnOrangeSmall} onPress={handleRemitNow}>
                                     <Text style={styles.btnOrangeText}>I have paid</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity style={styles.btnOutlineSmall}>
-                                    <Text style={styles.btnOutlineText}>Regenerate QR</Text>
+                                <TouchableOpacity style={styles.btnOutlineSmall} onPress={fetchDashboardData}>
+                                    <Text style={styles.btnOutlineText}>Refresh</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -268,7 +412,7 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
                             <Text style={styles.bankTextBold}>A/C: Rice Mill Express Pvt Ltd</Text>
                             <Text style={styles.bankTextLight}>A/C: 1234567890 • IFSC: HDFC0001234</Text>
                         </View>
-                        <TouchableOpacity style={styles.btnOutlineSmall}>
+                         <TouchableOpacity style={styles.btnOutlineSmall} onPress={() => Alert.alert('Upload Receipt', 'Functionality coming soon: Please remit via UPI for instant confirmation.')}>
                             <Text style={styles.btnOutlineText}>Upload Receipt</Text>
                         </TouchableOpacity>
                     </View>
@@ -293,14 +437,14 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
             {/* Bottom Floating Bar */}
             <View style={styles.bottomBar}>
                 <View style={styles.holdingInfo}>
-                    <Text style={styles.holdingLabel}>Holding</Text>
-                    <Text style={styles.holdingAmount}>₹4,250</Text>
+                    <Text style={styles.holdingLabel}>Cash with me</Text>
+                    <Text style={styles.holdingAmount}>₹{stats.floatingCash || 0}</Text>
                 </View>
-                <TouchableOpacity style={styles.btnOrangeFlex}>
-                    <Text style={styles.btnOrangeText}>Remit Now</Text>
+                 <TouchableOpacity style={styles.btnOrangeFlex} onPress={handleRemitNow}>
+                    <Text style={styles.btnOrangeText}>Pay Now</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.btnOutlineFlex}>
-                    <Text style={styles.btnOutlineText}>Report Issue</Text>
+                <TouchableOpacity style={styles.btnOutlineFlex} onPress={() => handleRaiseIssue(activeOrdersList[0]?._id)}>
+                    <Text style={styles.btnOutlineText}>Report Problem</Text>
                 </TouchableOpacity>
             </View>
         </SafeAreaView>
@@ -327,12 +471,12 @@ const OrderCardMock = ({ id, title, type, amount, eta, customer, dist, isFirst }
             </View>
         </View>
         {!isFirst && (
-            <View style={styles.orderActions}>
-                <TouchableOpacity style={styles.btnWhiteIcon}>
+             <View style={styles.orderActions}>
+                 <TouchableOpacity style={styles.btnWhiteIcon} onPress={() => Alert.alert('Info', `Calling customer for mock order #${id}`)}>
                     <Ionicons name="call" size={16} color="#000" />
                     <Text style={styles.btnWhiteText}>Call</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.btnGreenIcon}>
+                <TouchableOpacity style={styles.btnGreenIcon} onPress={() => Alert.alert('Info', `Navigating to ${title}`)}>
                     <Ionicons name="location-outline" size={16} color="#fff" />
                     <Text style={styles.btnGreenText}>Navigate</Text>
                 </TouchableOpacity>

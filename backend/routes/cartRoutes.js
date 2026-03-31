@@ -73,19 +73,17 @@ router.post('/', protect, async (req, res) => {
 // DELETE /api/cart/:productId
 router.delete('/:productId', protect, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-
-    user.cartItems = user.cartItems.filter(
-      i => i.product.toString() !== req.params.productId
-    );
-
-    const saved = await user.save();
-    await saved.populate({
+    const updatedUser = await User.findOneAndUpdate(
+      { _id: req.user._id },
+      { $pull: { cartItems: { product: req.params.productId } } },
+      { new: true }
+    ).populate({
       path: 'cartItems.product',
       select: 'name price offerPrice images stock weight'
     });
-    res.json(saved.cartItems);
+
+    if (!updatedUser) return res.status(404).json({ message: 'User not found' });
+    res.json(updatedUser.cartItems);
   } catch (err) {
     console.error('Remove from cart error:', err);
     res.status(500).json({ message: 'Failed to remove item' });
@@ -95,12 +93,14 @@ router.delete('/:productId', protect, async (req, res) => {
 // DELETE /api/cart  (clear)
 router.delete('/', protect, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    const updatedUser = await User.findOneAndUpdate(
+      { _id: req.user._id },
+      { $set: { cartItems: [] } },
+      { new: true }
+    );
 
-    user.cartItems = [];
-    const saved = await user.save();
-    res.json(saved.cartItems);
+    if (!updatedUser) return res.status(404).json({ message: 'User not found' });
+    res.json(updatedUser.cartItems);
   } catch (err) {
     console.error('Clear cart error:', err);
     res.status(500).json({ message: 'Failed to clear cart' });

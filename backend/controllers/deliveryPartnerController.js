@@ -107,6 +107,7 @@ const getDashboard = asyncHandler(async (req, res) => {
             todayOrders,
             activeDeliveries,
             totalDeliveries,
+            totalOrdersCount: await Order.countDocuments({ deliveryPartner: { $in: profileIds } }),
             todayCompleted,
             totalEarnings,
             todayEarnings,
@@ -114,8 +115,23 @@ const getDashboard = asyncHandler(async (req, res) => {
                 acc[item._id] = item.count;
                 return acc;
             }, {}),
-            rating: partnerProfiles.length > 0 ? (partnerProfiles.reduce((sum, p) => sum + (p.rating || 5), 0) / partnerProfiles.length) : 5,
-            onTimeRate: partnerProfiles.length > 0 ? (partnerProfiles.reduce((sum, p) => sum + (p.onTimeDeliveryRate || 100), 0) / partnerProfiles.length) : 100
+            onTimeRate: partnerProfiles.length > 0 ? (partnerProfiles.reduce((sum, p) => sum + (p.onTimeDeliveryRate || 100), 0) / partnerProfiles.length) : 100,
+            floatingCash: await Order.aggregate([
+                {
+                    $match: {
+                        deliveryPartner: { $in: profileIds },
+                        paymentMethod: 'cod',
+                        codCollected: true,
+                        codSettled: { $ne: true }
+                    }
+                },
+                {
+                    $group: {
+                        _id: null,
+                        total: { $sum: '$totalPrice' }
+                    }
+                }
+            ]).then(res => res[0]?.total || 0)
         }
     });
 });
@@ -639,6 +655,42 @@ const requestReplacement = asyncHandler(async (req, res) => {
     });
 });
 
+// @desc    Remit collected COD cash
+// @route   POST /api/delivery-partners/remit-cash
+// @access  Private/DeliveryPartner
+const remitCash = asyncHandler(async (req, res) => {
+    const partnerProfiles = await DeliveryPartner.find({ user: req.user._id });
+    const profileIds = partnerProfiles.map(p => p._id);
+
+    if (profileIds.length === 0) {
+        res.status(404);
+        throw new Error('Delivery partner profile not found');
+    }
+
+    // Find all collected but not settled COD orders
+    const result = await Order.updateMany(
+        {
+            deliveryPartner: { $in: profileIds },
+            paymentMethod: 'cod',
+            codCollected: true,
+            codSettled: { $ne: true }
+        },
+        {
+            $set: {
+                codSettled: true,
+                codSettledAt: new Date(),
+                codSettledBy: req.user._id
+            }
+        }
+    );
+
+    res.json({
+        success: true,
+        message: `${result.modifiedCount} orders marked as remitted`,
+        count: result.modifiedCount
+    });
+});
+
 module.exports = {
     getDashboard,
     getMyOrders,
@@ -648,4 +700,5 @@ module.exports = {
     confirmCOD,
     uploadDeliveryPhotoAndComplete,
     requestReplacement,
+    remitCash,
 };

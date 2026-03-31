@@ -61,6 +61,9 @@ import {
   FORUM_BOOKMARKS_LIST_REQUEST,
   FORUM_BOOKMARKS_LIST_SUCCESS,
   FORUM_BOOKMARKS_LIST_FAIL,
+  FORUM_POST_SHARE_REQUEST,
+  FORUM_POST_SHARE_SUCCESS,
+  FORUM_POST_SHARE_FAIL,
 } from '../constants/ForumConstants';
 import { handleApiError } from '../../utils/handleApiError';
 import axiosInstance from '../../utils/axiosInstance';
@@ -710,6 +713,20 @@ export const getUserBookmarks = (page = 1, limit = 20) => async (dispatch, getSt
       type: FORUM_BOOKMARKS_LIST_FAIL,
       payload: message,
     });
+    return Promise.reject(message);
+  }
+};
+
+// NEW: Share Post (Increment count)
+export const sharePost = (postId) => async (dispatch) => {
+  try {
+    dispatch({ type: FORUM_POST_SHARE_REQUEST });
+    const { data } = await axiosInstance.post(`/api/forum/${postId}/share`);
+    dispatch({ type: FORUM_POST_SHARE_SUCCESS, payload: data });
+    return Promise.resolve(data);
+  } catch (error) {
+    const message = handleApiError(error);
+    dispatch({ type: FORUM_POST_SHARE_FAIL, payload: message });
     return Promise.reject(message);
   }
 };

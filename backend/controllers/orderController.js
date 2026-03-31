@@ -161,11 +161,8 @@ exports.createOrder = asyncHandler(async (req, res) => {
   if (isImmediatePayment || isAdvancePayment) {
     initialStatus = 'confirmed';
   } else if (finalPaymentMethod === 'cod') {
-    if (grandTotal > 5000) {
-      initialStatus = 'pending_payment'; // Waiting for advance payment link redirection
-    } else {
-      initialStatus = 'confirmed'; // Standard COD
-    }
+    // 🔥 STRICT: All COD orders now require a 20% advance online payment to be confirmed
+    initialStatus = 'pending_payment'; // Always wait for advance payment
   }
 
   // Payment Verification logic

@@ -18,7 +18,8 @@ import { useNavigate } from 'react-router-dom';
 import { listSellerOrders, updateOrderStatus, downloadInvoice } from '../redux/actions/orderActions';
 import { listDeliveryPartners, assignDeliveryPartner } from '../redux/actions/deliveryActions';
 import { listSellerProducts } from '../redux/actions/productActions';
-import { OrderTrackingSocket } from '../utils/socket';
+import { listMyRecipes } from '../redux/actions/recipeActions';
+import { setupSocialListeners, OrderTrackingSocket } from '../utils/socket';
 import SellerProfile from '../components/seller/SellerProfile';
 import SellerProducts from '../components/seller/SellerProducts';
 import SellerPayments from '../components/seller/SellerPayments';
@@ -26,6 +27,8 @@ import SellerDelivery from '../components/seller/SellerDelivery';
 import AnalyticsDashboard from '../components/seller/AnalyticsDashboard';
 import OrderKanban from '../components/seller/OrderKanban';
 import Message from '../components/common/Message';
+import CommunityForum from '../components/seller/CommunityForum';
+import RecipeEngagementDashboard from '../components/seller/RecipeEngagementDashboard';
 import { RECIPE_SUBMIT_RESET } from '../redux/constants/RecipeConstants';
 
 // ────────────────────────────────────────────────────────────
@@ -43,7 +46,9 @@ const NAV_ITEMS = (tab) => [
     { label: 'Payments', icon: <AccountBalanceWallet fontSize="small" />, id: 3 },
     { label: 'Delivery Partners', icon: <LocalShipping fontSize="small" />, id: 4 },
     { label: 'Analytics', icon: <BarChart fontSize="small" />, id: 5 },
-    { label: 'Settings', icon: <Settings fontSize="small" />, id: 6 },
+    { label: 'Community Forum', icon: <Chat fontSize="small" />, id: 6 },
+    { label: 'Recipes', icon: <PeopleAlt fontSize="small" />, id: 7 },
+    { label: 'Settings', icon: <Settings fontSize="small" />, id: 8 },
 ];
 
 // ────────────────────────────────────────────────────────────
@@ -194,14 +199,31 @@ const OverviewPanel = ({ orders, products, onTabChange }) => {
 const OrdersPanel = ({ orders, partners, onAssign, onUpdateStatus, onDownloadInvoice, invoiceLoading }) => {
     const [statusFilter, setStatusFilter] = useState('All');
     const [search, setSearch] = useState('');
+    const [dateFilter, setDateFilter] = useState('');
 
     const STATUS_TABS = ['All', 'New', 'Processing', 'Ready', 'Shipped', 'Delivered'];
 
-    const filtered = orders.filter(o => {
-        const matchStatus = statusFilter === 'All' || o.orderStatus.toLowerCase().includes(statusFilter.toLowerCase());
-        const matchSearch = search === '' || o._id.toLowerCase().includes(search.toLowerCase()) || (o.user?.name || '').toLowerCase().includes(search.toLowerCase());
-        return matchStatus && matchSearch;
-    });
+    const filtered = useMemo(() => orders.filter(o => {
+        // 1. Status Mapping
+        let matchStatus = true;
+        if (statusFilter === 'New') matchStatus = ['placed', 'pending'].includes(o.orderStatus?.toLowerCase());
+        else if (statusFilter === 'Ready') matchStatus = o.orderStatus?.toLowerCase() === 'packed';
+        else if (statusFilter !== 'All') matchStatus = o.orderStatus?.toLowerCase() === statusFilter.toLowerCase();
+        
+        // 2. Search (ID or Customer Name)
+        const matchSearch = search === '' || 
+                           o._id?.toLowerCase().includes(search.toLowerCase()) || 
+                           (o.user?.name || '').toLowerCase().includes(search.toLowerCase());
+        
+        // 3. Date filtering
+        let matchDate = true;
+        if (dateFilter) {
+            const orderDate = new Date(o.createdAt).toISOString().split('T')[0];
+            matchDate = orderDate === dateFilter;
+        }
+
+        return matchStatus && matchSearch && matchDate;
+    }), [orders, statusFilter, search, dateFilter]);
 
     const STATUS_CONFIG = {
         placed: { label: 'NEW', bg: '#EF4444', text: '#fff' },
@@ -218,7 +240,8 @@ const OrdersPanel = ({ orders, partners, onAssign, onUpdateStatus, onDownloadInv
             {/* Filters */}
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, mb: 3, border: '1px solid #F3F4F6' }}>
                 <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <TextField size="small" placeholder="Date Range" type="date" sx={{ minWidth: 160 }} InputLabelProps={{ shrink: true }} />
+                    <TextField size="small" type="date" value={dateFilter} onChange={e => setDateFilter(e.target.value)}
+                        sx={{ minWidth: 160 }} InputLabelProps={{ shrink: true }} label="Filter by Date" />
                     <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                         <Typography variant="body2" fontWeight={700} sx={{ mr: 1, alignSelf: 'center' }}>Status</Typography>
                         {STATUS_TABS.map(s => (
@@ -386,6 +409,7 @@ const SellerDashboard = () => {
     const orders = useMemo(() => Array.isArray(rawOrders) ? rawOrders : rawOrders?.orders || [], [rawOrders]);
     const { partners = [] } = useSelector(s => s.deliveryPartnerList || {});
     const { products: sellerProducts = [] } = useSelector(s => s.productSellerList || {});
+    const { recipes: myRecipes = [] } = useSelector(s => s.recipeListMy || {});
     const assignState = useSelector(s => s.deliveryPartnerAction || {});
     const updateState = useSelector(s => s.orderUpdate || {});
 
@@ -393,6 +417,7 @@ const SellerDashboard = () => {
         dispatch(listSellerOrders());
         dispatch(listDeliveryPartners());
         dispatch(listSellerProducts());
+        dispatch(listMyRecipes());
     }, [dispatch]);
 
     useEffect(() => {
@@ -402,6 +427,33 @@ const SellerDashboard = () => {
     useEffect(() => {
         if (updateState.success) { dispatch(listSellerOrders()); dispatch({ type: 'ORDER_UPDATE_RESET' }); }
     }, [updateState.success, dispatch]);
+
+    // ✅ NEW: Real-time synchronization via Socket
+    useEffect(() => {
+        console.log('🔌 SellerDashboard: Setting up socket listeners');
+        setupSocialListeners({
+            onOrderUpdate: (data) => {
+                console.log('📦 Socket: Order update received', data);
+                dispatch(listSellerOrders());
+                dispatch(listSellerProducts());
+                dispatch(listDeliveryPartners());
+                // Trigger global refresh event for sub-components (like Analytics)
+                window.dispatchEvent(new CustomEvent('seller:refresh-data', { detail: data }));
+            },
+            onBulkOrderUpdate: (data) => {
+                console.log('📦 Socket: Bulk order update received', data);
+                dispatch(listSellerOrders());
+                window.dispatchEvent(new CustomEvent('seller:refresh-data', { detail: data }));
+            }
+        });
+
+        return () => {
+            console.log('🧹 SellerDashboard: Cleaning up order socket callbacks');
+            // Only clear order-specific callbacks, not ALL social listeners
+            window.orderUpdateCallback = null;
+            window.bulkOrderUpdateCallback = null;
+        };
+    }, [dispatch]);
 
     const handleAssign = async (partnerId) => {
         if (!selectedOrder || !partnerId) return;
@@ -429,7 +481,9 @@ const SellerDashboard = () => {
             case 3: return <SellerPayments />;
             case 4: return <SellerDelivery />;
             case 5: return <AnalyticsDashboard />;
-            case 6: return <SellerProfile />;
+            case 6: return <CommunityForum />;
+            case 7: return <RecipeEngagementDashboard recipes={myRecipes} />;
+            case 8: return <SellerProfile />;
             default: return null;
         }
     };

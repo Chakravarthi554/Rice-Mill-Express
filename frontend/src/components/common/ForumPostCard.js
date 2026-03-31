@@ -12,7 +12,7 @@ import {
   BookmarkBorder, Report, Send
 } from '@mui/icons-material';
 import {
-  likePost, deleteForumPost, reportPost, addComment, reportForumComment, toggleBookmark
+  likePost, deleteForumPost, reportPost, addComment, reportForumComment, toggleBookmark, sharePost
 } from '../../redux/actions/forumActions';
 import { emitSocialAction, joinPostRoom, leavePostRoom } from '../../utils/socket';
 import ReportModal from './ReportModal';
@@ -58,6 +58,12 @@ const ForumPostCard = ({ post, onUpdate }) => {
               isBookmarked: data.action === 'bookmarked'
             }));
           }
+        } else if (data.type === 'SHARE') {
+          console.log('📡 Received SOCIAL_UPDATE SHARE event:', data);
+          setCurrentPost(prev => ({
+            ...prev,
+            sharesCount: data.sharesCount
+          }));
         }
       }
     };
@@ -150,6 +156,7 @@ const ForumPostCard = ({ post, onUpdate }) => {
 
     if (link) window.open(link, '_blank');
     setShareOpen(false);
+    dispatch(sharePost(currentPost._id));
     showSnackbar('Shared!', 'success');
   };
 
@@ -243,7 +250,7 @@ const ForumPostCard = ({ post, onUpdate }) => {
         </CardContent>
         <Box sx={{ px: 2, py: 1, borderTop: 1, borderColor: 'divider' }}>
           <Typography variant="body2" color="text.secondary">
-            {currentPost.likesCount || 0} likes • {currentPost.commentsCount || 0} comments • {currentPost.viewCount || 0} views
+            {currentPost.likesCount || 0} likes • {currentPost.commentsCount || 0} comments • {currentPost.sharesCount || 0} shares • {currentPost.viewCount || 0} views
           </Typography>
         </Box>
         <CardActions>

@@ -23,7 +23,7 @@ import Grid2 from '@mui/material/Unstable_Grid2'; // Correct import for Grid2
 import { listSellerAnalytics } from '../../redux/actions/productActions';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { io } from 'socket.io-client';
+// Removed redundant io import
 import { selectSellerAnalytics } from '../../redux/store';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Legend);
@@ -41,55 +41,18 @@ const AnalyticsDashboard = () => {
     }
   }, [dispatch, timeframe, userInfo?._id]);
 
+  // ✅ NEW: Listen for global refresh event from SellerDashboard
   useEffect(() => {
-    const token = userInfo?.token || localStorage.getItem('token');
-    if (!token) {
-      console.error('❌ No token available for WebSocket connection');
-      return;
-    }
-
-    const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5001';
-    const socket = io(SOCKET_URL, {
-      auth: { token: `Bearer ${token}` },
-      withCredentials: true,
-      transports: ['websocket', 'polling'],
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 2000,
-    });
-
-    socket.on('connect', () => {
-      console.log('✅ Connected to WebSocket:', socket.id);
-      const sellerId = userInfo?._id || localStorage.getItem('userId');
-      if (sellerId) {
-        socket.emit('joinSellerRoom', sellerId);
-        console.log('Joined room:', `seller_${sellerId}`);
-      }
-    });
-
-    socket.on('REFRESH_ANALYTICS', (data) => {
-      console.log('📊 REFRESH_ANALYTICS received:', data);
-      const sellerId = userInfo?._id || localStorage.getItem('userId');
-      if (data.sellerId === sellerId) {
-        dispatch(listSellerAnalytics(timeframe));
-      }
-    });
-
-    socket.on('connect_error', (err) => {
-      console.error('❌ WebSocket connection error:', err.message);
-    });
-
-    socket.on('disconnect', (reason) => {
-      console.warn('⚠️ WebSocket disconnected:', reason);
-    });
-
-    return () => {
-      socket.off('REFRESH_ANALYTICS');
-      socket.off('connect_error');
-      socket.off('disconnect');
-      socket.disconnect();
+    const handleRefresh = (e) => {
+      console.log('🔄 AnalyticsDashboard: Refreshing due to global event', e?.detail);
+      dispatch(listSellerAnalytics(timeframe));
     };
-  }, [dispatch, timeframe, userInfo?._id, userInfo?.token]);
+
+    window.addEventListener('seller:refresh-data', handleRefresh);
+    return () => window.removeEventListener('seller:refresh-data', handleRefresh);
+  }, [dispatch, timeframe]);
+
+  // Removed redundant private socket useEffect
 
   useEffect(() => {
     console.log('Analytics state:', { analytics, loading, error });

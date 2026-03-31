@@ -1,7 +1,8 @@
 import { io } from 'socket.io-client';
 
-// ✅ FIXED: Enhanced API URL configuration
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
+// ✅ FIXED: Use base URL for socket to avoid "Invalid namespace" errors
+const SOCKET_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5001').replace(/\/api$/, '');
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 let socketInstance = null;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
@@ -52,7 +53,7 @@ export const getSocket = (userId, role, token) => {
   console.log('🔄 Creating new socket connection...');
 
   // ✅ FIXED: Enhanced socket configuration
-  socketInstance = io(API_URL, {
+  socketInstance = io(SOCKET_URL, {
     auth: {
       token: tokenStr,
       userId: userId,
@@ -258,15 +259,11 @@ export const getSocket = (userId, role, token) => {
     console.log('💓 Pong received:', data);
   });
 
-  // ✅ FIXED: Handle authentication errors
+  // ✅ NEW: Dynamic token update
   socketInstance.on('unauthorized', (error) => {
-    console.error('❌ Socket unauthorized:', error);
-    if (error.message?.includes('token') || error.message?.includes('auth')) {
-      console.log('🔐 Socket authentication failed, clearing storage...');
-      localStorage.removeItem('userInfo');
-      localStorage.removeItem('token');
-      window.location.href = '/login';
-    }
+    console.warn('❌ Socket unauthorized:', error.message);
+    // Don't force logout here anymore. This is handled by AuthContext if needed.
+    // Usually this happens during a brief token expiry window.
   });
 
   socketInstance.on('error', (error) => {
@@ -274,6 +271,18 @@ export const getSocket = (userId, role, token) => {
   });
 
   return socketInstance;
+};
+
+// ✅ NEW: Export for dynamic token updates without reconnection
+export const updateSocketToken = (newToken) => {
+  if (socketInstance) {
+    console.log('🔄 Socket: Updating auth token dynamically');
+    socketInstance.auth.token = newToken;
+    
+    // Most socket.io servers check auth on each request/event if configured, 
+    // or we can wait for next auto-reconnect.
+    // If disconnected, it will use the new one on next attempt.
+  }
 };
 
 export const initializeSocket = (userInfo) => {

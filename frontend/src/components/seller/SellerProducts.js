@@ -166,8 +166,9 @@ const SellerProducts = () => {
             : { bg: '#DCFCE7', text: '#166534', label: `In Stock (${product.countInStock})` };
 
           // Use the first image or a placeholder
+          const baseUrl = (process.env.REACT_APP_API_URL || 'http://localhost:5001').replace(/\/api\/?$/, '');
           const imgUrl = (product.images && product.images[0])
-            ? (product.images[0].startsWith('http') ? product.images[0] : `${process.env.REACT_APP_API_URL || ''}${product.images[0]}`)
+            ? (product.images[0].startsWith('http') ? product.images[0] : `${baseUrl}${product.images[0]}`)
             : null;
 
           return (

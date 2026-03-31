@@ -78,6 +78,7 @@ import OrderDetailsScreen from './screens/delivery/OrderDetailsScreen';
 import DeliveryHistoryScreen from './screens/delivery/DeliveryHistoryScreen';
 import DeliveryPartnerProfileScreen from './screens/delivery/DeliveryPartnerProfileScreen';
 import ReplacementRequestScreen from './screens/delivery/ReplacementRequestScreen';
+import DeliveryWithdrawalScreen from './screens/delivery/DeliveryWithdrawalScreen';
 
 // Shared Screens
 import ProfileScreen from './screens/shared/ProfileScreen';
@@ -300,7 +301,7 @@ function DeliveryTabs() {
       <Tab.Screen
         name="Dashboard"
         component={DeliveryPartnerDashboard}
-        options={{ title: 'Dashboard' }}
+        options={{ headerShown: false }}
       />
       <Tab.Screen
         name="DeliveryHistory"
@@ -339,6 +340,11 @@ function DeliveryStack() {
         name="DeliveryConfirmation"
         component={DeliveryConfirmationScreen}
         options={{ title: 'Confirm Delivery' }}
+      />
+      <Stack.Screen
+        name="Withdraw"
+        component={DeliveryWithdrawalScreen}
+        options={{ title: 'Withdraw' }}
       />
     </Stack.Navigator>
   );
