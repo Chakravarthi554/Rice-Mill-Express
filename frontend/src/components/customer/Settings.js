@@ -1,118 +1,179 @@
-import React from 'react';
-import { Box, Paper, List, ListItemButton, ListItemIcon, ListItemText, Typography, Divider } from '@mui/material';
-import { NavLink, Outlet } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
-import { useTranslation } from 'react-i18next';
+// [Premium Figma-level Redesign — Customer Settings (Web)]
+import React, { useState } from 'react';
+import { Box, List, ListItemButton, ListItemIcon, ListItemText, Divider, Avatar } from '@mui/material';
+import { useNavigate, useLocation, Outlet } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import {
-  PersonOutline, LocationOnOutlined, ShieldOutlined, LockOutlined,
-  HistoryOutlined, StarOutline, CardGiftcardOutlined,
-  NotificationsOutlined, LanguageOutlined, Brightness4Outlined,
-  HelpOutlineOutlined, DescriptionOutlined, LogoutOutlined
+    Person, LocationOn, Security, Lock, ShoppingBag,
+    Star, CardGiftcard, Notifications, Language, Brightness4,
+    HelpOutline, Description, Logout,
 } from '@mui/icons-material';
+import { useTranslation } from 'react-i18next';
+
+const NAV_GROUPS = [
+    {
+        title: 'Account',
+        items: [
+            { label: 'Personal Info', sub: 'Profile & contact', icon: Person, iconBg: '#EEF2FF', iconColor: '#4F46E5', path: '/settings/profile' },
+            { label: 'Addresses', sub: 'Saved locations', icon: LocationOn, iconBg: '#F0FDF4', iconColor: '#16A34A', path: '/settings/addresses' },
+            { label: 'Security', sub: '2FA & password', icon: Security, iconBg: '#FFF7ED', iconColor: '#EA580C', path: '/settings/security' },
+            { label: 'Privacy', sub: 'Data preferences', icon: Lock, iconBg: '#F5F3FF', iconColor: '#7C3AED', path: '/settings/privacy' },
+        ],
+    },
+    {
+        title: 'Shopping',
+        items: [
+            { label: 'My Orders', sub: 'Track & manage', icon: ShoppingBag, iconBg: '#F0FDF4', iconColor: '#16A34A', path: '/settings/orders' },
+            { label: 'Rewards', sub: 'Points & wallet', icon: Star, iconBg: '#FEFCE8', iconColor: '#CA8A04', path: '/settings/rewards' },
+            { label: 'Notifications', sub: 'Alerts & updates', icon: Notifications, iconBg: '#FFF7ED', iconColor: '#EA580C', path: '/settings/notifications' },
+        ],
+    },
+    {
+        title: 'Preferences',
+        items: [
+            { label: 'Language', sub: 'App language', icon: Language, iconBg: '#F5F3FF', iconColor: '#7C3AED', path: '/settings/language' },
+            { label: 'Appearance', sub: 'Theme settings', icon: Brightness4, iconBg: '#F0FDFA', iconColor: '#0D9488', path: '/settings/appearance' },
+        ],
+    },
+    {
+        title: 'Support',
+        items: [
+            { label: 'Help Center', sub: 'FAQs & support', icon: HelpOutline, iconBg: '#F1F5F9', iconColor: '#475569', path: '/settings/help' },
+            { label: 'Legal', sub: 'Terms & privacy', icon: Description, iconBg: '#F8FAFC', iconColor: '#64748B', path: '/settings/legal' },
+        ],
+    },
+];
 
 const Settings = () => {
-  const { logout } = useAuth();
-  const { t } = useTranslation();
+    const navigate = useNavigate();
+    const location = useLocation();
+    const { t } = useTranslation();
+    const { user } = useSelector(state => state.auth || {});
+    const [hovered, setHovered] = useState(null);
 
-  const settingsGroups = [
-    {
-      subheader: 'Account & Security',
-      items: [
-        { text: t('editProfile'), icon: <PersonOutline fontSize="small" />, path: 'profile', bg: '#EEF2FF', color: '#4F46E5' },
-        { text: t('manageAddresses'), icon: <LocationOnOutlined fontSize="small" />, path: 'addresses', bg: '#F0FDF4', color: '#16A34A' },
-        { text: 'Security Hub', icon: <ShieldOutlined fontSize="small" />, path: 'security', bg: '#FFF7ED', color: '#EA580C' },
-        { text: 'Privacy Controls', icon: <LockOutlined fontSize="small" />, path: 'privacy', bg: '#FDF2F8', color: '#9333EA' },
-      ],
-    },
-    {
-      subheader: 'Orders & Activity',
-      items: [
-        { text: t('orderHistory'), icon: <HistoryOutlined fontSize="small" />, path: 'order-history', bg: '#F0FDF4', color: '#16A34A' },
-        { text: t('myReviews'), icon: <StarOutline fontSize="small" />, path: 'reviews', bg: '#FEFCE8', color: '#CA8A04' },
-        { text: 'Refer & Earn', icon: <CardGiftcardOutlined fontSize="small" />, path: 'rewards', bg: '#FFF7ED', color: '#F97316' },
-      ],
-    },
-    {
-      subheader: 'Preferences',
-      items: [
-        { text: t('notifications'), icon: <NotificationsOutlined fontSize="small" />, path: 'notifications', bg: '#FFF7ED', color: '#EA580C' },
-        { text: t('languageRegion'), icon: <LanguageOutlined fontSize="small" />, path: 'language', bg: '#F5F3FF', color: '#7C3AED' },
-        { text: t('themeMode'), icon: <Brightness4Outlined fontSize="small" />, path: 'theme', bg: '#F0FDFA', color: '#0D9488' },
-      ],
-    },
-    {
-      subheader: 'Support & Legal',
-      items: [
-        { text: t('helpCenter'), icon: <HelpOutlineOutlined fontSize="small" />, path: 'help-center', bg: '#F1F5F9', color: '#475569' },
-        { text: t('legalPolicies'), icon: <DescriptionOutlined fontSize="small" />, path: 'legal', bg: '#F8FAFC', color: '#64748B' },
-      ],
-    }
-  ];
+    const initials = user?.name
+        ? user.name.trim().split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
+        : 'C';
 
-  return (
-    <Box sx={{ display: 'flex', minHeight: 'calc(100vh - 80px)', bgcolor: '#F9FAFB', p: { xs: 2, md: 4 }, gap: 4 }}>
-      {/* Settings Navigation Sidebar */}
-      <Paper elevation={0} sx={{ width: 320, borderRadius: 4, overflow: 'hidden', border: '1px solid #F3F4F6', bgcolor: '#fff', flexShrink: 0, height: 'fit-content' }} component="nav">
-        
-        <Box sx={{ p: 3, pb: 1 }}>
-          <Typography variant="h5" fontWeight={800} color="#111827">Settings</Typography>
-          <Typography variant="body2" color="text.secondary">Manage your account preferences</Typography>
-        </Box>
+    const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/');
 
-        <List sx={{ px: 2, pb: 3 }}>
-          {settingsGroups.map((group, gIndex) => (
-            <Box key={group.subheader} sx={{ mb: 2 }}>
-              <Typography variant="caption" sx={{ display: 'block', px: 2, py: 1.5, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                {group.subheader}
-              </Typography>
+    return (
+        <Box sx={{ display: 'flex', gap: 3, minHeight: '70vh', fontFamily: "'Inter', sans-serif" }}>
 
-              {group.items.map((item) => (
-                <ListItemButton
-                  key={item.text}
-                  component={NavLink}
-                  to={item.path}
-                  sx={{
-                    borderRadius: 3, mb: 0.5, py: 1.2, px: 2,
-                    '&.active': { bgcolor: '#F3F4F6' },
-                    '&:hover': { bgcolor: '#F9FAFB' }
-                  }}
-                >
-                  <ListItemIcon sx={{ minWidth: 0, mr: 2 }}>
-                    <Box sx={{ width: 36, height: 36, borderRadius: 2.5, bgcolor: item.bg, color: item.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {item.icon}
+            {/* ── SIDEBAR ── */}
+            <Box sx={{
+                width: 280, flexShrink: 0, background: '#fff', borderRadius: 4,
+                border: '1px solid #F3F4F6', boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                overflow: 'hidden', height: 'fit-content', position: 'sticky', top: 24,
+            }}>
+                {/* User Card */}
+                <Box sx={{ p: 3, background: 'linear-gradient(135deg, #16A34A15, #F0FDF4)', borderBottom: '1px solid #F3F4F6' }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
+                        <Box sx={{ position: 'relative' }}>
+                            <Avatar sx={{
+                                width: 64, height: 64, bgcolor: '#16A34A', fontSize: 24, fontWeight: 800,
+                                boxShadow: '0 4px 14px rgba(22,163,74,0.3)',
+                            }}>
+                                {initials}
+                            </Avatar>
+                            <Box sx={{
+                                position: 'absolute', bottom: 0, right: 0, width: 20, height: 20,
+                                borderRadius: 10, bgcolor: '#F97316', border: '2px solid #fff',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: 10, color: '#fff',
+                            }}>✏️</Box>
+                        </Box>
+                        <Box sx={{ textAlign: 'center' }}>
+                            <Box sx={{ fontSize: 16, fontWeight: 800, color: '#111827' }}>{user?.name || 'Customer'}</Box>
+                            <Box sx={{ fontSize: 12, color: '#9CA3AF', mt: 0.3 }}>{user?.email || 'customer@ricemill.com'}</Box>
+                        </Box>
+                        <Box
+                            component="button"
+                            onClick={() => navigate('/settings/profile')}
+                            sx={{
+                                background: '#16A34A', color: '#fff', fontSize: 12, fontWeight: 700,
+                                py: 0.8, px: 2.5, borderRadius: 99, border: 'none', cursor: 'pointer',
+                                boxShadow: '0 2px 8px rgba(22,163,74,0.25)',
+                                '&:hover': { background: '#15803D' },
+                            }}
+                        >
+                            Edit Profile
+                        </Box>
                     </Box>
-                  </ListItemIcon>
-                  <ListItemText 
-                    primary={item.text} 
-                    primaryTypographyProps={{ fontSize: 15, fontWeight: 600, color: '#374151' }} 
-                  />
-                </ListItemButton>
-              ))}
-              {gIndex < settingsGroups.length - 1 && <Divider sx={{ my: 1, mx: 2, borderColor: '#F3F4F6' }} />}
+                </Box>
+
+                {/* Nav Groups */}
+                {NAV_GROUPS.map((group, gi) => (
+                    <Box key={gi}>
+                        <Box sx={{ px: 3, pt: 2, pb: 0.5 }}>
+                            <Box sx={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                                {group.title}
+                            </Box>
+                        </Box>
+                        {group.items.map((item, ii) => {
+                            const IconComp = item.icon;
+                            const active = isActive(item.path);
+                            return (
+                                <ListItemButton
+                                    key={ii}
+                                    onClick={() => navigate(item.path)}
+                                    onMouseEnter={() => setHovered(`${gi}-${ii}`)}
+                                    onMouseLeave={() => setHovered(null)}
+                                    sx={{
+                                        mx: 1.5, borderRadius: 3, mb: 0.3, px: 1.5,
+                                        background: active ? '#F0FDF4' : hovered === `${gi}-${ii}` ? '#F9FAFB' : 'transparent',
+                                        transition: 'all 0.2s',
+                                    }}
+                                >
+                                    <ListItemIcon sx={{ minWidth: 42 }}>
+                                        <Box sx={{
+                                            width: 34, height: 34, borderRadius: 2.5,
+                                            bgcolor: active ? item.iconBg : '#F9FAFB',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            transition: 'all 0.2s',
+                                        }}>
+                                            <IconComp sx={{ fontSize: 18, color: active ? item.iconColor : '#9CA3AF' }} />
+                                        </Box>
+                                    </ListItemIcon>
+                                    <ListItemText
+                                        primary={item.label}
+                                        secondary={item.sub}
+                                        primaryTypographyProps={{ fontSize: 14, fontWeight: active ? 700 : 600, color: active ? '#111827' : '#374151' }}
+                                        secondaryTypographyProps={{ fontSize: 11, color: '#9CA3AF', mt: 0.2 }}
+                                    />
+                                    {active && <Box sx={{ width: 3, height: 24, borderRadius: 2, bgcolor: item.iconColor, ml: 1 }} />}
+                                </ListItemButton>
+                            );
+                        })}
+                        {gi < NAV_GROUPS.length - 1 && <Divider sx={{ my: 1, borderColor: '#F9FAFB', mx: 2 }} />}
+                    </Box>
+                ))}
+
+                {/* Logout */}
+                <Box sx={{ p: 1.5, pt: 1, borderTop: '1px solid #F3F4F6', mt: 1 }}>
+                    <ListItemButton
+                        sx={{ borderRadius: 3, background: '#FEF2F2', '&:hover': { background: '#FEE2E2' } }}
+                        onClick={() => navigate('/logout')}
+                    >
+                        <ListItemIcon sx={{ minWidth: 42 }}>
+                            <Box sx={{ width: 34, height: 34, borderRadius: 2.5, bgcolor: '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <Logout sx={{ fontSize: 18, color: '#EF4444' }} />
+                            </Box>
+                        </ListItemIcon>
+                        <ListItemText
+                            primary="Log Out"
+                            primaryTypographyProps={{ fontSize: 14, fontWeight: 700, color: '#EF4444' }}
+                        />
+                    </ListItemButton>
+                </Box>
             </Box>
-          ))}
 
-          <Divider sx={{ my: 2, mx: 2, borderColor: '#F3F4F6' }} />
-          
-          <ListItemButton onClick={logout} sx={{ borderRadius: 3, py: 1.2, px: 2, '&:hover': { bgcolor: '#FEF2F2' } }}>
-            <ListItemIcon sx={{ minWidth: 0, mr: 2 }}>
-               <Box sx={{ width: 36, height: 36, borderRadius: 2.5, bgcolor: '#FEF2F2', color: '#EF4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                 <LogoutOutlined fontSize="small" />
-               </Box>
-            </ListItemIcon>
-            <ListItemText primary={t('logout')} primaryTypographyProps={{ fontSize: 15, fontWeight: 700, color: '#EF4444' }} />
-          </ListItemButton>
-        </List>
-      </Paper>
-
-      {/* Main Settings Content Area */}
-      <Box component="main" sx={{ flexGrow: 1, maxWidth: 800 }}>
-        <Paper elevation={0} sx={{ minHeight: 500, borderRadius: 4, border: '1px solid #F3F4F6', bgcolor: '#fff', p: { xs: 3, md: 5 } }}>
-          <Outlet />
-        </Paper>
-      </Box>
-    </Box>
-  );
+            {/* ── CONTENT ── */}
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Outlet />
+            </Box>
+        </Box>
+    );
 };
 
 export default Settings;

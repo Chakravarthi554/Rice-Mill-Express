@@ -115,35 +115,51 @@ function AuthStack() {
   );
 }
 
-// Customer Tab Navigator
+// Customer Tab Navigator — Premium Design
 function CustomerTabs() {
   const { t } = useTranslation();
+  const { Feather: FeatherIcons } = require('@expo/vector-icons');
 
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        tabBarIcon: ({ color, size }) => {
+        headerShown: false,
+        tabBarIcon: ({ color, focused, size }) => {
           let iconName;
           if (route.name === 'Home') iconName = 'home';
-          else if (route.name === 'Cart') iconName = 'shopping-cart';
-          else if (route.name === 'WishlistTab') iconName = 'favorite';
-          else if (route.name === 'Orders') iconName = 'receipt';
-          else if (route.name === 'Profile') iconName = 'person';
-          return <MaterialIcons name={iconName} size={size} color={color} />;
+          else if (route.name === 'Cart') iconName = 'shopping-bag';
+          else if (route.name === 'WishlistTab') iconName = 'heart';
+          else if (route.name === 'Orders') iconName = 'package';
+          else if (route.name === 'Profile') iconName = 'user';
+          return <FeatherIcons name={iconName} size={focused ? 22 : 20} color={color} />;
         },
-        tabBarActiveTintColor: '#4CAF50',
-        tabBarInactiveTintColor: 'gray',
+        tabBarActiveTintColor: '#16A34A',
+        tabBarInactiveTintColor: '#9CA3AF',
+        tabBarStyle: {
+          height: 70,
+          paddingBottom: 10,
+          paddingTop: 6,
+          backgroundColor: '#fff',
+          borderTopWidth: 1,
+          borderTopColor: '#F3F4F6',
+          elevation: 12,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.06,
+          shadowRadius: 12,
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '600',
+          marginTop: 2,
+        },
       })}
     >
-      <Tab.Screen
-        name="Home"
-        component={CustomerHomeScreen}
-        options={{ title: t('products') }}
-      />
-      <Tab.Screen name="Cart" component={CartScreen} options={{ title: t('cart') }} />
-      <Tab.Screen name="WishlistTab" component={WishlistScreen} options={{ title: t('wishlist') }} />
-      <Tab.Screen name="Orders" component={OrdersScreen} options={{ title: t('myOrders') }} />
-      <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: t('profile') }} />
+      <Tab.Screen name="Home" component={CustomerHomeScreen} options={{ title: 'Home' }} />
+      <Tab.Screen name="Cart" component={CartScreen} options={{ title: 'Cart' }} />
+      <Tab.Screen name="WishlistTab" component={WishlistScreen} options={{ title: 'Wishlist' }} />
+      <Tab.Screen name="Orders" component={OrdersScreen} options={{ title: 'Orders' }} />
+      <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
     </Tab.Navigator>
   );
 }

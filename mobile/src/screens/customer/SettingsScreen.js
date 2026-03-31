@@ -1,12 +1,49 @@
-// [AI: Premium Mobile Polish - Luxury grouped settings, Feather icons, Squircles]
+// [Premium Figma-level Redesign — SettingsScreen]
 import React, { useEffect } from 'react';
 import {
-    View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, SafeAreaView, Platform
+    View, Text, StyleSheet, ScrollView, TouchableOpacity,
+    Alert, SafeAreaView, StatusBar, Image,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchSettings } from '../../redux/slices/settingsSlice';
 import { logout } from '../../redux/slices/authSlice';
+
+const SETTING_GROUPS = [
+    {
+        title: 'Account & Security',
+        items: [
+            { title: 'Personal Information', sub: 'Name, photo, contact details', icon: 'user', iconBg: '#EEF2FF', iconColor: '#4F46E5', nav: 'EditProfile' },
+            { title: 'Saved Addresses', sub: 'Home, work and other locations', icon: 'map-pin', iconBg: '#F0FDF4', iconColor: '#16A34A', nav: 'Addresses' },
+            { title: 'Security & Passwords', sub: '2FA, password management', icon: 'shield', iconBg: '#FFF7ED', iconColor: '#EA580C', nav: 'Security' },
+            { title: 'Privacy Preferences', sub: 'Data and ad preferences', icon: 'lock', iconBg: '#FDF2F8', iconColor: '#9333EA', nav: 'Privacy' },
+        ]
+    },
+    {
+        title: 'Orders & Rewards',
+        items: [
+            { title: 'Order History', sub: 'Past and pending orders', icon: 'package', iconBg: '#F0FDF4', iconColor: '#16A34A', nav: 'Orders' },
+            { title: 'Rewards & Points', sub: 'Earn and redeem points', icon: 'star', iconBg: '#FEFCE8', iconColor: '#CA8A04', nav: 'Rewards' },
+            { title: 'Refer & Earn', sub: 'Invite friends for rewards', icon: 'gift', iconBg: '#FFF7ED', iconColor: '#F97316', nav: 'Referral' },
+            { title: 'My Reviews', sub: 'Reviews you have written', icon: 'edit-3', iconBg: '#F0F9FF', iconColor: '#0284C7', nav: 'MyReviews' },
+        ]
+    },
+    {
+        title: 'Preferences',
+        items: [
+            { title: 'Notifications', sub: 'Order updates, offers, alerts', icon: 'bell', iconBg: '#FFF7ED', iconColor: '#EA580C', nav: 'Notifications' },
+            { title: 'Language & Region', sub: 'App language settings', icon: 'globe', iconBg: '#F5F3FF', iconColor: '#7C3AED', nav: 'Language' },
+            { title: 'Theme', sub: 'Light, dark or system', icon: 'moon', iconBg: '#F0FDFA', iconColor: '#0D9488', nav: 'Theme' },
+        ]
+    },
+    {
+        title: 'Support',
+        items: [
+            { title: 'Help Center', sub: 'FAQs and support resources', icon: 'help-circle', iconBg: '#F1F5F9', iconColor: '#475569', nav: 'HelpCenter' },
+            { title: 'Legal & Policies', sub: 'Terms, privacy policy', icon: 'file-text', iconBg: '#F8FAFC', iconColor: '#64748B', nav: 'Legal' },
+        ]
+    }
+];
 
 const SettingsScreen = ({ navigation }) => {
     const dispatch = useDispatch();
@@ -15,96 +52,110 @@ const SettingsScreen = ({ navigation }) => {
     useEffect(() => { dispatch(fetchSettings()); }, [dispatch]);
 
     const handleLogout = () => {
-        Alert.alert('Logout', 'Are you sure you want to log out?', [
+        Alert.alert('Log Out', 'Are you sure you want to log out?', [
             { text: 'Cancel', style: 'cancel' },
-            { text: 'Logout', style: 'destructive', onPress: () => dispatch(logout()) }
+            { text: 'Log Out', style: 'destructive', onPress: () => dispatch(logout()) }
         ]);
     };
 
-    const settingGroups = [
-        {
-            title: 'Account & Security',
-            items: [
-                { title: 'Personal Information', icon: 'user', iconBg: '#EEF2FF', iconColor: '#4F46E5', onPress: () => navigation.navigate('EditProfile') },
-                { title: 'Saved Addresses', icon: 'map-pin', iconBg: '#F0FDF4', iconColor: '#16A34A', onPress: () => navigation.navigate('Addresses') },
-                { title: 'Security & Passwords', icon: 'shield', iconBg: '#FFF7ED', iconColor: '#EA580C', onPress: () => navigation.navigate('Security') },
-                { title: 'Privacy Preferences', icon: 'lock', iconBg: '#FDF2F8', iconColor: '#9333EA', onPress: () => navigation.navigate('Privacy') },
-            ]
-        },
-        {
-            title: 'Orders & Rewards',
-            items: [
-                { title: 'Order History', icon: 'package', iconBg: '#F0FDF4', iconColor: '#16A34A', onPress: () => navigation.navigate('Orders') },
-                { title: 'Rewards & Points', icon: 'star', iconBg: '#FEFCE8', iconColor: '#CA8A04', onPress: () => navigation.navigate('Rewards') },
-                { title: 'Refer & Earn', icon: 'gift', iconBg: '#FFF7ED', iconColor: '#F97316', onPress: () => navigation.navigate('Referral') },
-                { title: 'My Reviews', icon: 'edit-3', iconBg: '#F0F9FF', iconColor: '#0284C7', onPress: () => navigation.navigate('MyReviews') },
-            ]
-        },
-        {
-            title: 'Preferences',
-            items: [
-                { title: 'Notifications', icon: 'bell', iconBg: '#FFF7ED', iconColor: '#EA580C', onPress: () => navigation.navigate('Notifications') },
-                { title: 'Language', icon: 'globe', iconBg: '#F5F3FF', iconColor: '#7C3AED', onPress: () => navigation.navigate('Language') },
-                { title: 'Theme', icon: 'moon', iconBg: '#F0FDFA', iconColor: '#0D9488', onPress: () => navigation.navigate('Theme') },
-            ]
-        },
-        {
-            title: 'Support',
-            items: [
-                { title: 'Help Center', icon: 'help-circle', iconBg: '#F1F5F9', iconColor: '#475569', onPress: () => navigation.navigate('HelpCenter') },
-                { title: 'Legal & Policies', icon: 'file-text', iconBg: '#F8FAFC', iconColor: '#64748B', onPress: () => navigation.navigate('Legal') },
-            ]
-        }
-    ];
+    const initials = user?.name
+        ? user.name.trim().split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
+        : 'C';
 
     return (
         <SafeAreaView style={styles.container}>
+            <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+
+            {/* Header */}
+            <View style={styles.header}>
+                <Text style={styles.headerTitle}>Settings</Text>
+            </View>
+
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
 
-                {/* Profile Header */}
-                <View style={styles.header}>
-                    <View style={styles.avatarWrap}>
-                        <View style={styles.avatar}>
-                            <Text style={styles.avatarText}>{user?.name ? user.name.charAt(0).toUpperCase() : 'C'}</Text>
+                {/* ── PROFILE HERO CARD ── */}
+                <View style={styles.profileCard}>
+                    <View style={styles.profileAvatarWrap}>
+                        <View style={styles.profileAvatar}>
+                            <Text style={styles.profileAvatarText}>{initials}</Text>
                         </View>
-                        <TouchableOpacity style={styles.editBadge} onPress={() => navigation.navigate('EditProfile')}>
+                        <TouchableOpacity
+                            style={styles.editBadge}
+                            onPress={() => navigation.navigate('EditProfile')}
+                        >
                             <Feather name="camera" size={12} color="#fff" />
                         </TouchableOpacity>
                     </View>
-                    <View style={styles.headerInfo}>
-                        <Text style={styles.name}>{user?.name || 'Customer'}</Text>
-                        <Text style={styles.email}>{user?.email || 'customer@ricemill.com'}</Text>
+                    <View style={styles.profileInfo}>
+                        <Text style={styles.profileName}>{user?.name || 'Customer'}</Text>
+                        <Text style={styles.profileEmail}>{user?.email || 'customer@ricemill.com'}</Text>
+                        <TouchableOpacity style={styles.editProfileBtn} onPress={() => navigation.navigate('EditProfile')}>
+                            <Text style={styles.editProfileBtnText}>Edit Profile</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
 
-                {/* Settings Groups */}
-                {settingGroups.map((group, gIndex) => (
-                    <View key={gIndex} style={styles.groupContainer}>
+                {/* ── QUICK STATS ── */}
+                <View style={styles.statsRow}>
+                    <TouchableOpacity style={styles.statCard} onPress={() => navigation.navigate('Orders')}>
+                        <Text style={styles.statValue}>🛍️</Text>
+                        <Text style={styles.statLabel}>My Orders</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.statCard} onPress={() => navigation.navigate('Wishlist')}>
+                        <Text style={styles.statValue}>❤️</Text>
+                        <Text style={styles.statLabel}>Wishlist</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.statCard} onPress={() => navigation.navigate('Rewards')}>
+                        <Text style={styles.statValue}>⭐</Text>
+                        <Text style={styles.statLabel}>Rewards</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.statCard} onPress={() => navigation.navigate('Referral')}>
+                        <Text style={styles.statValue}>🎁</Text>
+                        <Text style={styles.statLabel}>Refer</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {/* ── SETTING GROUPS ── */}
+                {SETTING_GROUPS.map((group, gIndex) => (
+                    <View key={gIndex} style={styles.groupBlock}>
                         <Text style={styles.groupTitle}>{group.title}</Text>
-                        <View style={styles.card}>
+                        <View style={styles.groupCard}>
                             {group.items.map((item, iIndex) => (
                                 <View key={iIndex}>
-                                    <TouchableOpacity style={styles.itemRow} onPress={item.onPress} activeOpacity={0.7}>
-                                        <View style={[styles.iconBox, { backgroundColor: item.iconBg }]}>
-                                            <Feather name={item.icon} size={20} color={item.iconColor} />
+                                    <TouchableOpacity
+                                        style={styles.settingRow}
+                                        onPress={() => navigation.navigate(item.nav)}
+                                        activeOpacity={0.7}
+                                    >
+                                        <View style={[styles.settingIconBox, { backgroundColor: item.iconBg }]}>
+                                            <Feather name={item.icon} size={19} color={item.iconColor} />
                                         </View>
-                                        <Text style={styles.itemTitle}>{item.title}</Text>
-                                        <Feather name="chevron-right" size={20} color="#D1D5DB" />
+                                        <View style={styles.settingContent}>
+                                            <Text style={styles.settingTitle}>{item.title}</Text>
+                                            <Text style={styles.settingSub}>{item.sub}</Text>
+                                        </View>
+                                        <Feather name="chevron-right" size={18} color="#D1D5DB" />
                                     </TouchableOpacity>
-                                    {iIndex < group.items.length - 1 && <View style={styles.divider} />}
+                                    {iIndex < group.items.length - 1 && (
+                                        <View style={styles.itemDivider} />
+                                    )}
                                 </View>
                             ))}
                         </View>
                     </View>
                 ))}
 
-                {/* Logout Button */}
+                {/* ── LOGOUT ── */}
                 <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-                    <Feather name="log-out" size={20} color="#EF4444" />
+                    <View style={styles.logoutIconBox}>
+                        <Feather name="log-out" size={18} color="#EF4444" />
+                    </View>
                     <Text style={styles.logoutText}>Log Out</Text>
+                    <Feather name="chevron-right" size={18} color="#EF4444" />
                 </TouchableOpacity>
 
-                <Text style={styles.version}>App Version 2.0.0</Text>
+                <Text style={styles.versionText}>Rice Mill Express • Version 2.0.0</Text>
+                <View style={{ height: 32 }} />
             </ScrollView>
         </SafeAreaView>
     );
@@ -112,25 +163,73 @@ const SettingsScreen = ({ navigation }) => {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F9FAFB' },
-    scrollContent: { padding: 20, paddingBottom: 40 },
-    header: { flexDirection: 'row', alignItems: 'center', marginBottom: 32, backgroundColor: '#fff', padding: 20, borderRadius: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
-    avatarWrap: { position: 'relative', marginRight: 16 },
-    avatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#16A34A', alignItems: 'center', justifyContent: 'center' },
-    avatarText: { fontSize: 28, fontWeight: '800', color: '#fff' },
-    editBadge: { position: 'absolute', bottom: -4, right: -4, backgroundColor: '#F97316', width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
-    headerInfo: { flex: 1 },
-    name: { fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 4 },
-    email: { fontSize: 14, color: '#6B7280' },
-    groupContainer: { marginBottom: 24 },
-    groupTitle: { fontSize: 14, fontWeight: '700', color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12, marginLeft: 8 },
-    card: { backgroundColor: '#fff', borderRadius: 20, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 1 },
-    itemRow: { flexDirection: 'row', alignItems: 'center', padding: 16 },
-    iconBox: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
-    itemTitle: { flex: 1, fontSize: 16, fontWeight: '500', color: '#111827' },
-    divider: { height: 1, backgroundColor: '#F3F4F6', marginLeft: 72 },
-    logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 16, backgroundColor: '#FEF2F2', borderRadius: 50, marginTop: 12 },
-    logoutText: { marginLeft: 8, fontSize: 16, fontWeight: '700', color: '#EF4444' },
-    version: { textAlign: 'center', marginTop: 32, fontSize: 13, color: '#9CA3AF', fontWeight: '500' }
+    header: {
+        paddingHorizontal: 20, paddingVertical: 16, backgroundColor: '#fff',
+        borderBottomWidth: 1, borderBottomColor: '#F3F4F6',
+    },
+    headerTitle: { fontSize: 24, fontWeight: '800', color: '#111827', letterSpacing: -0.5 },
+    scrollContent: { padding: 16, paddingBottom: 32 },
+
+    // Profile
+    profileCard: {
+        flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff',
+        borderRadius: 24, padding: 20, marginBottom: 16,
+        shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
+        borderWidth: 1, borderColor: '#F3F4F6',
+    },
+    profileAvatarWrap: { position: 'relative', marginRight: 16 },
+    profileAvatar: {
+        width: 70, height: 70, borderRadius: 35, backgroundColor: '#16A34A',
+        alignItems: 'center', justifyContent: 'center',
+        shadowColor: '#16A34A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4,
+    },
+    profileAvatarText: { fontSize: 26, fontWeight: '800', color: '#fff' },
+    editBadge: {
+        position: 'absolute', bottom: -2, right: -2, backgroundColor: '#F97316',
+        width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center',
+        borderWidth: 2, borderColor: '#fff',
+    },
+    profileInfo: { flex: 1 },
+    profileName: { fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 3 },
+    profileEmail: { fontSize: 13, color: '#9CA3AF', marginBottom: 10 },
+    editProfileBtn: { backgroundColor: '#F0FDF4', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 50, alignSelf: 'flex-start' },
+    editProfileBtnText: { fontSize: 13, fontWeight: '700', color: '#16A34A' },
+
+    // Quick stats
+    statsRow: { flexDirection: 'row', gap: 10, marginBottom: 24 },
+    statCard: {
+        flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 14,
+        alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#F3F4F6',
+        shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 4, elevation: 1,
+    },
+    statValue: { fontSize: 24 },
+    statLabel: { fontSize: 11, fontWeight: '700', color: '#6B7280', textAlign: 'center' },
+
+    // Groups
+    groupBlock: { marginBottom: 20 },
+    groupTitle: { fontSize: 13, fontWeight: '700', color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10, marginLeft: 4 },
+    groupCard: {
+        backgroundColor: '#fff', borderRadius: 20, overflow: 'hidden',
+        shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 1,
+        borderWidth: 1, borderColor: '#F3F4F6',
+    },
+    settingRow: { flexDirection: 'row', alignItems: 'center', padding: 16 },
+    settingIconBox: { width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
+    settingContent: { flex: 1 },
+    settingTitle: { fontSize: 15, fontWeight: '600', color: '#111827', marginBottom: 2 },
+    settingSub: { fontSize: 12, color: '#9CA3AF' },
+    itemDivider: { height: 1, backgroundColor: '#F9FAFB', marginLeft: 74 },
+
+    // Logout
+    logoutBtn: {
+        flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff',
+        borderRadius: 20, padding: 16, marginBottom: 20, gap: 14,
+        borderWidth: 1.5, borderColor: '#FEE2E2',
+    },
+    logoutIconBox: { width: 44, height: 44, borderRadius: 13, backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center' },
+    logoutText: { flex: 1, fontSize: 15, fontWeight: '700', color: '#EF4444' },
+
+    versionText: { textAlign: 'center', fontSize: 12, color: '#D1D5DB', fontWeight: '500' },
 });
 
 export default SettingsScreen;
