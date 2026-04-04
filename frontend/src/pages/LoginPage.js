@@ -26,19 +26,6 @@ const LoginPage = () => {
   const { userInfo, error: loginError, loading: authLoading } = useSelector((state) => state.userLogin || {});
   const recaptchaRef = React.useRef(null);
 
-  // ✅ PROACTIVE REDIRECTION: If already logged in, get out of here immediately!
-  useEffect(() => {
-    if (userInfo && !authLoading) {
-      console.log('🚀 LoginPage: User already detected in Redux, redirecting...');
-      const role = userInfo.role;
-      let path = '/customer/dashboard';
-      if (role === 'admin') path = '/admin/dashboard';
-      else if (role === 'seller') path = '/seller/dashboard';
-      else if (role === 'delivery') path = '/delivery/dashboard';
-      navigate(path, { replace: true });
-    }
-  }, [userInfo, authLoading, navigate]);
-
   // ✅ SYNC ERROR MESSAGES: Show errors from AuthContext/Redux
   useEffect(() => {
     if (loginError) {

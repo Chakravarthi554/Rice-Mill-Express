@@ -23,7 +23,7 @@ const NAV_GROUPS = [
     {
         title: 'Shopping',
         items: [
-            { label: 'My Orders', sub: 'Track & manage', icon: ShoppingBag, iconBg: '#F0FDF4', iconColor: '#16A34A', path: '/settings/orders' },
+            { label: 'My Orders', sub: 'Track & manage', icon: ShoppingBag, iconBg: '#F0FDF4', iconColor: '#16A34A', path: '/settings/order-history' },
             { label: 'Rewards', sub: 'Points & wallet', icon: Star, iconBg: '#FEFCE8', iconColor: '#CA8A04', path: '/settings/rewards' },
             { label: 'Notifications', sub: 'Alerts & updates', icon: Notifications, iconBg: '#FFF7ED', iconColor: '#EA580C', path: '/settings/notifications' },
         ],
@@ -32,13 +32,13 @@ const NAV_GROUPS = [
         title: 'Preferences',
         items: [
             { label: 'Language', sub: 'App language', icon: Language, iconBg: '#F5F3FF', iconColor: '#7C3AED', path: '/settings/language' },
-            { label: 'Appearance', sub: 'Theme settings', icon: Brightness4, iconBg: '#F0FDFA', iconColor: '#0D9488', path: '/settings/appearance' },
+            { label: 'Appearance', sub: 'Theme settings', icon: Brightness4, iconBg: '#F0FDFA', iconColor: '#0D9488', path: '/settings/theme' },
         ],
     },
     {
         title: 'Support',
         items: [
-            { label: 'Help Center', sub: 'FAQs & support', icon: HelpOutline, iconBg: '#F1F5F9', iconColor: '#475569', path: '/settings/help' },
+            { label: 'Help Center', sub: 'FAQs & support', icon: HelpOutline, iconBg: '#F1F5F9', iconColor: '#475569', path: '/settings/help-center' },
             { label: 'Legal', sub: 'Terms & privacy', icon: Description, iconBg: '#F8FAFC', iconColor: '#64748B', path: '/settings/legal' },
         ],
     },

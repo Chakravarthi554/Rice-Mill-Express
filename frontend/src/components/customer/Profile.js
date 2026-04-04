@@ -1,6 +1,9 @@
 // frontend/src/components/customer/Profile.js
 import React, { useState } from 'react';
 import { Typography, Paper, Box, Tabs, Tab } from '@mui/material';
+import { useDispatch, useSelector } from 'react-redux';
+import { useEffect } from 'react';
+import { getUserDetails } from '../../redux/actions/userActions';
 import {
   PersonOutline,
   LocationOnOutlined,

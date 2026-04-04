@@ -65,7 +65,7 @@ import PreferencesSettings from './components/customer/PreferencesSettings';
 import LanguageSettings from './components/customer/LanguageSettings';
 import ThemeMode from './components/customer/ThemeMode';
 import AccessibilitySettings from './components/customer/AccessibilitySettings';
-import OrderHistory from './components/customer/OrderHistory';
+import OrderHistory from './components/customer/MyOrders';
 import RefundsReturns from './components/customer/RefundsReturns';
 import DownloadInvoices from './components/customer/DownloadInvoices';
 import RewardsWallet from './components/customer/RewardsWallet';
@@ -290,7 +290,23 @@ function App() {
               </Route>
 
               {/* --- DEFAULT --- */}
-              <Route path="/" element={<LoginPage />} />
+              <Route 
+                path="/" 
+                element={
+                  userInfo?.token ? (
+                    <Navigate 
+                      to={
+                        userInfo.role === 'admin' ? '/admin/dashboard' :
+                        userInfo.role === 'seller' ? (userInfo.kycStatus === 'approved' ? '/seller/dashboard' : '/seller/kyc') :
+                        '/customer/dashboard'
+                      } 
+                      replace 
+                    />
+                  ) : (
+                    <LoginPage />
+                  )
+                } 
+              />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
         </I18nProvider>

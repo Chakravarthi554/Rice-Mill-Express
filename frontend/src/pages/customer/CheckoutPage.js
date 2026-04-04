@@ -98,47 +98,42 @@ const CheckoutPage = () => {
       return sum + price * qty;
     }, 0);
 
-  // Calculate delivery charge
+  // Determine Delivery Charge (Mobile parity logic)
   useEffect(() => {
-    const fetchDeliveryFee = async () => {
-      if (!selectedAddress || selectedItems.length === 0) return;
-
+    const fetchDeliveryCharge = async () => {
+      if (!selectedAddress) {
+        setDeliveryCharge(0);
+        return;
+      }
       try {
         const { data } = await api.post('/api/orders/delivery-fee-preview', {
-          orderItems: cartItems
-            .filter(i => selectedItems.includes(i.product._id))
-            .map(i => ({ product: i.product._id, qty: i.quantity })),
-          shippingAddressId: selectedAddress._id
+          shippingAddressId: selectedAddress._id,
+          orderTotal: totalAmount
         });
-
-        setDeliveryCharge(data.deliveryFee);
-        setFreeDelivery(data.freeDeliveryApplied);
+        setDeliveryCharge(data.deliveryFee || 0);
       } catch (err) {
-        console.error('Error fetching delivery fee:', err);
-        // Fallback to basic calculation
-        if (totalAmount >= 5000) {
+        console.error('Failed to fetch delivery fee preview');
+        // Fallback identical to Mobile app parity
+        if (totalAmount > 500) {
           setDeliveryCharge(0);
-          setFreeDelivery(true);
         } else {
           setDeliveryCharge(50);
-          setFreeDelivery(false);
         }
       }
     };
-
-    fetchDeliveryFee();
+    fetchDeliveryCharge();
   }, [totalAmount, selectedAddress, selectedItems, cartItems]);
 
-  const grandTotal = totalAmount + deliveryCharge;
-
-  // Reward Discount Calculation
+  // Calculations exactly synced with Mobile CheckoutScreen.js
   let discount = 0;
-  if (useRewards && rewards && rewards.points > 0) {
-    discount = Math.min(rewards.points, grandTotal);
+  if (useRewards && rewards?.points) {
+    discount = Math.min(rewards.points, totalAmount); // Cap discount to subtotal
   }
-  const finalTotal = grandTotal - discount;
 
-  const isMinOrderMet = totalAmount >= 1500;
+  const finalTotal = totalAmount + deliveryCharge - discount;
+
+  // Minimum Order COD Check (Mobile uses finalTotal < 1500)
+  const isMinOrderMet = finalTotal >= 1500;
 
   // -----------------------------------------------------------------
   // Qty change → call API, then re-fetch cart (so UI stays in sync)

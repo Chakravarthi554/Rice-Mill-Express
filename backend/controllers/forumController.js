@@ -316,6 +316,17 @@ const getPostById = asyncHandler(async (req, res) => {
     const postObj = post.toObject();
     postObj.userId = anonymizeUser(post.userId, req.user);
 
+    // 🔥 ENHANCED: Real-time view updates
+    if (req.io) {
+      req.io.emit('SOCIAL_UPDATE', {
+        type: 'VIEW',
+        itemId: post._id,
+        itemType: 'forum',
+        viewCount: currentViewCount
+      });
+      console.log(`👁️ View broadcasted for post ${post._id}: ${currentViewCount}`);
+    }
+
     res.json({
       ...postObj,
       replies: anonymizedComments, // Map comments to 'replies' field expected by frontend

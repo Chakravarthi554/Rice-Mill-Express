@@ -1,8 +1,9 @@
 // [Premium Figma-level Redesign — MyOrders (Web)]
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Box, Grid, Button, Chip } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
+import { listMyOrders } from '../../redux/actions/orderActions';
 import Loader from '../common/Loader';
 import OrderTracker from '../customer/OrderTracker';
 import Price from '../common/Price';
@@ -21,11 +22,23 @@ const STATUS_CONFIG = {
     cancelled: { label: 'Cancelled', bg: '#FEF2F2', text: '#B91C1C', border: '#FECACA', dot: '#EF4444' },
 };
 
+const BACKEND_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5001').replace('/api', '');
+const getImageUrl = (url) => {
+  if (!url) return '/placeholder.jpg';
+  if (url.startsWith('http')) return url;
+  return BACKEND_URL + url;
+};
+
 const MyOrders = () => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
     const { t } = useTranslation();
     const { loading: ordersLoading, error: ordersError, orders = [] } = useSelector((state) => state.orderListMy || {});
+
+  // ✅ Load orders fresh from database on mount
+  useEffect(() => {
+    dispatch(listMyOrders());
+  }, [dispatch]);
 
     const formatDate = (ds) => {
         try {
@@ -118,7 +131,7 @@ const MyOrders = () => {
                                                     border: '1px solid #F3F4F6',
                                                 }}>
                                                     <Box component="img"
-                                                        src={item.product.images?.[0] || '/placeholder.jpg'}
+                                                        src={getImageUrl(item.product.images?.[0])}
                                                         alt={item.product.name}
                                                         sx={{ width: 60, height: 60, borderRadius: 2, objectFit: 'cover', flexShrink: 0 }}
                                                     />

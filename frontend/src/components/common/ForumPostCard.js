@@ -64,6 +64,12 @@ const ForumPostCard = ({ post, onUpdate }) => {
             ...prev,
             sharesCount: data.sharesCount
           }));
+        } else if (data.type === 'VIEW') {
+          console.log('📡 Received SOCIAL_UPDATE VIEW event:', data);
+          setCurrentPost(prev => ({
+            ...prev,
+            viewCount: data.viewCount
+          }));
         }
       }
     };

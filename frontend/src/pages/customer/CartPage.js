@@ -29,8 +29,8 @@ const CartPage = () => {
   const handleRemove = (id) => dispatch(removeFromCart(id));
   const proceedToCheckout = () => navigate('/checkout');
 
-  const subtotal = cartItems.reduce((s, i) => s + (i.product?.price || 0) * (i.qty || 0), 0);
-  const deliveryFee = subtotal >= 1000 ? 0 : 80;
+  const subtotal = cartItems.reduce((s, i) => s + ((i.product?.offerPrice || i.product?.price) || 0) * (i.qty || 0), 0);
+  const deliveryFee = subtotal > 500 ? 0 : 50;
   const grandTotal = subtotal + deliveryFee;
 
   const cartProductIds = cartItems.map(item => item.product._id);
@@ -60,12 +60,12 @@ const CartPage = () => {
         My Cart <Chip label={`${cartItems.length} items`} size="small" sx={{ ml: 1, bgcolor: '#F0FDF4', color: '#16A34A', fontWeight: 700 }} />
       </Typography>
 
-      {subtotal < 1000 && (
+      {subtotal <= 500 && (
         <Alert
           icon={<LocalShipping />}
           severity="info"
           sx={{ mb: 3, borderRadius: 2, bgcolor: '#EFF6FF', border: '1px solid #BFDBFE', color: '#1D4ED8' }}>
-          Add <strong> ₹{(1000 - subtotal).toFixed(0)} </strong> more for <strong>FREE delivery!</strong>
+          Add <strong> ₹{(500 - subtotal + 1).toFixed(0)} </strong> more for <strong>FREE delivery!</strong>
         </Alert>
       )}
 

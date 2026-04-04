@@ -9,6 +9,7 @@ import { USER_UPDATE_PROFILE_RESET } from '../../redux/constants/userConstants';
 const BasicInfo = () => {
   const dispatch = useDispatch();
   const { userInfo } = useSelector(state => state.userLogin);
+  const { user: userDetails } = useSelector(state => state.userDetails || {});
   const { loading, error, success } = useSelector(state => state.userUpdateProfile);
 
   const [name, setName] = useState('');
@@ -21,15 +22,18 @@ const BasicInfo = () => {
   const [message, setMessage] = useState(null);
 
   useEffect(() => {
-    if (userInfo) {
-      setName(userInfo.name || '');
-      setEmail(userInfo.email || '');
-      setPhone(userInfo.phone || '');
-      setGender(userInfo.gender || '');
-      setDob(userInfo.dob ? new Date(userInfo.dob).toISOString().split('T')[0] : '');
-      setPreviewImage(userInfo.profileImage);
+    // Prefer fresh user details from database, fallback to session info
+    const currentUser = userDetails && userDetails._id ? userDetails : userInfo;
+    
+    if (currentUser) {
+      setName(currentUser.name || '');
+      setEmail(currentUser.email || '');
+      setPhone(currentUser.phone || '');
+      setGender(currentUser.gender || '');
+      setDob(currentUser.dob ? new Date(currentUser.dob).toISOString().split('T')[0] : '');
+      setPreviewImage(currentUser.profileImage);
     }
-  }, [userInfo]);
+  }, [userInfo, userDetails]);
 
   useEffect(() => {
     if (success) {

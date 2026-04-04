@@ -21,6 +21,7 @@ const {
   getReportStats,
   bookmarkPost,
   getUserBookmarks,
+  sharePost,
   customerLimiter,
   sellerLimiter
 } = require('../controllers/forumController');

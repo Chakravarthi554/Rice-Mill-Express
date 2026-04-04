@@ -193,14 +193,13 @@ export const AuthProvider = ({ children }) => {
             try {
               const parsed = JSON.parse(storedUser);
               if (parsed.uid === firebaseUser.uid && parsed.token) {
-                console.log('⏩ AuthContext: User profile already in localStorage for UID:', firebaseUser.uid);
-                  if (!userInfo || userInfo.token !== parsed.token) {
-                    dispatch({ type: USER_LOGIN_SUCCESS, payload: parsed });
-                    updateUser(parsed);
-                  }
-                  setLoading(false);
-                  return;
-                }
+                console.log('⏩ AuthContext: User profile found in localStorage for UID:', firebaseUser.uid);
+                // ALWAYS dispatch to ensure state is fresh, even if token is the same
+                dispatch({ type: USER_LOGIN_SUCCESS, payload: parsed });
+                updateUser(parsed);
+                setLoading(false);
+                return;
+              }
             } catch (e) {
               console.warn('⚠️ AuthContext: Failed to parse stored user, will fetch fresh');
             }
@@ -233,8 +232,35 @@ export const AuthProvider = ({ children }) => {
           } catch (syncError) {
             console.error('❌ AuthContext: Sync failed:', syncError.message);
             const errMsg = syncError.response?.data?.message || syncError.message || 'Login synchronization failed';
-            dispatch({ type: USER_LOGIN_FAIL, payload: errMsg });
-            setUser(firebaseUser); // Fallback to raw firebase user
+            // CRITICAL FIX: Never dispatch USER_LOGIN_FAIL on network errors.
+            // It wipes Redux state and blocks login completely.
+            // Instead fall back gracefully to cached data.
+            let mergedUser = null;
+            const cachedRaw = localStorage.getItem('userInfo');
+            if (cachedRaw) {
+              try {
+                const cached = JSON.parse(cachedRaw);
+                if (cached.uid === firebaseUser.uid) {
+                  const freshToken = await firebaseUser.getIdToken().catch(() => cached.token);
+                  mergedUser = { ...cached, token: freshToken };
+                }
+              } catch (_e) {}
+            }
+            if (!mergedUser) {
+              const freshToken = await firebaseUser.getIdToken().catch(() => null);
+              mergedUser = {
+                uid: firebaseUser.uid,
+                email: firebaseUser.email,
+                name: firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split('@')[0] : 'User'),
+                role: 'customer',
+                token: freshToken,
+                profileImage: firebaseUser.photoURL || '/uploads/default_avatar.jpg',
+              };
+            }
+            if (mergedUser.token) localStorage.setItem('token', mergedUser.token);
+            localStorage.setItem('userInfo', JSON.stringify(mergedUser));
+            dispatch({ type: USER_LOGIN_SUCCESS, payload: mergedUser });
+            updateUser(mergedUser);
           } finally {
             fetchingUidRef.current = null;
           }
@@ -271,40 +297,49 @@ export const AuthProvider = ({ children }) => {
   }, [dispatch, updateUser, user, userInfo]);
 
 
-  // Redirect logic
+  // ✅ CONSOLIDATED REDIRECTION LOGIC
   useEffect(() => {
     const isAuthPath = location.pathname === '/login' || location.pathname === '/register' || location.pathname === '/';
-    if (!loading && userInfo && isAuthPath) {
-      const redirectPath = () => {
-        if (userInfo.role === 'admin') return '/admin/dashboard';
-        if (userInfo.role === 'customer') return '/customer/dashboard';
-        if (userInfo.role === 'deliveryPartner') {
-          // Delivery partners should only use the mobile app
-          setTimeout(() => {
-            logout(true);
-            setMessage('Delivery partners can only access through the mobile app. Please use the mobile application.');
-          }, 100);
-          return '/login';
-        }
+    
+    if (!loading && userInfo?.token && isAuthPath) {
+      console.log('🏁 AuthContext: Redirection checking for user:', userInfo.email, 'Role:', userInfo.role);
 
-        // Mandatory email verification check for Sellers/Customers
+      const getSafeRedirectPath = () => {
+        // High priority: Email Verification
         if (!userInfo.emailVerified && userInfo.requiresVerification) {
+          console.log('⚠️ AuthContext: Email verification required');
           return '/verify-email-notice';
         }
 
-        if (userInfo.role === 'seller') {
-          return userInfo.kycStatus === 'approved'
-            ? '/seller/dashboard'
-            : '/seller/kyc';
+        // Role-based routing
+        const role = userInfo.role;
+        switch (role) {
+          case 'admin': return '/admin/dashboard';
+          case 'seller':
+            return userInfo.kycStatus === 'approved' ? '/seller/dashboard' : '/seller/kyc';
+          case 'customer': return '/customer/dashboard';
+          case 'deliveryPartner':
+            console.warn('🛑 Delivery Partner attempted desktop login');
+            setTimeout(() => {
+              logout(true);
+              setMessage('Delivery Partners must use the mobile application.');
+            }, 100);
+            return '/login';
+          default:
+            console.log('ℹ️ AuthContext: No specific role path, defaulting to customer dashboard');
+            return '/customer/dashboard';
         }
-        return '/customer/dashboard';
       };
 
-      const path = redirectPath();
-      console.log('🔀 AuthContext: Redirecting to:', path);
-      navigate(path, { replace: true });
+      const targetPath = getSafeRedirectPath();
+      
+      // Prevent redundant navigation to the same path
+      if (location.pathname !== targetPath) {
+        console.log('🔀 AuthContext: 🚀 Navigating from', location.pathname, 'to', targetPath);
+        navigate(targetPath, { replace: true });
+      }
     }
-  }, [loading, userInfo, navigate, location.pathname]);
+  }, [loading, userInfo, navigate, location.pathname, logout]);
 
   const login = async (email, password) => {
     dispatch({ type: USER_LOGIN_REQUEST });

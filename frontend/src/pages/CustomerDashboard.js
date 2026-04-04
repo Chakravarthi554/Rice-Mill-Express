@@ -1,5 +1,4 @@
-// src/pages/CustomerDashboard.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from '../components/common/Header';
 import Dashboard from '../components/customer/Dashboard';
 import ProductFilter from '../components/common/ProductFilter';
@@ -12,12 +11,26 @@ import {
   ShoppingBag, Explore, LocalOffer, Favorite, Person, Storefront
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
+import { useDispatch, useSelector } from 'react-redux';
+import { listMyOrders } from '../redux/actions/orderActions';
+import { getUserDetails } from '../redux/actions/userActions';
+import { listMyCart } from '../redux/actions/cartActions';
 import { useNavigate } from 'react-router-dom';
 
 const CustomerDashboard = () => {
   const { user: userInfo } = useAuth();
   const [activeTab, setActiveTab] = useState(0);
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+
+  // ✅ Load all customer data on dashboard mount
+  useEffect(() => {
+    if (userInfo?._id) {
+      dispatch(getUserDetails(userInfo._id));
+      dispatch(listMyOrders());
+      dispatch(listMyCart());
+    }
+  }, [dispatch, userInfo?._id]);
 
   const handleTabChange = (event, newValue) => setActiveTab(newValue);
 
@@ -44,10 +57,10 @@ const CustomerDashboard = () => {
   };
 
   const quickLinks = [
-    { label: 'My Orders', icon: <ShoppingBag />, path: '/orders', color: '#4F46E5', bg: '#EEF2FF' },
+    { label: 'My Orders', icon: <ShoppingBag />, path: '/settings/order-history', color: '#4F46E5', bg: '#EEF2FF' },
     { label: 'Wishlist', icon: <Favorite />, path: '/wishlist', color: '#DB2777', bg: '#FDF2F8' },
     { label: 'Offers', icon: <LocalOffer />, path: '/products?sale=true', color: '#EA580C', bg: '#FFF7ED' },
-    { label: 'My Profile', icon: <Person />, path: '/profile', color: '#0284C7', bg: '#F0F9FF' },
+    { label: 'My Profile', icon: <Person />, path: '/settings/profile', color: '#0284C7', bg: '#F0F9FF' },
   ];
 
   return (

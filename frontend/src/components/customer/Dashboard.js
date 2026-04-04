@@ -37,6 +37,14 @@ function useCountdown(seconds) {
     return `${h}:${m}:${s}`;
 }
 
+const BACKEND_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5001').replace('/api', '');
+
+const getImageUrl = (url) => {
+  if (!url) return null;
+  if (url.startsWith('http')) return url;
+  return BACKEND_URL + url;
+};
+
 const Dashboard = () => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
@@ -49,8 +57,9 @@ const Dashboard = () => {
     const { wishlistItems = [] } = useSelector(state => state.wishlist || {});
 
     useEffect(() => {
-        if (!products || products.length === 0) dispatch(listProducts());
-    }, [dispatch, products]);
+        dispatch(listProducts({ limit: 20 }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [dispatch]);
 
     useEffect(() => {
         const interval = setInterval(() => setActiveBanner(p => (p + 1) % BANNERS.length), 4000);

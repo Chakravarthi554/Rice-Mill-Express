@@ -14,6 +14,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { getRewards, getRewardTransactions, getWalletData, requestWithdrawal, getWithdrawalHistory, getReferralCode, getReferrals } from '../../redux/actions/rewardsActions';
 import { getPublicSettings } from '../../redux/actions/adminSettingsActions';
 import { WITHDRAW_RESET } from '../../redux/constants/rewardsConstants';
+import { useNavigate } from 'react-router-dom';
 
 // Dummy icons since some apps don't have WhatsApp standard in MUI
 const WhatsAppIcon = () => <Box sx={{ width: 32, height: 32, borderRadius: '50%', bgcolor: '#25D366', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700 }}>W</Box>;
@@ -56,18 +57,19 @@ const RewardsWallet = () => {
     const code = referralCodeObj?.code || rewards?.referralCode;
     if (code) { navigator.clipboard.writeText(code); alert('Copied!'); }
   };
+  const navigate = useNavigate();
 
   const menuItems = [
     { label: 'Account', isHeader: true },
-    { label: 'My Orders', icon: <LocalMall fontSize="small" /> },
-    { label: 'My Addresses', icon: <LocationOn fontSize="small" /> },
-    { label: 'Saved Payments', icon: <Payment fontSize="small" /> },
-    { label: 'Rice Mill Wallet', icon: <AccountBalanceWallet fontSize="small" />, suffix: `₹${walletData?.balance || 0}` },
+    { label: 'My Orders', icon: <LocalMall fontSize="small" />, path: '/orders' },
+    { label: 'My Addresses', icon: <LocationOn fontSize="small" />, path: '/profile' }, // Address tab is in profile
+    { label: 'Saved Payments', icon: <Payment fontSize="small" />, path: '/profile' }, // Fallback to profile
+    { label: 'Rice Mill Wallet', icon: <AccountBalanceWallet fontSize="small" />, suffix: `₹${walletData?.balance || 0}`, path: '/settings/rewards' },
     { label: 'Rewards', isHeader: true },
-    { label: 'Refer & Earn', icon: <CardGiftcard fontSize="small" /> },
-    { label: 'My Coupons', icon: <LocalOffer fontSize="small" /> },
+    { label: 'Refer & Earn', icon: <CardGiftcard fontSize="small" />, path: '/settings/rewards' },
+    { label: 'My Coupons', icon: <LocalOffer fontSize="small" />, path: '/products?sale=true' }, // Fallback to sale items
     { label: 'Settings', isHeader: true },
-    { label: 'Language', icon: <Language fontSize="small" />, suffix: 'English' },
+    { label: 'Language', icon: <Language fontSize="small" />, suffix: 'English', path: '/settings' },
     { label: 'Notifications', icon: <NotificationsActive fontSize="small" />, isToggle: true },
   ];
 
@@ -91,7 +93,7 @@ const RewardsWallet = () => {
               </Avatar>
               <Typography variant="h6" fontWeight={800}>{userInfo?.name || 'Rahul Sharma'}</Typography>
               <Typography variant="body2" sx={{ opacity: 0.9 }}>{userInfo?.phone || '+91 98765 43210'}</Typography>
-              <Typography variant="caption" sx={{ mt: 1, textDecoration: 'underline', cursor: 'pointer', fontWeight: 600 }}>Edit Profile</Typography>
+              <Typography variant="caption" sx={{ mt: 1, textDecoration: 'underline', cursor: 'pointer', fontWeight: 600 }} onClick={() => navigate('/profile')}>Edit Profile</Typography>
             </Box>
             
             <List sx={{ pt: 0, pb: 2 }}>
@@ -101,7 +103,7 @@ const RewardsWallet = () => {
                     {item.label}
                   </Typography>
                 ) : (
-                  <ListItem key={i} button sx={{ px: 3, py: 1.2 }}>
+                  <ListItem key={i} button onClick={() => { if (item.path) navigate(item.path); }} sx={{ px: 3, py: 1.2 }}>
                     <Box sx={{ color: '#16A34A', mr: 2, display: 'flex' }}>{item.icon}</Box>
                     <ListItemText primary={<Typography variant="body2" fontWeight={600} color="#374151">{item.label}</Typography>} />
                     {item.suffix && <Typography variant="caption" fontWeight={700} color={item.label === 'Rice Mill Wallet' ? '#16A34A' : 'text.secondary'}>{item.suffix}</Typography>}
