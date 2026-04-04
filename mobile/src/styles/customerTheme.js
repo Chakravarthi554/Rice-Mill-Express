@@ -8,8 +8,10 @@ export const COLORS = {
   greenPrimary: '#16A34A',
   greenDark: '#15803D',
   greenDeep: '#166534',
+  greenForest: '#14532D',
   greenLight: '#F0FDF4',
   greenMid: '#DCFCE7',
+  greenGlow: '#86EFAC',
 
   // Orange Accent (discounts, CTAs)
   orange: '#F97316',
@@ -21,10 +23,12 @@ export const COLORS = {
   amberLight: '#FEFCE8',
 
   // Neutrals
-  bgPage: '#F9FAFB',
+  bgPage: '#F4F7F2',
+  bgCanvas: '#EEF6EF',
   bgCard: '#FFFFFF',
   bgInput: '#F3F4F6',
   bgHover: '#F9FAFB',
+  bgMuted: '#F8FAFC',
 
   // Text
   textPrimary: '#111827',
@@ -115,10 +119,29 @@ export const SHADOW = {
     shadowRadius: 12,
     elevation: 6,
   },
+  soft: {
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+    elevation: 10,
+  },
 };
 
 // Reusable component style presets
 export const COMPONENTS = {
+  screen: {
+    flex: 1,
+    backgroundColor: COLORS.bgPage,
+  },
+  heroCard: {
+    backgroundColor: COLORS.bgCard,
+    borderRadius: RADIUS.xl,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    overflow: 'hidden',
+    ...SHADOW.soft,
+  },
   // Base card
   card: {
     backgroundColor: COLORS.bgCard,
@@ -157,13 +180,14 @@ export const COMPONENTS = {
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.bgInput,
+    backgroundColor: COLORS.bgCard,
     borderRadius: RADIUS.pill,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm + 4,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: COLORS.borderStrong,
     gap: SPACING.sm + 2,
+    ...SHADOW.sm,
   },
 
   // Status badges
@@ -203,6 +227,11 @@ export const COMPONENTS = {
     alignItems: 'center',
     justifyContent: 'center',
   }),
+  sectionShell: {
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.lg,
+  },
 };
 
 export default {

@@ -1,125 +1,382 @@
-// [AI: Premium Mobile Polish - Rounded inputs, pill buttons, high-contrast]
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import {
+    View,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    StyleSheet,
+    Alert,
+    ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    SafeAreaView,
+    StatusBar,
+} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
 import { useDispatch, useSelector } from 'react-redux';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { register } from '../../redux/slices/authSlice';
+import { COLORS, COMPONENTS, RADIUS, SHADOW, SPACING, TYPOGRAPHY } from '../../styles/customerTheme';
+
+const ROLE_OPTIONS = [
+    { label: 'Customer', value: 'customer' },
+    { label: 'Seller', value: 'seller' },
+    { label: 'Delivery Partner', value: 'deliveryPartner' },
+];
 
 export default function RegisterScreen({ navigation }) {
-    const [formData, setFormData] = useState({ name: '', email: '', password: '', confirmPassword: '', phone: '', role: 'customer', referralCode: '' });
+    const [formData, setFormData] = useState({
+        name: '',
+        email: '',
+        password: '',
+        confirmPassword: '',
+        phone: '',
+        role: 'customer',
+        referralCode: '',
+    });
     const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [focusedField, setFocusedField] = useState('');
 
     const dispatch = useDispatch();
     const { loading } = useSelector((state) => state.auth);
 
     const handleRegister = async () => {
         const { name, email, password, confirmPassword, phone, role, referralCode } = formData;
-        if (!name || !email || !password || !phone) { Alert.alert('Error', 'Please fill in all fields'); return; }
-        if (password !== confirmPassword) { Alert.alert('Error', 'Passwords do not match'); return; }
-        if (password.length < 6) { Alert.alert('Error', 'Password must be at least 6 characters'); return; }
+        if (!name || !email || !password || !phone) {
+            Alert.alert('Missing Fields', 'Please complete all required details.');
+            return;
+        }
+        if (password !== confirmPassword) {
+            Alert.alert('Password Mismatch', 'Password and confirm password should match.');
+            return;
+        }
+        if (password.length < 6) {
+            Alert.alert('Weak Password', 'Password must be at least 6 characters long.');
+            return;
+        }
 
         try {
             let deviceId = await AsyncStorage.getItem('deviceFingerprint');
             if (!deviceId) {
-                deviceId = `mobile-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                deviceId = `mobile-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
                 await AsyncStorage.setItem('deviceFingerprint', deviceId);
             }
+
             await dispatch(register({ name, email, password, phone, role, referralCode, deviceId })).unwrap();
-            Alert.alert('Success', 'Account created successfully! Please login.', [{ text: 'OK', onPress: () => navigation.navigate('Login') }]);
+            Alert.alert('Account Created', 'Your account is ready. Please sign in to continue.', [
+                { text: 'Go to Login', onPress: () => navigation.navigate('Login') },
+            ]);
         } catch (error) {
             Alert.alert('Registration Failed', error || 'An error occurred during registration');
         }
     };
 
-    const updateFormData = (field, value) => setFormData({ ...formData, [field]: value });
+    const updateFormData = (field, value) => setFormData((prev) => ({ ...prev, [field]: value }));
+
+    const renderInput = ({
+        field,
+        placeholder,
+        icon,
+        keyboardType,
+        autoCapitalize = 'none',
+        secureTextEntry = false,
+        rightAction,
+        value,
+    }) => (
+        <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>{placeholder}</Text>
+            <View style={[styles.inputShell, focusedField === field && styles.inputShellFocused]}>
+                <Feather name={icon} size={18} color={focusedField === field ? COLORS.greenPrimary : COLORS.textMuted} />
+                <TextInput
+                    style={styles.input}
+                    placeholder={placeholder}
+                    placeholderTextColor={COLORS.textMuted}
+                    value={value}
+                    onChangeText={(text) => updateFormData(field, text)}
+                    keyboardType={keyboardType}
+                    autoCapitalize={autoCapitalize}
+                    secureTextEntry={secureTextEntry}
+                    onFocus={() => setFocusedField(field)}
+                    onBlur={() => setFocusedField('')}
+                />
+                {rightAction}
+            </View>
+        </View>
+    );
 
     return (
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
-            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                
-                <View style={styles.header}>
-                    <View style={styles.iconBox}>
-                        <Text style={{ fontSize: 36 }}>✨</Text>
-                    </View>
-                    <Text style={styles.title}>Join Us</Text>
-                    <Text style={styles.subtitle}>Create your Rice Mill account</Text>
-                </View>
-
-                <View style={styles.form}>
-                    <View style={styles.inputContainer}>
-                        <Feather name="user" size={20} color="#9CA3AF" style={styles.icon} />
-                        <TextInput style={styles.input} placeholder="Full Name" placeholderTextColor="#9CA3AF" value={formData.name} onChangeText={(v) => updateFormData('name', v)} autoCapitalize="words" />
+        <SafeAreaView style={styles.container}>
+            <StatusBar barStyle="dark-content" backgroundColor={COLORS.bgPage} />
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
+                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                    <View style={styles.hero}>
+                        <View style={styles.heroBadge}>
+                            <MaterialCommunityIcons name="rice" size={30} color={COLORS.greenPrimary} />
+                        </View>
+                        <Text style={styles.heroTitle}>Create your Rice Mill Express account</Text>
+                        <Text style={styles.heroSubtitle}>
+                            Save addresses, reorder faster, track rewards, and enjoy a premium shopping experience on every device.
+                        </Text>
                     </View>
 
-                    <View style={styles.inputContainer}>
-                        <Feather name="mail" size={20} color="#9CA3AF" style={styles.icon} />
-                        <TextInput style={styles.input} placeholder="Email Address" placeholderTextColor="#9CA3AF" value={formData.email} onChangeText={(v) => updateFormData('email', v)} autoCapitalize="none" keyboardType="email-address" />
-                    </View>
+                    <View style={styles.formCard}>
+                        <View style={styles.ribbonRow}>
+                            <View style={styles.ribbon}>
+                                <Feather name="shield" size={13} color={COLORS.greenPrimary} />
+                                <Text style={styles.ribbonText}>Secure onboarding</Text>
+                            </View>
+                            <View style={[styles.ribbon, styles.ribbonAccent]}>
+                                <Feather name="gift" size={13} color={COLORS.orangeDark} />
+                                <Text style={[styles.ribbonText, { color: COLORS.orangeDark }]}>Referral ready</Text>
+                            </View>
+                        </View>
 
-                    <View style={styles.inputContainer}>
-                        <Feather name="phone" size={20} color="#9CA3AF" style={styles.icon} />
-                        <TextInput style={styles.input} placeholder="Phone Number" placeholderTextColor="#9CA3AF" value={formData.phone} onChangeText={(v) => updateFormData('phone', v)} keyboardType="phone-pad" />
-                    </View>
+                        {renderInput({
+                            field: 'name',
+                            placeholder: 'Full Name',
+                            icon: 'user',
+                            autoCapitalize: 'words',
+                            value: formData.name,
+                        })}
+                        {renderInput({
+                            field: 'email',
+                            placeholder: 'Email Address',
+                            icon: 'mail',
+                            keyboardType: 'email-address',
+                            value: formData.email,
+                        })}
+                        {renderInput({
+                            field: 'phone',
+                            placeholder: 'Phone Number',
+                            icon: 'phone',
+                            keyboardType: 'phone-pad',
+                            value: formData.phone,
+                        })}
+                        {renderInput({
+                            field: 'password',
+                            placeholder: 'Password',
+                            icon: 'lock',
+                            secureTextEntry: !showPassword,
+                            value: formData.password,
+                            rightAction: (
+                                <TouchableOpacity onPress={() => setShowPassword((prev) => !prev)}>
+                                    <Feather name={showPassword ? 'eye-off' : 'eye'} size={18} color={COLORS.textMuted} />
+                                </TouchableOpacity>
+                            ),
+                        })}
+                        {renderInput({
+                            field: 'confirmPassword',
+                            placeholder: 'Confirm Password',
+                            icon: 'shield',
+                            secureTextEntry: !showConfirmPassword,
+                            value: formData.confirmPassword,
+                            rightAction: (
+                                <TouchableOpacity onPress={() => setShowConfirmPassword((prev) => !prev)}>
+                                    <Feather name={showConfirmPassword ? 'eye-off' : 'eye'} size={18} color={COLORS.textMuted} />
+                                </TouchableOpacity>
+                            ),
+                        })}
 
-                    <View style={styles.inputContainer}>
-                        <Feather name="lock" size={20} color="#9CA3AF" style={styles.icon} />
-                        <TextInput style={styles.input} placeholder="Password" placeholderTextColor="#9CA3AF" value={formData.password} onChangeText={(v) => updateFormData('password', v)} secureTextEntry={!showPassword} />
-                        <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ padding: 4 }}>
-                            <Feather name={showPassword ? 'eye-off' : 'eye'} size={20} color="#9CA3AF" />
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>Account Type</Text>
+                            <View style={[styles.inputShell, focusedField === 'role' && styles.inputShellFocused, styles.pickerShell]}>
+                                <Feather name="briefcase" size={18} color={focusedField === 'role' ? COLORS.greenPrimary : COLORS.textMuted} />
+                                <Picker
+                                    selectedValue={formData.role}
+                                    style={styles.picker}
+                                    onValueChange={(value) => updateFormData('role', value)}
+                                    onFocus={() => setFocusedField('role')}
+                                    onBlur={() => setFocusedField('')}
+                                >
+                                    {ROLE_OPTIONS.map((item) => (
+                                        <Picker.Item key={item.value} label={item.label} value={item.value} />
+                                    ))}
+                                </Picker>
+                            </View>
+                        </View>
+
+                        {renderInput({
+                            field: 'referralCode',
+                            placeholder: 'Referral Code (Optional)',
+                            icon: 'gift',
+                            autoCapitalize: 'characters',
+                            value: formData.referralCode,
+                        })}
+
+                        <TouchableOpacity style={[styles.primaryButton, loading && styles.primaryButtonDisabled]} onPress={handleRegister} disabled={loading}>
+                            {loading ? (
+                                <ActivityIndicator color={COLORS.textInverse} />
+                            ) : (
+                                <>
+                                    <Text style={styles.primaryButtonText}>Create Account</Text>
+                                    <View style={styles.primaryButtonArrow}>
+                                        <Feather name="arrow-right" size={16} color={COLORS.greenPrimary} />
+                                    </View>
+                                </>
+                            )}
                         </TouchableOpacity>
+
+                        <Text style={styles.helperText}>
+                            By signing up, you agree to secure account verification and our standard privacy protections.
+                        </Text>
                     </View>
 
-                    <View style={styles.inputContainer}>
-                        <Feather name="shield" size={20} color="#9CA3AF" style={styles.icon} />
-                        <TextInput style={styles.input} placeholder="Confirm Password" placeholderTextColor="#9CA3AF" value={formData.confirmPassword} onChangeText={(v) => updateFormData('confirmPassword', v)} secureTextEntry={!showPassword} />
-                    </View>
-
-                    <View style={styles.pickerContainer}>
-                        <Feather name="briefcase" size={20} color="#9CA3AF" style={styles.icon} />
-                        <Picker selectedValue={formData.role} style={styles.picker} onValueChange={(v) => updateFormData('role', v)}>
-                            <Picker.Item label="Customer" value="customer" color="#111827" />
-                            <Picker.Item label="Seller" value="seller" color="#111827" />
-                            <Picker.Item label="Delivery Partner" value="deliveryPartner" color="#111827" />
-                        </Picker>
-                    </View>
-
-                    <View style={styles.inputContainer}>
-                        <Feather name="gift" size={20} color="#F97316" style={styles.icon} />
-                        <TextInput style={styles.input} placeholder="Referral Code (Optional)" placeholderTextColor="#9CA3AF" value={formData.referralCode} onChangeText={(v) => updateFormData('referralCode', v)} autoCapitalize="characters" />
-                    </View>
-
-                    <TouchableOpacity style={[styles.mainButton, loading && styles.buttonDisabled]} onPress={handleRegister} disabled={loading}>
-                        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Create Account</Text>}
+                    <TouchableOpacity style={styles.linkRow} onPress={() => navigation.navigate('Login')}>
+                        <Text style={styles.linkPrompt}>Already have an account? </Text>
+                        <Text style={styles.linkText}>Log In</Text>
                     </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.linkButton} onPress={() => navigation.navigate('Login')}>
-                        <Text style={styles.linkText}>Already have an account? <Text style={styles.linkTextBold}>Log In</Text></Text>
-                    </TouchableOpacity>
-                </View>
-            </ScrollView>
-        </KeyboardAvoidingView>
+                </ScrollView>
+            </KeyboardAvoidingView>
+        </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#FFFFFF' },
-    scrollContent: { flexGrow: 1, padding: 24, paddingTop: 40, paddingBottom: 60 },
-    header: { alignItems: 'center', marginBottom: 32 },
-    iconBox: { width: 72, height: 72, backgroundColor: '#FFF7ED', borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
-    title: { fontSize: 28, fontWeight: '800', color: '#111827', marginBottom: 6 },
-    subtitle: { fontSize: 16, color: '#6B7280' },
-    form: { width: '100%' },
-    inputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 16, paddingHorizontal: 16, marginBottom: 16, height: 56 },
-    pickerContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 16, paddingHorizontal: 16, marginBottom: 16, height: 56, overflow: 'hidden' },
-    icon: { marginRight: 12 },
-    input: { flex: 1, fontSize: 16, color: '#111827', height: '100%' },
-    picker: { flex: 1, height: 50 },
-    mainButton: { backgroundColor: '#16A34A', height: 56, borderRadius: 50, alignItems: 'center', justifyContent: 'center', shadowColor: '#16A34A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4, marginTop: 12 },
-    buttonDisabled: { backgroundColor: '#86EFAC', shadowOpacity: 0 },
-    buttonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-    linkButton: { marginTop: 24, alignItems: 'center' },
-    linkText: { color: '#6B7280', fontSize: 15 },
-    linkTextBold: { color: '#16A34A', fontWeight: '700' },
+    container: {
+        flex: 1,
+        backgroundColor: COLORS.bgPage,
+    },
+    flex: {
+        flex: 1,
+    },
+    scrollContent: {
+        flexGrow: 1,
+        paddingHorizontal: SPACING.lg,
+        paddingTop: SPACING.lg,
+        paddingBottom: SPACING.xxxl,
+    },
+    hero: {
+        marginBottom: SPACING.lg,
+    },
+    heroBadge: {
+        width: 72,
+        height: 72,
+        borderRadius: 24,
+        backgroundColor: COLORS.greenLight,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: SPACING.md,
+        borderWidth: 1,
+        borderColor: COLORS.greenMid,
+    },
+    heroTitle: {
+        ...TYPOGRAPHY.display,
+        lineHeight: 34,
+        marginBottom: SPACING.sm,
+    },
+    heroSubtitle: {
+        ...TYPOGRAPHY.body,
+        lineHeight: 21,
+    },
+    formCard: {
+        ...COMPONENTS.card,
+        padding: SPACING.lg,
+    },
+    ribbonRow: {
+        flexDirection: 'row',
+        gap: SPACING.sm,
+        marginBottom: SPACING.lg,
+    },
+    ribbon: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        borderRadius: RADIUS.pill,
+        backgroundColor: COLORS.greenLight,
+    },
+    ribbonAccent: {
+        backgroundColor: COLORS.orangeLight,
+    },
+    ribbonText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: COLORS.greenPrimary,
+    },
+    inputGroup: {
+        marginBottom: SPACING.md,
+    },
+    inputLabel: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: COLORS.textSecondary,
+        marginBottom: SPACING.sm,
+    },
+    inputShell: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: SPACING.sm + 2,
+        minHeight: 56,
+        paddingHorizontal: SPACING.md,
+        backgroundColor: COLORS.bgMuted,
+        borderRadius: RADIUS.md,
+        borderWidth: 1.5,
+        borderColor: COLORS.borderStrong,
+    },
+    inputShellFocused: {
+        borderColor: COLORS.greenPrimary,
+        backgroundColor: COLORS.greenLight,
+    },
+    input: {
+        flex: 1,
+        color: COLORS.textPrimary,
+        fontSize: 15,
+        fontWeight: '600',
+    },
+    pickerShell: {
+        paddingRight: 4,
+    },
+    picker: {
+        flex: 1,
+        height: 54,
+        color: COLORS.textPrimary,
+    },
+    primaryButton: {
+        ...COMPONENTS.pillBtnPrimary,
+        minHeight: 56,
+        marginTop: SPACING.sm,
+        justifyContent: 'space-between',
+        paddingHorizontal: SPACING.lg,
+    },
+    primaryButtonDisabled: {
+        backgroundColor: COLORS.greenGlow,
+        shadowOpacity: 0,
+    },
+    primaryButtonText: {
+        color: COLORS.textInverse,
+        fontSize: 16,
+        fontWeight: '800',
+    },
+    primaryButtonArrow: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: COLORS.textInverse,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    helperText: {
+        ...TYPOGRAPHY.caption,
+        textAlign: 'center',
+        marginTop: SPACING.md,
+        lineHeight: 18,
+    },
+    linkRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        marginTop: SPACING.lg,
+    },
+    linkPrompt: {
+        fontSize: 15,
+        color: COLORS.textSecondary,
+    },
+    linkText: {
+        fontSize: 15,
+        fontWeight: '800',
+        color: COLORS.greenPrimary,
+    },
 });

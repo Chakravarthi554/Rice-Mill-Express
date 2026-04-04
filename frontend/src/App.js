@@ -87,46 +87,57 @@ import SettingsPlaceholder from './components/customer/SettingsPlaceholder';
 // ============================================================
 const getAppTheme = (mode) => {
   const lightPalette = {
-    primary: { main: '#2e7d32' },
-    secondary: { main: '#ff8f00' },
-    background: { default: '#f5f5f5', paper: '#ffffff' },
+    primary: { main: '#166534' },
+    secondary: { main: '#F97316' },
+    success: { main: '#16A34A' },
+    warning: { main: '#F59E0B' },
+    background: { default: '#F4F7F2', paper: '#FFFFFF' },
+    text: { primary: '#111827', secondary: '#6B7280' },
   };
   const darkPalette = {
     mode: 'dark',
-    primary: { main: '#66bb6a' },
-    secondary: { main: '#ffa726' },
-    background: { default: '#303030', paper: '#424242' },
+    primary: { main: '#4ADE80' },
+    secondary: { main: '#FB923C' },
+    success: { main: '#22C55E' },
+    warning: { main: '#FBBF24' },
+    background: { default: '#0B1410', paper: '#142019' },
+    text: { primary: '#F8FAFC', secondary: '#CBD5E1' },
   };
   return createTheme({
     palette: mode === 'dark' ? darkPalette : lightPalette,
     shape: {
-      borderRadius: 12,
+      borderRadius: 20,
     },
     spacing: 8,
     typography: {
-      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-      h1: { fontSize: '2rem', fontWeight: 700, lineHeight: 1.25 },
-      h2: { fontSize: '1.75rem', fontWeight: 700, lineHeight: 1.3 },
-      h3: { fontSize: '1.5rem', fontWeight: 700, lineHeight: 1.35 },
-      h4: { fontSize: '1.25rem', fontWeight: 700, lineHeight: 1.4 },
-      h5: { fontSize: '1.125rem', fontWeight: 600, lineHeight: 1.45 },
-      h6: { fontSize: '1rem', fontWeight: 600, lineHeight: 1.5 },
-      body1: { fontSize: '1rem', lineHeight: 1.6 },
-      body2: { fontSize: '0.875rem', lineHeight: 1.55 },
+      fontFamily: '"Poppins", "Inter", "Segoe UI", sans-serif',
+      h1: { fontSize: '2.6rem', fontWeight: 800, lineHeight: 1.1, letterSpacing: '-0.04em' },
+      h2: { fontSize: '2rem', fontWeight: 800, lineHeight: 1.15, letterSpacing: '-0.03em' },
+      h3: { fontSize: '1.625rem', fontWeight: 700, lineHeight: 1.2, letterSpacing: '-0.02em' },
+      h4: { fontSize: '1.25rem', fontWeight: 700, lineHeight: 1.3 },
+      h5: { fontSize: '1.05rem', fontWeight: 700, lineHeight: 1.35 },
+      h6: { fontSize: '0.95rem', fontWeight: 700, lineHeight: 1.4 },
+      body1: { fontSize: '1rem', lineHeight: 1.65 },
+      body2: { fontSize: '0.9rem', lineHeight: 1.6 },
+      button: { fontWeight: 700 },
     },
     components: {
       MuiContainer: {
         styleOverrides: {
           root: {
-            paddingLeft: 16,
-            paddingRight: 16,
+            paddingLeft: 20,
+            paddingRight: 20,
           },
         },
       },
       MuiCard: {
         styleOverrides: {
           root: {
-            borderRadius: 12,
+            borderRadius: 22,
+            border: '1px solid rgba(15, 23, 42, 0.06)',
+            boxShadow: mode === 'dark'
+              ? '0 18px 40px rgba(0,0,0,0.24)'
+              : '0 18px 40px rgba(15, 23, 42, 0.07)',
           },
         },
       },
@@ -137,15 +148,34 @@ const getAppTheme = (mode) => {
         styleOverrides: {
           root: {
             textTransform: 'none',
-            borderRadius: 10,
-            fontWeight: 600,
+            borderRadius: 999,
+            fontWeight: 700,
+            paddingLeft: 18,
+            paddingRight: 18,
           },
         },
       },
       MuiPaper: {
         styleOverrides: {
           root: {
-            borderRadius: 12,
+            borderRadius: 22,
+            backgroundImage: 'none',
+          },
+        },
+      },
+      MuiChip: {
+        styleOverrides: {
+          root: {
+            borderRadius: 999,
+            fontWeight: 700,
+          },
+        },
+      },
+      MuiOutlinedInput: {
+        styleOverrides: {
+          root: {
+            borderRadius: 18,
+            backgroundColor: mode === 'dark' ? 'rgba(255,255,255,0.04)' : '#FFFFFF',
           },
         },
       },

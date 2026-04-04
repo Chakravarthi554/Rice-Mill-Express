@@ -2,12 +2,45 @@ import React, { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import {
-  Box, Card, CardContent, CardMedia, Typography, Button, Grid,
-  CircularProgress, Alert, Pagination, TextField, Select, MenuItem, FormControl, InputLabel
+  Box,
+  Card,
+  CardContent,
+  CardMedia,
+  Typography,
+  Button,
+  Grid,
+  Pagination,
+  TextField,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Alert,
+  Chip,
+  Stack,
+  InputAdornment,
 } from '@mui/material';
-import { listRecipes } from '../../redux/actions/recipeActions'; // Correct import
+import {
+  Search,
+  RestaurantMenu,
+  Star,
+  LocalDining,
+  ShoppingBagOutlined,
+} from '@mui/icons-material';
+import { listRecipes } from '../../redux/actions/recipeActions';
+import Loader from './Loader';
 
-import Loader from './Loader'; // Use your Loader component
+const riceTypes = ['Basmati', 'Jasmine', 'Brown Rice', 'Arborio', 'Sushi Rice', 'Wild Rice', 'Other'];
+
+const toneByRiceType = {
+  Basmati: { bg: '#FEF3C7', color: '#B45309' },
+  Jasmine: { bg: '#E0F2FE', color: '#0369A1' },
+  'Brown Rice': { bg: '#F5E6D3', color: '#9A3412' },
+  Arborio: { bg: '#F3E8FF', color: '#7C3AED' },
+  'Sushi Rice': { bg: '#FCE7F3', color: '#BE185D' },
+  'Wild Rice': { bg: '#DCFCE7', color: '#166534' },
+  Other: { bg: '#E2E8F0', color: '#475569' },
+};
 
 const RecipeList = () => {
   const dispatch = useDispatch();
@@ -17,132 +50,231 @@ const RecipeList = () => {
   const searchTerm = searchParams.get('search') || '';
   const riceTypeFilter = searchParams.get('riceType') || '';
 
-  // State for search and filter inputs
   const [currentSearch, setCurrentSearch] = useState(searchTerm);
   const [currentRiceType, setCurrentRiceType] = useState(riceTypeFilter);
 
-  // --- FIX: Correct useSelector and provide default value ---
-  const { loading, error, recipes = [], pages = 1, total = 0 } = useSelector(
-    (state) => state.recipeList || { loading: true, error: null, recipes: [], page: 1, pages: 1, total: 0 }
+  const { loading, error, recipes = [], pages = 1 } = useSelector(
+    (state) => state.recipeList || { loading: true, error: null, recipes: [], pages: 1 }
   );
-  const { userInfo } = useSelector((state) => state.userLogin); // Get user info for chat
-
-
 
   useEffect(() => {
-    // Fetch recipes based on current URL params
     dispatch(listRecipes({ pageNumber: page, search: searchTerm, riceType: riceTypeFilter }));
   }, [dispatch, page, searchTerm, riceTypeFilter]);
 
-  const handleSearch = (e) => {
-    e.preventDefault();
+  const handleSearch = (event) => {
+    event.preventDefault();
     setSearchParams({ pageNumber: 1, search: currentSearch, riceType: currentRiceType });
   };
 
-  const handleFilterChange = (e) => {
-    setCurrentRiceType(e.target.value);
-    setSearchParams({ pageNumber: 1, search: currentSearch, riceType: e.target.value });
+  const handleFilterChange = (event) => {
+    const nextType = event.target.value;
+    setCurrentRiceType(nextType);
+    setSearchParams({ pageNumber: 1, search: currentSearch, riceType: nextType });
   };
 
-  const handlePageChange = (event, value) => {
+  const handlePageChange = (_event, value) => {
     setSearchParams({ pageNumber: value, search: searchTerm, riceType: riceTypeFilter });
   };
 
-  // Define Rice Types for Filter (adjust as needed)
-  const riceTypes = ['Basmati', 'Jasmine', 'Brown Rice', 'Arborio', 'Sushi Rice', 'Wild Rice', 'Other'];
+  const featuredRecipe = recipes[0];
 
   return (
-    <Box sx={{ p: { xs: 2, md: 4 } }}>
-      <Typography variant="h4" gutterBottom sx={{ mb: 3, fontWeight: 'bold', color: 'primary.main' }}>
-        Discover Rice Recipes
-      </Typography>
+    <Box sx={{ px: { xs: 2, md: 4 }, py: { xs: 2, md: 4 } }}>
+      <Box
+        sx={{
+          mb: 4,
+          borderRadius: 5,
+          overflow: 'hidden',
+          background: 'linear-gradient(135deg, #166534 0%, #16A34A 55%, #4ADE80 100%)',
+          color: '#fff',
+          p: { xs: 3, md: 4 },
+          position: 'relative',
+        }}
+      >
+        <Box sx={{ position: 'absolute', top: -80, right: -60, width: 220, height: 220, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.08)' }} />
+        <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.78, mb: 1 }}>
+          Recipe Studio
+        </Typography>
+        <Typography variant="h3" sx={{ fontWeight: 800, maxWidth: 560, mb: 1.5 }}>
+          Curated rice recipes that look premium on every screen
+        </Typography>
+        <Typography sx={{ maxWidth: 640, opacity: 0.88, lineHeight: 1.7 }}>
+          Browse chef-style inspiration, home favorites, and recipe ideas connected directly to the products customers already love.
+        </Typography>
 
-      {/* Filter and Search Bar */}
-      <Box component="form" onSubmit={handleSearch} sx={{ display: 'flex', gap: 2, mb: 4, alignItems: 'center', flexWrap: 'wrap' }}>
-        <TextField
-          label="Search Recipes"
-          variant="outlined"
-          value={currentSearch}
-          onChange={(e) => setCurrentSearch(e.target.value)}
-          sx={{ flexGrow: 1, minWidth: '200px' }}
-        />
-        <FormControl sx={{ minWidth: 150 }}>
-          <InputLabel>Rice Type</InputLabel>
-          <Select
-            value={currentRiceType}
-            label="Rice Type"
-            onChange={handleFilterChange}
-          >
-            <MenuItem value=""><em>All Types</em></MenuItem>
-            {riceTypes.map(type => <MenuItem key={type} value={type}>{type}</MenuItem>)}
-          </Select>
-        </FormControl>
-        <Button type="submit" variant="contained">Search</Button>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} sx={{ mt: 3 }}>
+          <Chip label={`${recipes.length} recipes loaded`} sx={{ bgcolor: 'rgba(255,255,255,0.18)', color: '#fff', fontWeight: 700 }} />
+          <Chip label={riceTypeFilter || 'All rice types'} sx={{ bgcolor: 'rgba(255,255,255,0.18)', color: '#fff', fontWeight: 700 }} />
+        </Stack>
       </Box>
 
-      {loading && page === 1 ? ( // Show loader only on initial load
+      <Box
+        component="form"
+        onSubmit={handleSearch}
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', md: '1.4fr 0.7fr auto' },
+          gap: 2,
+          mb: 4,
+          p: 2,
+          borderRadius: 4,
+          bgcolor: 'background.paper',
+          border: '1px solid rgba(15,23,42,0.06)',
+          boxShadow: '0 12px 28px rgba(15,23,42,0.05)',
+        }}
+      >
+        <TextField
+          value={currentSearch}
+          onChange={(event) => setCurrentSearch(event.target.value)}
+          placeholder="Search biryani, pulao, pongal..."
+          fullWidth
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Search sx={{ color: '#94A3B8' }} />
+              </InputAdornment>
+            ),
+          }}
+        />
+        <FormControl fullWidth>
+          <InputLabel>Rice Type</InputLabel>
+          <Select value={currentRiceType} label="Rice Type" onChange={handleFilterChange}>
+            <MenuItem value="">All Types</MenuItem>
+            {riceTypes.map((type) => (
+              <MenuItem key={type} value={type}>{type}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <Button type="submit" variant="contained" color="success" sx={{ minHeight: 56 }}>
+          Explore Recipes
+        </Button>
+      </Box>
+
+      {featuredRecipe ? (
+        <Card
+          sx={{
+            mb: 4,
+            borderRadius: 5,
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', md: '1.2fr 0.8fr' },
+            overflow: 'hidden',
+          }}
+        >
+          <Box sx={{ p: { xs: 3, md: 4 }, bgcolor: '#F8FFF8' }}>
+            <Typography sx={{ fontSize: 12, fontWeight: 700, color: '#16A34A', letterSpacing: '0.08em', textTransform: 'uppercase', mb: 1 }}>
+              Featured
+            </Typography>
+            <Typography variant="h4" sx={{ fontWeight: 800, mb: 1.5 }}>
+              {featuredRecipe.title}
+            </Typography>
+            <Typography sx={{ color: 'text.secondary', lineHeight: 1.75, mb: 2 }}>
+              {featuredRecipe.description || 'A standout recipe built for customers who want flavor, clarity, and easy ingredient pairing.'}
+            </Typography>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              <Chip icon={<LocalDining />} label={featuredRecipe.riceType || 'Rice recipe'} sx={{ bgcolor: '#ECFCCB', color: '#3F6212', fontWeight: 700 }} />
+              <Chip icon={<ShoppingBagOutlined />} label={`${featuredRecipe.linkedProducts?.length || 0} linked products`} sx={{ bgcolor: '#FFF7ED', color: '#C2410C', fontWeight: 700 }} />
+              <Chip icon={<Star />} label={`${Number(featuredRecipe.averageRating || featuredRecipe.rating || 0).toFixed(1)} rating`} sx={{ bgcolor: '#FEF3C7', color: '#B45309', fontWeight: 700 }} />
+            </Stack>
+          </Box>
+          <Box sx={{ minHeight: 260, bgcolor: '#EEF6EF' }}>
+            <CardMedia
+              component="img"
+              image={featuredRecipe.image || '/images/default-image.jpg'}
+              alt={featuredRecipe.title}
+              sx={{ height: '100%', minHeight: 260 }}
+              onError={(event) => {
+                event.target.onerror = null;
+                event.target.src = '/images/default-image.jpg';
+              }}
+            />
+          </Box>
+        </Card>
+      ) : null}
+
+      {loading && page === 1 ? (
         <Loader />
       ) : error ? (
-        <Alert severity="error">{error}</Alert>
+        <Alert severity="error" sx={{ borderRadius: 3 }}>{error}</Alert>
       ) : recipes.length === 0 ? (
-        <Typography>No recipes found matching your criteria.</Typography>
+        <Box
+          sx={{
+            textAlign: 'center',
+            py: 8,
+            px: 3,
+            borderRadius: 5,
+            border: '1px dashed rgba(15,23,42,0.12)',
+            bgcolor: 'background.paper',
+          }}
+        >
+          <RestaurantMenu sx={{ fontSize: 52, color: '#94A3B8', mb: 2 }} />
+          <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>No recipes found</Typography>
+          <Typography color="text.secondary">Try a different keyword or switch to another rice type.</Typography>
+        </Box>
       ) : (
         <>
-          <Grid container spacing={3}>
-            {recipes.map((recipe) => (
-              <Grid item xs={12} sm={6} md={4} lg={3} key={recipe._id}>
-                <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', boxShadow: 3, '&:hover': { boxShadow: 6 } }}>
-                  <CardMedia
-                    component="img"
-                    height="160"
-                    image={recipe.image || '/images/default-image.jpg'} // Use default image path
-                    alt={recipe.title}
-                    onError={(e) => { e.target.onerror = null; e.target.src = '/images/default-image.jpg'; }} // Fallback image
-                  />
-                  <CardContent sx={{ flexGrow: 1 }}>
-                    <Typography gutterBottom variant="h6" component="div" noWrap title={recipe.title}>
-                      {recipe.title}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                      Rice Type: {recipe.riceType}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                      By: {recipe.sellerId?.name || 'Unknown Seller'}
-                    </Typography>
-                    {/* Display linked products concisely */}
-                    {recipe.linkedProducts && recipe.linkedProducts.length > 0 && (
-                      <Typography variant="caption" display="block" color="text.secondary">
-                        Uses: {recipe.linkedProducts.map(p => p.name).join(', ')}
+          <Grid container spacing={2.5}>
+            {recipes.map((recipe) => {
+              const tone = toneByRiceType[recipe.riceType] || toneByRiceType.Other;
+              const rating = Number(recipe.averageRating || recipe.rating || 0).toFixed(1);
+
+              return (
+                <Grid item xs={12} sm={6} lg={4} key={recipe._id}>
+                  <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                    <Box sx={{ position: 'relative' }}>
+                      <CardMedia
+                        component="img"
+                        height="220"
+                        image={recipe.image || '/images/default-image.jpg'}
+                        alt={recipe.title}
+                        onError={(event) => {
+                          event.target.onerror = null;
+                          event.target.src = '/images/default-image.jpg';
+                        }}
+                      />
+                      <Chip label={recipe.riceType || 'Recipe'} sx={{ position: 'absolute', top: 14, left: 14, bgcolor: tone.bg, color: tone.color, fontWeight: 800 }} />
+                      <Chip icon={<Star sx={{ color: '#F59E0B !important' }} />} label={rating} sx={{ position: 'absolute', bottom: 14, right: 14, bgcolor: 'rgba(255,255,255,0.94)', fontWeight: 800 }} />
+                    </Box>
+                    <CardContent sx={{ flexGrow: 1, p: 2.5 }}>
+                      <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }} noWrap title={recipe.title}>
+                        {recipe.title}
                       </Typography>
-                    )}
-                  </CardContent>
-                  <Box sx={{ p: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #eee' }}>
-                    <Button component={RouterLink} to={`/recipes/${recipe._id}`} size="small">
-                      View Recipe
-                    </Button>
-                  </Box>
-                </Card>
-              </Grid>
-            ))}
+                      <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1.5, minHeight: 44 }}>
+                        {recipe.description || 'A polished rice recipe with great pairing ideas and practical cooking inspiration.'}
+                      </Typography>
+                      <Stack spacing={0.8} sx={{ mb: 2 }}>
+                        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                          By <strong>{recipe.sellerId?.name || 'Rice Mill Kitchen'}</strong>
+                        </Typography>
+                        {recipe.linkedProducts?.length > 0 ? (
+                          <Typography variant="body2" sx={{ color: '#C2410C' }}>
+                            Uses: {recipe.linkedProducts.map((product) => product.name).join(', ')}
+                          </Typography>
+                        ) : null}
+                      </Stack>
+                      <Button
+                        component={RouterLink}
+                        to={`/recipes/${recipe._id}`}
+                        variant="contained"
+                        color="success"
+                        fullWidth
+                      >
+                        View Recipe
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              );
+            })}
           </Grid>
 
-          {/* Pagination */}
-          {pages > 1 && (
+          {pages > 1 ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-              <Pagination
-                count={pages}
-                page={page}
-                onChange={handlePageChange}
-                color="primary"
-                disabled={loading} // Disable during loading
-              />
+              <Pagination count={pages} page={page} onChange={handlePageChange} color="success" disabled={loading} />
             </Box>
-          )}
-          {loading && page > 1 && <Loader sx={{ mt: 2 }} />} {/* Show loader during page changes */}
+          ) : null}
+          {loading && page > 1 ? <Loader /> : null}
         </>
       )}
-
-
     </Box>
   );
 };

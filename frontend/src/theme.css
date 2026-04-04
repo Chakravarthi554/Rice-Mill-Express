@@ -1,79 +1,92 @@
-/* Global Theme Styles for Rice Mill App */
-
 :root {
   --base-font-size: 16px;
   --contrast-level: 0;
-  
-  /* Light Mode Colors */
-  --bg-primary: #ffffff;
-  --bg-secondary: #f5f5f5;
-  --text-primary: #212121;
-  --text-secondary: #757575;
-  --border-color: #e0e0e0;
+  --bg-primary: #f4f7f2;
+  --bg-secondary: #ffffff;
+  --bg-muted: #eef6ef;
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --border-color: rgba(15, 23, 42, 0.08);
+  --brand-green: #16a34a;
+  --brand-green-deep: #166534;
+  --brand-orange: #f97316;
+  --shadow-soft: 0 18px 40px rgba(15, 23, 42, 0.07);
 }
 
-/* Dark Mode — Premium Slate Palette */
 .dark-mode {
-  --bg-primary: #0F172A;
-  --bg-secondary: #1E293B;
-  --text-primary: #F1F5F9;
-  --text-secondary: #CBD5E1;
-  --border-color: #1E293B;
+  --bg-primary: #0b1410;
+  --bg-secondary: #142019;
+  --bg-muted: #1a2a21;
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --shadow-soft: 0 22px 48px rgba(0, 0, 0, 0.28);
 }
 
-.dark-mode body {
-  background-color: var(--bg-primary);
+html {
+  font-size: var(--base-font-size);
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: "Poppins", "Inter", "Segoe UI", sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(34, 197, 94, 0.08), transparent 28%),
+    radial-gradient(circle at top right, rgba(249, 115, 22, 0.08), transparent 24%),
+    var(--bg-primary);
   color: var(--text-primary);
 }
 
-.dark-mode .MuiPaper-root {
-  background-color: var(--bg-secondary) !important;
-  color: var(--text-primary) !important;
+#root {
+  min-height: 100vh;
 }
 
-.dark-mode .MuiTypography-root {
-  color: var(--text-primary) !important;
+a {
+  color: inherit;
 }
 
-.dark-mode .MuiTypography-colorTextSecondary {
-  color: var(--text-secondary) !important;
+* {
+  box-sizing: border-box;
+  transition: background-color 0.24s ease, color 0.24s ease, border-color 0.24s ease, filter 0.24s ease;
 }
 
-.dark-mode .MuiButton-outlined {
-  border-color: var(--border-color) !important;
-  color: var(--text-primary) !important;
+.MuiPaper-root,
+.MuiCard-root {
+  backdrop-filter: blur(14px);
 }
 
-.dark-mode .MuiOutlinedInput-root {
-  color: var(--text-primary) !important;
-}
-
-.dark-mode .MuiOutlinedInput-notchedOutline {
+.MuiPaper-outlined,
+.MuiCard-root {
   border-color: var(--border-color) !important;
 }
 
-.dark-mode .MuiInputLabel-root {
+.MuiTypography-root {
+  color: inherit;
+}
+
+.MuiInputBase-root,
+.MuiOutlinedInput-root {
+  color: var(--text-primary) !important;
+}
+
+.MuiOutlinedInput-notchedOutline {
+  border-color: var(--border-color) !important;
+}
+
+.MuiInputLabel-root {
   color: var(--text-secondary) !important;
 }
 
-.dark-mode .MuiTableCell-root {
-  color: var(--text-primary) !important;
-  border-bottom-color: var(--border-color) !important;
+.MuiButton-containedPrimary,
+.MuiButton-containedSuccess {
+  box-shadow: 0 14px 28px rgba(22, 163, 74, 0.22) !important;
 }
 
-.dark-mode .MuiCard-root {
-  background-color: var(--bg-secondary) !important;
+.MuiButton-containedSecondary {
+  box-shadow: 0 14px 28px rgba(249, 115, 22, 0.2) !important;
 }
 
-.dark-mode .MuiListItem-root {
-  color: var(--text-primary) !important;
-}
-
-.dark-mode .MuiDivider-root {
-  background-color: var(--border-color) !important;
-}
-
-/* High Contrast Mode */
 .high-contrast {
   filter: contrast(calc(1 + var(--contrast-level) / 100));
 }
@@ -88,74 +101,35 @@
 
 .high-contrast a {
   text-decoration: underline !important;
-  font-weight: 600 !important;
+  font-weight: 700 !important;
 }
 
-/* Text Size Scaling */
-html {
-  font-size: var(--base-font-size);
+.dark-mode .MuiDivider-root {
+  border-color: var(--border-color) !important;
 }
 
-body {
-  font-size: 1rem;
-}
-
-h1 {
-  font-size: 2.5rem;
-}
-
-h2 {
-  font-size: 2rem;
-}
-
-h3 {
-  font-size: 1.75rem;
-}
-
-h4 {
-  font-size: 1.5rem;
-}
-
-h5 {
-  font-size: 1.25rem;
-}
-
-h6 {
-  font-size: 1rem;
-}
-
-/* Smooth Transitions */
-* {
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, filter 0.3s ease;
-}
-
-/* Accessibility Improvements */
 .dark-mode *:focus-visible {
-  outline: 2px solid #90caf9 !important;
+  outline: 2px solid #86efac !important;
   outline-offset: 2px;
 }
 
-.light-mode *:focus-visible {
-  outline: 2px solid #1976d2 !important;
+.light-mode *:focus-visible,
+*:focus-visible {
+  outline: 2px solid #16a34a;
   outline-offset: 2px;
 }
 
-/* Print Styles */
 @media print {
-  .dark-mode {
-    --bg-primary: #ffffff;
-    --bg-secondary: #f5f5f5;
-    --text-primary: #000000;
-    --text-secondary: #666666;
-  }
-  
   .high-contrast {
     filter: none;
   }
 }
 
-/* Reduced Motion */
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
   * {
     transition: none !important;
     animation: none !important;
