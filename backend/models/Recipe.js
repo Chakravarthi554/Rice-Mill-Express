@@ -22,6 +22,8 @@ const recipeSchema = new mongoose.Schema({
   moderatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   moderatedAt: { type: Date },
   // Engagement Aggregates (Cached for performance)
+  viewCount: { type: Number, default: 0 },
+  viewedBy: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], default: [] },
   averageRating: { type: Number, default: 0 },
   numReviews: { type: Number, default: 0 },
   likesCount: { type: Number, default: 0 },

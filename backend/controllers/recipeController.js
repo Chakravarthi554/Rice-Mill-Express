@@ -200,11 +200,53 @@ const getRecipeById = asyncHandler(async (req, res) => {
   // 🔥 Reconcile and synchronize social counts for real-time accuracy
   await syncEngagementCounts(Recipe, req.params.id).catch(err => console.error('Sync error:', err));
 
+  // Handle View Tracking atomically
+  let currentViewCount = 0;
+  if (req.user) {
+    const recipeCheck = await Recipe.findById(req.params.id).select('viewedBy viewCount');
+    if (recipeCheck) {
+      const alreadyViewed = recipeCheck.viewedBy?.some(id => id.toString() === req.user._id.toString());
+      if (!alreadyViewed) {
+        const updated = await Recipe.findByIdAndUpdate(
+          req.params.id,
+          {
+            $addToSet: { viewedBy: req.user._id },
+            $inc: { viewCount: 1 }
+          },
+          { new: true }
+        );
+        currentViewCount = updated.viewCount;
+      } else {
+        currentViewCount = recipeCheck.viewCount || 0;
+      }
+    }
+  } else {
+    // Unauthenticated views
+    const updated = await Recipe.findByIdAndUpdate(
+      req.params.id,
+      { $inc: { viewCount: 1 } },
+      { new: true }
+    );
+    if (updated) currentViewCount = updated.viewCount;
+  }
+
   const recipe = await Recipe.findById(req.params.id)
     .populate('linkedProducts', 'name price images seller')
     .populate('sellerId', 'name email isProfilePublic privacySettings');
 
   if (recipe) {
+    // Force viewCount from the atomic operation
+    recipe.viewCount = currentViewCount;
+
+    // 🔥 Trigger socket event for live view syncing
+    if (req.io) {
+      req.io.to(`recipe_${recipe._id}`).emit('SOCIAL_UPDATE', {
+        type: 'VIEW_UPDATED',
+        itemId: recipe._id,
+        itemType: 'Recipe',
+        viewCount: currentViewCount
+      });
+    }
     // 🔥 Fetch and anonymize comments from standalone collection
     const rawComments = await Comment.find({
       targetId: recipe._id,

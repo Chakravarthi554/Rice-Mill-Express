@@ -162,12 +162,20 @@ const ForumPostDetailScreen = ({ route, navigation }) => {
                         color={post.userLiked ? '#4CAF50' : '#666'}
                     />
                     <Text style={[styles.actionText, post.userLiked && { color: '#4CAF50', fontWeight: 'bold' }]}>
-                        {post.likesCount || 0} Likes
+                        {post.likesCount || 0}
                     </Text>
                 </TouchableOpacity>
                 <View style={styles.actionButton}>
                     <MaterialIcons name="comment" size={24} color="#666" />
-                    <Text style={styles.actionText}>{post.replies?.length || post.commentsCount || 0} Comments</Text>
+                    <Text style={styles.actionText}>{post.replies?.length || post.commentsCount || 0}</Text>
+                </View>
+                <View style={styles.actionButton}>
+                    <MaterialIcons name="share" size={24} color="#666" />
+                    <Text style={styles.actionText}>{post.sharesCount || 0}</Text>
+                </View>
+                <View style={styles.actionButton}>
+                    <MaterialIcons name="visibility" size={24} color="#666" />
+                    <Text style={styles.actionText}>{post.viewCount || 0}</Text>
                 </View>
             </View>
 

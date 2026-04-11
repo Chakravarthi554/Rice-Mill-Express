@@ -629,7 +629,7 @@ const rateItem = asyncHandler(async (req, res) => {
 
     res.json({
       success: true,
-      rating: item.rating,
+      rating: item.averageRating || item.rating,
       numReviews: item.numReviews,
       distribution: item.ratingDistribution
     });

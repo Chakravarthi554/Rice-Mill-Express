@@ -184,7 +184,7 @@ const RecipeDetail = () => {
     return roots;
   }, [socialCommentsList.comments]);
 
-  const hasLiked = recipe.likes?.includes(userInfo?._id);
+  const hasLiked = recipe.userLiked || false;
   const displayRating = recipe.averageRating || 0;
 
   if (loading) return <Loader />;
@@ -229,7 +229,7 @@ const RecipeDetail = () => {
                   </AnimatePresence>
                 </IconButton>
               </Tooltip>
-              <Typography variant="body2" fontWeight="bold">{recipe.likes?.length || 0} Likes</Typography>
+              <Typography variant="body2" fontWeight="bold">{recipe.likesCount || 0} Likes</Typography>
 
               <Tooltip title="Comment">
                 <IconButton onClick={() => commentInputRef.current?.focus()}>
@@ -243,7 +243,13 @@ const RecipeDetail = () => {
                   <ShareIcon />
                 </IconButton>
               </Tooltip>
-              <Typography variant="body2" fontWeight="bold">{recipe.shares || 0} Shares</Typography>
+              <Typography variant="body2" fontWeight="bold">{recipe.sharesCount || 0} Shares</Typography>
+              
+              <Tooltip title="Views">
+                <Box sx={{ display: 'flex', alignItems: 'center', ml: 2, opacity: 0.7 }}>
+                  <Typography variant="body2">👁 {recipe.viewCount || 0} Views</Typography>
+                </Box>
+              </Tooltip>
             </SocialStatsBar>
 
             <Box sx={{ p: 3 }}>
