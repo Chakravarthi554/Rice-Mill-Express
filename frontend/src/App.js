@@ -12,6 +12,7 @@ import { ThemeProvider as CustomThemeProvider } from './context/ThemeContext';
 import { I18nProvider } from './context/i18nContext';
 import ProtectedRoute from './components/common/RoleRoute';
 import SocketInitializer from './components/common/SocketInitializer';
+import EnvBadge from './components/EnvBadge';
 import './theme.css';
 
 // --- Pages ---
@@ -339,6 +340,7 @@ function App() {
               />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+            <EnvBadge />
         </I18nProvider>
       </CustomThemeProvider>
     </ThemeProvider>

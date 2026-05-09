@@ -35,6 +35,9 @@ module.exports = {
         })
       );
 
+      // 4. Disable strict export presence to fix React Router v7 'use' hook error with React 18
+      webpackConfig.module.strictExportPresence = false;
+
       return webpackConfig;
     },
   },

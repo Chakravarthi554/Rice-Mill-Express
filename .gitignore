@@ -14,13 +14,19 @@ backend/dist/
 .out/
 .cache/
 .parcel-cache/
+# ─── Environment Variables ────────────────────────────────────────────────
+# Root .env (contains secrets — never commit)
 .env
-# Environment variables
 
+# Local machine-specific overrides — never commit these
 .env.local
-.env.development
-.env.production
-.env.test
+.env.development.local
+.env.production.local
+.env.test.local
+
+# .env.development and .env.production ARE committed (non-secret config)
+# They live in frontend/ and mobile/ subdirectories
+# Add secrets to EC2 directly, not to these files!
 
 # Logs
 logs/
@@ -79,12 +85,19 @@ data/
 # yarn.lock
 # pnpm-lock.yaml
 
-# Frontend specific
-frontend/.env*
+# Frontend specific — gitignore .env.local overrides but KEEP .env.development / .env.production
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.production.local
 frontend/public/robots.txt
 frontend/public/favicon.ico
 frontend/public/logo*.png
 frontend/public/manifest.json
+
+# Mobile specific — same pattern
+mobile/.env.local
+mobile/.env.development.local
+mobile/.env.production.local
 
 
 # Default images (only keep in repo if needed)

@@ -4,9 +4,17 @@
   "main": "index.js",
   "scripts": {
     "start": "expo start",
+    "start:dev": "cross-env APP_ENV=development expo start",
+    "start:prod": "cross-env APP_ENV=production expo start --no-dev",
     "android": "expo start --android",
+    "android:dev": "cross-env APP_ENV=development expo start --android",
+    "android:prod": "cross-env APP_ENV=production expo start --android --no-dev",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "ios:dev": "cross-env APP_ENV=development expo start --ios",
+    "ios:prod": "cross-env APP_ENV=production expo start --ios --no-dev",
+    "web": "expo start --web",
+    "build:android": "cross-env APP_ENV=production eas build --platform android",
+    "build:ios": "cross-env APP_ENV=production eas build --platform ios"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.0.0",
@@ -42,7 +50,8 @@
     "socket.io-client": "^4.6.1"
   },
   "devDependencies": {
-    "@babel/core": "^7.20.0"
+    "@babel/core": "^7.20.0",
+    "cross-env": "^7.0.3"
   },
   "private": true
 }
