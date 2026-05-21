@@ -204,16 +204,17 @@ router.post('/bookmarks', validateController(userController, 'bookmarkPost'));
 router.delete('/bookmarks/:postId', validateController(userController, 'unbookmarkPost'));
 router.get('/bookmarks', validateController(userController, 'getBookmarks'));
 
+// Route for getting a specific user by ID (authenticated users can fetch themselves, admin can fetch anyone)
+router.route('/:id')
+  .get(validateController(userController, 'getUserById'))
+  .put(authorize('admin'), validateController(userController, 'updateUser'))
+  .delete(authorize('admin'), validateController(userController, 'deleteUser'));
+
 // ✅ FIXED: Admin only routes
 router.use(authorize('admin'));
 
 router.route('/')
   .get(validateController(userController, 'getUsers'));
-
-router.route('/:id')
-  .get(validateController(userController, 'getUserById'))
-  .put(validateController(userController, 'updateUser'))
-  .delete(validateController(userController, 'deleteUser'));
 
 console.log('✅ User routes loaded successfully');
 

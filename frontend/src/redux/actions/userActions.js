@@ -1,5 +1,5 @@
 // [AI: Bookmark actions and mapping added]
-import axios from 'axios';
+
 import {
   USER_LOGIN_REQUEST,
   USER_LOGIN_SUCCESS,
@@ -628,7 +628,7 @@ export const addPaymentMethod = (method) => async (dispatch, getState) => {
     dispatch({ type: USER_ADD_PAYMENT_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await axios.post('/api/users/payment-methods', method, config);
+    const { data } = await axiosInstance.post('/api/users/payment-methods', method, config);
     dispatch({ type: USER_ADD_PAYMENT_SUCCESS, payload: data });
     dispatch(getUserDetails('profile'));
   } catch (error) {
@@ -641,7 +641,7 @@ export const deletePaymentMethod = (id) => async (dispatch, getState) => {
     dispatch({ type: USER_DELETE_PAYMENT_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    await axios.delete(`/api/users/payment-methods/${id}`, config);
+    await axiosInstance.delete(`/api/users/payment-methods/${id}`, config);
     dispatch({ type: USER_DELETE_PAYMENT_SUCCESS });
     dispatch(getUserDetails('profile'));
   } catch (error) {
@@ -654,7 +654,7 @@ export const getRewards = () => async (dispatch, getState) => {
     dispatch({ type: USER_GET_REWARDS_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await axios.get('/api/users/rewards', config);
+    const { data } = await axiosInstance.get('/api/users/rewards', config);
     dispatch({ type: USER_GET_REWARDS_SUCCESS, payload: data });
   } catch (error) {
     dispatch({ type: USER_GET_REWARDS_FAIL, payload: error.response?.data?.message || error.message });

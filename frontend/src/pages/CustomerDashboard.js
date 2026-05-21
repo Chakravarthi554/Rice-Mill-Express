@@ -26,7 +26,7 @@ const CustomerDashboard = () => {
   // ✅ Load all customer data on dashboard mount
   useEffect(() => {
     if (userInfo?._id) {
-      dispatch(getUserDetails(userInfo._id));
+      dispatch(getUserDetails());
       dispatch(listMyOrders());
       dispatch(listMyCart());
     }

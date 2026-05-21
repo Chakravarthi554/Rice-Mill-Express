@@ -1,7 +1,7 @@
 import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import axios from 'axios';
+
 import api from '../utils/api';
 import {
   USER_LOGIN_REQUEST,
@@ -91,9 +91,9 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('token');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('pendingSocialActions');
-      document.cookie = 'refreshToken=; Max-Age=0; path=/; domain=localhost;';
+      document.cookie = `refreshToken=; Max-Age=0; path=/; domain=${window.location.hostname};`;
       disconnectSocket();
-      delete axios.defaults.headers.common['Authorization'];
+      delete api.defaults.headers.common['Authorization'];
       dispatch({ type: USER_LOGOUT });
       updateUser(null);
       setMessage('Logged out successfully!');
@@ -122,11 +122,7 @@ export const AuthProvider = ({ children }) => {
         return null;
       }
 
-      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
-      const response = await axios.post(
-        `${API_BASE_URL}/api/auth/refresh-token`,
-        { refreshToken: refreshTokenValue }
-      );
+      const response = await api.post('/api/auth/refresh-token', { refreshToken: refreshTokenValue });
 
       const { accessToken, refreshToken: newRefreshToken, user: userData } = response.data;
       console.log('✅ AuthContext: Token refresh successful');
@@ -145,7 +141,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('userInfo', JSON.stringify(updatedUserInfo));
 
       // Update axios headers
-      axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+      api.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
 
       // Update state
       dispatch({ type: USER_LOGIN_SUCCESS, payload: updatedUserInfo });
@@ -383,8 +379,7 @@ export const AuthProvider = ({ children }) => {
       };
 
       // 2. Sync with MongoDB
-      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
-      const { data } = await axios.post(`${API_BASE_URL}/api/auth/register`, registrationData);
+      const { data } = await api.post('/api/auth/register', registrationData);
 
       if (data.success) {
         const idToken = await firebaseUser.getIdToken();
@@ -392,7 +387,7 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('refreshToken', firebaseUser.refreshToken);
 
         // Fetch full profile (bridging MongoDB roles)
-        const { data: profileData } = await axios.get(`${API_BASE_URL}/api/users/profile`, {
+        const { data: profileData } = await api.get('/api/users/profile', {
           headers: { Authorization: `Bearer ${idToken}` },
         });
 
@@ -402,7 +397,7 @@ export const AuthProvider = ({ children }) => {
         dispatch({ type: USER_LOGIN_SUCCESS, payload: fullUserData });
         updateUser(fullUserData);
         getSocket(fullUserData._id, fullUserData.role, idToken);
-        axios.defaults.headers.common['Authorization'] = `Bearer ${idToken}`;
+        api.defaults.headers.common['Authorization'] = `Bearer ${idToken}`;
 
         // ✅ UX: Show success message before any redirect
         window.alert('✅ Registration successful! Welcome to Rice-Express.');
