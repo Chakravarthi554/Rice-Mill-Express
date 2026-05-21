@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
+import axios from 'axios';
 
 import api from '../utils/api';
 import {
@@ -166,11 +167,63 @@ export const AuthProvider = ({ children }) => {
     }
   }, [dispatch, logout, tokenRefreshing, updateUser]);
 
+  // ✅ Dynamic background user profile synchronization from MongoDB
+  const syncProfileInBackground = useCallback(async (firebaseUser, signal) => {
+    try {
+      console.log('🔄 AuthContext: Background syncing profile for UID:', firebaseUser.uid);
+      const idToken = await firebaseUser.getIdToken(true);
+      const response = await api.post('/api/auth/firebase-login', { idToken }, { signal });
+      console.log('📦 AuthContext: Background sync successful');
+
+      const userData = {
+        ...response.data,
+        uid: firebaseUser.uid,
+        token: idToken
+      };
+
+      const storedUser = localStorage.getItem('userInfo');
+      if (storedUser) {
+        const parsed = JSON.parse(storedUser);
+        const hasChanges = 
+          parsed.role !== userData.role ||
+          parsed.email !== userData.email ||
+          parsed.kycStatus !== userData.kycStatus ||
+          parsed.isVerified !== userData.isVerified ||
+          parsed._id !== userData._id ||
+          parsed.token !== userData.token;
+
+        if (hasChanges) {
+          console.log(`📝 AuthContext: Background sync detected changed profile data. Old Role: ${parsed.role}, New Role: ${userData.role}`);
+          localStorage.setItem('userInfo', JSON.stringify(userData));
+          localStorage.setItem('token', userData.token);
+          dispatch({ type: USER_LOGIN_SUCCESS, payload: userData });
+          updateUser(userData);
+        } else {
+          console.log('✅ AuthContext: Background sync complete, no changes.');
+        }
+      } else {
+        localStorage.setItem('userInfo', JSON.stringify(userData));
+        localStorage.setItem('token', userData.token);
+        dispatch({ type: USER_LOGIN_SUCCESS, payload: userData });
+        updateUser(userData);
+      }
+    } catch (err) {
+      if (axios.isCancel(err)) {
+        console.log('⏩ AuthContext: Background sync cancelled');
+      } else {
+        console.error('⚠️ AuthContext: Background sync failed (non-critical):', err.message);
+      }
+    }
+  }, [dispatch, updateUser]);
+
   // ✅ Track which UID we're currently fetching to prevent infinite loops
   const fetchingUidRef = React.useRef(null);
 
   // ✅ Firebase Auth State Listener
   useEffect(() => {
+    let active = true;
+    const abortController = new AbortController();
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       console.log('🔥 AuthContext: Firebase Auth State Changed:', firebaseUser?.uid);
 
@@ -183,18 +236,29 @@ export const AuthProvider = ({ children }) => {
             return;
           }
 
+          const isAuthPath = window.location.pathname === '/login' || window.location.pathname === '/register' || window.location.pathname === '/';
+
           // Check if we already have this user loaded
           const storedUser = localStorage.getItem('userInfo');
           if (storedUser) {
             try {
               const parsed = JSON.parse(storedUser);
               if (parsed.uid === firebaseUser.uid && parsed.token) {
-                console.log('⏩ AuthContext: User profile found in localStorage for UID:', firebaseUser.uid);
-                // ALWAYS dispatch to ensure state is fresh, even if token is the same
-                dispatch({ type: USER_LOGIN_SUCCESS, payload: parsed });
-                updateUser(parsed);
-                setLoading(false);
-                return;
+                // If we are on a public auth path, we CANNOT trust the cache immediately!
+                // We must verify the role with the backend first before setting loading to false or redirecting.
+                if (isAuthPath) {
+                  console.log('🏁 AuthContext: Stale cache check bypassed because user is on auth path. Forcing full backend sync...');
+                } else {
+                  console.log('⏩ AuthContext: User profile found in localStorage for UID:', firebaseUser.uid);
+                  if (active) {
+                    dispatch({ type: USER_LOGIN_SUCCESS, payload: parsed });
+                    updateUser(parsed);
+                    setLoading(false);
+                    // Trigger background verification of metadata
+                    syncProfileInBackground(firebaseUser, abortController.signal);
+                  }
+                  return;
+                }
               }
             } catch (e) {
               console.warn('⚠️ AuthContext: Failed to parse stored user, will fetch fresh');
@@ -207,11 +271,9 @@ export const AuthProvider = ({ children }) => {
 
           try {
             console.log('🔄 AuthContext: Fetching profile for UID:', firebaseUser.uid);
-            // ✅ Force refresh so we never send an expired token
             const idToken = await firebaseUser.getIdToken(true);
             
-            // ✅ Correct path: /api/auth/firebase-login (not /auth/firebase-login)
-            const response = await api.post('/api/auth/firebase-login', { idToken });
+            const response = await api.post('/api/auth/firebase-login', { idToken }, { signal: abortController.signal });
             console.log('📦 AuthContext: Sync successful');
 
             const userData = {
@@ -220,17 +282,22 @@ export const AuthProvider = ({ children }) => {
               token: idToken
             };
 
-            localStorage.setItem('userInfo', JSON.stringify(userData));
-            localStorage.setItem('token', userData.token);
-            
-            dispatch({ type: USER_LOGIN_SUCCESS, payload: userData });
-            updateUser(userData);
+            if (active) {
+              localStorage.setItem('userInfo', JSON.stringify(userData));
+              localStorage.setItem('token', userData.token);
+              dispatch({ type: USER_LOGIN_SUCCESS, payload: userData });
+              updateUser(userData);
+            }
           } catch (syncError) {
+            if (axios.isCancel(syncError)) {
+              console.log('⏩ AuthContext: Sync request aborted');
+              return;
+            }
+
             console.error('❌ AuthContext: Sync failed:', syncError.message);
             const errMsg = syncError.response?.data?.message || syncError.message || 'Login synchronization failed';
-            // CRITICAL FIX: Never dispatch USER_LOGIN_FAIL on network errors.
-            // It wipes Redux state and blocks login completely.
-            // Instead fall back gracefully to cached data.
+            
+            // Try to fall back to cached data ONLY if UID matches
             let mergedUser = null;
             const cachedRaw = localStorage.getItem('userInfo');
             if (cachedRaw) {
@@ -242,43 +309,55 @@ export const AuthProvider = ({ children }) => {
                 }
               } catch (_e) {}
             }
-            if (!mergedUser) {
-              const freshToken = await firebaseUser.getIdToken().catch(() => null);
-              mergedUser = {
-                uid: firebaseUser.uid,
-                email: firebaseUser.email,
-                name: firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split('@')[0] : 'User'),
-                role: 'customer',
-                token: freshToken,
-                profileImage: firebaseUser.photoURL || '/uploads/default_avatar.jpg',
-              };
+
+            if (mergedUser && active) {
+              console.log('🔄 AuthContext: Sync failed, falling back to cached user details');
+              if (mergedUser.token) localStorage.setItem('token', mergedUser.token);
+              localStorage.setItem('userInfo', JSON.stringify(mergedUser));
+              dispatch({ type: USER_LOGIN_SUCCESS, payload: mergedUser });
+              updateUser(mergedUser);
+            } else {
+              // No cached user or mismatch. STRICT ENFORCEMENT: Reject fallback, logout
+              console.error('🛑 AuthContext: Authentication sync failed and no valid cached profile found. Rejecting session.');
+              setMessage(errMsg);
+              if (active) {
+                logout(true);
+              }
             }
-            if (mergedUser.token) localStorage.setItem('token', mergedUser.token);
-            localStorage.setItem('userInfo', JSON.stringify(mergedUser));
-            dispatch({ type: USER_LOGIN_SUCCESS, payload: mergedUser });
-            updateUser(mergedUser);
           } finally {
-            fetchingUidRef.current = null;
+            if (active) {
+              fetchingUidRef.current = null;
+              setLoading(false);
+            }
           }
         } else {
           console.log('❌ AuthContext: No Firebase user');
-          setUser(null);
-          fetchingUidRef.current = null;
-          if (userInfo) {
-             dispatch({ type: USER_LOGOUT });
+          if (active) {
+            setUser(null);
+            fetchingUidRef.current = null;
+            if (userInfo) {
+              dispatch({ type: USER_LOGOUT });
+            }
+            localStorage.removeItem('userInfo');
+            localStorage.removeItem('token');
           }
-          localStorage.removeItem('userInfo');
-          localStorage.removeItem('token');
         }
       } catch (globalError) {
         console.error('❌ AuthContext Global Error:', globalError);
       } finally {
-        setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       }
     });
 
-    return () => unsubscribe();
-  }, [dispatch, updateUser]);
+    return () => {
+      active = false;
+      abortController.abort();
+      console.log('🧹 AuthContext: Cleaned up onAuthStateChanged listener and aborted in-flight syncs');
+      unsubscribe();
+    };
+  }, [dispatch, updateUser, syncProfileInBackground, logout]);
 
   // Handle Redirection Persistence
   useEffect(() => {

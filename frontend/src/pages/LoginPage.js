@@ -50,14 +50,11 @@ const LoginPage = () => {
     try {
       setLoading(true); setMessage('');
       const provider = new GoogleAuthProvider();
+      console.log('🔑 LoginPage: Initiating Google Sign-In popup...');
       const result = await signInWithPopup(auth, provider);
-      const idToken = await result.user.getIdToken();
-      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
-      const response = await fetch(`${API_BASE_URL}/api/auth/google-login`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken })
-      });
-      if (!response.ok) throw new Error((await response.json()).message || 'Google sign-in failed');
+      console.log('✅ LoginPage: Google Sign-In popup succeeded for UID:', result.user?.uid);
     } catch (error) {
+      console.error('❌ LoginPage: Google Sign-in Error:', error);
       setMessage(error.message || 'Failed to sign in with Google');
     } finally { setLoading(false); }
   };
