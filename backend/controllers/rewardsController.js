@@ -146,45 +146,77 @@ const getReferralInfo = asyncHandler(async (req, res) => {
 });
 
 // ✅ Process referral rewards (called when order is delivered)
+// ✅ Process referral rewards (called when order is delivered)
 const processReferralRewards = asyncHandler(async (orderId) => {
     const session = await mongoose.startSession();
     session.startTransaction();
     try {
         const order = await Order.findById(orderId).populate('user').session(session);
-        if (!order || order.orderStatus !== 'delivered' || !order.isPaid) {
+        if (!order) {
+            await session.abortTransaction();
+            return;
+        }
+
+        // Hard checks for eligible order: must be delivered, fully paid, and not cancelled/refunded
+        if (order.orderStatus !== 'delivered' || !order.isPaid || order.paymentStatus !== 'completed') {
+            console.log(`[Referral] Order ${orderId} is not delivered, not paid, or not completed. Skipping rewards.`);
+            await session.abortTransaction();
+            return;
+        }
+
+        if (order.paymentStatus === 'refunded' || order.orderStatus === 'cancelled' || order.orderStatus === 'returned') {
+            console.log(`[Referral] Order ${orderId} is cancelled, refunded, or returned. Skipping rewards.`);
             await session.abortTransaction();
             return;
         }
 
         const user = order.user;
         if (!user || user.role !== 'customer' || user.isReferralRewardClaimed) {
+            console.log(`[Referral] User is either not customer or already claimed referral reward.`);
             await session.abortTransaction();
             return;
         }
 
-        // Check if this is the user's first delivered order
+        // Anti-Abuse: Prevent self-referral
+        if (user.referredBy && user.referredBy.toString() === user._id.toString()) {
+            console.warn(`[Referral Anti-Abuse] Self-referral detected for user ${user._id}. Blocking rewards.`);
+            await session.abortTransaction();
+            return;
+        }
+
+        // Check if this is the user's first successful completed order
         const deliveredOrdersCount = await Order.countDocuments({
             user: user._id,
-            orderStatus: 'delivered'
+            orderStatus: 'delivered',
+            isPaid: true
         }).session(session);
 
         if (deliveredOrdersCount === 1) {
             const AdminSettings = require('../models/AdminSettings');
-            const settings = await AdminSettings.getSettings(); // Statics usually don't need session if just reading
+            const settings = await AdminSettings.getSettings();
             if (!settings.referralCampaignEnabled) {
                 await session.abortTransaction();
                 return;
             }
 
-            const rewardAmount = settings.referralRewardAmount || 100;
+            // Strictly ₹50 as required by user request
+            const rewardAmount = 50;
             const admin = await User.findOne({ role: 'admin' }).session(session);
             
             // 1. Credit Referrer
             if (user.referredBy) {
                 const referrer = await User.findById(user.referredBy).session(session);
 
-                // Anti-Abuse: Only Customers can refer, and prevent self-referral
+                // Anti-Abuse: Only Customers can refer, and check that email/phone are different to block multi-account farming
                 if (referrer && referrer.role === 'customer' && referrer._id.toString() !== user._id.toString()) {
+                    // Anti-Abuse: Basic fingerprint checks (different phone/email prefixes)
+                    const isFarming = referrer.email.split('@')[0] === user.email.split('@')[0] || referrer.phone === user.phone;
+                    if (isFarming) {
+                        console.warn(`[Referral Anti-Abuse] Potential fake/duplicate farming detected between user ${user._id} and referrer ${referrer._id}. Blocking rewards.`);
+                        await session.abortTransaction();
+                        return;
+                    }
+
                     referrer.walletBalance = Math.round((referrer.walletBalance || 0) + rewardAmount);
                     if (!referrer.referralStats) referrer.referralStats = { referredUsers: 0, earnedCredits: 0, totalEarnings: 0 };
                     referrer.referralStats.earnedCredits = (referrer.referralStats.earnedCredits || 0) + rewardAmount;
@@ -194,7 +226,7 @@ const processReferralRewards = asyncHandler(async (orderId) => {
 
                     // Debit Admin for Referrer Reward
                     if (admin) {
-                        admin.walletBalance -= rewardAmount;
+                        admin.walletBalance = (admin.walletBalance || 0) - rewardAmount;
                         await admin.save({ session });
                     }
 
@@ -233,7 +265,7 @@ const processReferralRewards = asyncHandler(async (orderId) => {
 
             // Debit Admin for Referee Reward
             if (admin) {
-                admin.walletBalance -= rewardAmount;
+                admin.walletBalance = (admin.walletBalance || 0) - rewardAmount;
                 await admin.save({ session });
             }
 
@@ -299,14 +331,30 @@ const syncRewards = asyncHandler(async (req, res) => {
 
 // ✅ Get wallet data (balance and recent transactions)
 const getWalletData = asyncHandler(async (req, res) => {
-    const user = await User.findById(req.user._id).select('walletBalance');
+    const user = await User.findById(req.user._id);
+    if (!user) {
+        res.status(404);
+        throw new Error('User not found');
+    }
+    const sumResult = await WalletTransaction.aggregate([
+        { $match: { user: req.user._id } },
+        { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]);
+    const ledgerBalance = sumResult[0]?.total || 0;
+    
+    if (user.walletBalance !== ledgerBalance) {
+        console.log(`[Wallet Sync] Correcting balance drift for User ${user._id}: stored ₹${user.walletBalance} -> ledger ₹${ledgerBalance}`);
+        user.walletBalance = ledgerBalance;
+        await user.save();
+    }
+
     const transactions = await WalletTransaction.find({ user: req.user._id })
         .sort({ createdAt: -1 })
         .limit(20);
 
     res.json({
         success: true,
-        balance: user.walletBalance || 0,
+        balance: ledgerBalance,
         transactions
     });
 });
@@ -314,7 +362,11 @@ const getWalletData = asyncHandler(async (req, res) => {
 // ✅ Request withdrawal
 const requestWithdrawal = asyncHandler(async (req, res) => {
     const { amount, bankDetails } = req.body;
-    const user = await User.findById(req.user._id);
+    
+    if (!amount || amount <= 0) {
+        res.status(400);
+        throw new Error('Invalid withdrawal amount');
+    }
 
     const AdminSettings = require('../models/AdminSettings');
     const settings = await AdminSettings.getSettings();
@@ -325,50 +377,78 @@ const requestWithdrawal = asyncHandler(async (req, res) => {
         throw new Error(`Minimum withdrawal amount is ₹${minWithdrawal}`);
     }
 
-    if (user.walletBalance < amount) {
-        res.status(400);
-        throw new Error('Insufficient wallet balance');
-    }
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+        const user = await User.findById(req.user._id).session(session);
+        if (!user) {
+            throw new Error('User not found');
+        }
 
-    // Create withdrawal request
-    const withdrawal = await WithdrawalRequest.create({
-        user: req.user._id,
-        amount,
-        bankDetails,
-        status: 'pending'
-    });
+        // Ledger truth balance check inside session
+        const sumResult = await WalletTransaction.aggregate([
+            { $match: { user: user._id } },
+            { $group: { _id: null, total: { $sum: '$amount' } } }
+        ]).session(session);
+        const ledgerBalance = sumResult[0]?.total || 0;
 
-    // Deduct from wallet balance immediately (locked)
-    user.walletBalance -= amount;
-    await user.save();
+        if (ledgerBalance < amount) {
+            throw new Error('Insufficient wallet balance');
+        }
 
-    // Create transaction record
-    await WalletTransaction.create({
-        user: req.user._id,
-        amount: -amount,
-        type: 'withdrawal',
-        status: 'pending',
-        description: `Withdrawal request for ₹${amount}`,
-        referenceId: withdrawal._id,
-        referenceType: 'WithdrawalRequest',
-        balanceAfter: user.walletBalance
-    });
+        // Create withdrawal request
+        const withdrawal = await WithdrawalRequest.create([{
+            user: user._id,
+            amount,
+            bankDetails,
+            status: 'pending'
+        }], { session });
 
-    // Notify Admins
-    if (req.io) {
-        req.io.emit('ADMIN_ALERT', {
-            title: 'New Withdrawal Request',
-            message: `${user.name} has requested a withdrawal of ₹${amount}`,
+        const createdWithdrawal = withdrawal[0];
+
+        // Deduct from wallet balance atomically
+        user.walletBalance = ledgerBalance - amount;
+        await user.save({ session });
+
+        // Create transaction record
+        await WalletTransaction.create([{
+            user: user._id,
+            amount: -amount,
             type: 'withdrawal',
-            withdrawalId: withdrawal._id
-        });
-    }
+            status: 'pending',
+            description: `Withdrawal request for ₹${amount}`,
+            referenceId: createdWithdrawal._id,
+            referenceType: 'WithdrawalRequest',
+            balanceAfter: user.walletBalance
+        }], { session });
 
-    res.status(201).json({
-        success: true,
-        message: 'Withdrawal request submitted',
-        withdrawal
-    });
+        await session.commitTransaction();
+
+        // Notify Admins
+        if (req.io) {
+            req.io.emit('ADMIN_ALERT', {
+                title: 'New Withdrawal Request',
+                message: `${user.name} has requested a withdrawal of ₹${amount}`,
+                type: 'withdrawal',
+                withdrawalId: createdWithdrawal._id
+            });
+        }
+
+        res.status(201).json({
+            success: true,
+            message: 'Withdrawal request submitted',
+            withdrawal: createdWithdrawal
+        });
+    } catch (error) {
+        await session.abortTransaction();
+        console.error("Withdrawal request error:", error);
+        res.status(400).json({
+            success: false,
+            message: error.message || 'Failed to submit withdrawal request'
+        });
+    } finally {
+        session.endSession();
+    }
 });
 
 // ✅ Get user withdrawal history

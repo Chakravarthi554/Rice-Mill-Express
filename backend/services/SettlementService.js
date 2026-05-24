@@ -41,26 +41,54 @@ class SettlementService {
      * @param   {String} orderId - The ID of the delivered order
      */
     static async processDeliverySettlement(orderId) {
+        const session = await mongoose.startSession();
+        session.startTransaction();
         try {
-            const order = await Order.findById(orderId).populate('seller user deliveryPartner');
-            if (!order || order.orderStatus !== 'delivered') {
-                throw new Error('Order not found or not in delivered status');
+            const order = await Order.findById(orderId).populate('seller user deliveryPartner').session(session);
+            if (!order) {
+                throw new Error('Order not found');
+            }
+
+            if (order.orderStatus !== 'delivered') {
+                console.log(`[Settlement] Order ${orderId} is not in delivered status (current: ${order.orderStatus}). Skipping settlement.`);
+                await session.abortTransaction();
+                return;
+            }
+
+            // Exclude cancelled/refunded/returned orders
+            if (['cancelled', 'returned', 'refunded'].includes(order.orderStatus) || order.paymentStatus === 'refunded') {
+                console.log(`[Settlement] Order ${orderId} is cancelled, returned, or refunded. Skipping settlement.`);
+                await session.abortTransaction();
+                return;
+            }
+
+            const Payment = mongoose.model('Payment');
+            
+            // Check if settlement has already been processed (Idempotency check)
+            let paymentRecord = await Payment.findOne({ order: order._id }).session(session);
+            if (paymentRecord && paymentRecord.payoutStatus === 'completed') {
+                console.log(`[Settlement] Settlement already processed for Order ${orderId}. Skipping to prevent duplicate credits.`);
+                await session.abortTransaction();
+                return;
             }
 
             const breakdown = this.calculateBreakdown(order);
             const { platformCommission, deliveryPartnerEarning, sellerEarning } = breakdown;
 
             // 1. Handle Seller Settlement
-            const seller = await User.findById(order.seller);
+            const seller = await User.findById(order.seller).session(session);
+            if (!seller) {
+                throw new Error('Seller not found');
+            }
             
             order.sellerAmount = sellerEarning;
             order.commissionAmount = platformCommission;
             
             // Handle Negative Wallet Auto-Deduction
             let duesDeducted = 0;
-            let currentBalance = seller.walletBalance;
+            let currentBalance = seller.walletBalance || 0;
 
-            // 1. First record the full earning
+            // First record the full earning
             currentBalance += sellerEarning;
             await WalletTransaction.create([{
                 user: seller._id,
@@ -71,63 +99,73 @@ class SettlementService {
                 referenceId: order._id,
                 referenceType: 'Order',
                 balanceAfter: currentBalance
-            }]);
+            }], { session });
 
-            // 2. If balance was negative, calculate how much was "settled"
+            // If balance was negative, calculate how much was "settled"
             if (seller.walletBalance < 0) {
                 duesDeducted = Math.min(sellerEarning, Math.abs(seller.walletBalance));
                 console.log(`[Settlement] Auto-settled dues: ${duesDeducted} for Seller ${seller.name}`);
             }
 
             seller.walletBalance = currentBalance;
+            await seller.save({ session });
 
-            // Update associated payment record
-            const Payment = mongoose.model('Payment');
-            await Payment.findOneAndUpdate(
-                { order: order._id },
-                { 
-                    $set: { 
-                        payoutStatus: 'completed', 
-                        status: 'completed',
-                        notes: duesDeducted > 0 ? `Auto-settled dues: ₹${duesDeducted}` : undefined
-                    } 
-                }
-            );
+            // Update or Create associated payment record
+            if (!paymentRecord) {
+                paymentRecord = new Payment({
+                    order: order._id,
+                    user: order.user._id,
+                    seller: order.seller._id,
+                    amount: order.finalPaidAmount || order.totalPrice,
+                    method: order.paymentMethod === 'cod' ? 'cod' : 'razorpay',
+                    currency: 'INR'
+                });
+            }
 
-            await seller.save();
-            await order.save(); // Save sellerAmount and commissionAmount
+            paymentRecord.status = 'completed';
+            paymentRecord.payoutStatus = 'completed';
+            paymentRecord.commissionAmount = platformCommission;
+            paymentRecord.sellerPayoutAmount = sellerEarning;
+            if (duesDeducted > 0) {
+                paymentRecord.notes = (paymentRecord.notes || '') + `\nAuto-settled dues: ₹${duesDeducted}`;
+            }
+            await paymentRecord.save({ session });
+
+            // Save order sellerAmount and commissionAmount
+            await order.save({ session }); 
 
             // 2. Handle Delivery Partner Settlement
             if (order.deliveryPartner) {
-                const dpProfile = await mongoose.model('DeliveryPartner').findById(order.deliveryPartner);
-                const dpUser = await User.findById(dpProfile.user);
-                
-                if (dpUser) {
-                    dpUser.walletBalance += deliveryPartnerEarning;
-                    await dpUser.save();
+                const dpProfile = await mongoose.model('DeliveryPartner').findById(order.deliveryPartner).session(session);
+                if (dpProfile) {
+                    const dpUser = await User.findById(dpProfile.user).session(session);
+                    if (dpUser) {
+                        dpUser.walletBalance = (dpUser.walletBalance || 0) + deliveryPartnerEarning;
+                        await dpUser.save({ session });
 
-                    // Save DP earning to order for stats
-                    order.deliveryPartnerAmount = deliveryPartnerEarning;
-                    await order.save();
+                        // Save DP earning to order for stats
+                        order.deliveryPartnerAmount = deliveryPartnerEarning;
+                        await order.save({ session });
 
-                    await WalletTransaction.create([{
-                        user: dpUser._id,
-                        amount: deliveryPartnerEarning,
-                        type: 'delivery_earning',
-                        status: 'completed',
-                        description: `Earning for Order #${order._id.toString().slice(-6)}`,
-                        referenceId: order._id,
-                        referenceType: 'Order',
-                        balanceAfter: dpUser.walletBalance
-                    }]);
+                        await WalletTransaction.create([{
+                            user: dpUser._id,
+                            amount: deliveryPartnerEarning,
+                            type: 'delivery_earning',
+                            status: 'completed',
+                            description: `Earning for Order #${order._id.toString().slice(-6)}`,
+                            referenceId: order._id,
+                            referenceType: 'Order',
+                            balanceAfter: dpUser.walletBalance
+                        }], { session });
+                    }
                 }
             }
 
             // 3. Handle Admin Commission Record (Internal Ledger)
-            const admin = await User.findOne({ role: 'admin' });
+            const admin = await User.findOne({ role: 'admin' }).session(session);
             if (admin) {
-                admin.walletBalance += platformCommission;
-                await admin.save();
+                admin.walletBalance = (admin.walletBalance || 0) + platformCommission;
+                await admin.save({ session });
 
                 await WalletTransaction.create([{
                     user: admin._id,
@@ -138,13 +176,17 @@ class SettlementService {
                     referenceId: order._id,
                     referenceType: 'Order',
                     balanceAfter: admin.walletBalance
-                }]);
+                }], { session });
             }
 
+            await session.commitTransaction();
             console.log(`✅ Settlement processed for Order ${orderId}`);
         } catch (error) {
+            await session.abortTransaction();
             console.error(`❌ Settlement failed for Order ${orderId}:`, error.message);
             throw error;
+        } finally {
+            session.endSession();
         }
     }
 

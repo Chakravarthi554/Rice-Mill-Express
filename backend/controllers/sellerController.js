@@ -11,7 +11,7 @@ const getSellerDashboard = asyncHandler(async (req, res) => {
   console.log('Fetching dashboard for seller:', sellerId);
 
   const [orders, products, earnings] = await Promise.all([
-    Order.countDocuments({ seller: sellerId }),
+    Order.countDocuments({ seller: sellerId, orderStatus: { $nin: ['cancelled', 'pending_payment'] } }),
     Product.countDocuments({ seller: sellerId }),
     Order.aggregate([
       {

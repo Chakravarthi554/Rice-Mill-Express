@@ -589,16 +589,24 @@ const setupSocketServer = (server) => {
 
       // Create notifications
       const Notification = require('../models/Notification');
-      await Notification.create(
+      const createdNotifications = await Notification.create(
         userList.map(uid => ({
           user: uid,
           type: 'ORDER_UPDATE',
-          message: `Order updated to ${order.orderStatus}`,
+          title: `Order Status Update`,
+          message: `Order #${order._id.toString().slice(-6)} updated to ${order.orderStatus}`,
           relatedEntity: order._id,
+          entityModel: 'Order',
+          priority: 'medium'
         }))
       );
 
-      logger.info(`✅ Order update broadcast for order ${orderId}`);
+      // Emit to each user's socket room for real-time updates
+      createdNotifications.forEach(n => {
+        emitNotification(n.user.toString(), n.toJSON ? n.toJSON() : n);
+      });
+
+      logger.info(`✅ Order update broadcast for order ${orderId} & notifications emitted`);
     } catch (err) {
       logger.error('❌ broadcastOrderUpdate error', err);
     }

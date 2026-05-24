@@ -80,7 +80,7 @@ const getDashboardStats = asyncHandler(async (req, res) => {
       newUsersLastMonth
     ] = await Promise.all([
       User.countDocuments().catch(() => 0),
-      Order.countDocuments().catch(() => 0),
+      Order.countDocuments({ orderStatus: { $ne: 'pending_payment' } }).catch(() => 0),
       User.countDocuments({ role: 'seller', active: true }).catch(() => 0),
       User.countDocuments({ role: 'customer', active: true }).catch(() => 0),
       Recipe.countDocuments().catch(() => 0),

@@ -72,7 +72,7 @@ const getPaymentStats = asyncHandler(async (req, res) => {
   const startOfToday = new Date(new Date().setHours(0, 0, 0, 0));
   const startOfWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-  const paidFilter = { $or: [{ isPaid: true }, { orderStatus: 'delivered' }] };
+  const paidFilter = { isPaid: true, orderStatus: { $nin: ['cancelled', 'pending_payment'] } };
 
   const todayStats = await Order.aggregate([
     { $match: { ...paidFilter, createdAt: { $gte: startOfToday } } },

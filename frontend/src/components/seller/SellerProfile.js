@@ -34,6 +34,9 @@ const SellerProfile = () => {
     userInfo: updatedUserInfo
   } = useSelector(state => state.userUpdateProfile || {});
 
+  const userDetails = useSelector(state => state.userDetails || {});
+  const { user: dbUser } = userDetails;
+
   const [editMode, setEditMode] = useState(false);
   const [profileData, setProfileData] = useState({
     businessName: '',
@@ -55,24 +58,26 @@ const SellerProfile = () => {
   }, [dispatch]);
 
   useEffect(() => {
-    if (userInfo || updatedUserInfo) {
-      const user = updatedUserInfo || userInfo;
-      setProfileData({
-        businessName: user.businessDetails?.businessName || '',
-        businessType: user.businessDetails?.businessType || '',
-        gstNumber: user.businessDetails?.gstNumber || '',
-        panNumber: user.businessDetails?.panNumber || '',
-        address: user.businessDetails?.address || { street: '', city: '', state: '', pinCode: '' },
-        phone: user.phone || '',
-        email: user.email || '',
-        profileImage: user.profileImage || '/uploads/default_avatar.jpg',
-        productAvailability: user.productAvailability !== false,
-        notificationEnabled: user.notificationEnabled !== false,
-        bankAccount: user.businessDetails?.bankAccount || { accountNumber: '', ifscCode: '', accountHolderName: '' },
-        integrations: user.integrations || { amazon: '', zepto: '', flipkart: '' },
-      });
+    if (userInfo || updatedUserInfo || dbUser) {
+      const user = updatedUserInfo || dbUser || userInfo;
+      if (user && user._id) {
+        setProfileData({
+          businessName: user.businessDetails?.businessName || '',
+          businessType: user.businessDetails?.businessType || '',
+          gstNumber: user.businessDetails?.gstNumber || '',
+          panNumber: user.businessDetails?.panNumber || '',
+          address: user.businessDetails?.address || { street: '', city: '', state: '', pinCode: '' },
+          phone: user.phone || '',
+          email: user.email || '',
+          profileImage: user.profileImage || '/uploads/default_avatar.jpg',
+          productAvailability: user.productAvailability !== false,
+          notificationEnabled: user.notificationEnabled !== false,
+          bankAccount: user.businessDetails?.bankAccount || { accountNumber: '', ifscCode: '', accountHolderName: '' },
+          integrations: user.integrations || { amazon: '', zepto: '', flipkart: '' },
+        });
+      }
     }
-  }, [userInfo, updatedUserInfo]);
+  }, [userInfo, updatedUserInfo, dbUser]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;

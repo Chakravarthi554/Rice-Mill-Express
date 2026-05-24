@@ -17,6 +17,7 @@ import { translations } from '../utils/constants';
 import { loginUser } from '../redux/actions/userActions';
 import { auth } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+import i18n from '../i18n';
 
 const AuthContext = createContext();
 
@@ -30,7 +31,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [tokenRefreshing, setTokenRefreshing] = useState(false);
-  const [language, setLanguage] = useState('english');
+  const [language, setLanguage] = useState(() => localStorage.getItem('rice-mill-language') || 'english');
   const [theme, setTheme] = useState('system');
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -181,30 +182,58 @@ export const AuthProvider = ({ children }) => {
       };
 
       const storedUser = localStorage.getItem('userInfo');
-      if (storedUser) {
-        const parsed = JSON.parse(storedUser);
-        const hasChanges =
-          parsed.role !== userData.role ||
-          parsed.email !== userData.email ||
-          parsed.kycStatus !== userData.kycStatus ||
-          parsed.isVerified !== userData.isVerified ||
-          parsed._id !== userData._id ||
-          parsed.token !== userData.token;
+      let mergedUser = userData;
+      let hasChanges = true;
 
-        if (hasChanges) {
-          console.log(`📝 AuthContext: Background sync detected changed profile data. Old Role: ${parsed.role}, New Role: ${userData.role}`);
-          localStorage.setItem('userInfo', JSON.stringify(userData));
-          localStorage.setItem('token', userData.token);
-          dispatch({ type: USER_LOGIN_SUCCESS, payload: userData });
-          updateUser(userData);
-        } else {
-          console.log('✅ AuthContext: Background sync complete, no changes.');
+      if (storedUser) {
+        try {
+          const parsed = JSON.parse(storedUser);
+          
+          mergedUser = {
+            profileImage: parsed.profileImage || userData.profileImage || '/uploads/default_avatar.jpg',
+            preferences: {
+              ...(parsed.preferences || {}),
+              ...(userData.preferences || {})
+            },
+            businessDetails: {
+              ...(parsed.businessDetails || {}),
+              ...(userData.businessDetails || {})
+            },
+            ...userData,
+            _id: userData._id || parsed._id,
+            role: userData.role,
+            kycStatus: userData.kycStatus,
+            isVerified: userData.isVerified !== undefined ? userData.isVerified : parsed.isVerified,
+            email: userData.email || parsed.email,
+            phone: userData.phone || parsed.phone,
+            token: userData.token || parsed.token,
+            uid: userData.uid || parsed.uid,
+          };
+
+          hasChanges =
+            parsed.role !== mergedUser.role ||
+            parsed.email !== mergedUser.email ||
+            parsed.kycStatus !== mergedUser.kycStatus ||
+            parsed.isVerified !== mergedUser.isVerified ||
+            parsed._id !== mergedUser._id ||
+            parsed.token !== mergedUser.token ||
+            parsed.profileImage !== mergedUser.profileImage ||
+            JSON.stringify(parsed.preferences) !== JSON.stringify(mergedUser.preferences) ||
+            JSON.stringify(parsed.businessDetails) !== JSON.stringify(mergedUser.businessDetails);
+            
+        } catch (e) {
+          console.warn('⚠️ AuthContext: Failed to parse stored user during background sync merge');
         }
+      }
+
+      if (hasChanges) {
+        console.log(`📝 AuthContext: Background sync detected changed profile data. Updating state...`);
+        localStorage.setItem('userInfo', JSON.stringify(mergedUser));
+        localStorage.setItem('token', mergedUser.token);
+        dispatch({ type: USER_LOGIN_SUCCESS, payload: mergedUser });
+        updateUser(mergedUser);
       } else {
-        localStorage.setItem('userInfo', JSON.stringify(userData));
-        localStorage.setItem('token', userData.token);
-        dispatch({ type: USER_LOGIN_SUCCESS, payload: userData });
-        updateUser(userData);
+        console.log('✅ AuthContext: Background sync complete, no changes.');
       }
     } catch (err) {
       if (axios.isCancel(err)) {
@@ -281,11 +310,43 @@ export const AuthProvider = ({ children }) => {
               token: idToken
             };
 
+            const storedUser = localStorage.getItem('userInfo');
+            let mergedUser = userData;
+            if (storedUser) {
+              try {
+                const parsed = JSON.parse(storedUser);
+                if (parsed.uid === firebaseUser.uid) {
+                  mergedUser = {
+                    profileImage: parsed.profileImage || userData.profileImage || '/uploads/default_avatar.jpg',
+                    preferences: {
+                      ...(parsed.preferences || {}),
+                      ...(userData.preferences || {})
+                    },
+                    businessDetails: {
+                      ...(parsed.businessDetails || {}),
+                      ...(userData.businessDetails || {})
+                    },
+                    ...userData,
+                    _id: userData._id || parsed._id,
+                    role: userData.role,
+                    kycStatus: userData.kycStatus,
+                    isVerified: userData.isVerified !== undefined ? userData.isVerified : parsed.isVerified,
+                    email: userData.email || parsed.email,
+                    phone: userData.phone || parsed.phone,
+                    token: userData.token || parsed.token,
+                    uid: userData.uid || parsed.uid,
+                  };
+                }
+              } catch (e) {
+                console.warn('⚠️ AuthContext: Failed to parse stored user during auth sync merge');
+              }
+            }
+
             if (active) {
-              localStorage.setItem('userInfo', JSON.stringify(userData));
-              localStorage.setItem('token', userData.token);
-              dispatch({ type: USER_LOGIN_SUCCESS, payload: userData });
-              updateUser(userData);
+              localStorage.setItem('userInfo', JSON.stringify(mergedUser));
+              localStorage.setItem('token', mergedUser.token);
+              dispatch({ type: USER_LOGIN_SUCCESS, payload: mergedUser });
+              updateUser(mergedUser);
             }
           } catch (syncError) {
             if (axios.isCancel(syncError)) {
@@ -369,6 +430,21 @@ export const AuthProvider = ({ children }) => {
       } catch (e) { }
     }
   }, [dispatch, updateUser, user, userInfo]);
+
+  // Keep local user state synchronized when Redux userInfo updates
+  useEffect(() => {
+    if (userInfo) {
+      updateUser(userInfo);
+    }
+  }, [userInfo, updateUser]);
+
+  // Bridge i18n localization and synchronise language changes globally
+  useEffect(() => {
+    if (language) {
+      i18n.changeLanguage(language);
+      localStorage.setItem('rice-mill-language', language);
+    }
+  }, [language]);
 
 
   // ✅ CONSOLIDATED REDIRECTION LOGIC

@@ -535,7 +535,7 @@ const uploadDeliveryPhotoAndComplete = asyncHandler(async (req, res) => {
     try {
         const { processReferralRewards } = require('./rewardsController');
         if (typeof processReferralRewards === 'function') {
-            await processReferralRewards(order.user, order._id);
+            await processReferralRewards(order._id);
         }
     } catch (refErr) {
         console.error('Referral reward processing error (non-fatal):', refErr.message);

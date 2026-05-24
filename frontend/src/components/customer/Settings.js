@@ -71,10 +71,13 @@ const Settings = () => {
                 <Box sx={{ p: 3, background: 'linear-gradient(135deg, #16A34A15, #F0FDF4)', borderBottom: '1px solid #F3F4F6' }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
                         <Box sx={{ position: 'relative' }}>
-                            <Avatar sx={{
-                                width: 64, height: 64, bgcolor: '#16A34A', fontSize: 24, fontWeight: 800,
-                                boxShadow: '0 4px 14px rgba(22,163,74,0.3)',
-                            }}>
+                            <Avatar
+                                src={user?.profileImage}
+                                sx={{
+                                    width: 64, height: 64, bgcolor: '#16A34A', fontSize: 24, fontWeight: 800,
+                                    boxShadow: '0 4px 14px rgba(22,163,74,0.3)',
+                                }}
+                            >
                                 {initials}
                             </Avatar>
                             <Box sx={{

@@ -99,42 +99,63 @@ const verifyRazorpayPayment = asyncHandler(async (req, res) => {
             if (paymentDetails.status === 'captured') {
                 console.log(`(Verify Route) Payment ${razorpay_payment_id} status confirmed as 'captured'.`);
 
-                const orders = await Order.find({ razorpayOrderId: razorpay_order_id, isPaid: false });
-                if (orders.length > 0) {
-                    console.log(`(Verify Route) Found ${orders.length} unpaid orders associated. Updating to paid...`);
-                    for (const order of orders) {
-                        order.isPaid = true;
-                        order.paidAt = new Date();
-                        order.paymentStatus = 'completed';
-                        order.orderStatus = 'confirmed'; // Promote from pending_payment
-                        order.paymentResult = {
-                            id: razorpay_payment_id,
-                            status: 'completed',
-                            update_time: new Date()
-                        };
-                        await order.save();
+                const orders = await Order.find({ razorpayOrderId: razorpay_order_id });
+                let updatedCount = 0;
+                for (const order of orders) {
+                    if (order.isPaid) {
+                        console.log(`(Verify Route) Order ${order._id} already marked as paid.`);
+                        continue;
+                    }
+                    
+                    // Atomic update to prevent race conditions
+                    const updatedOrder = await Order.findOneAndUpdate(
+                        { _id: order._id, isPaid: false },
+                        {
+                            $set: {
+                                isPaid: true,
+                                paidAt: new Date(),
+                                paymentStatus: 'completed',
+                                orderStatus: 'confirmed',
+                                paymentResult: {
+                                    id: razorpay_payment_id,
+                                    status: 'completed',
+                                    update_time: new Date()
+                                }
+                            }
+                        },
+                        { new: true }
+                    );
+
+                    if (updatedOrder) {
+                        updatedCount++;
+                        console.log(`(Verify Route) Order ${updatedOrder._id} atomically updated to paid.`);
+                        
+                        try {
+                            await User.findByIdAndUpdate(updatedOrder.user, { $set: { cartItems: [] } });
+                            console.log(`🛒 Cart cleared for user: ${updatedOrder.user}`);
+                        } catch (cartErr) {
+                            console.error('⚠️ Failed to clear cart after payment:', cartErr);
+                        }
 
                         if (req.broadcastOrderUpdate) {
-                            await req.broadcastOrderUpdate(order._id);
+                            await req.broadcastOrderUpdate(updatedOrder._id);
                         }
 
                         // Create/Update Payment Record
-                        // BUG-3 FIX: Include required `user` and `seller` fields so upsert
-                        // doesn't fail Mongoose validation when the document is new.
                         await Payment.findOneAndUpdate(
-                            { order: order._id },
+                            { order: updatedOrder._id },
                             {
                                 $set: {
                                     status: 'completed',
                                     razorpayPaymentId: razorpay_payment_id,
                                     razorpayOrderId: razorpay_order_id,
-                                    amount: order.finalPaidAmount,
+                                    amount: updatedOrder.finalPaidAmount,
                                     method: 'razorpay',
-                                    user: order.user,
-                                    seller: order.seller,
+                                    user: updatedOrder.user,
+                                    seller: updatedOrder.seller,
                                     currency: 'INR',
-                                    commissionAmount: order.commissionAmount,
-                                    sellerPayoutAmount: order.sellerAmount,
+                                    commissionAmount: updatedOrder.commissionAmount,
+                                    sellerPayoutAmount: updatedOrder.sellerAmount,
                                     payoutStatus: 'pending',
                                 }
                             },
@@ -200,75 +221,88 @@ const handleRazorpayWebhook = asyncHandler(async (req, res) => {
                 const razorpayOrderId = paymentEntity.order_id;
                 const razorpayPaymentId = paymentEntity.id;
 
-                const orders = await Order.find({ razorpayOrderId: razorpayOrderId, isPaid: false });
+                const orders = await Order.find({ razorpayOrderId: razorpayOrderId });
+                let updatedCount = 0;
+                for (const order of orders) {
+                    if (order.isPaid) {
+                        console.log(`Webhook: Order ${order._id} already marked as paid.`);
+                        continue;
+                    }
 
-                if (orders.length > 0) {
-                    console.log(`Webhook: Processing payment.captured for RZP OID: ${razorpayOrderId}. Found ${orders.length} unpaid orders.`);
+                    // Atomic update to prevent race conditions
+                    const updatedOrder = await Order.findOneAndUpdate(
+                        { _id: order._id, isPaid: false },
+                        {
+                            $set: {
+                                isPaid: true,
+                                paidAt: new Date(paymentEntity.created_at * 1000),
+                                paymentStatus: 'completed',
+                                orderStatus: 'confirmed',
+                                paymentResult: {
+                                    id: razorpayPaymentId,
+                                    status: 'completed',
+                                    update_time: new Date(),
+                                    email_address: paymentEntity.email
+                                }
+                            }
+                        },
+                        { new: true }
+                    );
 
-                    for (const order of orders) {
+                    if (updatedOrder) {
+                        updatedCount++;
+                        console.log(`Webhook: Order ${updatedOrder._id} atomically updated to paid.`);
+
                         // Find or Create Payment Record
                         let payment = await Payment.findOneAndUpdate(
-                            { order: order._id, razorpayOrderId: razorpayOrderId },
+                            { order: updatedOrder._id },
                             {
                                 $set: {
                                     status: 'completed',
                                     razorpayPaymentId: razorpayPaymentId,
-                                    notes: (payment?.notes || '') + `\nWebhook: Payment captured.`,
-                                    user: order.user,
-                                    seller: order.seller,
-                                    amount: order.finalPaidAmount,
+                                    razorpayOrderId: razorpayOrderId,
+                                    user: updatedOrder.user,
+                                    seller: updatedOrder.seller,
+                                    amount: updatedOrder.finalPaidAmount,
                                     currency: 'INR',
                                     method: 'razorpay',
-                                    commissionAmount: order.commissionAmount,
-                                    sellerPayoutAmount: order.sellerAmount,
+                                    commissionAmount: updatedOrder.commissionAmount,
+                                    sellerPayoutAmount: updatedOrder.sellerAmount,
                                     payoutStatus: 'pending',
                                 }
                             },
                             { upsert: true, new: true, setDefaultsOnInsert: true }
                         );
-                        console.log(`Webhook: Payment record ${payment._id} updated/created.`);
 
-                        // Update Order
-                        order.isPaid = true;
-                        order.paidAt = new Date(paymentEntity.created_at * 1000);
-                        order.paymentStatus = 'completed';
-                        order.paymentResult = {
-                            id: razorpayPaymentId,
-                            status: 'completed',
-                            update_time: new Date(),
-                            email_address: paymentEntity.email
-                        };
-                        await order.save();
-                        console.log(`Webhook: Order ${order._id} updated to paid.`);
+                        // Clear user cart
+                        try {
+                            await User.findByIdAndUpdate(updatedOrder.user, { $set: { cartItems: [] } });
+                            console.log(`🛒 Webhook: Cart cleared for user: ${updatedOrder.user}`);
+                        } catch (cartErr) {
+                            console.error('⚠️ Webhook: Failed to clear cart after payment:', cartErr);
+                        }
 
                         // Notify Seller
                         await Notification.create({
-                            user: order.seller,
+                            user: updatedOrder.seller,
                             type: 'PAYMENT_STATUS',
-                            message: `Payment received via webhook for order #${order._id.toString().slice(-6)}.`,
-                            relatedEntity: order._id,
+                            title: 'Payment Received',
+                            message: `Payment received via webhook for order #${updatedOrder._id.toString().slice(-6)}.`,
+                            relatedEntity: updatedOrder._id,
                             entityModel: 'Order'
                         });
 
                         // Emit Socket events
                         if (req.broadcastOrderUpdate) {
-                            await req.broadcastOrderUpdate(order._id);
+                            await req.broadcastOrderUpdate(updatedOrder._id);
                         }
                         const io = req.app.get('io');
                         if (io) {
-                            // BUG-2 FIX: `updateDataEmit` was never defined — replaced with actual fields.
                             io.to('admin').emit('ORDER_UPDATE', {
                                 type: 'ORDER_UPDATE',
-                                data: { orderId: order._id, isPaid: true, paymentStatus: 'completed' }
+                                data: { orderId: updatedOrder._id, isPaid: true, paymentStatus: 'completed' }
                             });
                         }
-                    }
-                } else {
-                    const existingPaidOrders = await Order.find({ razorpayOrderId: razorpayOrderId, isPaid: true });
-                    if (existingPaidOrders.length > 0) {
-                        console.log(`Webhook: payment.captured ignored (Order ${razorpayOrderId} already marked as paid).`);
-                    } else {
-                        console.warn(`Webhook: payment.captured received for unknown or already processed Razorpay Order ID: ${razorpayOrderId}`);
                     }
                 }
 
@@ -414,33 +448,33 @@ const requestPayout = asyncHandler(async (req, res) => {
         throw new Error('Invalid amount');
     }
 
+    const session = await mongoose.startSession();
+    session.startTransaction();
     try {
-        // Recalculate available balance server-side
+        // Recalculate available balance server-side within session
         const earnings = await Payment.aggregate([
             { $match: { seller: sellerId, status: 'completed' } },
             { $group: { _id: null, total: { $sum: '$sellerPayoutAmount' } } }
-        ]);
+        ]).session(session);
 
         const paidOut = await Payout.aggregate([
             { $match: { seller: sellerId, status: { $in: ['pending', 'processing', 'completed'] } } },
             { $group: { _id: null, total: { $sum: '$amount' } } }
-        ]);
+        ]).session(session);
 
         const totalEarnings = earnings[0]?.total || 0;
         const totalPaidOrPending = paidOut[0]?.total || 0;
         const availableBalance = Math.max(0, totalEarnings - totalPaidOrPending);
 
         if (amount > availableBalance) {
-            res.status(400);
             throw new Error(`Requested ₹${amount.toFixed(2)} exceeds available ₹${availableBalance.toFixed(2)}`);
         }
 
         // Get seller bank details
-        const seller = await User.findById(sellerId).select('name email businessDetails.bankAccount');
+        const seller = await User.findById(sellerId).select('name email businessDetails.bankAccount').session(session);
         const bankDetails = seller?.businessDetails?.bankAccount;
 
         if (!bankDetails?.accountNumber || !bankDetails?.ifscCode || !bankDetails?.accountHolderName) {
-            res.status(400);
             throw new Error('Bank details incomplete. Please update profile.');
         }
 
@@ -456,7 +490,7 @@ const requestPayout = asyncHandler(async (req, res) => {
                 ifsc: bankDetails.ifscCode,
             }
         });
-        const createdPayout = await payout.save();
+        const createdPayout = await payout.save({ session });
 
         // Notify Admin about the new payout request
         try {
@@ -484,12 +518,16 @@ const requestPayout = asyncHandler(async (req, res) => {
             // Non-blocking: We don't want to fail the payout if notification fails
         }
 
+        await session.commitTransaction();
         res.status(201).json({ message: 'Payout requested', payout: createdPayout });
     } catch (error) {
+        await session.abortTransaction();
         console.error("Payout request error:", error);
-        res.status(error.statusCode || 500).json({
+        res.status(400).json({
             message: error.message || 'Failed payout request'
         });
+    } finally {
+        session.endSession();
     }
 });
 
@@ -716,19 +754,26 @@ const verifyRazorpayLink = asyncHandler(async (req, res) => {
     const { orderId, razorpay_payment_id, razorpay_payment_link_status } = req.query;
 
     if (razorpay_payment_link_status === 'paid') {
-        const order = await Order.findById(orderId);
+        // Atomic update to prevent race conditions
+        const order = await Order.findOneAndUpdate(
+            { _id: orderId, isPaid: false },
+            {
+                $set: {
+                    isPaid: true,
+                    paidAt: Date.now(),
+                    paymentStatus: 'completed',
+                    orderStatus: 'confirmed',
+                    paymentResult: {
+                        id: razorpay_payment_id,
+                        status: 'completed',
+                        update_time: new Date()
+                    }
+                }
+            },
+            { new: true }
+        );
+
         if (order) {
-            // Update Order Status
-            order.isPaid = true;
-            order.paidAt = Date.now();
-            order.paymentStatus = 'completed';
-            order.orderStatus = 'confirmed'; // ✅ FIX: Move from pending_payment to confirmed
-            order.paymentResult = {
-                id: razorpay_payment_id,
-                status: 'completed',
-                update_time: new Date()
-            };
-            await order.save();
             console.log('✅ Order Payment Verified & Confirmed via Link:', orderId);
             
             // ✅ Trigger Socket Broadcast to update Mobile UI immediately
@@ -780,56 +825,65 @@ const verifyRazorpayAdvanceLink = asyncHandler(async (req, res) => {
     const { orderId, razorpay_payment_id, razorpay_payment_link_status } = req.query;
 
     if (razorpay_payment_link_status === 'paid') {
-        const order = await Order.findById(orderId);
-        if (order) {
-            const advanceAmount = Math.round(order.totalPrice * 0.2);
-            // Update Order Status
-            order.isAdvancePaid = true;
-            order.advanceAmountPaid = advanceAmount;
-            order.remainingCodAmount = order.totalPrice - advanceAmount;
-            order.paymentStatus = 'partial';
-            order.orderStatus = 'confirmed'; // Confirmed now that advance is paid
+        const orderDoc = await Order.findById(orderId);
+        if (orderDoc) {
+            const advanceAmount = Math.round(orderDoc.totalPrice * 0.2);
             
-            await order.save();
-            console.log('✅ Order Advance Payment Verified & Confirmed via Link:', orderId);
-            
-            // ✅ Trigger Socket Broadcast to update Mobile UI immediately
-            if (req.broadcastOrderUpdate) {
-                await req.broadcastOrderUpdate(orderId, { status: 'confirmed' });
-            }
+            // Atomic update to prevent race conditions
+            const order = await Order.findOneAndUpdate(
+                { _id: orderId, isAdvancePaid: false },
+                {
+                    $set: {
+                        isAdvancePaid: true,
+                        advanceAmountPaid: advanceAmount,
+                        remainingCodAmount: orderDoc.totalPrice - advanceAmount,
+                        paymentStatus: 'partial',
+                        orderStatus: 'confirmed'
+                    }
+                },
+                { new: true }
+            );
 
-            // ✅ Clear User Cart (since order is now fully confirmed)
-            try {
-                await User.findByIdAndUpdate(order.user, { $set: { cartItems: [] } });
-                console.log('🛒 Cart cleared for user:', order.user);
-            } catch (cartErr) {
-                console.error('⚠️ Failed to clear cart after payment:', cartErr);
-            }
-            
-            // Redirect to mobile app success deep link
-            // We'll use both common deep link schemes for maximum compatibility
-            return res.send(`
-                <html>
-                    <head><title>Payment Success</title></head>
-                    <body style="font-family: sans-serif; text-align: center; padding: 50px;">
-                        <div style="color: #4CAF50; font-size: 48px;">✔</div>
-                        <h2>Advance Payment Successful!</h2>
-                        <p>Updating your order status...</p>
-                        <p>Redirecting you back to the app...</p>
-                        <script>
-                            // Try multiple schemes
-                            const orderId = "${orderId}";
-                            setTimeout(() => {
-                                window.location.href = "ricemill://payment-success?orderId=" + orderId;
-                                // Fallback for Expo Go
+            if (order) {
+                console.log('✅ Order Advance Payment Verified & Confirmed via Link:', orderId);
+                
+                // ✅ Trigger Socket Broadcast to update Mobile UI immediately
+                if (req.broadcastOrderUpdate) {
+                    await req.broadcastOrderUpdate(orderId, { status: 'confirmed' });
+                }
+
+                // ✅ Clear User Cart (since order is now fully confirmed)
+                try {
+                    await User.findByIdAndUpdate(order.user, { $set: { cartItems: [] } });
+                    console.log('🛒 Cart cleared for user:', order.user);
+                } catch (cartErr) {
+                    console.error('⚠️ Failed to clear cart after payment:', cartErr);
+                }
+                
+                // Redirect to mobile app success deep link
+                return res.send(`
+                    <html>
+                        <head><title>Payment Success</title></head>
+                        <body style="font-family: sans-serif; text-align: center; padding: 50px;">
+                            <div style="color: #4CAF50; font-size: 48px;">✔</div>
+                            <h2>Advance Payment Successful!</h2>
+                            <p>Updating your order status...</p>
+                            <p>Redirecting you back to the app...</p>
+                            <script>
+                                // Try multiple schemes
+                                const orderId = "${orderId}";
                                 setTimeout(() => {
-                                    window.location.href = "exp://10.151.178.143:8081/--/payment-success?orderId=" + orderId;
+                                    window.location.href = "ricemill://payment-success?orderId=" + orderId;
+                                    // Fallback for Expo Go
+                                    setTimeout(() => {
+                                        window.location.href = "exp://10.151.178.143:8081/--/payment-success?orderId=" + orderId;
+                                    }, 1000);
                                 }, 1000);
-                            }, 1000);
-                        </script>
-                    </body>
-                </html>
-            `);
+                                </script>
+                            </body>
+                        </html>
+                    `);
+            }
         }
     }
 

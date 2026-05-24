@@ -22,6 +22,7 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import CustomerDashboard from './pages/CustomerDashboard';
 import SellerDashboard from './pages/SellerDashboard';
+import DeliveryDashboard from './pages/DeliveryDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import SellerKycPage from './pages/seller/SellerKycPage';
 import AdminForumPanel from './components/admin/AdminForumPanel';
@@ -244,7 +245,11 @@ function App() {
               element={<ProtectedRoute roles={['seller']}><SellerKycPage /></ProtectedRoute>}
             />
 
-
+            {/* --- DELIVERY --- */}
+            <Route
+              path="/delivery/dashboard"
+              element={<ProtectedRoute roles={['deliveryPartner']}><DeliveryDashboard /></ProtectedRoute>}
+            />
 
             {/* --- ADMIN --- */}
             <Route
@@ -331,7 +336,8 @@ function App() {
                     to={
                       userInfo.role === 'admin' ? '/admin/dashboard' :
                         userInfo.role === 'seller' ? (userInfo.kycStatus === 'approved' ? '/seller/dashboard' : '/seller/kyc') :
-                          '/customer/dashboard'
+                          userInfo.role === 'deliveryPartner' ? '/delivery/dashboard' :
+                            '/customer/dashboard'
                     }
                     replace
                   />

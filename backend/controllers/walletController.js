@@ -1,4 +1,5 @@
 const asyncHandler = require('express-async-handler');
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const WalletTransaction = require('../models/WalletTransaction');
 const WithdrawalRequest = require('../models/WithdrawalRequest');
@@ -7,14 +8,29 @@ const WithdrawalRequest = require('../models/WithdrawalRequest');
 // @route   GET /api/rewards/wallet
 // @access  Private
 const getWalletData = asyncHandler(async (req, res) => {
-    const user = await User.findById(req.user._id).select('walletBalance referralStats savedBanks');
+    const user = await User.findById(req.user._id);
+    if (!user) {
+        res.status(404);
+        throw new Error('User not found');
+    }
+    const sumResult = await WalletTransaction.aggregate([
+        { $match: { user: req.user._id } },
+        { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]);
+    const ledgerBalance = sumResult[0]?.total || 0;
+    
+    if (user.walletBalance !== ledgerBalance) {
+        console.log(`[Wallet Sync] Correcting balance drift for User ${user._id}: stored ₹${user.walletBalance} -> ledger ₹${ledgerBalance}`);
+        user.walletBalance = ledgerBalance;
+        await user.save();
+    }
 
     const transactions = await WalletTransaction.find({ user: req.user._id })
         .sort({ createdAt: -1 })
         .limit(50);
 
     res.json({
-        balance: user.walletBalance || 0,
+        balance: ledgerBalance,
         stats: user.referralStats,
         savedBanks: user.savedBanks || [],
         transactions
@@ -32,50 +48,76 @@ const requestWithdrawal = asyncHandler(async (req, res) => {
         throw new Error('Invalid withdrawal amount');
     }
 
-    const user = await User.findById(req.user._id);
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+        const user = await User.findById(req.user._id).session(session);
+        if (!user) {
+            throw new Error('User not found');
+        }
 
-    if (user.walletBalance < amount) {
-        res.status(400);
-        throw new Error('Insufficient wallet balance');
+        // Ledger truth balance check inside session
+        const sumResult = await WalletTransaction.aggregate([
+            { $match: { user: user._id } },
+            { $group: { _id: null, total: { $sum: '$amount' } } }
+        ]).session(session);
+        const ledgerBalance = sumResult[0]?.total || 0;
+
+        if (ledgerBalance < amount) {
+            throw new Error('Insufficient wallet balance');
+        }
+
+        const Payout = require('../models/payoutModel');
+
+        // Create withdrawal request using Payout model for Admin dashboard visibility
+        const withdrawal = await Payout.create([{
+            seller: user._id,
+            amount,
+            bankDetailsSnapshot: {
+                accountHolderName: bankDetails.accountHolderName,
+                accountNumber: bankDetails.accountNumber,
+                ifsc: bankDetails.ifscCode,
+                bankName: bankDetails.bankName,
+                branch: bankDetails.branchName,
+            },
+            status: 'pending'
+        }], { session });
+
+        const createdWithdrawal = withdrawal[0];
+
+        // Deduct from wallet balance atomically
+        user.walletBalance = ledgerBalance - amount;
+        await user.save({ session });
+
+        // Create transaction record
+        await WalletTransaction.create([{
+            user: user._id,
+            amount: -amount,
+            type: 'withdrawal',
+            status: 'pending',
+            description: 'Withdrawal request initiated',
+            referenceId: createdWithdrawal._id,
+            referenceType: 'WithdrawalRequest',
+            balanceAfter: user.walletBalance
+        }], { session });
+
+        await session.commitTransaction();
+
+        res.status(201).json({
+            success: true,
+            message: 'Withdrawal request submitted successfully',
+            withdrawal: createdWithdrawal
+        });
+    } catch (error) {
+        await session.abortTransaction();
+        console.error("Delivery Partner Withdrawal request error:", error);
+        res.status(400).json({
+            success: false,
+            message: error.message || 'Failed to submit withdrawal request'
+        });
+    } finally {
+        session.endSession();
     }
-
-    const Payout = require('../models/payoutModel');
-
-    // Create withdrawal request using Payout model for Admin dashboard visibility
-    const withdrawal = await Payout.create({
-        seller: req.user._id,
-        amount,
-        bankDetailsSnapshot: {
-            accountHolderName: bankDetails.accountHolderName,
-            accountNumber: bankDetails.accountNumber,
-            ifsc: bankDetails.ifscCode,
-            bankName: bankDetails.bankName,
-            branch: bankDetails.branchName,
-        },
-        status: 'pending'
-    });
-
-    // Deduct from wallet balance immediately (locked)
-    user.walletBalance -= amount;
-    await user.save();
-
-    // Create transaction record
-    await WalletTransaction.create({
-        user: req.user._id,
-        amount: -amount,
-        type: 'withdrawal',
-        status: 'pending',
-        description: 'Withdrawal request initiated',
-        referenceId: withdrawal._id,
-        referenceType: 'WithdrawalRequest',
-        balanceAfter: user.walletBalance
-    });
-
-    res.status(201).json({
-        success: true,
-        message: 'Withdrawal request submitted successfully',
-        withdrawal
-    });
 });
 
 // @desc    Get withdrawal history

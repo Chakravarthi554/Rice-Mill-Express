@@ -40,6 +40,12 @@ function TabPanel(props) {
 
 const Profile = () => {
   const [value, setValue] = useState(0);
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    dispatch(getUserDetails());
+  }, [dispatch]);
+
   const handleChange = (event, newValue) => {
     setValue(newValue);
   };

@@ -330,7 +330,7 @@ const assignDeliveryToOrder = asyncHandler(async (req, res) => {
         deliveryPartner: updatedOrder.deliveryPartner
       });
       if (partner && partner.user) {
-        io.to(`delivery_${partner.user.toString()}`).emit('ORDER_ASSIGNED', updatedOrder);
+        io.to(`delivery_partner_${partner.user.toString()}`).emit('ORDER_ASSIGNED', updatedOrder);
       }
     }
 
@@ -492,8 +492,8 @@ const getAssignedOrders = asyncHandler(async (req, res) => {
   if (status) {
     query.orderStatus = status;
   } else {
-    // Include all statuses that a delivery partner should see
-    query.orderStatus = { $in: ['confirmed', 'placed', 'processing', 'packed', 'shipped', 'out_for_delivery', 'delivered'] };
+    // Include all statuses that a delivery partner should see, including completed history
+    query.orderStatus = { $in: ['confirmed', 'placed', 'processing', 'packed', 'shipped', 'out_for_delivery', 'delivered', 'completed'] };
   }
 
   // 3. Fetch orders

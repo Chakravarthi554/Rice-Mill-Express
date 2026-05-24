@@ -23,7 +23,7 @@ import {
   Chat as ChatIcon
 } from '@mui/icons-material';
 import { useSelector, useDispatch } from 'react-redux';
-import { getCurrentSocket, setupSocialListeners } from '../../utils/socket';
+import { getCurrentSocket, setupSocialListeners, removeSocialListeners } from '../../utils/socket';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import api from '../../utils/api';
@@ -48,36 +48,58 @@ const NotificationBadge = () => {
     default: <CircleIcon color="action" />
   };
 
+  // 1. Fetch initial notifications on userInfo change immediately
+  useEffect(() => {
+    if (userInfo) {
+      fetchNotifications();
+    }
+  }, [userInfo]);
+
+  // 2. Setup socket listeners with automatic retry and cleanup on unmount/logout
   useEffect(() => {
     if (!userInfo) return;
 
-    const socket = getCurrentSocket();
-    if (!socket) return;
+    let active = true;
+    let socketInitTimeout;
 
-    // Setup notification listeners
-    const callbacks = {
-      onNotification: (notification) => {
-        setNotifications(prev => [notification, ...prev.slice(0, 9)]);
-        setUnreadCount(prev => prev + 1);
-      },
-      onAdminNotification: (notification) => {
-        if (userInfo.role === 'admin') {
-          setNotifications(prev => [notification, ...prev.slice(0, 9)]);
-          setUnreadCount(prev => prev + 1);
-        }
-      },
-      onUnreadCount: (count) => {
-        setUnreadCount(count);
+    const initListeners = () => {
+      const socket = getCurrentSocket();
+      if (socket) {
+        console.log('🔌 Socket: setting up notification badge listeners for user', userInfo._id);
+        const callbacks = {
+          onNotification: (notification) => {
+            if (active) {
+              setNotifications(prev => [notification, ...prev.slice(0, 9)]);
+              setUnreadCount(prev => prev + 1);
+            }
+          },
+          onAdminNotification: (notification) => {
+            if (active && userInfo.role === 'admin') {
+              setNotifications(prev => [notification, ...prev.slice(0, 9)]);
+              setUnreadCount(prev => prev + 1);
+            }
+          },
+          onUnreadCount: (count) => {
+            if (active) {
+              setUnreadCount(count);
+            }
+          }
+        };
+
+        setupSocialListeners(callbacks);
+      } else {
+        // Retry in 1 second if socket is not initialized yet
+        socketInitTimeout = setTimeout(initListeners, 1000);
       }
     };
 
-    setupSocialListeners(callbacks);
-
-    // Fetch initial notifications
-    fetchNotifications();
+    initListeners();
 
     return () => {
-      // Cleanup will be handled by the socket utility
+      active = false;
+      if (socketInitTimeout) clearTimeout(socketInitTimeout);
+      console.log('🧹 Socket: removing notification badge listeners');
+      removeSocialListeners();
     };
   }, [userInfo]);
 
@@ -112,12 +134,25 @@ const NotificationBadge = () => {
       if (!userInfo) return;
 
       await api.put('/api/notifications/read-all');
+      // Update local state to reflect all read
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     } catch (error) {
       console.error('Error marking notifications as read:', error);
     }
   };
 
   const handleNotificationClick = async (notification) => {
+    // Mark single notification as read if not already read
+    if (!notification.read) {
+      try {
+        await api.put(`/api/notifications/${notification._id}/read`);
+        setNotifications(prev => prev.map(n => 
+          n._id === notification._id ? { ...n, read: true } : n
+        ));
+      } catch (error) {
+        console.error('Error marking notification as read:', error);
+      }
+    }
     // Handle notification action
     if (notification.actionUrl) {
       window.location.href = notification.actionUrl;

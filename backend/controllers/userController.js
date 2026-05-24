@@ -623,8 +623,8 @@ const getDashboardStats = asyncHandler(async (req, res) => {
   let stats = {};
 
   if (user.role === 'customer') {
-    const totalOrders = await Order.countDocuments({ user: user._id });
-    const pendingOrders = await Order.countDocuments({ user: user._id, orderStatus: { $in: ['placed', 'processing', 'packed', 'shipped'] } });
+    const totalOrders = await Order.countDocuments({ user: user._id, orderStatus: { $ne: 'pending_payment' } });
+    const pendingOrders = await Order.countDocuments({ user: user._id, orderStatus: { $in: ['placed', 'processing', 'packed', 'shipped', 'out_for_delivery'] } });
     const deliveredOrders = await Order.countDocuments({ user: user._id, orderStatus: 'delivered' });
 
     stats = {
@@ -635,22 +635,48 @@ const getDashboardStats = asyncHandler(async (req, res) => {
       addressesCount: user.addresses?.length || 0
     };
   } else if (user.role === 'seller') {
-    const totalOrders = await Order.countDocuments({ seller: user._id });
-    const pendingOrders = await Order.countDocuments({ seller: user._id, orderStatus: { $in: ['placed', 'processing', 'packed', 'shipped'] } });
-    const deliveredOrders = await Order.countDocuments({ seller: user._id, orderStatus: 'delivered' });
+    const [totalOrders, pendingOrders, deliveredOrders, earningsData, pendingData] = await Promise.all([
+      Order.countDocuments({ seller: user._id, orderStatus: { $ne: 'pending_payment' } }),
+      Order.countDocuments({ seller: user._id, orderStatus: { $in: ['placed', 'processing', 'packed', 'shipped', 'out_for_delivery'] } }),
+      Order.countDocuments({ seller: user._id, orderStatus: 'delivered' }),
+      // Calculate actual earnings (completed paid orders or delivered COD orders, excluding cancelled)
+      Order.aggregate([
+        {
+          $match: {
+            seller: user._id,
+            $and: [
+              { $or: [{ isPaid: true }, { orderStatus: 'delivered' }] },
+              { orderStatus: { $nin: ['cancelled', 'pending_payment'] } }
+            ]
+          }
+        },
+        { $group: { _id: null, total: { $sum: { $ifNull: ['$sellerAmount', { $multiply: ['$totalPrice', 0.85] }] } } } }
+      ]),
+      // Calculate pending payments for active orders in progress
+      Order.aggregate([
+        {
+          $match: {
+            seller: user._id,
+            orderStatus: { $in: ['placed', 'processing', 'packed', 'shipped', 'out_for_delivery'] },
+            isPaid: false
+          }
+        },
+        { $group: { _id: null, total: { $sum: { $ifNull: ['$sellerAmount', { $multiply: ['$totalPrice', 0.85] }] } } } }
+      ])
+    ]);
 
     stats = {
       totalOrders,
       pendingOrders,
       deliveredOrders,
-      totalEarnings: 0, // You can calculate from payments
-      pendingPayments: 0
+      totalEarnings: earningsData[0]?.total || 0,
+      pendingPayments: pendingData[0]?.total || 0
     };
   } else if (user.role === 'admin') {
-    const totalUsers = await User.countDocuments();
+    const totalUsers = await User.countDocuments({ role: { $ne: 'search_log' } });
     const totalSellers = await User.countDocuments({ role: 'seller' });
     const totalCustomers = await User.countDocuments({ role: 'customer' });
-    const totalOrders = await Order.countDocuments();
+    const totalOrders = await Order.countDocuments({ orderStatus: { $ne: 'pending_payment' } });
 
     stats = {
       totalUsers,

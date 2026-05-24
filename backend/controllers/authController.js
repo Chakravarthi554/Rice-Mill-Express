@@ -230,11 +230,14 @@ const loginUser = asyncHandler(async (req, res) => {
       phone: user.phone || '',
       role: user.role,
       accessToken,
+      profileImage: user.profileImage || '/uploads/default_avatar.jpg',
+      preferences: user.preferences || { language: 'english', theme: 'system', recommendationsEnabled: true },
     };
 
     // Only include kycStatus for sellers
     if (user.role === 'seller') {
       response.kycStatus = user.kycStatus;
+      response.businessDetails = user.businessDetails || {};
     }
 
     res.json(response);
@@ -302,10 +305,13 @@ const loginWithPhone = asyncHandler(async (req, res) => {
       phone: user.phone,
       role: user.role,
       accessToken,
+      profileImage: user.profileImage || '/uploads/default_avatar.jpg',
+      preferences: user.preferences || { language: 'english', theme: 'system', recommendationsEnabled: true },
     };
 
     if (user.role === 'seller') {
       response.kycStatus = user.kycStatus;
+      response.businessDetails = user.businessDetails || {};
     }
 
     res.json(response);
@@ -469,10 +475,13 @@ const firebaseLogin = asyncHandler(async (req, res) => {
       role: user.role,
       emailVerified: email_verified || false,
       accessToken,
+      profileImage: user.profileImage || '/uploads/default_avatar.jpg',
+      preferences: user.preferences || { language: 'english', theme: 'system', recommendationsEnabled: true },
     };
 
     if (user.role === 'seller') {
       response.kycStatus = user.kycStatus;
+      response.businessDetails = user.businessDetails || {};
     }
 
     console.log('✅ Firebase Login successful for:', email || phone_number, 'Role:', user.role);
@@ -563,10 +572,13 @@ const loginWithGoogle = asyncHandler(async (req, res) => {
       phone: user.phone || '',
       role: user.role,
       accessToken,
+      profileImage: user.profileImage || '/uploads/default_avatar.jpg',
+      preferences: user.preferences || { language: 'english', theme: 'system', recommendationsEnabled: true },
     };
 
     if (user.role === 'seller') {
       response.kycStatus = user.kycStatus;
+      response.businessDetails = user.businessDetails || {};
     }
 
     res.json(response);
@@ -706,13 +718,22 @@ const verify2FA = asyncHandler(async (req, res) => {
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 
-  res.json({
+  const response = {
     _id: user._id,
     name: user.name,
     email: user.email,
     role: user.role,
     accessToken,
-  });
+    profileImage: user.profileImage || '/uploads/default_avatar.jpg',
+    preferences: user.preferences || { language: 'english', theme: 'system', recommendationsEnabled: true },
+  };
+
+  if (user.role === 'seller') {
+    response.kycStatus = user.kycStatus;
+    response.businessDetails = user.businessDetails || {};
+  }
+
+  res.json(response);
 });
 
 const logoutUser = asyncHandler(async (req, res) => {
