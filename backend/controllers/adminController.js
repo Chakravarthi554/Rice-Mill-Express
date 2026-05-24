@@ -1064,7 +1064,7 @@ const getAnalyticsData = asyncHandler(async (req, res) => {
       data: {
         salesOverview: {
           totalSales: salesOverview[0]?.totalSales || 0,
-          dailySales: dailySales.map(d => ({ day: d._id, sales: d.amount })),
+          dailySales: dailySales.map(d => ({ day: d._id, sales: d.sales })),
           topRiceTypes: topRiceTypes.map(t => ({ name: t._id, value: t.value })),
           commissionEarned: salesOverview[0]?.commissionEarned || 0
         },

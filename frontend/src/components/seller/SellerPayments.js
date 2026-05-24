@@ -58,6 +58,31 @@ const SellerPayments = () => {
   const [selectedAccount, setSelectedAccount] = useState('');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
+  // ── Download Statement as CSV ──────────────────────────────────────────────
+  const handleDownloadStatement = () => {
+    if (payments.length === 0) {
+      setSnackbar({ open: true, message: 'No transactions to download.', severity: 'info' });
+      return;
+    }
+    const headers = ['Date', 'Amount (₹)', 'Commission (15%)', 'Net Payout (₹)', 'Method', 'Status'];
+    const rows = payments.map(p => [
+      new Date(p.createdAt).toLocaleDateString('en-IN'),
+      p.amount?.toFixed(2) || '0.00',
+      ((p.amount || 0) * 0.15).toFixed(2),
+      p.sellerPayoutAmount?.toFixed(2) || '0.00',
+      p.method || 'UPI',
+      p.status || 'pending'
+    ]);
+    const csvContent = [headers, ...rows].map(r => r.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `seller-statement-${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   const {
     payments = [], balance = { totalEarnings: 0, availableBalance: 0, pendingPayouts: 0 },
     payoutHistory = [], loading: paymentsLoading = true, error: paymentsError = null
@@ -141,7 +166,8 @@ const SellerPayments = () => {
             <Box sx={{ px: 3, py: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #F3F4F6' }}>
               <Typography fontWeight={800}>Transaction History</Typography>
               <Button size="small" startIcon={<Download fontSize="small" />}
-                variant="outlined" sx={{ borderColor: '#E5E7EB', color: '#6B7280', borderRadius: 2, fontWeight: 700 }}>
+                variant="outlined" onClick={handleDownloadStatement}
+                sx={{ borderColor: '#E5E7EB', color: '#6B7280', borderRadius: 2, fontWeight: 700 }}>
                 Download Statement
               </Button>
             </Box>
@@ -211,6 +237,7 @@ const SellerPayments = () => {
             </TableContainer>
             <Box sx={{ px: 2, pb: 2, pt: 1 }}>
               <Button fullWidth size="small" variant="outlined"
+                onClick={() => { if (codPayments.length > 0) { setSelectedPayment(codPayments[0]); setPaymentAmount(codPayments[0]?.amount || 0); setOpenCodDialog(true); } else { setSnackbar({ open: true, message: 'No COD payments pending verification.', severity: 'info' }); } }}
                 sx={{ borderColor: '#E5E7EB', color: '#374151', borderRadius: 2, fontWeight: 700 }}>
                 Verify Remittance
               </Button>

@@ -58,12 +58,6 @@ const registerUser = asyncHandler(async (req, res) => {
     sanitisedPhone = sanitisedPhone.replace(/\D/g, '').slice(-10);
   }
 
-  const userExists = await User.findOne({ email });
-  if (userExists) {
-    res.status(400);
-    throw new Error('User already exists');
-  }
-
   // Handle Referral
   let referrerId = null;
   if (referralCode) {
@@ -73,6 +67,56 @@ const registerUser = asyncHandler(async (req, res) => {
     }
   }
 
+  const userExists = await User.findOne({ email });
+  if (userExists) {
+    if (userExists.firebaseUid === firebaseUid && userExists.role === 'customer') {
+      console.log('🔄 registerUser: Found auto-provisioned user, updating to full registration details');
+      userExists.name = name;
+      userExists.phone = sanitisedPhone || userExists.phone;
+      userExists.role = role || 'customer';
+      userExists.password = password;
+      userExists.referredBy = referrerId;
+      userExists.kycStatus = role === 'seller' ? 'not_submitted' : 'not_required';
+
+      await userExists.save();
+
+      // Update refreshToken later
+      const accessToken = generateToken(userExists._id, 'access');
+      const refreshToken = generateRefreshToken(userExists._id);
+
+      await User.updateOne(
+        { _id: userExists._id },
+        { $set: { refreshToken } }
+      );
+
+      res.cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+
+      return res.status(201).json({
+        success: true,
+        message: 'Registration successful! Welcome!',
+        user: {
+          _id: userExists._id,
+          name: userExists.name,
+          email: userExists.email,
+          phone: userExists.phone,
+          role: userExists.role,
+          kycStatus: userExists.kycStatus,
+          isVerified: userExists.isVerified,
+        },
+        accessToken,
+      });
+    }
+
+    res.status(400);
+    throw new Error('User already exists');
+  }
+
+  // Normal creation
   const user = await User.create({
     name,
     email,
@@ -365,9 +409,11 @@ const firebaseLogin = asyncHandler(async (req, res) => {
 
     // Profile Image
     if (picture && user.profileImage !== picture) {
-      user.profileImage = picture;
-      updateData.profileImage = picture;
-      needsUpdate = true;
+      if (!user.profileImage || user.profileImage.startsWith('http') || user.profileImage === '/uploads/default_avatar.jpg') {
+        user.profileImage = picture;
+        updateData.profileImage = picture;
+        needsUpdate = true;
+      }
     }
 
     if (needsUpdate) {

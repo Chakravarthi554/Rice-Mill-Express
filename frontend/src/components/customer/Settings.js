@@ -9,6 +9,7 @@ import {
     HelpOutline, Description, Logout,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../../context/AuthContext';
 
 const NAV_GROUPS = [
     {
@@ -48,7 +49,7 @@ const Settings = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { t } = useTranslation();
-    const { user } = useSelector(state => state.auth || {});
+    const { user } = useAuth();
     const [hovered, setHovered] = useState(null);
 
     const initials = user?.name

@@ -30,6 +30,7 @@ import Message from '../components/common/Message';
 import CommunityForum from '../components/seller/CommunityForum';
 import RecipeEngagementDashboard from '../components/seller/RecipeEngagementDashboard';
 import { RECIPE_SUBMIT_RESET } from '../redux/constants/RecipeConstants';
+import NotificationBadge from '../components/common/NotificationBadge';
 
 // ────────────────────────────────────────────────────────────
 // Design Tokens (matching image: dark navy sidebar)
@@ -209,12 +210,12 @@ const OrdersPanel = ({ orders, partners, onAssign, onUpdateStatus, onDownloadInv
         if (statusFilter === 'New') matchStatus = ['placed', 'pending'].includes(o.orderStatus?.toLowerCase());
         else if (statusFilter === 'Ready') matchStatus = o.orderStatus?.toLowerCase() === 'packed';
         else if (statusFilter !== 'All') matchStatus = o.orderStatus?.toLowerCase() === statusFilter.toLowerCase();
-        
+
         // 2. Search (ID or Customer Name)
-        const matchSearch = search === '' || 
-                           o._id?.toLowerCase().includes(search.toLowerCase()) || 
-                           (o.user?.name || '').toLowerCase().includes(search.toLowerCase());
-        
+        const matchSearch = search === '' ||
+            o._id?.toLowerCase().includes(search.toLowerCase()) ||
+            (o.user?.name || '').toLowerCase().includes(search.toLowerCase());
+
         // 3. Date filtering
         let matchDate = true;
         if (dateFilter) {
@@ -361,7 +362,7 @@ const AssignDPDialog = ({ open, onClose, onAssign, partners, loading, selectedOr
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                     {filteredPartners.map(p => {
                         const isOnline = p.isOnline ?? p.status === 'active';
-                                    return (
+                        return (
                             <Box key={p._id} onClick={() => setSelectedId(p._id)}
                                 sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 1.5, borderRadius: 2, cursor: 'pointer', border: '1px solid', borderColor: selectedId === p._id ? ACCENT : '#F3F4F6', bgcolor: selectedId === p._id ? '#F0FDF4' : '#FAFAFA', '&:hover': { borderColor: ACCENT } }}>
                                 <Avatar sx={{ width: 42, height: 42 }}>{p.name?.[0]}</Avatar>
@@ -496,7 +497,7 @@ const SellerDashboard = () => {
                 <Box sx={{ px: 3, py: 3, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
                     <Typography variant="h6" fontWeight={800} color="#fff" fontSize="1rem">🌾 Rice Mill Express</Typography>
                     <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>Seller Portal</Typography>
-                            </Box>
+                </Box>
 
                 {/* Nav Items */}
                 <Box sx={{ flex: 1, py: 2, overflowY: 'auto' }}>
@@ -514,9 +515,9 @@ const SellerDashboard = () => {
                     <Box onClick={handleLogout} sx={{ display: 'flex', alignItems: 'center', gap: 2, cursor: 'pointer', color: 'rgba(255,255,255,0.55)', '&:hover': { color: '#fff' } }}>
                         <Logout fontSize="small" />
                         <Typography variant="body2" fontWeight={500}>Logout</Typography>
-                                                </Box>
+                    </Box>
                 </Box>
-                </Box>
+            </Box>
 
             {/* Main Content */}
             <Box sx={{ ml: '220px', flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -527,15 +528,15 @@ const SellerDashboard = () => {
                         <input style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 14, color: '#374151', flex: 1 }} placeholder="Search orders, customers, or IDs" />
                     </Box>
                     <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <IconButton size="small"><Notifications sx={{ color: '#6B7280' }} /></IconButton>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, cursor: 'pointer' }}>
+                        <NotificationBadge />
+                        <Box onClick={() => setActiveTab(8)} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, cursor: 'pointer' }}>
                             <Avatar sx={{ width: 36, height: 36, bgcolor: ACCENT, fontSize: '0.9rem' }}>{user?.name?.[0] || 'S'}</Avatar>
                             <Box>
                                 <Typography variant="body2" fontWeight={700} lineHeight={1}>{user?.name || 'Seller'}</Typography>
                                 <Typography variant="caption" color="text.secondary">Seller Portal</Typography>
                             </Box>
-                </Box>
-                </Box>
+                        </Box>
+                    </Box>
                 </Box>
 
                 {/* Page Content */}
@@ -546,7 +547,7 @@ const SellerDashboard = () => {
                     {ordersError && <Alert severity="error" sx={{ mb: 2 }}>{ordersError}</Alert>}
                     {renderContent()}
                 </Box>
-                </Box>
+            </Box>
 
             {/* Assign DP Dialog */}
             <AssignDPDialog

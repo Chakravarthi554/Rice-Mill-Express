@@ -34,8 +34,27 @@ const LoginPage = () => {
   }, [loginError]);
 
   useEffect(() => {
-    if (!recaptchaRef.current) {
-      try { recaptchaRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible' }); } catch (error) {}
+    if (loginError) {
+      setMessage(loginError);
+    }
+  }, [loginError]);
+
+  useEffect(() => {
+    if (!window.recaptchaVerifier) {
+      try {
+        window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+          size: 'invisible'
+        });
+        recaptchaRef.current = window.recaptchaVerifier;
+        // Optionally render to catch errors early
+        window.recaptchaVerifier.render().catch(err => {
+          console.error('Recaptcha render error:', err);
+        });
+      } catch (error) {
+        console.error("Recaptcha Initialization Error:", error);
+      }
+    } else {
+      recaptchaRef.current = window.recaptchaVerifier;
     }
   }, []);
 
@@ -110,7 +129,7 @@ const LoginPage = () => {
       {/* Right side Form */}
       <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', p: { xs: 3, sm: 6, md: 8 } }}>
         <Box sx={{ width: '100%', maxWidth: 420 }}>
-          
+
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 5 }}>
             <Typography variant="h4" fontWeight={800} color="#111827">Welcome Back</Typography>
             <IconButton onClick={() => navigate('/')} sx={{ bgcolor: '#F3F4F6', color: '#6B7280', '&:hover': { bgcolor: '#E5E7EB' } }}><CloseIcon /></IconButton>
@@ -119,11 +138,11 @@ const LoginPage = () => {
           {step === 1 ? (
             <Box>
               <Typography variant="body1" color="text.secondary" mb={4}>Enter your email or phone to continue.</Typography>
-              
+
               <TextField fullWidth placeholder="Email or Phone Number" value={emailOrPhone} onChange={(e) => setEmailOrPhone(e.target.value)} sx={{ ...inputSx, mb: 3 }}
                 InputProps={{ startAdornment: <InputAdornment position="start"><EmailOutlined sx={{ color: '#9CA3AF' }} /></InputAdornment> }}
               />
-              
+
               <Button fullWidth variant="contained" onClick={handleInitialContinue} disabled={loading}
                 sx={{ py: 1.8, bgcolor: '#16A34A', color: '#fff', borderRadius: '50px', textTransform: 'none', fontSize: 16, fontWeight: 700, boxShadow: '0 8px 16px -4px rgba(22, 163, 74, 0.3)', '&:hover': { bgcolor: '#15803D', boxShadow: '0 12px 20px -4px rgba(22, 163, 74, 0.4)' }, mb: 4 }}>
                 Continue
@@ -149,7 +168,7 @@ const LoginPage = () => {
               <Typography variant="body1" color="text.secondary" mb={4}>
                 Please enter your {isEmail ? 'password' : 'OTP'} for <strong style={{ color: '#111827' }}>{emailOrPhone}</strong>.
               </Typography>
-              
+
               <TextField fullWidth type={isEmail && !showPassword ? 'password' : 'text'} placeholder={isEmail ? 'Password' : 'Enter 6-digit OTP'} value={isEmail ? password : otp} onChange={(e) => isEmail ? setPassword(e.target.value) : setOtp(e.target.value)} sx={{ ...inputSx, mb: 1.5 }}
                 InputProps={{
                   startAdornment: <InputAdornment position="start">{isEmail ? <LockOutlined sx={{ color: '#9CA3AF' }} /> : <PhoneOutlined sx={{ color: '#9CA3AF' }} />}</InputAdornment>,
@@ -169,7 +188,7 @@ const LoginPage = () => {
               )}
 
               <Button fullWidth variant="contained" onClick={handleFinalContinue} disabled={loading}
-                sx={{ py: 1.8, bgcolor: '#16A34A', color: '#fff', borderRadius: '50px', textTransform: 'none', fontSize: 16, fontWeight: 700, mt: isEmail ? 1 : 2, mb: 2, boxShadow: '0 8px 16px -4px rgba(22, 163, 74, 0.3)', '&:hover': { bgcolor: '#15803D' }}}>
+                sx={{ py: 1.8, bgcolor: '#16A34A', color: '#fff', borderRadius: '50px', textTransform: 'none', fontSize: 16, fontWeight: 700, mt: isEmail ? 1 : 2, mb: 2, boxShadow: '0 8px 16px -4px rgba(22, 163, 74, 0.3)', '&:hover': { bgcolor: '#15803D' } }}>
                 {loading ? <CircularProgress size={24} color="inherit" /> : 'Log In'}
               </Button>
 
@@ -180,7 +199,7 @@ const LoginPage = () => {
           )}
 
           {message && <Alert severity={message.includes('success') ? 'success' : 'error'} sx={{ mt: 3, borderRadius: 3, fontWeight: 500 }}>{message}</Alert>}
-          
+
           <Typography variant="caption" display="block" textAlign="center" color="text.disabled" sx={{ mt: 6 }}>
             By continuing, you agree to our Terms of Service & Privacy Policy.
           </Typography>

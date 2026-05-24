@@ -7,6 +7,8 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const { emitNewKyc } = require('../utils/socketServer');
+const sendEmail = require('../utils/sendEmail');
+const sendSMS = require('../utils/sendSMS');
 
 // Multer configuration (in-memory storage)
 const storage = multer.memoryStorage();
@@ -57,9 +59,9 @@ const submitKycApplication = asyncHandler(async (req, res) => {
     // Check for required files
     const requiredFiles = ['idProof', 'addressProof'];
     const missingFiles = requiredFiles.filter(field => !files[field]);
-    
+
     if (missingFiles.length > 0) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
         message: `Missing required files: ${missingFiles.join(', ')}`,
         details: `Please upload: ${missingFiles.map(f => f.replace(/([A-Z])/g, ' $1').toLowerCase()).join(', ')}`
@@ -67,10 +69,10 @@ const submitKycApplication = asyncHandler(async (req, res) => {
     }
 
     const { businessName, businessType, gstNumber, panNumber, businessAddress } = req.body;
-    
+
     // Validate required fields
     if (!businessName || !businessType || !gstNumber || !panNumber) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
         message: 'All business fields are required',
         required: ['businessName', 'businessType', 'gstNumber', 'panNumber']
@@ -83,7 +85,7 @@ const submitKycApplication = asyncHandler(async (req, res) => {
       try {
         address = typeof businessAddress === 'string' ? JSON.parse(businessAddress) : businessAddress;
       } catch (parseError) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           success: false,
           message: 'Invalid business address format',
           details: 'Business address must be a valid JSON string'
@@ -94,7 +96,7 @@ const submitKycApplication = asyncHandler(async (req, res) => {
     // Process and save files
     const documents = [];
     const uploadDir = path.join(__dirname, '..', 'uploads');
-    
+
     // Ensure upload directory exists
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
@@ -105,13 +107,13 @@ const submitKycApplication = asyncHandler(async (req, res) => {
         const filename = `kyc-${Date.now()}-${req.user._id}-${type}${path.extname(file.originalname)}`;
         const documentUrl = `/uploads/${filename}`;
         const uploadPath = path.join(uploadDir, filename);
-        
+
         try {
           fs.writeFileSync(uploadPath, file.buffer);
           console.log(`File saved to: ${uploadPath}`);
-          
-          documents.push({ 
-            documentType: type, 
+
+          documents.push({
+            documentType: type,
             documentUrl,
             originalName: file.originalname,
             uploadedAt: new Date()
@@ -129,10 +131,10 @@ const submitKycApplication = asyncHandler(async (req, res) => {
               }
             }
           });
-          return res.status(500).json({ 
+          return res.status(500).json({
             success: false,
             message: 'Failed to save uploaded files',
-            error: fileError.message 
+            error: fileError.message
           });
         }
       }
@@ -156,11 +158,11 @@ const submitKycApplication = asyncHandler(async (req, res) => {
     try {
       console.log('Creating KYC application with data:', kycData);
       const kycApplication = await KycApplication.create([kycData], { session });
-      
+
       console.log('Updating user KYC status for:', req.user._id);
       await User.findByIdAndUpdate(
-        req.user._id, 
-        { kycStatus: 'under_review' }, 
+        req.user._id,
+        { kycStatus: 'under_review' },
         { session }
       );
 
@@ -171,7 +173,7 @@ const submitKycApplication = asyncHandler(async (req, res) => {
       // 🔥 ENHANCED: Create admin notifications for KYC
       const adminUsers = await mongoose.model('User').find({ role: 'admin' }).select('_id');
       if (adminUsers.length > 0) {
-        const notificationPromises = adminUsers.map(admin => 
+        const notificationPromises = adminUsers.map(admin =>
           Notification.create({
             user: admin._id,
             type: 'NEW_KYC_APPLICATION',
@@ -184,7 +186,7 @@ const submitKycApplication = asyncHandler(async (req, res) => {
             actionLabel: 'Review KYC'
           })
         );
-        
+
         await Promise.all(notificationPromises);
       }
 
@@ -199,17 +201,17 @@ const submitKycApplication = asyncHandler(async (req, res) => {
         });
       }
 
-      res.status(201).json({ 
-        success: true, 
-        message: 'KYC application submitted successfully', 
+      res.status(201).json({
+        success: true,
+        message: 'KYC application submitted successfully',
         kycApplication: kycApplication[0],
-        documentUrls: documents.map(d => d.documentUrl) 
+        documentUrls: documents.map(d => d.documentUrl)
       });
 
     } catch (transactionError) {
       await session.abortTransaction();
       session.endSession();
-      
+
       // Clean up uploaded files on transaction error
       documents.forEach((doc) => {
         const filePath = path.join(uploadDir, path.basename(doc.documentUrl));
@@ -221,27 +223,27 @@ const submitKycApplication = asyncHandler(async (req, res) => {
           }
         }
       });
-      
+
       console.error('Transaction error in submitKycApplication:', transactionError);
       throw transactionError;
     }
 
   } catch (error) {
     console.error('Error in submitKycApplication:', error);
-    
+
     if (error.name === 'ValidationError') {
       const errors = Object.values(error.errors).map(err => err.message);
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
         message: 'KYC validation failed',
-        errors 
+        errors
       });
     }
 
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       message: 'Server error during KYC submission',
-      error: error.message 
+      error: error.message
     });
   }
 });
@@ -270,6 +272,18 @@ const approveKycApplication = asyncHandler(async (req, res) => {
     message: 'Your KYC application has been approved.',
     relatedEntity: kyc._id,
   });
+
+  // 📧 Send Email & SMS Notifications
+  try {
+    const emailSubject = 'KYC Approved - Welcome to Rice-Mill Express!';
+    const msgBody = `<h2>Congratulations!</h2><p>Your KYC application for <b>${kyc.businessName}</b> has been <b>approved</b>.</p><p>You can now log in to the Seller Dashboard and start listing your products.</p><p>Review Notes: ${reviewNotes || 'Welcome aboard!'}</p>`;
+    const smsMessage = `Congratulations! Your KYC for ${kyc.businessName} is approved. You can now log in to your seller account.`;
+
+    await sendEmail({ email: updatedUser.email, subject: emailSubject, message: msgBody });
+    if (updatedUser.phone) await sendSMS({ phone: updatedUser.phone, message: smsMessage });
+  } catch (notifyErr) {
+    console.error('⚠️ Notification failed during KYC approval:', notifyErr.message);
+  }
 
   res.status(200).json({ success: true, message: 'KYC application approved', kyc, user: updatedUser });
 });
@@ -300,6 +314,18 @@ const rejectKycApplication = asyncHandler(async (req, res) => {
     message: `Your KYC application has been rejected. Notes: ${reviewNotes}`,
     relatedEntity: kyc._id,
   });
+
+  // 📧 Send Email & SMS Notifications
+  try {
+    const emailSubject = 'KYC Application Rejected';
+    const msgBody = `<h2>KYC Update</h2><p>Your KYC application for <b>${kyc.businessName}</b> has been <b>rejected</b>.</p><p>Reason: ${reviewNotes}</p><p>Please update your documents and try again.</p>`;
+    const smsMessage = `Your KYC for ${kyc.businessName} was rejected. Reason: ${reviewNotes}. Please re-submit correctly.`;
+
+    await sendEmail({ email: updatedUser.email, subject: emailSubject, message: msgBody });
+    if (updatedUser.phone) await sendSMS({ phone: updatedUser.phone, message: smsMessage });
+  } catch (notifyErr) {
+    console.error('⚠️ Notification failed during KYC rejection:', notifyErr.message);
+  }
 
   res.status(200).json({ success: true, message: 'KYC application rejected', kyc, user: updatedUser });
 });
@@ -360,6 +386,36 @@ const reviewKycApplication = asyncHandler(async (req, res) => {
     relatedEntity: application._id,
     metadata: { kycApplicationId: application._id, newStatus: status, reviewNotes },
   });
+
+  // 📧 Send Email & SMS Notifications
+  try {
+    const isApproved = status === 'approved';
+    const emailSubject = isApproved ? 'KYC Approved - Welcome to Rice-Mill Express!' : 'KYC Application Rejected';
+    const msgBody = isApproved
+      ? `<h2>Congratulations!</h2><p>Your KYC application for <b>${application.businessName}</b> has been <b>approved</b>.</p><p>You can now log in to the Seller Dashboard and start listing your products.</p><p>Review Notes: ${reviewNotes || 'Welcome aboard!'}</p>`
+      : `<h2>KYC Update</h2><p>Your KYC application for <b>${application.businessName}</b> has been <b>rejected</b>.</p><p>Reason: ${reviewNotes}</p><p>Please update your documents and try again.</p>`;
+
+    const smsMessage = isApproved
+      ? `Congratulations! Your KYC for ${application.businessName} is approved. You can now log in to your seller account.`
+      : `Your KYC for ${application.businessName} was rejected. Reason: ${reviewNotes}. Please re-submit correctly.`;
+
+    // Send Email
+    await sendEmail({
+      email: updatedUser.email,
+      subject: emailSubject,
+      message: msgBody
+    });
+
+    // Send SMS (if phone exists)
+    if (updatedUser.phone) {
+      await sendSMS({
+        phone: updatedUser.phone,
+        message: smsMessage
+      });
+    }
+  } catch (notifyErr) {
+    console.error('⚠️ Notification failed during KYC review:', notifyErr.message);
+  }
 
   console.log('Admin reviewed KYC application:', updatedApplication._id, 'Status:', status);
   res.json({

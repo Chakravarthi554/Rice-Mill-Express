@@ -4,21 +4,27 @@ import { useSelector } from 'react-redux';
 import Loader from './Loader';
 
 const ProtectedRoute = ({ children, roles }) => {
-  const { userInfo, loading } = useSelector(state => state.userLogin);
+  const { userInfo: reduxUserInfo, loading } = useSelector(state => state.userLogin);
   const location = useLocation();
 
+  // Fall back to localStorage when Redux state hasn't been hydrated yet
+  // (e.g., immediately after registration before the store syncs)
+  const userInfo = reduxUserInfo || (() => {
+    try { return JSON.parse(localStorage.getItem('userInfo')); } catch { return null; }
+  })();
+
   const isAuthenticated = !!userInfo?.token;
-  
+
   // 🔥 CRITICAL FIX: Enhanced role checking with admin override
   const isAuthorized = useMemo(() => {
     if (!roles) return true;
-    
+
     // Admin can access any route
     if (userInfo?.role === 'admin') {
       console.log(`✅ Admin ${userInfo._id} granted access to ${roles.join(', ')} routes`);
       return true;
     }
-    
+
     return roles.includes(userInfo?.role);
   }, [roles, userInfo?.role]);
 

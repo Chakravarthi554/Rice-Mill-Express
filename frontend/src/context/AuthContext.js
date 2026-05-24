@@ -15,9 +15,8 @@ import {
 import { getSocket, disconnectSocket } from '../utils/socket';
 import { translations } from '../utils/constants';
 import { loginUser } from '../redux/actions/userActions';
-import { auth, db } from '../firebase';
+import { auth } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const AuthContext = createContext();
 
@@ -184,7 +183,7 @@ export const AuthProvider = ({ children }) => {
       const storedUser = localStorage.getItem('userInfo');
       if (storedUser) {
         const parsed = JSON.parse(storedUser);
-        const hasChanges = 
+        const hasChanges =
           parsed.role !== userData.role ||
           parsed.email !== userData.email ||
           parsed.kycStatus !== userData.kycStatus ||
@@ -272,7 +271,7 @@ export const AuthProvider = ({ children }) => {
           try {
             console.log('🔄 AuthContext: Fetching profile for UID:', firebaseUser.uid);
             const idToken = await firebaseUser.getIdToken(true);
-            
+
             const response = await api.post('/api/auth/firebase-login', { idToken }, { signal: abortController.signal });
             console.log('📦 AuthContext: Sync successful');
 
@@ -296,7 +295,7 @@ export const AuthProvider = ({ children }) => {
 
             console.error('❌ AuthContext: Sync failed:', syncError.message);
             const errMsg = syncError.response?.data?.message || syncError.message || 'Login synchronization failed';
-            
+
             // Try to fall back to cached data ONLY if UID matches
             let mergedUser = null;
             const cachedRaw = localStorage.getItem('userInfo');
@@ -307,7 +306,7 @@ export const AuthProvider = ({ children }) => {
                   const freshToken = await firebaseUser.getIdToken().catch(() => cached.token);
                   mergedUser = { ...cached, token: freshToken };
                 }
-              } catch (_e) {}
+              } catch (_e) { }
             }
 
             if (mergedUser && active) {
@@ -357,7 +356,7 @@ export const AuthProvider = ({ children }) => {
       console.log('🧹 AuthContext: Cleaned up onAuthStateChanged listener and aborted in-flight syncs');
       unsubscribe();
     };
-  }, [dispatch, updateUser, syncProfileInBackground, logout]);
+  }, [dispatch, updateUser, syncProfileInBackground, logout, userInfo]);
 
   // Handle Redirection Persistence
   useEffect(() => {
@@ -375,23 +374,26 @@ export const AuthProvider = ({ children }) => {
   // ✅ CONSOLIDATED REDIRECTION LOGIC
   useEffect(() => {
     const isAuthPath = location.pathname === '/login' || location.pathname === '/register' || location.pathname === '/';
-    
-    if (!loading && userInfo?.token && isAuthPath) {
-      console.log('🏁 AuthContext: Redirection checking for user:', userInfo.email, 'Role:', userInfo.role);
+
+    // PRIORITIZE Local State over Redux for redirection to prevent race conditions during registration
+    const currentUser = user || userInfo;
+
+    if (!loading && currentUser?.token && isAuthPath) {
+      console.log('🏁 AuthContext: Redirection checking for user:', currentUser.email, 'Role:', currentUser.role);
 
       const getSafeRedirectPath = () => {
         // High priority: Email Verification
-        if (!userInfo.emailVerified && userInfo.requiresVerification) {
+        if (!currentUser.emailVerified && currentUser.requiresVerification) {
           console.log('⚠️ AuthContext: Email verification required');
           return '/verify-email-notice';
         }
 
         // Role-based routing
-        const role = userInfo.role;
+        const role = currentUser.role;
         switch (role) {
           case 'admin': return '/admin/dashboard';
           case 'seller':
-            return userInfo.kycStatus === 'approved' ? '/seller/dashboard' : '/seller/kyc';
+            return currentUser.kycStatus === 'approved' ? '/seller/dashboard' : '/seller/kyc';
           case 'customer': return '/customer/dashboard';
           case 'deliveryPartner':
             console.warn('🛑 Delivery Partner attempted desktop login');
@@ -407,14 +409,14 @@ export const AuthProvider = ({ children }) => {
       };
 
       const targetPath = getSafeRedirectPath();
-      
+
       // Prevent redundant navigation to the same path
       if (location.pathname !== targetPath) {
         console.log('🔀 AuthContext: 🚀 Navigating from', location.pathname, 'to', targetPath);
         navigate(targetPath, { replace: true });
       }
     }
-  }, [loading, userInfo, navigate, location.pathname, logout]);
+  }, [loading, user, userInfo, navigate, location.pathname, logout]);
 
   const login = async (email, password) => {
     dispatch({ type: USER_LOGIN_REQUEST });

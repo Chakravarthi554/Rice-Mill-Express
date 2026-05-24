@@ -20,7 +20,8 @@ import {
     Help as NeutralIcon,
     Refresh as RefreshIcon,
     CheckCircle as OnlineIcon,
-    Error as OfflineIcon
+    Error as OfflineIcon,
+    Add as AddIcon
 } from '@mui/icons-material';
 import {
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip,
@@ -28,6 +29,7 @@ import {
 } from 'recharts';
 import api from '../../utils/api';
 import { formatDistanceToNow } from 'date-fns';
+import SubmitRecipeDialog from './SubmitRecipeDialog';
 
 const COLORS = ['#4caf50', '#ff9800', '#f44336']; // Positive, Neutral, Negative
 
@@ -41,6 +43,7 @@ const RecipeEngagementDashboard = ({ sellerId, recipes = [] }) => {
     const [error, setError] = useState(null);
     const [selectedRecipeDetails, setSelectedRecipeDetails] = useState(null);
     const [isOnline, setIsOnline] = useState(true);
+    const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
 
     const { userInfo } = useSelector((state) => state.userLogin);
 
@@ -177,16 +180,37 @@ const RecipeEngagementDashboard = ({ sellerId, recipes = [] }) => {
                     <Typography variant="h6">Engagement Dashboard</Typography>
                     {getStatusChip()}
                 </Stack>
-                <Button
-                    startIcon={<RefreshIcon />}
-                    onClick={fetchData}
-                    disabled={loading}
-                    size="small"
-                    variant="outlined"
-                >
-                    Sync Now
-                </Button>
+                <Stack direction="row" spacing={1}>
+                    <Button
+                        startIcon={<RefreshIcon />}
+                        onClick={fetchData}
+                        disabled={loading}
+                        size="small"
+                        variant="outlined"
+                        sx={{ borderRadius: 2 }}
+                    >
+                        Sync
+                    </Button>
+                    <Button
+                        startIcon={<AddIcon />}
+                        onClick={() => setSubmitDialogOpen(true)}
+                        size="small"
+                        variant="contained"
+                        sx={{ bgcolor: '#16A34A', '&:hover': { bgcolor: '#15803D' }, fontWeight: 700, borderRadius: 2 }}
+                    >
+                        Submit Recipe
+                    </Button>
+                </Stack>
             </Box>
+
+            <SubmitRecipeDialog
+                open={submitDialogOpen}
+                onClose={() => setSubmitDialogOpen(false)}
+                onSuccess={() => {
+                    fetchData();
+                    // Optionally notify parent SellerDashboard too if needed
+                }}
+            />
 
             {error && (
                 <Alert severity="warning" sx={{ mb: 3 }} action={

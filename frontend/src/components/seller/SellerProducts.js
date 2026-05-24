@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import {
   Container, Typography, Button, Paper, Dialog, DialogTitle,
   DialogContent, DialogActions, TextField, MenuItem, Box, Alert, Grid,
-  IconButton, Chip, FormControlLabel, Switch, InputAdornment
+  IconButton, Chip, FormControlLabel, Switch, InputAdornment, Menu, Divider
 } from "@mui/material";
 import Slider from "react-slick";
 import "slick-carousel/slick/slick.css";
@@ -11,7 +11,7 @@ import "slick-carousel/slick/slick-theme.css";
 import { Visibility, Edit, Delete, Warning, Add, Search, MoreVert, Inventory2 } from "@mui/icons-material";
 import { useDispatch, useSelector } from "react-redux";
 import {
-  listProducts, createProduct, updateProduct, deleteProduct,
+  listProducts, createProduct, updateProduct, deleteProduct, listSellerProducts,
 } from "../../redux/actions/productActions";
 
 const BRAND_OPTIONS = ['Sona Masuri', 'Samba Masuri', 'Telangana Sona', 'Swarna', 'Jagtial Sannalu', 'Tellahamsa', 'Brown Rice', 'Basmati'];
@@ -24,7 +24,7 @@ const UNIT_OPTIONS = ['kg', 'g', 'packet'];
 
 const SellerProducts = () => {
   const dispatch = useDispatch();
-  const { products } = useSelector((state) => state.productList);
+  const { products, loading } = useSelector((state) => state.productSellerList);
   const { userInfo } = useSelector((state) => state.userLogin);
 
   const [openDialog, setOpenDialog] = useState(false);
@@ -34,6 +34,8 @@ const SellerProducts = () => {
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [viewImages, setViewImages] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterAnchor, setFilterAnchor] = useState(null);
+  const [activeFilters, setActiveFilters] = useState({ brand: 'All', status: 'All' });
 
   const [formData, setFormData] = useState({
     name: "", brand: "", category: "", description: "", price: 0, offerPrice: 0,
@@ -41,7 +43,7 @@ const SellerProducts = () => {
     dietPreference: [], cookingPurpose: [], discounts: "", stockAvailability: "In-stock",
   });
 
-  useEffect(() => { if (userInfo?._id) dispatch(listProducts()); }, [dispatch, userInfo]);
+  useEffect(() => { if (userInfo?._id) dispatch(listSellerProducts()); }, [dispatch, userInfo]);
 
   const handleOpenDialog = (product = null) => {
     if (product) {
@@ -94,7 +96,7 @@ const SellerProducts = () => {
     }
 
     if (editingProduct) {
-      dispatch(updateProduct(editingProduct._id, formData)).then(() => dispatch(listProducts()));
+      dispatch(updateProduct(editingProduct._id, formData)).then(() => dispatch(listSellerProducts()));
     } else {
       const data = new FormData();
       Object.keys(formData).forEach((key) => {
@@ -102,23 +104,37 @@ const SellerProducts = () => {
         else data.append(key, formData[key]);
       });
       selectedImages.forEach((image) => data.append('images', image));
-      dispatch(createProduct(data)).then(() => dispatch(listProducts()));
+      dispatch(createProduct(data)).then(() => dispatch(listSellerProducts()));
     }
     handleCloseDialog();
   };
 
   const handleDelete = (id) => {
-    if (window.confirm("Delete this product?")) dispatch(deleteProduct(id));
+    if (window.confirm("Delete this product?")) dispatch(deleteProduct(id)).then(() => dispatch(listSellerProducts()));
   };
 
   const handleToggleActive = (product) => {
     // Treat countInStock=0 as inactive, >0 as active for this toggle, or if there's an isActive field.
     // Simulating toggle by adjusting stock status if no active field exists
     const updated = { ...product, isActive: product.isActive === undefined ? false : !product.isActive };
-    dispatch(updateProduct(product._id, updated)).then(() => dispatch(listProducts()));
+    dispatch(updateProduct(product._id, updated)).then(() => dispatch(listSellerProducts()));
   };
 
-  const filteredProducts = (products || []).filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.brand.toLowerCase().includes(searchQuery.toLowerCase()));
+  const handleFilterClick = (event) => setFilterAnchor(event.currentTarget);
+  const handleFilterClose = () => setFilterAnchor(null);
+  const handleFilterSelect = (type, value) => {
+    setActiveFilters({ ...activeFilters, [type]: value });
+    handleFilterClose();
+  };
+
+  const filteredProducts = (products || []).filter(p => {
+    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.brand.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesBrand = activeFilters.brand === 'All' || p.brand === activeFilters.brand;
+    const matchesStatus = activeFilters.status === 'All' ||
+      (activeFilters.status === 'In Stock' && p.countInStock > 0) ||
+      (activeFilters.status === 'Out of Stock' && p.countInStock === 0);
+    return matchesSearch && matchesBrand && matchesStatus;
+  });
   const lowStockProducts = (products || []).filter(p => p.countInStock > 0 && p.countInStock <= 10);
 
   return (
@@ -153,7 +169,25 @@ const SellerProducts = () => {
           fullWidth placeholder="Search products..." size="small" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
           InputProps={{ startAdornment: <InputAdornment position="start"><Search fontSize="small" sx={{ color: '#9CA3AF' }} /></InputAdornment>, sx: { borderRadius: 2, bgcolor: '#fff' } }}
         />
-        <Button variant="outlined" sx={{ borderColor: '#E5E7EB', color: '#374151', borderRadius: 2, fontWeight: 600 }}>Filter</Button>
+        <Button
+          variant="outlined"
+          onClick={handleFilterClick}
+          sx={{ borderColor: '#E5E7EB', color: '#374151', borderRadius: 2, fontWeight: 600, whiteSpace: 'nowrap' }}
+        >
+          {activeFilters.brand === 'All' && activeFilters.status === 'All' ? 'Filter' : 'Filtered'}
+        </Button>
+        <Menu anchorEl={filterAnchor} open={Boolean(filterAnchor)} onClose={handleFilterClose}>
+          <Typography variant="overline" sx={{ px: 2, fontWeight: 800 }}>Brand</Typography>
+          <MenuItem onClick={() => handleFilterSelect('brand', 'All')}>All Brands</MenuItem>
+          {BRAND_OPTIONS.map(b => (
+            <MenuItem key={b} onClick={() => handleFilterSelect('brand', b)} selected={activeFilters.brand === b}>{b}</MenuItem>
+          ))}
+          <Divider />
+          <Typography variant="overline" sx={{ px: 2, fontWeight: 800 }}>Status</Typography>
+          <MenuItem onClick={() => handleFilterSelect('status', 'All')}>All Status</MenuItem>
+          <MenuItem onClick={() => handleFilterSelect('status', 'In Stock')} selected={activeFilters.status === 'In Stock'}>In Stock</MenuItem>
+          <MenuItem onClick={() => handleFilterSelect('status', 'Out of Stock')} selected={activeFilters.status === 'Out of Stock'}>Out of Stock</MenuItem>
+        </Menu>
       </Box>
 
       {/* Product Cards Grid */}
@@ -163,7 +197,7 @@ const SellerProducts = () => {
           const isLow = product.countInStock > 0 && product.countInStock <= 10;
           const statusColors = isOut ? { bg: '#FEE2E2', text: '#B91C1C', label: 'Out of Stock' }
             : isLow ? { bg: '#FEF3C7', text: '#D97706', label: `Low Stock (${product.countInStock})` }
-            : { bg: '#DCFCE7', text: '#166534', label: `In Stock (${product.countInStock})` };
+              : { bg: '#DCFCE7', text: '#166534', label: `In Stock (${product.countInStock})` };
 
           // Use the first image or a placeholder
           const baseUrl = (process.env.REACT_APP_API_URL || 'http://localhost:5001').replace(/\/api\/?$/, '');
@@ -201,7 +235,7 @@ const SellerProducts = () => {
                   <Typography variant="caption" color="text.secondary" fontWeight={600} gutterBottom textTransform="uppercase">{product.brand}</Typography>
                   <Typography variant="body1" fontWeight={800} sx={{ mb: 1, lineHeight: 1.2, height: 40, overflow: 'hidden' }}>{product.name}</Typography>
                   <Chip label={statusColors.label} size="small" sx={{ bgcolor: statusColors.bg, color: statusColors.text, fontWeight: 700, fontSize: '0.7rem', alignSelf: 'flex-start', mb: 2 }} />
-                  
+
                   <Box sx={{ mt: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #F3F4F6', pt: 1.5 }}>
                     <Typography variant="h6" fontWeight={800} color="#3B82F6">₹{product.price}</Typography>
                     <Switch
@@ -222,7 +256,7 @@ const SellerProducts = () => {
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
         <DialogTitle fontWeight={800}>{editingProduct ? "Edit Product" : "Add Product"}</DialogTitle>
         <DialogContent dividers>
-          {!editingProduct && <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>Upload 3-5 high-quality images (>1.5MB each) for the best customer experience.</Alert>}
+          {!editingProduct && <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>Upload 3-5 high-quality images (&gt;1.5MB each) for the best customer experience.</Alert>}
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5, mt: 1 }}>
             <TextField label="Name" name="name" value={formData.name} onChange={handleChange} fullWidth size="small" />
             <Grid container spacing={2}>

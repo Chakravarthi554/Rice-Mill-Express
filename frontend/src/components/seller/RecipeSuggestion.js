@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch } from 'react-redux';
 import { Container, Typography, TextField, Button, Paper } from '@mui/material';
 import { suggestRecipe } from '../../redux/actions/productActions';
+import { useAuth } from '../../context/AuthContext';
 
 const RecipeSuggestion = () => {
   const dispatch = useDispatch();
-  const { user } = useSelector((state) => state.userLogin);
+  const { user } = useAuth();
   const [recipe, setRecipe] = useState({ title: '', description: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');

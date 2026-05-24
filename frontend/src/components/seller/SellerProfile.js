@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import { useAuth } from '../../context/AuthContext';
 import {
   Box, Typography, TextField, Button, Avatar,
   Grid, Divider, Paper, Switch, FormControlLabel, CircularProgress,
@@ -24,7 +25,8 @@ import Message from '../common/Message';
 
 const SellerProfile = () => {
   const dispatch = useDispatch();
-  const { userInfo } = useSelector(state => state.userLogin);
+  // ✅ FIX: Use AuthContext instead of broken Redux userLogin selector
+  const { user: userInfo } = useAuth();
   const {
     loading: updateLoading,
     error: updateError,
@@ -164,19 +166,19 @@ const SellerProfile = () => {
   };
 
   return (
-    <Paper 
-      elevation={3} 
-      sx={{ 
-        p: 3, 
+    <Paper
+      elevation={3}
+      sx={{
+        p: 3,
         background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
         borderRadius: 3
       }}
     >
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography 
-          variant="h4" 
-          gutterBottom 
-          sx={{ 
+        <Typography
+          variant="h4"
+          gutterBottom
+          sx={{
             fontWeight: 'bold',
             background: 'linear-gradient(45deg, #1976d2, #00bcd4)',
             backgroundClip: 'text',
@@ -187,7 +189,7 @@ const SellerProfile = () => {
         >
           Seller Profile
         </Typography>
-        
+
         <Button
           onClick={() => setEditMode(!editMode)}
           variant={editMode ? "outlined" : "contained"}
@@ -227,9 +229,9 @@ const SellerProfile = () => {
               <Avatar
                 alt="Profile Image"
                 src={imageSrc}
-                sx={{ 
-                  width: 100, 
-                  height: 100, 
+                sx={{
+                  width: 100,
+                  height: 100,
                   border: `4px solid ${colors.primary}`,
                   boxShadow: '0 4px 8px rgba(0,0,0,0.2)'
                 }}
@@ -253,7 +255,7 @@ const SellerProfile = () => {
                 ✓
               </Box>
             </Box>
-            
+
             <Box sx={{ flex: 1, minWidth: 200 }}>
               <Typography variant="h6" sx={{ fontWeight: 'bold', color: colors.primary, mb: 1 }}>
                 {profileData.businessName || 'Your Business Name'}
@@ -261,11 +263,11 @@ const SellerProfile = () => {
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                 {profileData.businessType || 'Business Type'}
               </Typography>
-              <FileUpload 
-                label="Upload Profile Image" 
-                onFileSelect={handleFileSelect} 
-                acceptedTypes="image/*" 
-                existingFileName={userInfo?.profileImage?.split('/').pop()} 
+              <FileUpload
+                label="Upload Profile Image"
+                onFileSelect={handleFileSelect}
+                acceptedTypes="image/*"
+                existingFileName={userInfo?.profileImage?.split('/').pop()}
               />
             </Box>
           </Box>
@@ -282,7 +284,7 @@ const SellerProfile = () => {
                 avatar={<PersonIcon sx={{ color: colors.primary }} />}
                 title="Basic Information"
                 titleTypographyProps={{ variant: 'h6', fontWeight: 'bold' }}
-                sx={{ 
+                sx={{
                   backgroundColor: colors.cardHeader,
                   borderBottom: `1px solid #e0e0e0`
                 }}
@@ -306,15 +308,15 @@ const SellerProfile = () => {
                     <Typography><strong>Phone:</strong> {profileData.phone}</Typography>
                   </Box>
                   <Box>
-                    <Chip 
-                      label={`GST: ${profileData.gstNumber || 'Not provided'}`} 
-                      size="small" 
+                    <Chip
+                      label={`GST: ${profileData.gstNumber || 'Not provided'}`}
+                      size="small"
                       color={profileData.gstNumber ? "primary" : "default"}
                       variant="outlined"
                     />
-                    <Chip 
-                      label={`PAN: ${profileData.panNumber || 'Not provided'}`} 
-                      size="small" 
+                    <Chip
+                      label={`PAN: ${profileData.panNumber || 'Not provided'}`}
+                      size="small"
                       color={profileData.panNumber ? "secondary" : "default"}
                       variant="outlined"
                       sx={{ ml: 1 }}
@@ -332,7 +334,7 @@ const SellerProfile = () => {
                 avatar={<LocationIcon sx={{ color: colors.warning }} />}
                 title="Business Address"
                 titleTypographyProps={{ variant: 'h6', fontWeight: 'bold' }}
-                sx={{ 
+                sx={{
                   backgroundColor: colors.cardHeader,
                   borderBottom: `1px solid #e0e0e0`
                 }}
@@ -358,7 +360,7 @@ const SellerProfile = () => {
                 avatar={<IntegrationIcon sx={{ color: colors.info }} />}
                 title="Platform Integrations"
                 titleTypographyProps={{ variant: 'h6', fontWeight: 'bold' }}
-                sx={{ 
+                sx={{
                   backgroundColor: colors.cardHeader,
                   borderBottom: `1px solid #e0e0e0`
                 }}
@@ -367,24 +369,24 @@ const SellerProfile = () => {
                 <Stack spacing={2}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Typography><strong>Amazon:</strong></Typography>
-                    <Chip 
-                      label={profileData.integrations.amazon || "Not connected"} 
+                    <Chip
+                      label={profileData.integrations.amazon || "Not connected"}
                       color={profileData.integrations.amazon ? "primary" : "default"}
                       size="small"
                     />
                   </Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Typography><strong>Zepto:</strong></Typography>
-                    <Chip 
-                      label={profileData.integrations.zepto || "Not connected"} 
+                    <Chip
+                      label={profileData.integrations.zepto || "Not connected"}
                       color={profileData.integrations.zepto ? "success" : "default"}
                       size="small"
                     />
                   </Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Typography><strong>Flipkart:</strong></Typography>
-                    <Chip 
-                      label={profileData.integrations.flipkart || "Not connected"} 
+                    <Chip
+                      label={profileData.integrations.flipkart || "Not connected"}
                       color={profileData.integrations.flipkart ? "warning" : "default"}
                       size="small"
                     />
@@ -401,7 +403,7 @@ const SellerProfile = () => {
                 avatar={<BankIcon sx={{ color: colors.success }} />}
                 title="Bank Account & Settings"
                 titleTypographyProps={{ variant: 'h6', fontWeight: 'bold' }}
-                sx={{ 
+                sx={{
                   backgroundColor: colors.cardHeader,
                   borderBottom: `1px solid #e0e0e0`
                 }}
@@ -416,16 +418,16 @@ const SellerProfile = () => {
                   <Divider />
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Typography><strong>Product Availability:</strong></Typography>
-                    <Chip 
-                      label={profileData.productAvailability ? 'ACTIVE' : 'INACTIVE'} 
+                    <Chip
+                      label={profileData.productAvailability ? 'ACTIVE' : 'INACTIVE'}
                       color={profileData.productAvailability ? "success" : "error"}
                       size="small"
                     />
                   </Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Typography><strong>Notifications:</strong></Typography>
-                    <Chip 
-                      label={profileData.notificationEnabled ? 'ENABLED' : 'DISABLED'} 
+                    <Chip
+                      label={profileData.notificationEnabled ? 'ENABLED' : 'DISABLED'}
                       color={profileData.notificationEnabled ? "info" : "default"}
                       size="small"
                     />
@@ -447,7 +449,7 @@ const SellerProfile = () => {
                     <PersonIcon /> Basic Information
                   </Typography>
                 </Grid>
-                
+
                 <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth

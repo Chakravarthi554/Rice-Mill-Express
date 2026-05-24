@@ -16,12 +16,14 @@ import { listMyOrders } from '../redux/actions/orderActions';
 import { getUserDetails } from '../redux/actions/userActions';
 import { listMyCart } from '../redux/actions/cartActions';
 import { useNavigate } from 'react-router-dom';
+import { useI18n } from '../context/i18nContext';
 
 const CustomerDashboard = () => {
   const { user: userInfo } = useAuth();
   const [activeTab, setActiveTab] = useState(0);
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { t } = useI18n();
 
   // ✅ Load all customer data on dashboard mount
   useEffect(() => {
@@ -57,10 +59,10 @@ const CustomerDashboard = () => {
   };
 
   const quickLinks = [
-    { label: 'My Orders', icon: <ShoppingBag />, path: '/settings/order-history', color: '#4F46E5', bg: '#EEF2FF' },
-    { label: 'Wishlist', icon: <Favorite />, path: '/wishlist', color: '#DB2777', bg: '#FDF2F8' },
-    { label: 'Offers', icon: <LocalOffer />, path: '/products?sale=true', color: '#EA580C', bg: '#FFF7ED' },
-    { label: 'My Profile', icon: <Person />, path: '/settings/profile', color: '#0284C7', bg: '#F0F9FF' },
+    { label: t('my_orders') || 'My Orders', icon: <ShoppingBag />, path: '/settings/order-history', color: '#4F46E5', bg: '#EEF2FF' },
+    { label: t('wishlist') || 'Wishlist', icon: <Favorite />, path: '/wishlist', color: '#DB2777', bg: '#FDF2F8' },
+    { label: t('offers') || 'Offers', icon: <LocalOffer />, path: '/products?sale=true', color: '#EA580C', bg: '#FFF7ED' },
+    { label: t('my_profile') || 'My Profile', icon: <Person />, path: '/settings/profile', color: '#0284C7', bg: '#F0F9FF' },
   ];
 
   return (
@@ -86,12 +88,12 @@ const CustomerDashboard = () => {
                   Welcome back, {userInfo?.name?.split(' ')[0] || 'there'} 👋
                 </Typography>
                 <Typography sx={{ opacity: 0.85, mb: 2 }}>
-                  Fresh rice delivered to your doorstep. What are you looking for today?
+                  {t('dashboard_subtitle') || 'Fresh rice delivered to your doorstep. What are you looking for today?'}
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                  <Chip label="🌾 Premium Basmati" size="small" sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: '#fff', fontWeight: 600 }} />
-                  <Chip label="🌿 Organic Rice" size="small" sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: '#fff', fontWeight: 600 }} />
-                  <Chip label="📦 Bulk Orders" size="small" sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: '#fff', fontWeight: 600 }} />
+                  <Chip label={`🌾 ${t('cat_basmati') || 'Premium Basmati'}`} size="small" onClick={() => navigate('/products?category=basmati')} sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: '#fff', fontWeight: 600, cursor: 'pointer', '&:hover': { bgcolor: 'rgba(255,255,255,0.35)' } }} />
+                  <Chip label={`🌿 ${t('cat_organic') || 'Organic Rice'}`} size="small" onClick={() => navigate('/products?category=organic')} sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: '#fff', fontWeight: 600, cursor: 'pointer', '&:hover': { bgcolor: 'rgba(255,255,255,0.35)' } }} />
+                  <Chip label={`📦 ${t('cat_bulk') || 'Bulk Orders'}`} size="small" onClick={() => navigate('/products?minQty=50')} sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: '#fff', fontWeight: 600, cursor: 'pointer', '&:hover': { bgcolor: 'rgba(255,255,255,0.35)' } }} />
                 </Box>
               </Box>
               <Avatar sx={{ width: 72, height: 72, bgcolor: 'rgba(255,255,255,0.2)', border: '3px solid rgba(255,255,255,0.4)', fontSize: 28 }}>
@@ -137,8 +139,8 @@ const CustomerDashboard = () => {
                 '& .Mui-selected': { color: '#16A34A' },
                 '& .MuiTabs-indicator': { bgcolor: '#16A34A', height: 3, borderRadius: '3px 3px 0 0' }
               }}>
-              <Tab label="📊 My Dashboard" />
-              <Tab label="🛍️ Browse All Products" />
+              <Tab label={`📊 ${t('my_dashboard') || 'My Dashboard'}`} />
+              <Tab label={`🛍️ ${t('browse_all_products') || 'Browse All Products'}`} />
             </Tabs>
             <Box sx={{ bgcolor: '#F9FAFB', p: 3 }}>
               {activeTab === 0 && <Dashboard />}

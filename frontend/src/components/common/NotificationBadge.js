@@ -85,8 +85,8 @@ const NotificationBadge = () => {
     try {
       if (!userInfo) return;
 
-      const { data } = await api.get('/notifications?limit=10');
-      
+      const { data } = await api.get('/api/notifications?limit=10');
+
       if (data.success) {
         setNotifications(data.notifications || []);
         setUnreadCount(data.unreadCount || 0);
@@ -111,7 +111,7 @@ const NotificationBadge = () => {
     try {
       if (!userInfo) return;
 
-      await api.put('/notifications/read-all');
+      await api.put('/api/notifications/read-all');
     } catch (error) {
       console.error('Error marking notifications as read:', error);
     }

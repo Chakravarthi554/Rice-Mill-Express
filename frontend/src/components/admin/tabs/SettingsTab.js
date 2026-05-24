@@ -340,7 +340,7 @@ const SettingsTab = () => {
                 fullWidth
                 select
                 label="Select Recipe of the Day"
-                value={formData.recipeOfTheDay || ''}
+                value={typeof formData.recipeOfTheDay === 'object' ? formData.recipeOfTheDay?._id : (formData.recipeOfTheDay || '')}
                 onChange={(e) => handleInputChange('recipeOfTheDay', e.target.value)}
                 margin="normal"
                 helperText="Featured recipe shown on home page"
@@ -353,10 +353,12 @@ const SettingsTab = () => {
                 ))}
               </TextField>
 
-              {formData.recipeOfTheDay && recipes?.find(r => r._id === formData.recipeOfTheDay) && (
+              {formData.recipeOfTheDay && (
                 <Box mt={1} p={1} bgcolor="success.light" borderRadius={1}>
                   <Typography variant="body2" color="success.dark">
-                    Selected: {recipes.find(r => r._id === formData.recipeOfTheDay)?.title}
+                    Selected: {typeof formData.recipeOfTheDay === 'object'
+                      ? formData.recipeOfTheDay.title
+                      : (recipes?.find(r => r._id === formData.recipeOfTheDay)?.title || 'Selected Recipe')}
                   </Typography>
                 </Box>
               )}

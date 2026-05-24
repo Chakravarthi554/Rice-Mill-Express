@@ -91,8 +91,8 @@ const CheckoutPage = () => {
   const totalAmount = cartItems
     .filter(i => selectedItems.includes(i.product?._id))
     .reduce((sum, i) => {
-      const price = (i.product?.offerPrice > 0 && i.product?.offerPrice < i.product?.price) 
-        ? i.product.offerPrice 
+      const price = (i.product?.offerPrice > 0 && i.product?.offerPrice < i.product?.price)
+        ? i.product.offerPrice
         : (i.product?.price ?? 0);
       const qty = i.quantity ?? 1;
       return sum + price * qty;
@@ -279,14 +279,7 @@ const CheckoutPage = () => {
     if (paymentMethod === 'cod' && !isMinOrderMet) return alert('Minimum ₹1500 for COD');
 
     if (paymentMethod === 'cod') {
-      if (finalTotal > 5000) {
-        const advanceAmount = Math.round(finalTotal * 0.2);
-        if (window.confirm(`COD orders over ₹5000 require a 20% advance payment (₹${advanceAmount}). Do you want to proceed to payment?`)) {
-          await initiateRazorpayForAdvance(advanceAmount);
-        }
-      } else {
-        await placeCODOrder();
-      }
+      await placeCODOrder();
     } else {
       await initiateRazorpay();
     }
@@ -296,7 +289,7 @@ const CheckoutPage = () => {
   // Load Razorpay script only when needed
   // -----------------------------------------------------------------
   useEffect(() => {
-    if ((paymentMethod === 'razorpay' || (paymentMethod === 'cod' && finalTotal > 5000)) && !window.Razorpay) {
+    if (paymentMethod === 'razorpay' && !window.Razorpay) {
       loadScript('https://checkout.razorpay.com/v1/checkout.js');
     }
     return () => {
@@ -324,136 +317,136 @@ const CheckoutPage = () => {
           onAction={() => navigate('/cart')}
         />
       ) : (
-      <Grid container spacing={3}>
-        {/* ---------- LEFT COLUMN ---------- */}
-        <Grid item xs={12} md={8}>
-          {/* Address */}
-          <Paper sx={{ p: 3, mb: 3 }}>
-            <Typography variant="h6" gutterBottom>{t('addresses')}</Typography>
-            <AddressManager onSelectAddress={setSelectedAddress} />
-            {!selectedAddress && <Alert severity="info" sx={{ mt: 2 }}>{t('selectLanguage')}</Alert>}
-          </Paper>
+        <Grid container spacing={3}>
+          {/* ---------- LEFT COLUMN ---------- */}
+          <Grid item xs={12} md={8}>
+            {/* Address */}
+            <Paper sx={{ p: 3, mb: 3 }}>
+              <Typography variant="h6" gutterBottom>{t('addresses')}</Typography>
+              <AddressManager onSelectAddress={setSelectedAddress} />
+              {!selectedAddress && <Alert severity="info" sx={{ mt: 2 }}>{t('selectLanguage')}</Alert>}
+            </Paper>
 
-          {/* Payment */}
-          <Paper sx={{ p: 3, mb: 3 }}>
-            <PaymentMethodSelector value={paymentMethod} onChange={handlePaymentChange} />
-            {paymentMethod === 'cod' && !isMinOrderMet && (
-              <Alert severity="warning" sx={{ mt: 2 }}>
-                Minimum ₹1500 required for COD. Current: ₹{totalAmount.toFixed(2)}
-              </Alert>
-            )}
-          </Paper>
-        </Grid>
+            {/* Payment */}
+            <Paper sx={{ p: 3, mb: 3 }}>
+              <PaymentMethodSelector value={paymentMethod} onChange={handlePaymentChange} />
+              {paymentMethod === 'cod' && !isMinOrderMet && (
+                <Alert severity="warning" sx={{ mt: 2 }}>
+                  Minimum ₹1500 required for COD. Current: ₹{totalAmount.toFixed(2)}
+                </Alert>
+              )}
+            </Paper>
+          </Grid>
 
-        {/* ---------- RIGHT COLUMN (SUMMARY) ---------- */}
-        <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 3, position: 'sticky', top: 20 }}>
-            <Typography variant="h6" gutterBottom>{t('orderSummary') || 'Order Summary'}</Typography>
+          {/* ---------- RIGHT COLUMN (SUMMARY) ---------- */}
+          <Grid item xs={12} md={4}>
+            <Paper sx={{ p: 3, position: 'sticky', top: 20 }}>
+              <Typography variant="h6" gutterBottom>{t('orderSummary') || 'Order Summary'}</Typography>
 
-            {cartItems.map((item, idx) => (
-              <Box key={item.product._id} sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                {/* \u2705 Checkbox for item selection */}
-                <Checkbox
-                  checked={selectedItems.includes(item.product._id)}
-                  onChange={() => handleItemToggle(item.product._id)}
-                  sx={{ mr: 1 }}
-                />
-                <Box sx={{ flexGrow: 1 }}>
-                  <Typography variant="body2">{item.product.name}</Typography>
-                  <Typography variant="caption">
-                    ₹{(item.product.offerPrice > 0 && item.product.offerPrice < item.product.price) 
-                      ? item.product.offerPrice 
-                      : item.product.price} × {item.quantity}
+              {cartItems.map((item, idx) => (
+                <Box key={item.product._id} sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  {/* \u2705 Checkbox for item selection */}
+                  <Checkbox
+                    checked={selectedItems.includes(item.product._id)}
+                    onChange={() => handleItemToggle(item.product._id)}
+                    sx={{ mr: 1 }}
+                  />
+                  <Box sx={{ flexGrow: 1 }}>
+                    <Typography variant="body2">{item.product.name}</Typography>
+                    <Typography variant="caption">
+                      ₹{(item.product.offerPrice > 0 && item.product.offerPrice < item.product.price)
+                        ? item.product.offerPrice
+                        : item.product.price} × {item.quantity}
+                    </Typography>
+                  </Box>
+
+                  <IconButton
+                    size="small"
+                    onClick={() => handleQtyChange(idx, -1)}
+                    disabled={item.quantity <= 1}
+                  >
+                    <Remove />
+                  </IconButton>
+
+                  <Typography sx={{ mx: 1, minWidth: 30, textAlign: 'center' }}>
+                    {item.quantity}
+                  </Typography>
+
+                  <IconButton
+                    size="small"
+                    onClick={() => handleQtyChange(idx, 1)}
+                  >
+                    <Add />
+                  </IconButton>
+
+                  <Typography sx={{ ml: 2 }}>
+                    ₹{(((item.product.offerPrice > 0 && item.product.offerPrice < item.product.price)
+                      ? item.product.offerPrice
+                      : item.product.price) * item.quantity).toFixed(2)}
                   </Typography>
                 </Box>
+              ))}
 
-                <IconButton
-                  size="small"
-                  onClick={() => handleQtyChange(idx, -1)}
-                  disabled={item.quantity <= 1}
-                >
-                  <Remove />
-                </IconButton>
+              <Divider sx={{ my: 2 }} />
 
-                <Typography sx={{ mx: 1, minWidth: 30, textAlign: 'center' }}>
-                  {item.quantity}
-                </Typography>
-
-                <IconButton
-                  size="small"
-                  onClick={() => handleQtyChange(idx, 1)}
-                >
-                  <Add />
-                </IconButton>
-
-                <Typography sx={{ ml: 2 }}>
-                  ₹{(((item.product.offerPrice > 0 && item.product.offerPrice < item.product.price) 
-                    ? item.product.offerPrice 
-                    : item.product.price) * item.quantity).toFixed(2)}
-                </Typography>
+              {/* Delivery Charge */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                <Typography>{t('subtotal')}:</Typography>
+                <Typography>₹{totalAmount.toFixed(2)}</Typography>
               </Box>
-            ))}
-
-            <Divider sx={{ my: 2 }} />
-
-            {/* Delivery Charge */}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-              <Typography>{t('subtotal')}:</Typography>
-              <Typography>₹{totalAmount.toFixed(2)}</Typography>
-            </Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-              <Typography>{t('delivery')}:</Typography>
-              {freeDelivery ? (
-                <Typography color="success.main" fontWeight="bold">FREE</Typography>
-              ) : (
-                <Typography>₹{deliveryCharge.toFixed(2)}</Typography>
-              )}
-            </Box>
-
-            {/* Rewards Toggle */}
-            {rewards && rewards.points > 0 && (
-              <Box sx={{ mb: 2, p: 1, bgcolor: '#f1f8e9', borderRadius: 1 }}>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={useRewards}
-                      onChange={(e) => setUseRewards(e.target.checked)}
-                      color="success"
-                    />
-                  }
-                  label={`Use Rewards (${rewards.points} pts)`}
-                />
-                {useRewards && (
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0 }}>
-                    <Typography variant="body2" color="success.main">Discount Applied:</Typography>
-                    <Typography variant="body2" color="success.main">-₹{discount.toFixed(2)}</Typography>
-                  </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                <Typography>{t('delivery')}:</Typography>
+                {freeDelivery ? (
+                  <Typography color="success.main" fontWeight="bold">FREE</Typography>
+                ) : (
+                  <Typography>₹{deliveryCharge.toFixed(2)}</Typography>
                 )}
               </Box>
-            )}
 
-            {freeDelivery && (
-              <Typography variant="caption" color="success.main" sx={{ mb: 1, display: 'block' }}>
-                🎉 Free delivery on orders ≥ ₹1000
-              </Typography>
-            )}
-            <Divider sx={{ my: 1 }} />
-            <Typography variant="h6">{t('grandTotal')}: ₹{finalTotal.toFixed(2)}</Typography>
+              {/* Rewards Toggle */}
+              {rewards && rewards.points > 0 && (
+                <Box sx={{ mb: 2, p: 1, bgcolor: '#f1f8e9', borderRadius: 1 }}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={useRewards}
+                        onChange={(e) => setUseRewards(e.target.checked)}
+                        color="success"
+                      />
+                    }
+                    label={`Use Rewards (${rewards.points} pts)`}
+                  />
+                  {useRewards && (
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0 }}>
+                      <Typography variant="body2" color="success.main">Discount Applied:</Typography>
+                      <Typography variant="body2" color="success.main">-₹{discount.toFixed(2)}</Typography>
+                    </Box>
+                  )}
+                </Box>
+              )}
 
-            <Button
-              fullWidth
-              variant="contained"
-              color="success"
-              sx={{ mt: 3 }}
-              onClick={placeOrderHandler}
-              disabled={isLoading || !selectedAddress || (paymentMethod === 'cod' && !isMinOrderMet)}
-            >
-              {isLoading ? <CircularProgress size={24} /> :
-                (paymentMethod === 'razorpay' ? 'Proceed to Pay' : 'Place Order (COD)')}
-            </Button>
-          </Paper>
+              {freeDelivery && (
+                <Typography variant="caption" color="success.main" sx={{ mb: 1, display: 'block' }}>
+                  🎉 Free delivery on orders ≥ ₹1000
+                </Typography>
+              )}
+              <Divider sx={{ my: 1 }} />
+              <Typography variant="h6">{t('grandTotal')}: ₹{finalTotal.toFixed(2)}</Typography>
+
+              <Button
+                fullWidth
+                variant="contained"
+                color="success"
+                sx={{ mt: 3 }}
+                onClick={placeOrderHandler}
+                disabled={isLoading || !selectedAddress || (paymentMethod === 'cod' && !isMinOrderMet)}
+              >
+                {isLoading ? <CircularProgress size={24} /> :
+                  (paymentMethod === 'razorpay' ? 'Proceed to Pay' : 'Place Order (COD)')}
+              </Button>
+            </Paper>
+          </Grid>
         </Grid>
-      </Grid>
       )}
     </Container>
   );

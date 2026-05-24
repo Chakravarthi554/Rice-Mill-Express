@@ -69,8 +69,10 @@ import { handleApiError } from '../../utils/handleApiError';
 import axiosInstance from '../../utils/axiosInstance';
 
 // 🔥 CRITICAL FIX: Enhanced authentication helper with better error handling
+// Falls back to localStorage token (used by AuthContext) if Redux state has no token
 const getAuthConfig = (userInfo) => {
-  if (!userInfo?.token) {
+  const token = userInfo?.token || localStorage.getItem('token');
+  if (!token) {
     console.error('❌ No user token available for forum request');
     throw new Error('Authentication required. Please log in again.');
   }
@@ -78,7 +80,7 @@ const getAuthConfig = (userInfo) => {
   return {
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${userInfo.token}`,
+      Authorization: `Bearer ${token}`,
     },
   };
 };
