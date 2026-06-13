@@ -1,17 +1,17 @@
 const mongoose = require('mongoose');
 
 const connectDB = async () => {
-  try {
-    // ✅ FIXED: Remove deprecated options that cause warnings
-    const options = {
-      // No deprecated options - using modern defaults
-    };
+  // ✅ Connection timeout options so Atlas failures fail fast
+  const options = {
+    serverSelectionTimeoutMS: 8000,  // Give up selecting a server after 8s
+    connectTimeoutMS: 10000,          // Give up on initial connection after 10s
+    socketTimeoutMS: 45000,           // Close sockets after 45s of inactivity
+  };
 
+  try {
     // Check if MONGO_URI is available
     if (!process.env.MONGO_URI) {
-      console.error('❌ MONGO_URI is not defined in environment variables');
-      console.log('💡 Please check your .env file and ensure MONGO_URI is set');
-      process.exit(1);
+      console.warn('⚠️ MONGO_URI not defined in environment variables; attempting local MongoDB fallback');
     }
 
     console.log('🔄 Attempting to connect to MongoDB...');
@@ -39,19 +39,33 @@ const connectDB = async () => {
     mongoose.set('debug', false); // Disable debug mode to reduce noise
 
   } catch (error) {
-    console.error(`❌ MongoDB Connection Error: ${error.message}`);
+    console.warn(`❌ MongoDB Connection Error: ${error.message}`);
     
     // Provide helpful error messages
     if (error.name === 'MongooseServerSelectionError') {
       console.log('\n🔧 Troubleshooting Tips:');
       console.log('1. Check if your MongoDB Atlas cluster is running');
-      console.log('2. Verify your IP address is whitelisted in MongoDB Atlas');
+      console.log('2. ⚠️  IMPORTANT: Whitelist your IP in MongoDB Atlas:');
+      console.log('   → Go to: Atlas > Network Access > Add IP Address');
+      console.log('   → Add your current IP or 0.0.0.0/0 (allow all) for development');
       console.log('3. Check your MONGO_URI connection string in .env file');
       console.log('4. Ensure your internet connection is stable');
       console.log('5. If using local MongoDB, make sure MongoDB service is running');
     }
     
-    process.exit(1);
+    // Attempt fallback to local MongoDB if Atlas connection fails
+    if (error.name === 'MongooseServerSelectionError' && process.env.MONGO_URI_LOCAL) {
+      console.log('⚡ Attempting fallback to local MongoDB...');
+      try {
+        const localConn = await mongoose.connect(process.env.MONGO_URI_LOCAL, options);
+        console.log(`✅ Connected to local MongoDB at ${localConn.connection.host}`);
+      } catch (localErr) {
+        console.error('❌ Local MongoDB fallback failed:', localErr.message);
+        process.exit(1);
+      }
+    } else {
+      console.error('❌ Both Atlas and local MongoDB connections failed. Continuing without DB.');
+    }
   }
 };
 

@@ -21,30 +21,19 @@ import {
   NOTIFICATION_UPDATE,
   NOTIFICATION_REMOVE
 } from '../constants/notificationConstants';
+import api from '../../utils/api';
 
 // Get user notifications
-export const listNotifications = (filters = {}) => async (dispatch, getState) => {
+export const listNotifications = (filters = {}) => async (dispatch) => {
   try {
     dispatch({ type: NOTIFICATION_LIST_REQUEST });
 
-    const { userLogin: { userInfo } } = getState();
-    
     const queryParams = new URLSearchParams();
     Object.keys(filters).forEach(key => {
       if (filters[key]) queryParams.append(key, filters[key]);
     });
 
-    const response = await fetch(`/api/notifications?${queryParams}`, {
-      headers: {
-        'Authorization': `Bearer ${userInfo.token}`
-      }
-    });
-    
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to fetch notifications');
-    }
+    const { data } = await api.get(`/api/notifications?${queryParams}`);
 
     dispatch({
       type: NOTIFICATION_LIST_SUCCESS,
@@ -53,7 +42,7 @@ export const listNotifications = (filters = {}) => async (dispatch, getState) =>
   } catch (error) {
     dispatch({
       type: NOTIFICATION_LIST_FAIL,
-      payload: error.message
+      payload: error.response?.data?.message || error.message
     });
   }
 };
@@ -65,19 +54,7 @@ export const markNotificationAsRead = (notificationId) => async (dispatch, getSt
 
     const { userLogin: { userInfo } } = getState();
 
-    const response = await fetch(`/api/notifications/${notificationId}/read`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${userInfo.token}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to mark notification as read');
-    }
+    const { data } = await api.put(`/api/notifications/${notificationId}/read`);
 
     dispatch({
       type: NOTIFICATION_MARK_READ_SUCCESS,
@@ -90,31 +67,17 @@ export const markNotificationAsRead = (notificationId) => async (dispatch, getSt
   } catch (error) {
     dispatch({
       type: NOTIFICATION_MARK_READ_FAIL,
-      payload: error.message
+      payload: error.response?.data?.message || error.message
     });
   }
 };
 
 // Mark all notifications as read
-export const markAllNotificationsAsRead = () => async (dispatch, getState) => {
+export const markAllNotificationsAsRead = () => async (dispatch) => {
   try {
     dispatch({ type: NOTIFICATION_MARK_ALL_READ_REQUEST });
 
-    const { userLogin: { userInfo } } = getState();
-
-    const response = await fetch('/api/notifications/read-all', {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${userInfo.token}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to mark all notifications as read');
-    }
+    await api.put('/api/notifications/read-all');
 
     dispatch({
       type: NOTIFICATION_MARK_ALL_READ_SUCCESS
@@ -122,30 +85,17 @@ export const markAllNotificationsAsRead = () => async (dispatch, getState) => {
   } catch (error) {
     dispatch({
       type: NOTIFICATION_MARK_ALL_READ_FAIL,
-      payload: error.message
+      payload: error.response?.data?.message || error.message
     });
   }
 };
 
 // Delete notification
-export const deleteNotification = (notificationId) => async (dispatch, getState) => {
+export const deleteNotification = (notificationId) => async (dispatch) => {
   try {
     dispatch({ type: NOTIFICATION_DELETE_REQUEST });
 
-    const { userLogin: { userInfo } } = getState();
-
-    const response = await fetch(`/api/notifications/${notificationId}`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${userInfo.token}`
-      }
-    });
-    
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to delete notification');
-    }
+    await api.delete(`/api/notifications/${notificationId}`);
 
     dispatch({
       type: NOTIFICATION_DELETE_SUCCESS,
@@ -154,30 +104,17 @@ export const deleteNotification = (notificationId) => async (dispatch, getState)
   } catch (error) {
     dispatch({
       type: NOTIFICATION_DELETE_FAIL,
-      payload: error.message
+      payload: error.response?.data?.message || error.message
     });
   }
 };
 
 // Clear all notifications
-export const clearAllNotifications = () => async (dispatch, getState) => {
+export const clearAllNotifications = () => async (dispatch) => {
   try {
     dispatch({ type: NOTIFICATION_CLEAR_ALL_REQUEST });
 
-    const { userLogin: { userInfo } } = getState();
-
-    const response = await fetch('/api/notifications', {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${userInfo.token}`
-      }
-    });
-    
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to clear all notifications');
-    }
+    await api.delete('/api/notifications');
 
     dispatch({
       type: NOTIFICATION_CLEAR_ALL_SUCCESS
@@ -185,29 +122,17 @@ export const clearAllNotifications = () => async (dispatch, getState) => {
   } catch (error) {
     dispatch({
       type: NOTIFICATION_CLEAR_ALL_FAIL,
-      payload: error.message
+      payload: error.response?.data?.message || error.message
     });
   }
 };
 
 // Get notification statistics
-export const getNotificationStats = () => async (dispatch, getState) => {
+export const getNotificationStats = () => async (dispatch) => {
   try {
     dispatch({ type: NOTIFICATION_STATS_REQUEST });
 
-    const { userLogin: { userInfo } } = getState();
-
-    const response = await fetch('/api/notifications/stats', {
-      headers: {
-        'Authorization': `Bearer ${userInfo.token}`
-      }
-    });
-    
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to fetch notification stats');
-    }
+    const { data } = await api.get('/api/notifications/stats');
 
     dispatch({
       type: NOTIFICATION_STATS_SUCCESS,
@@ -216,7 +141,7 @@ export const getNotificationStats = () => async (dispatch, getState) => {
   } catch (error) {
     dispatch({
       type: NOTIFICATION_STATS_FAIL,
-      payload: error.message
+      payload: error.response?.data?.message || error.message
     });
   }
 };

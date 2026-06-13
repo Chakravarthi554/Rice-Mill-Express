@@ -474,11 +474,16 @@ const SellerDashboard = () => {
     const handleLogout = () => { if (window.confirm('Logout?')) logout(); };
 
     const renderContent = () => {
-        if (ordersLoading) return <Box display="flex" justifyContent="center" mt={8}><CircularProgress sx={{ color: ACCENT }} /></Box>;
         switch (activeTab) {
-            case 0: return <OverviewPanel orders={orders} products={sellerProducts} onTabChange={setActiveTab} />;
+            case 0: 
+                return ordersLoading ? 
+                    <Box display="flex" justifyContent="center" mt={8}><CircularProgress sx={{ color: ACCENT }} /></Box> : 
+                    <OverviewPanel orders={orders} products={sellerProducts} onTabChange={setActiveTab} />;
             case 1: return <SellerProducts />;
-            case 2: return <OrdersPanel orders={orders} partners={partners} onAssign={o => { setSelectedOrder(o); setOpenDialog(true); }} onUpdateStatus={handleUpdateStatus} onDownloadInvoice={handleDownloadInvoice} invoiceLoading={invoiceLoading} />;
+            case 2: 
+                return ordersLoading ? 
+                    <Box display="flex" justifyContent="center" mt={8}><CircularProgress sx={{ color: ACCENT }} /></Box> : 
+                    <OrdersPanel orders={orders} partners={partners} onAssign={o => { setSelectedOrder(o); setOpenDialog(true); }} onUpdateStatus={handleUpdateStatus} onDownloadInvoice={handleDownloadInvoice} invoiceLoading={invoiceLoading} />;
             case 3: return <SellerPayments />;
             case 4: return <SellerDelivery />;
             case 5: return <AnalyticsDashboard />;

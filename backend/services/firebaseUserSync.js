@@ -5,6 +5,10 @@ const { db } = require('../config/firebase');
  * Syncs MongoDB users to Firestore for Firebase rules to work
  */
 class FirebaseUserSync {
+    constructor() {
+        this.isFirestoreWorking = true;
+    }
+
     /**
      * Sync MongoDB user to Firestore
      * Call this after signup/login
@@ -14,7 +18,17 @@ class FirebaseUserSync {
     async syncUser(user, retryCount = 0) {
         const MAX_RETRIES = 3;
 
+        if (this.isFirestoreWorking === false) {
+            return false;
+        }
+
         try {
+        // ✅ Guard: Skip sync if Firebase Admin failed to init
+        const { isFirebaseInitialized } = require('../config/firebase');
+        if (!isFirebaseInitialized) {
+          console.warn('⚠️ Firebase not initialized; skipping Firestore sync');
+          return false;
+        }
             // ✅ Validation: Ensure user has required fields
             if (!user || !user._id) {
                 console.error('❌ Firestore sync: Invalid user object - missing _id');
@@ -60,6 +74,13 @@ class FirebaseUserSync {
             return true;
         } catch (error) {
             console.error(`❌ Firestore sync error (attempt ${retryCount + 1}/${MAX_RETRIES}):`, error.message);
+
+            // ✅ Gracefully disable sync if credentials are unauthorized
+            if (error.message.includes('UNAUTHENTICATED') || error.code === 16 || error.status === 16) {
+                console.error('🛑 Firestore authentication failed (invalid credentials). Disabling further Firestore syncs to avoid logs noise.');
+                this.isFirestoreWorking = false;
+                return false;
+            }
 
             // ✅ Retry logic: Retry up to MAX_RETRIES times
             if (retryCount < MAX_RETRIES - 1) {

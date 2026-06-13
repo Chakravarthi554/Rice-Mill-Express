@@ -49,4 +49,22 @@ if (fs.existsSync(mobileEnvPath)) {
   console.log('✅ mobile/src/config/env.js updated!');
 }
 
+// Update mobile/.env.development if it exists
+const mobileEnvDevPath = path.join(__dirname, 'mobile', '.env.development');
+if (fs.existsSync(mobileEnvDevPath)) {
+  let devContent = fs.readFileSync(mobileEnvDevPath, 'utf8');
+  devContent = devContent.replace(/EXPO_PUBLIC_API_URL=.*/g, `EXPO_PUBLIC_API_URL=${newURL}`);
+  fs.writeFileSync(mobileEnvDevPath, devContent, 'utf8');
+  console.log('✅ mobile/.env.development updated!');
+}
+
+// Update mobile/.env if it exists
+const mobileDotEnvPath = path.join(__dirname, 'mobile', '.env');
+if (fs.existsSync(mobileDotEnvPath)) {
+  let envContent = fs.readFileSync(mobileDotEnvPath, 'utf8');
+  envContent = envContent.replace(/EXPO_PUBLIC_API_URL=.*/g, `EXPO_PUBLIC_API_URL=${newURL}`);
+  fs.writeFileSync(mobileDotEnvPath, envContent, 'utf8');
+  console.log('✅ mobile/.env updated!');
+}
+
 console.log('\n✅ Done! Now restart:\n  - Backend:  cd backend && npm start\n  - Frontend: cd frontend && npm start\n');

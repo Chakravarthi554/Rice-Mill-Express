@@ -34,6 +34,8 @@ const NotificationBadge = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const { userInfo } = useSelector((state) => state.userLogin);
   const dispatch = useDispatch();
+  const fetchingRef = React.useRef(false);
+  const lastFetchedTokenRef = React.useRef(null);
 
   const iconMap = {
     RECIPE_SUBMITTED: <RecipeIcon color="primary" />,
@@ -48,12 +50,13 @@ const NotificationBadge = () => {
     default: <CircleIcon color="action" />
   };
 
-  // 1. Fetch initial notifications on userInfo change immediately
+  // 1. Fetch initial notifications on userInfo change immediately with guard
   useEffect(() => {
-    if (userInfo) {
+    if (userInfo && userInfo.token && userInfo.token !== lastFetchedTokenRef.current) {
+      console.log('🔔 NotificationBadge: userInfo/token changed, fetching notifications...');
       fetchNotifications();
     }
-  }, [userInfo]);
+  }, [userInfo?.token]); // Only trigger when token specifically changes
 
   // 2. Setup socket listeners with automatic retry and cleanup on unmount/logout
   useEffect(() => {
@@ -104,8 +107,16 @@ const NotificationBadge = () => {
   }, [userInfo]);
 
   const fetchNotifications = async () => {
+    if (fetchingRef.current) {
+      console.log('⏩ NotificationBadge: Fetch already in progress, skipping...');
+      return;
+    }
+
     try {
-      if (!userInfo) return;
+      if (!userInfo || !userInfo.token) return;
+
+      fetchingRef.current = true;
+      lastFetchedTokenRef.current = userInfo.token;
 
       const { data } = await api.get('/api/notifications?limit=10');
 
@@ -115,6 +126,8 @@ const NotificationBadge = () => {
       }
     } catch (error) {
       console.error('Error fetching notifications:', error);
+    } finally {
+      fetchingRef.current = false;
     }
   };
 
@@ -146,7 +159,7 @@ const NotificationBadge = () => {
     if (!notification.read) {
       try {
         await api.put(`/api/notifications/${notification._id}/read`);
-        setNotifications(prev => prev.map(n => 
+        setNotifications(prev => prev.map(n =>
           n._id === notification._id ? { ...n, read: true } : n
         ));
       } catch (error) {

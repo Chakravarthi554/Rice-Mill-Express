@@ -395,7 +395,8 @@ export const AuthProvider = ({ children }) => {
           if (active) {
             setUser(null);
             fetchingUidRef.current = null;
-            if (userInfo) {
+            const storedUser = localStorage.getItem('userInfo');
+            if (storedUser) {
               dispatch({ type: USER_LOGOUT });
             }
             localStorage.removeItem('userInfo');
@@ -417,7 +418,7 @@ export const AuthProvider = ({ children }) => {
       console.log('🧹 AuthContext: Cleaned up onAuthStateChanged listener and aborted in-flight syncs');
       unsubscribe();
     };
-  }, [dispatch, updateUser, syncProfileInBackground, logout, userInfo]);
+  }, [dispatch, updateUser, syncProfileInBackground, logout]);
 
   // Handle Redirection Persistence
   useEffect(() => {

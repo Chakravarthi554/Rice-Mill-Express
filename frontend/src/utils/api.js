@@ -91,7 +91,10 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       // 1. FIREBASE AUTH REFRESH FLOW
-      if (store.getState().userLogin?.userInfo?.firebaseUid || (auth && auth.currentUser)) {
+      const storedUser = JSON.parse(localStorage.getItem('userInfo') || '{}');
+      const hasFirebase = storedUser?.firebaseUid || store.getState().userLogin?.userInfo?.firebaseUid || (auth && auth.currentUser);
+
+      if (hasFirebase) {
         try {
           console.log('🔄 API: Refreshing token via authUtils...');
           const accessToken = await refreshFirebaseToken();
@@ -125,8 +128,15 @@ api.interceptors.response.use(
       if (!refreshToken) {
         console.error('❌ API: No refresh token available');
         store.dispatch({ type: USER_LOGOUT });
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('userInfo');
         processQueue(new Error('No refresh token'));
         isRefreshing = false;
+        
+        if (!window.location.pathname.includes('/login')) {
+          window.location.href = '/login';
+        }
         return Promise.reject(error);
       }
 

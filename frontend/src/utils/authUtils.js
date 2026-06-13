@@ -10,8 +10,22 @@ import { updateSocketToken } from './socket';
  */
 export const refreshFirebaseToken = async () => {
   try {
-    if (!auth || !auth.currentUser) {
-      console.warn('⚠️ authUtils: No current Firebase user found for refresh');
+    if (!auth) return null;
+
+    // If auth is not ready, wait for it to initialize (e.g. on page refresh)
+    if (!auth.currentUser) {
+      console.log('🔄 authUtils: Firebase auth not ready, waiting for initialization...');
+      await new Promise((resolve) => {
+        const unsubscribe = auth.onAuthStateChanged((user) => {
+          unsubscribe();
+          resolve(user);
+        });
+        setTimeout(resolve, 3000); // 3-second fallback timeout
+      });
+    }
+
+    if (!auth.currentUser) {
+      console.warn('⚠️ authUtils: No current Firebase user found for refresh after waiting');
       return null;
     }
 

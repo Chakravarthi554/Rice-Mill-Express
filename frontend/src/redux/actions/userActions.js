@@ -818,7 +818,7 @@ export const getBookmarks = () => async (dispatch, getState) => {
         Authorization: `Bearer ${userInfo.token}`,
       },
     };
-    const { data } = await axios.get('/api/users/bookmarks', config);
+    const { data } = await axiosInstance.get('/api/users/bookmarks', config);
     return data.bookmarks || [];
   } catch (error) {
     console.error('Get bookmarks error:', error.response?.data || error.message);

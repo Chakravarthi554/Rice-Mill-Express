@@ -123,6 +123,28 @@ app.use((req, res, next) => {
     next();
 });
 
+// ✅ Request Timeout Middleware to prevent hanging connections
+app.use((req, res, next) => {
+  const isUpload = req.originalUrl.includes('/api/upload') || req.originalUrl.includes('/uploads');
+  const timeoutMs = isUpload ? 300000 : 30000;
+
+  req.setTimeout(timeoutMs, () => {
+    console.warn(`⚠️ Request socket timeout: ${req.method} ${req.originalUrl}`);
+  });
+
+  res.setTimeout(timeoutMs, () => {
+    console.error(`⚠️ Request response timeout: ${req.method} ${req.originalUrl}`);
+    if (!res.headersSent) {
+      res.status(503).json({ 
+        message: "Request Timeout: The server took too long to respond.",
+        path: req.originalUrl
+      });
+    }
+  });
+
+  next();
+});
+
 app.use(
   cors({
     origin: [

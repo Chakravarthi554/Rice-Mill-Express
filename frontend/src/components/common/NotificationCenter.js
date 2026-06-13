@@ -32,6 +32,7 @@ import {
   Delete as DeleteIcon
 } from '@mui/icons-material';
 import { useSelector } from 'react-redux';
+import api from '../../utils/api';
 
 const NotificationCenter = () => {
   const [notifications, setNotifications] = useState([]);
@@ -75,12 +76,7 @@ const NotificationCenter = () => {
         url = `/api/notifications?type=${filter}&limit=50`;
       }
 
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${userInfo.token}`
-        }
-      });
-      const data = await response.json();
+      const { data } = await api.get(url);
       if (data.success) {
         setNotifications(data.notifications);
       }
@@ -97,13 +93,7 @@ const NotificationCenter = () => {
 
   const markAsRead = async (notificationId) => {
     try {
-      await fetch(`/api/notifications/${notificationId}/read`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${userInfo.token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      await api.put(`/api/notifications/${notificationId}/read`);
       // Update local state
       setNotifications(prev => prev.map(n =>
         n._id === notificationId ? { ...n, read: true } : n
@@ -117,13 +107,7 @@ const NotificationCenter = () => {
 
   const markAllAsRead = async () => {
     try {
-      await fetch('/api/notifications/read-all', {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${userInfo.token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      await api.put('/api/notifications/read-all');
       // Update local state
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     } catch (error) {
@@ -133,12 +117,7 @@ const NotificationCenter = () => {
 
   const deleteNotification = async (notificationId) => {
     try {
-      await fetch(`/api/notifications/${notificationId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${userInfo.token}`
-        }
-      });
+      await api.delete(`/api/notifications/${notificationId}`);
       // Remove from local state
       setNotifications(prev => prev.filter(n => n._id !== notificationId));
     } catch (error) {
@@ -148,12 +127,7 @@ const NotificationCenter = () => {
 
   const clearAllNotifications = async () => {
     try {
-      await fetch('/api/notifications', {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${userInfo.token}`
-        }
-      });
+      await api.delete('/api/notifications');
       setNotifications([]);
     } catch (error) {
       console.error('Error clearing all notifications:', error);

@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { logoutUser } from '../redux/actions/userActions';
 import store from '../redux/store';
 
 // ✅ CRITICAL FIX: Strip /api from baseURL since all routes already include /api/
@@ -141,7 +140,16 @@ axiosInstance.interceptors.response.use(
       } catch (refreshError) {
         console.error('❌ Axios: Token refresh failed:', refreshError.message);
         processQueue(refreshError, null);
-        store.dispatch(logoutUser());
+        localStorage.removeItem('userInfo');
+        localStorage.removeItem('token');
+        delete axiosInstance.defaults.headers.common['Authorization'];
+        try {
+          const { disconnectSocket } = require('./socket');
+          disconnectSocket();
+        } catch (socketErr) {
+          console.error('Failed to disconnect socket:', socketErr.message);
+        }
+        store.dispatch({ type: 'USER_LOGOUT' });
         if (window.location.pathname !== '/login') {
           window.location.href = '/login';
         }
