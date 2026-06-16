@@ -11,10 +11,17 @@ const connectDB = async () => {
   try {
     // Check if MONGO_URI is available
     if (!process.env.MONGO_URI) {
-      console.warn('⚠️ MONGO_URI not defined in environment variables; attempting local MongoDB fallback');
+      console.warn('⚠️ MONGO_URI not defined in environment variables; attempting local MongoDB directly');
+      if (process.env.MONGO_URI_LOCAL) {
+        const localConn = await mongoose.connect(process.env.MONGO_URI_LOCAL, options);
+        console.log(`✅ Connected directly to local MongoDB at ${localConn.connection.host}`);
+        return; // Exit early since we connected locally
+      } else {
+        throw new Error('Neither MONGO_URI nor MONGO_URI_LOCAL is defined');
+      }
     }
 
-    console.log('🔄 Attempting to connect to MongoDB...');
+    console.log('🔄 Attempting to connect to MongoDB Atlas...');
     
     const conn = await mongoose.connect(process.env.MONGO_URI, options);
     
