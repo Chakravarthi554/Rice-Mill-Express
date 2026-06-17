@@ -75,10 +75,17 @@ class FirebaseUserSync {
         } catch (error) {
             console.error(`❌ Firestore sync error (attempt ${retryCount + 1}/${MAX_RETRIES}):`, error.message);
 
-            // ✅ Gracefully disable sync if credentials are unauthorized
+            // ✅ Gracefully disable sync if credentials are unauthorized or transient failure
             if (error.message.includes('UNAUTHENTICATED') || error.code === 16 || error.status === 16) {
-                console.error('🛑 Firestore authentication failed (invalid credentials). Disabling further Firestore syncs to avoid logs noise.');
+                console.error('🛑 Firestore authentication failed (invalid credentials). Disabling further Firestore syncs for 5 minutes to avoid logs noise.');
                 this.isFirestoreWorking = false;
+                
+                // Automatically reset the circuit breaker after 5 minutes
+                setTimeout(() => {
+                    console.log('🔄 Resetting Firestore circuit breaker. Will attempt to sync again.');
+                    this.isFirestoreWorking = true;
+                }, 5 * 60 * 1000); // 5 minutes
+                
                 return false;
             }
 
