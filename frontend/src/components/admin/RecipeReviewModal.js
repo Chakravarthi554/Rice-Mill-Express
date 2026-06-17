@@ -193,7 +193,7 @@ const RecipeReviewModal = ({ open, onClose, recipeId, onApprove, onReject }) => 
               <Grid item xs={6} sm={3}>
                 <Box textAlign="center">
                   <Typography variant="h6" color="primary">
-                    {recipe.likes?.length || 0}
+                    {recipe.likesCount || 0}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Likes
@@ -203,7 +203,7 @@ const RecipeReviewModal = ({ open, onClose, recipeId, onApprove, onReject }) => 
               <Grid item xs={6} sm={3}>
                 <Box textAlign="center">
                   <Typography variant="h6" color="primary">
-                    {recipe.comments?.length || 0}
+                    {recipe.commentsCount || 0}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Comments
@@ -213,7 +213,7 @@ const RecipeReviewModal = ({ open, onClose, recipeId, onApprove, onReject }) => 
               <Grid item xs={6} sm={3}>
                 <Box textAlign="center">
                   <Typography variant="h6" color="primary">
-                    {recipe.shares || 0}
+                    {recipe.sharesCount || 0}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Shares

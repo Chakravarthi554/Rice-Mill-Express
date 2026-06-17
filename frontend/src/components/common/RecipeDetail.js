@@ -198,12 +198,20 @@ const RecipeDetail = () => {
         <Grid item xs={12} md={7}>
           <StyledPaper sx={{ overflow: 'hidden', p: 0 }}>
             <Box sx={{ position: 'relative' }}>
-              <img
-                src={recipe.image || '/images/default-image.jpg'}
-                alt={recipe.title}
-                style={{ width: '100%', display: 'block', maxHeight: '500px', objectFit: 'cover' }}
-                onError={(e) => { e.target.onerror = null; e.target.src = '/images/default-image.jpg'; }}
-              />
+              {recipe.video ? (
+                <video
+                  src={recipe.video}
+                  controls
+                  style={{ width: '100%', display: 'block', maxHeight: '500px', objectFit: 'cover', backgroundColor: '#000' }}
+                />
+              ) : (
+                <img
+                  src={recipe.images?.length > 0 ? recipe.images[0] : (recipe.image || '/images/default-image.jpg')}
+                  alt={recipe.title}
+                  style={{ width: '100%', display: 'block', maxHeight: '500px', objectFit: 'cover' }}
+                  onError={(e) => { e.target.onerror = null; e.target.src = '/images/default-image.jpg'; }}
+                />
+              )}
               <Box sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)', p: 3, pt: 8 }}>
                 <Typography variant="h4" sx={{ color: 'white', fontWeight: 'bold' }}>{recipe.title}</Typography>
                 <Stack direction="row" spacing={2} sx={{ mt: 1 }}>

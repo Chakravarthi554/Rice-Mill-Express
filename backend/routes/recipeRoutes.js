@@ -43,7 +43,7 @@ const storage = multer.diskStorage({
 
 // File filter (optional: accept only images)
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|gif|webp/;
+  const allowedTypes = /jpeg|jpg|png|gif|webp|mp4|webm|mov/;
   const mimetype = allowedTypes.test(file.mimetype);
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
 
@@ -51,7 +51,7 @@ const fileFilter = (req, file, cb) => {
     return cb(null, true);
   }
   console.log('❌ Recipe Upload: Invalid file type:', file.mimetype);
-  cb(new Error('Error: Images Only! Allowed formats: jpeg, jpg, png, gif'));
+  cb(new Error('Error: Invalid file type! Allowed formats: jpeg, jpg, png, gif, mp4, webm, mov'));
 };
 
 const upload = multer({
@@ -63,7 +63,7 @@ const upload = multer({
 
 // --- Routes ---
 // Seller routes
-router.post('/submit', protect, role('seller'), upload.single('image'), submitRecipe);
+router.post('/submit', protect, role('seller'), upload.fields([{ name: 'images', maxCount: 5 }, { name: 'video', maxCount: 1 }]), submitRecipe);
 router.get('/myrecipes', protect, role('seller'), getMyRecipes); // Seller gets their recipes
 
 // Admin routes

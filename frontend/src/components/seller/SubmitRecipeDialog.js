@@ -23,8 +23,11 @@ const SubmitRecipeDialog = ({ open, onClose, onSuccess }) => {
         steps: [''],
         linkedProducts: []
     });
-    const [image, setImage] = useState(null);
-    const [imagePreview, setImagePreview] = useState(null);
+    const [images, setImages] = useState([]);
+    const [imagePreviews, setImagePreviews] = useState([]);
+    const [video, setVideo] = useState(null);
+    const [videoPreview, setVideoPreview] = useState(null);
+    const [videoError, setVideoError] = useState('');
 
     useEffect(() => {
         if (open) {
@@ -51,13 +54,47 @@ const SubmitRecipeDialog = ({ open, onClose, onSuccess }) => {
     const removeStep = (index) => setFormData({ ...formData, steps: formData.steps.filter((_, i) => i !== index) });
 
     const handleImageChange = (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length + images.length > 5) {
+            alert('Maximum 5 images allowed');
+            return;
+        }
+        setImages([...images, ...files]);
+        
+        const newPreviews = files.map(file => URL.createObjectURL(file));
+        setImagePreviews([...imagePreviews, ...newPreviews]);
+    };
+
+    const handleVideoChange = (e) => {
+        setVideoError('');
         const file = e.target.files[0];
         if (file) {
-            setImage(file);
-            const reader = new FileReader();
-            reader.onloadend = () => setImagePreview(reader.result);
-            reader.readAsDataURL(file);
+            const videoElement = document.createElement('video');
+            videoElement.preload = 'metadata';
+            videoElement.onloadedmetadata = () => {
+                window.URL.revokeObjectURL(videoElement.src);
+                if (videoElement.duration > 20) {
+                    setVideoError('Video must not exceed 20 seconds');
+                    setVideo(null);
+                    setVideoPreview(null);
+                } else {
+                    setVideo(file);
+                    setVideoPreview(URL.createObjectURL(file));
+                }
+            };
+            videoElement.src = URL.createObjectURL(file);
         }
+    };
+
+    const removeImage = (index) => {
+        setImages(images.filter((_, i) => i !== index));
+        setImagePreviews(imagePreviews.filter((_, i) => i !== index));
+    };
+
+    const removeVideo = () => {
+        setVideo(null);
+        setVideoPreview(null);
+        setVideoError('');
     };
 
     const handleSubmit = async (e) => {
@@ -74,7 +111,10 @@ const SubmitRecipeDialog = ({ open, onClose, onSuccess }) => {
         submitData.append('ingredients', JSON.stringify(formData.ingredients));
         submitData.append('steps', JSON.stringify(formData.steps));
         submitData.append('linkedProducts', JSON.stringify(formData.linkedProducts.map(p => p._id)));
-        if (image) submitData.append('image', image);
+        if (videoError) return;
+
+        images.forEach(img => submitData.append('images', img));
+        if (video) submitData.append('video', video);
 
         try {
             await dispatch(submitRecipe(submitData));
@@ -88,8 +128,11 @@ const SubmitRecipeDialog = ({ open, onClose, onSuccess }) => {
                 steps: [''],
                 linkedProducts: []
             });
-            setImage(null);
-            setImagePreview(null);
+            setImages([]);
+            setImagePreviews([]);
+            setVideo(null);
+            setVideoPreview(null);
+            setVideoError('');
         } catch (err) {
             console.error(err);
         }
@@ -179,36 +222,49 @@ const SubmitRecipeDialog = ({ open, onClose, onSuccess }) => {
                         </Grid>
 
                         <Grid item xs={12} md={4}>
-                            <Box sx={{
-                                border: '2px dashed #E5E7EB',
-                                borderRadius: 3,
-                                p: 2,
-                                textAlign: 'center',
-                                bgcolor: '#F9FAFB',
-                                height: '100%',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                            }}>
-                                {imagePreview ? (
+                            <Box sx={{ border: '2px dashed #E5E7EB', borderRadius: 3, p: 2, textAlign: 'center', bgcolor: '#F9FAFB', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', mb: 2 }}>
+                                {imagePreviews.length > 0 ? (
                                     <Box sx={{ width: '100%', position: 'relative' }}>
-                                        <img src={imagePreview} alt="Preview" style={{ width: '100%', borderRadius: 8, maxHeight: 250, objectFit: 'cover' }} />
-                                        <Button size="small" onClick={() => { setImage(null); setImagePreview(null); }} sx={{ mt: 1, color: 'error.main' }}>Remove</Button>
+                                        {imagePreviews.map((preview, index) => (
+                                          <Box key={index} sx={{ mb: 2 }}>
+                                            <img src={preview} alt="Preview" style={{ width: '100%', borderRadius: 8, maxHeight: 150, objectFit: 'cover' }} />
+                                            <Button size="small" onClick={() => removeImage(index)} sx={{ color: 'error.main' }}>Remove</Button>
+                                          </Box>
+                                        ))}
+                                        {imagePreviews.length < 5 && (
+                                          <label htmlFor="recipe-image-upload">
+                                              <Button variant="outlined" component="span" size="small">Add More Images</Button>
+                                          </label>
+                                        )}
                                     </Box>
                                 ) : (
                                     <>
                                         <UploadIcon sx={{ fontSize: 48, color: '#9CA3AF', mb: 1 }} />
-                                        <Typography variant="body2" color="text.secondary" gutterBottom>Upload Recipe Photo</Typography>
-                                        <input
-                                            accept="image/*"
-                                            style={{ display: 'none' }}
-                                            id="recipe-image-upload"
-                                            type="file"
-                                            onChange={handleImageChange}
-                                        />
-                                        <label htmlFor="recipe-image-upload">
-                                            <Button variant="outlined" component="span" size="small">Select Image</Button>
+                                        <Typography variant="body2" color="text.secondary" gutterBottom>Upload Recipe Photos (Max 5)</Typography>
+                                    </>
+                                )}
+                                <input accept="image/*" multiple style={{ display: 'none' }} id="recipe-image-upload" type="file" onChange={handleImageChange} />
+                                {imagePreviews.length === 0 && (
+                                  <label htmlFor="recipe-image-upload">
+                                      <Button variant="outlined" component="span" size="small">Select Images</Button>
+                                  </label>
+                                )}
+                            </Box>
+
+                            <Box sx={{ border: '2px dashed #E5E7EB', borderRadius: 3, p: 2, textAlign: 'center', bgcolor: '#F9FAFB', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                                {videoError && <Alert severity="error" sx={{ mb: 1, p: 0 }}>{videoError}</Alert>}
+                                {videoPreview ? (
+                                    <Box sx={{ width: '100%', position: 'relative' }}>
+                                        <video src={videoPreview} controls style={{ width: '100%', borderRadius: 8, maxHeight: 150, objectFit: 'cover' }} />
+                                        <Button size="small" onClick={removeVideo} sx={{ mt: 1, color: 'error.main' }}>Remove</Button>
+                                    </Box>
+                                ) : (
+                                    <>
+                                        <UploadIcon sx={{ fontSize: 48, color: '#9CA3AF', mb: 1 }} />
+                                        <Typography variant="body2" color="text.secondary" gutterBottom>Upload Recipe Video (Max 20s)</Typography>
+                                        <input accept="video/mp4,video/webm,video/quicktime" style={{ display: 'none' }} id="recipe-video-upload" type="file" onChange={handleVideoChange} />
+                                        <label htmlFor="recipe-video-upload">
+                                            <Button variant="outlined" component="span" size="small">Select Video</Button>
                                         </label>
                                     </>
                                 )}

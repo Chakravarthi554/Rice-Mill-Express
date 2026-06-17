@@ -11,7 +11,9 @@ const recipeSchema = new mongoose.Schema({
   riceType: { type: String, required: true, index: true },
   linkedProducts: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }], default: [] },
   sellerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-  image: { type: String, default: null },
+  image: { type: String, default: null }, // Legacy single image
+  images: { type: [{ type: String }], default: [] }, // Support up to 5 images
+  video: { type: String, default: null }, // Support 1 video
   status: {
     type: String,
     enum: ['pending', 'approved', 'rejected'],

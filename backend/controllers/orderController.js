@@ -71,10 +71,10 @@ exports.createOrder = asyncHandler(async (req, res) => {
   const finalPaymentMethod = paymentMethod === 'online' ? 'razorpay' : paymentMethod;
 
   // Razorpay details are required if payment is being confirmed immediately
-  const isImmediatePayment = finalPaymentMethod === 'razorpay' && razorpayPaymentId && razorpayOrderId && razorpaySignature;
+  const isImmediatePayment = !!(finalPaymentMethod === 'razorpay' && razorpayPaymentId && razorpayOrderId && razorpaySignature);
   
   // Custom logic for 20% advance payment on high-value COD orders
-  const isAdvancePayment = finalPaymentMethod === 'cod' && req.body.isAdvancePaid === true && razorpayPaymentId && razorpayOrderId && razorpaySignature;
+  const isAdvancePayment = !!(finalPaymentMethod === 'cod' && req.body.isAdvancePaid === true && razorpayPaymentId && razorpayOrderId && razorpaySignature);
 
   const user = await User.findById(req.user._id).populate('addresses');
   if (!user) { res.status(404); throw new Error('User not found'); }
@@ -161,8 +161,7 @@ exports.createOrder = asyncHandler(async (req, res) => {
   if (isImmediatePayment || isAdvancePayment) {
     initialStatus = 'confirmed';
   } else if (finalPaymentMethod === 'cod') {
-    // 🔥 STRICT: All COD orders now require a 20% advance online payment to be confirmed
-    initialStatus = 'pending_payment'; // Always wait for advance payment
+    initialStatus = 'confirmed'; // Standard COD behavior
   }
 
   // Payment Verification logic
@@ -178,8 +177,17 @@ exports.createOrder = asyncHandler(async (req, res) => {
     }
     try {
       const payment = await razorpayInstance.payments.fetch(razorpayPaymentId);
-      // Allow for small floating point differences or if rewards reduced the amount
-      let expectedAmount = Math.round(grandTotal * 100);
+      // Calculate exactly as frontend CheckoutPage.js to prevent mismatch
+      const customerPincode = selectedAddress.pinCode || '500001';
+      const distance = await calculatePincodeDistance('500001', customerPincode);
+      const settings = await AdminSettings.getSettings();
+      
+      const subtotal = grandTotal + (req.redemption?.amount || 0);
+      const deliveryPreview = calculateDeliveryCharge(distance, 5, subtotal, settings);
+      const discountAmount = req.redemption?.amount || 0;
+      
+      let expectedAmount = Math.round((subtotal + deliveryPreview.charge - discountAmount) * 100);
+
       if (isAdvancePayment) {
         expectedAmount = Math.round(req.body.advanceAmountPaid * 100);
       }

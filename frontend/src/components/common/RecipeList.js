@@ -222,14 +222,15 @@ const RecipeList = () => {
                   <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                     <Box sx={{ position: 'relative' }}>
                       <CardMedia
-                        component="img"
+                        component={recipe.video ? "video" : "img"}
                         height="220"
-                        image={recipe.image || '/images/default-image.jpg'}
+                        image={recipe.video || (recipe.images?.length > 0 ? recipe.images[0] : (recipe.image || '/images/default-image.jpg'))}
                         alt={recipe.title}
                         onError={(event) => {
                           event.target.onerror = null;
                           event.target.src = '/images/default-image.jpg';
                         }}
+                        style={recipe.video ? { objectFit: 'cover' } : {}}
                       />
                       <Chip label={recipe.riceType || 'Recipe'} sx={{ position: 'absolute', top: 14, left: 14, bgcolor: tone.bg, color: tone.color, fontWeight: 800 }} />
                       <Chip icon={<Star sx={{ color: '#F59E0B !important' }} />} label={rating} sx={{ position: 'absolute', bottom: 14, right: 14, bgcolor: 'rgba(255,255,255,0.94)', fontWeight: 800 }} />

@@ -7,6 +7,8 @@ const Comment = require('../models/Comment');
 const Like = require('../models/Like');
 const mongoose = require('mongoose');
 const { anonymizeUser } = require('../utils/userVisibility');
+const cloudinary = require('../config/cloudinary');
+const fs = require('fs');
 
 let badWordsFilter;
 (async () => {
@@ -24,11 +26,39 @@ let badWordsFilter;
 // @access  Private/Seller
 const submitRecipe = asyncHandler(async (req, res) => {
   console.log('📥 Recipe Submission Request Received');
-  if (req.file) console.log('📁 File received:', req.file.filename);
-  else console.log('⚠️ No file received');
+  
+  let images = [];
+  if (req.files && req.files.images) {
+    images = req.files.images.map(file => `/uploads/recipes/${file.filename}`);
+  }
+
+  let imagePath = null;
+  if (req.file) {
+    imagePath = `/uploads/recipes/${req.file.filename}`;
+  } else if (images.length > 0) {
+    imagePath = images[0];
+  }
+
+  let videoUrl = null;
+  if (req.files && req.files.video) {
+    const videoFile = req.files.video[0];
+    try {
+      const result = await cloudinary.uploader.upload(videoFile.path, { resource_type: "video" });
+      if (result.duration > 20) {
+        await cloudinary.uploader.destroy(result.public_id, { resource_type: 'video' });
+        fs.unlinkSync(videoFile.path);
+        res.status(400);
+        throw new Error('Video must not exceed 20 seconds');
+      }
+      videoUrl = result.secure_url;
+      fs.unlinkSync(videoFile.path); // Free up local space
+    } catch (err) {
+      res.status(400);
+      throw new Error(err.message || 'Failed to process video');
+    }
+  }
 
   const { title, ingredients, steps, riceType, linkedProducts } = req.body;
-  const imagePath = req.file ? `/uploads/recipes/${req.file.filename}` : null;
 
   // Basic validation
   if (!title || !ingredients || !steps || !riceType || !linkedProducts) {
@@ -72,6 +102,8 @@ const submitRecipe = asyncHandler(async (req, res) => {
     linkedProducts: parsedLinkedProducts,
     sellerId: req.user._id,
     image: imagePath,
+    images: images,
+    video: videoUrl,
     status: 'pending',
   });
 
