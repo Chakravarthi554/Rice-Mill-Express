@@ -1,15 +1,26 @@
+// [Phase 2 Premium Redesign — Checkout Page]
+// Premium multi-step checkout with design tokens and existing business logic preserved.
 import React, { useState, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import {
-  Container, Typography, Button, Grid, Paper, Box, Alert, IconButton, Divider, CircularProgress, Checkbox, FormControlLabel
+  Container, Typography, Button, Grid, Paper, Box, Alert, IconButton,
+  Divider, CircularProgress, Checkbox, FormControlLabel, Stack, Chip
 } from '@mui/material';
+import {
+  Remove, Add, LocationOn, Payment, ShoppingBag,
+  CheckCircleOutline, LockOutlined, LocalShipping
+} from '@mui/icons-material';
+import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { Remove, Add } from '@mui/icons-material';
+
+// Existing components
 import AddressManager from '../../components/customer/AddressManager';
 import PaymentMethodSelector from '../../components/common/PaymentMethodSelector';
 import Loader from '../../components/common/Loader';
 import { EmptyState } from '../../components/common/PageStates';
+
+// Redux
 import { createOrder } from '../../redux/actions/orderActions';
 import { listMyCart, addToCart } from '../../redux/actions/cartActions';
 import { getRewards } from '../../redux/actions/rewardsActions';
@@ -19,6 +30,59 @@ import { ORDER_CREATE_RESET } from '../../redux/constants/orderConstants';
 import { RAZORPAY_ORDER_CREATE_RESET } from '../../redux/constants/paymentConstants';
 import api from '../../utils/api';
 
+// Theme
+import { colors, spacing, radius, shadows, tints, typography } from '../../theme/designTokens';
+
+const MotionBox = motion(Box);
+
+const BACKEND_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5001').replace('/api', '');
+const getImageUrl = (url) => {
+  if (!url) return null;
+  if (url.startsWith('http')) return url;
+  return BACKEND_URL + url;
+};
+
+// ── Step Indicator ──
+const StepIndicator = ({ steps, activeStep }) => (
+  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 5, gap: 0 }}>
+    {steps.map((step, idx) => (
+      <React.Fragment key={idx}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 80 }}>
+          <Box sx={{
+            width: 44, height: 44, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            bgcolor: idx <= activeStep ? colors.primary.main : colors.neutral[200],
+            color: idx <= activeStep ? '#fff' : colors.neutral[500],
+            fontWeight: 700, fontSize: '1rem',
+            boxShadow: idx <= activeStep ? shadows.greenGlow : 'none',
+            transition: 'all 0.3s ease',
+          }}>
+            {idx < activeStep ? <CheckCircleOutline sx={{ fontSize: 22 }} /> : step.icon}
+          </Box>
+          <Typography sx={{
+            mt: 1, fontSize: '0.75rem', fontWeight: idx === activeStep ? 700 : 500,
+            color: idx <= activeStep ? colors.primary.main : colors.neutral[500],
+          }}>
+            {step.label}
+          </Typography>
+        </Box>
+        {idx < steps.length - 1 && (
+          <Box sx={{
+            height: 2, flex: 1, mx: 1,
+            bgcolor: idx < activeStep ? colors.primary.main : colors.neutral[200],
+            transition: 'all 0.3s ease', borderRadius: 1, minWidth: 40,
+          }} />
+        )}
+      </React.Fragment>
+    ))}
+  </Box>
+);
+
+const CHECKOUT_STEPS = [
+  { label: 'Address', icon: <LocationOn sx={{ fontSize: 20 }} /> },
+  { label: 'Payment', icon: <Payment sx={{ fontSize: 20 }} /> },
+  { label: 'Review', icon: <ShoppingBag sx={{ fontSize: 20 }} /> },
+];
+
 const CheckoutPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -26,30 +90,27 @@ const CheckoutPage = () => {
 
   const cart = useSelector(s => s.cart);
   const cartItems = cart?.cartItems || [];
-
   const userLogin = useSelector(s => s.userLogin);
   const { userInfo } = userLogin;
-
   const orderCreate = useSelector(s => s.orderCreate);
   const { loading: orderLoading, error: orderError, success: orderSuccess, order: createdOrder } = orderCreate;
-
   const razorpayOrderCreate = useSelector(s => s.razorpayOrderCreate);
-  const { loading: rzpLoading, error: rzpError, success: rzpSuccess, razorpayOrder } = razorpayOrderCreate;
+  const { loading: rzpLoading, error: rzpError } = razorpayOrderCreate;
 
   const [selectedAddress, setSelectedAddress] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('cod');
   const [rzpInitiating, setRzpInitiating] = useState(false);
-  const [selectedItems, setSelectedItems] = useState([]); // ✅ Track selected cart items
+  const [selectedItems, setSelectedItems] = useState([]);
   const [deliveryCharge, setDeliveryCharge] = useState(0);
-  const [freeDelivery, setFreeDelivery] = useState(false);
+  const [freeDelivery] = useState(false);
   const razorpayRef = useRef(null);
 
-  // -----------------------------------------------------------------
-  // Load fresh cart on mount & reset order states
-  // -----------------------------------------------------------------
+  // Determine active checkout step
+  const activeStep = !selectedAddress ? 0 : paymentMethod ? 2 : 1;
+
   useEffect(() => {
-    dispatch(listMyCart());               // <-- always get the latest cart from DB
-    dispatch(getRewards());               // Fetch user rewards
+    dispatch(listMyCart());
+    dispatch(getRewards());
     dispatch({ type: ORDER_CREATE_RESET });
     dispatch({ type: RAZORPAY_ORDER_CREATE_RESET });
   }, [dispatch]);
@@ -58,25 +119,18 @@ const CheckoutPage = () => {
   const { rewards } = rewardsState;
   const [useRewards, setUseRewards] = useState(false);
 
-  // ✅ Select all items by default when cart loads
   useEffect(() => {
     if (cartItems.length > 0 && selectedItems.length === 0) {
       setSelectedItems(cartItems.map(item => item.product._id));
     }
-  }, [cartItems]);
+  }, [cartItems]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // -----------------------------------------------------------------
-  // Redirect when cart becomes empty
-  // -----------------------------------------------------------------
   useEffect(() => {
     if (cartItems.length === 0) {
       dispatch(listMyCart());
     }
-  }, [cartItems, navigate]);
+  }, [cartItems, dispatch]);
 
-  // -----------------------------------------------------------------
-  // Success → go to order-success page
-  // -----------------------------------------------------------------
   useEffect(() => {
     if (orderSuccess && createdOrder) {
       const orderToShow = Array.isArray(createdOrder.orders) ? createdOrder.orders[0] : createdOrder;
@@ -85,64 +139,43 @@ const CheckoutPage = () => {
     }
   }, [orderSuccess, createdOrder, navigate, dispatch]);
 
-  // -----------------------------------------------------------------
-  // Total calculation - ✅ FIXED: Calculate for SELECTED items only
-  // -----------------------------------------------------------------
+  // Total calculation - selected items only
   const totalAmount = cartItems
     .filter(i => selectedItems.includes(i.product?._id))
     .reduce((sum, i) => {
       const price = (i.product?.offerPrice > 0 && i.product?.offerPrice < i.product?.price)
-        ? i.product.offerPrice
-        : (i.product?.price ?? 0);
+        ? i.product.offerPrice : (i.product?.price ?? 0);
       const qty = i.quantity ?? 1;
       return sum + price * qty;
     }, 0);
 
-  // Determine Delivery Charge (Mobile parity logic)
   useEffect(() => {
     const fetchDeliveryCharge = async () => {
-      if (!selectedAddress) {
-        setDeliveryCharge(0);
-        return;
-      }
+      if (!selectedAddress) { setDeliveryCharge(0); return; }
       try {
         const { data } = await api.post('/api/orders/delivery-fee-preview', {
-          shippingAddressId: selectedAddress._id,
-          orderTotal: totalAmount
+          shippingAddressId: selectedAddress._id, orderTotal: totalAmount
         });
         setDeliveryCharge(data.deliveryFee || 0);
       } catch (err) {
-        console.error('Failed to fetch delivery fee preview');
-        // Fallback identical to Mobile app parity
-        if (totalAmount > 500) {
-          setDeliveryCharge(0);
-        } else {
-          setDeliveryCharge(50);
-        }
+        setDeliveryCharge(totalAmount > 500 ? 0 : 50);
       }
     };
     fetchDeliveryCharge();
   }, [totalAmount, selectedAddress, selectedItems, cartItems]);
 
-  // Calculations exactly synced with Mobile CheckoutScreen.js
   let discount = 0;
   if (useRewards && rewards?.points) {
-    discount = Math.min(rewards.points, totalAmount); // Cap discount to subtotal
+    discount = Math.min(rewards.points, totalAmount);
   }
-
   const finalTotal = totalAmount + deliveryCharge - discount;
-
-  // Minimum Order COD Check (Mobile uses finalTotal < 1500)
   const isMinOrderMet = finalTotal >= 1500;
 
-  // -----------------------------------------------------------------
-  // Qty change → call API, then re-fetch cart (so UI stays in sync)
-  // -----------------------------------------------------------------
   const handleQtyChange = async (idx, delta) => {
     const item = cartItems[idx];
     const newQty = Math.max(1, (item.quantity ?? 1) + delta);
     await dispatch(addToCart(item.product._id, newQty));
-    dispatch(listMyCart());                // <-- refresh UI instantly
+    dispatch(listMyCart());
   };
 
   const handlePaymentChange = (method) => {
@@ -150,305 +183,283 @@ const CheckoutPage = () => {
     dispatch({ type: RAZORPAY_ORDER_CREATE_RESET });
   };
 
-  // \u2705 Handle item selection toggle
   const handleItemToggle = (productId) => {
     setSelectedItems(prev =>
-      prev.includes(productId)
-        ? prev.filter(id => id !== productId)
-        : [...prev, productId]
+      prev.includes(productId) ? prev.filter(id => id !== productId) : [...prev, productId]
     );
   };
 
-  // -----------------------------------------------------------------
-  // COD order payload - ✅ UPDATED: Use only selected items
-  // -----------------------------------------------------------------
   const placeCODOrder = async () => {
     const selectedCartItems = cartItems.filter(i => selectedItems.includes(i.product._id));
-    const payload = {
-      orderItems: selectedCartItems.map(i => ({
-        product: i.product._id,
-        qty: i.quantity
-      })),
-      shippingAddressId: selectedAddress._id,
-      paymentMethod: 'cod',
-      useRewards // Pass flag to backend
-    };
-    await dispatch(createOrder(payload));
+    await dispatch(createOrder({
+      orderItems: selectedCartItems.map(i => ({ product: i.product._id, qty: i.quantity })),
+      shippingAddressId: selectedAddress._id, paymentMethod: 'cod', useRewards
+    }));
   };
 
-  // -----------------------------------------------------------------
-  // Razorpay flow
-  // -----------------------------------------------------------------
   const initiateRazorpay = async () => {
     setRzpInitiating(true);
-    const payload = {
-      amount: Math.round(finalTotal * 100), // Use finalTotal
-      currency: 'INR',
+    const rzpOrder = await dispatch(createRazorpayOrder({
+      amount: Math.round(finalTotal * 100), currency: 'INR',
       receipt: `rcpt_${userInfo._id}_${Date.now()}`.slice(0, 40)
-    };
-    const rzpOrder = await dispatch(createRazorpayOrder(payload));
+    }));
     if (!rzpOrder?.id) throw new Error('Failed to create Razorpay order');
-
     const options = {
       key: rzpOrder.key || process.env.REACT_APP_RAZORPAY_KEY_ID,
-      amount: rzpOrder.amount,
-      currency: rzpOrder.currency,
-      name: 'RiceMill Express',
-      description: 'Order Payment',
-      order_id: rzpOrder.id,
+      amount: rzpOrder.amount, currency: rzpOrder.currency,
+      name: 'RiceMill Express', description: 'Order Payment', order_id: rzpOrder.id,
       handler: async (response) => {
         const selectedCartItems = cartItems.filter(i => selectedItems.includes(i.product._id));
-        const finalPayload = {
-          orderItems: selectedCartItems.map(i => ({
-            product: i.product._id,
-            qty: i.quantity
-          })),
-          shippingAddressId: selectedAddress._id,
-          paymentMethod: 'razorpay',
-          useRewards, // Pass flag to backend
+        await dispatch(createOrder({
+          orderItems: selectedCartItems.map(i => ({ product: i.product._id, qty: i.quantity })),
+          shippingAddressId: selectedAddress._id, paymentMethod: 'razorpay', useRewards,
           razorpayPaymentId: response.razorpay_payment_id,
           razorpayOrderId: response.razorpay_order_id,
           razorpaySignature: response.razorpay_signature,
-        };
-        await dispatch(createOrder(finalPayload));
+        }));
       },
       prefill: { name: userInfo.name, email: userInfo.email, contact: userInfo.phone },
-      theme: { color: '#4CAF50' }
+      theme: { color: colors.primary.main }
     };
-
     const rzp = new window.Razorpay(options);
     rzp.open();
-    rzp.on('payment.failed', () => {
-      alert('Payment failed. Try again.');
-      setRzpInitiating(false);
-    });
+    rzp.on('payment.failed', () => { alert('Payment failed. Try again.'); setRzpInitiating(false); });
     razorpayRef.current = rzp;
   };
 
   const initiateRazorpayForAdvance = async (advanceAmount) => {
     setRzpInitiating(true);
-    const payload = {
-      amount: Math.round(advanceAmount * 100),
-      currency: 'INR',
+    const rzpOrder = await dispatch(createRazorpayOrder({
+      amount: Math.round(advanceAmount * 100), currency: 'INR',
       receipt: `adv_${userInfo._id}_${Date.now()}`.slice(0, 40)
-    };
-    const rzpOrder = await dispatch(createRazorpayOrder(payload));
+    }));
     if (!rzpOrder?.id) throw new Error('Failed to create Razorpay advance order');
-
     const options = {
       key: rzpOrder.key || process.env.REACT_APP_RAZORPAY_KEY_ID,
-      amount: rzpOrder.amount,
-      currency: rzpOrder.currency,
-      name: 'RiceMill Express',
-      description: 'COD Advance Payment (20%)',
-      order_id: rzpOrder.id,
+      amount: rzpOrder.amount, currency: rzpOrder.currency,
+      name: 'RiceMill Express', description: 'COD Advance Payment (20%)', order_id: rzpOrder.id,
       handler: async (response) => {
         const selectedCartItems = cartItems.filter(i => selectedItems.includes(i.product._id));
-        const finalPayload = {
-          orderItems: selectedCartItems.map(i => ({
-            product: i.product._id,
-            qty: i.quantity
-          })),
-          shippingAddressId: selectedAddress._id,
-          paymentMethod: 'cod',
-          useRewards, // Pass flag to backend
-          isAdvancePaid: true,
-          advanceAmountPaid: advanceAmount,
+        await dispatch(createOrder({
+          orderItems: selectedCartItems.map(i => ({ product: i.product._id, qty: i.quantity })),
+          shippingAddressId: selectedAddress._id, paymentMethod: 'cod', useRewards,
+          isAdvancePaid: true, advanceAmountPaid: advanceAmount,
           razorpayPaymentId: response.razorpay_payment_id,
           razorpayOrderId: response.razorpay_order_id,
           razorpaySignature: response.razorpay_signature,
-        };
-        await dispatch(createOrder(finalPayload));
+        }));
       },
       prefill: { name: userInfo.name, email: userInfo.email, contact: userInfo.phone },
-      theme: { color: '#4CAF50' }
+      theme: { color: colors.primary.main }
     };
-
     const rzp = new window.Razorpay(options);
     rzp.open();
-    rzp.on('payment.failed', () => {
-      alert('Advance Payment failed. Try again.');
-      setRzpInitiating(false);
-    });
+    rzp.on('payment.failed', () => { alert('Advance Payment failed. Try again.'); setRzpInitiating(false); });
     razorpayRef.current = rzp;
   };
 
   const placeOrderHandler = async () => {
     if (!selectedAddress) return alert('Select a delivery address');
-    if (selectedItems.length === 0) return alert('Please select at least one item to order'); // \u2705 Validate selection
+    if (selectedItems.length === 0) return alert('Please select at least one item to order');
     if (paymentMethod === 'cod' && !isMinOrderMet) return alert('Minimum ₹1500 for COD');
-
-    if (paymentMethod === 'cod') {
-      await placeCODOrder();
-    } else {
-      await initiateRazorpay();
-    }
+    if (paymentMethod === 'cod') { await placeCODOrder(); }
+    else { await initiateRazorpay(); }
   };
 
-  // -----------------------------------------------------------------
-  // Load Razorpay script only when needed
-  // -----------------------------------------------------------------
   useEffect(() => {
     if (paymentMethod === 'razorpay' && !window.Razorpay) {
       loadScript('https://checkout.razorpay.com/v1/checkout.js');
     }
-    return () => {
-      if (razorpayRef.current?.close) razorpayRef.current.close();
-    };
+    return () => { if (razorpayRef.current?.close) razorpayRef.current.close(); };
   }, [paymentMethod, finalTotal]);
 
   const isLoading = orderLoading || rzpLoading || rzpInitiating;
 
   return (
-    <Container sx={{ py: 4 }}>
-      <Typography variant="h4" gutterBottom sx={{ fontWeight: 600, color: 'green' }}>
-        {t('checkout')}
-      </Typography>
+    <Box sx={{ bgcolor: colors.surface.default, minHeight: '100vh', pb: 8 }}>
+      <Container maxWidth="xl" sx={{ pt: 4 }}>
 
-      {isLoading && <Loader />}
-      {orderError && <Alert severity="error" sx={{ mb: 2 }}>{orderError}</Alert>}
-      {rzpError && <Alert severity="error" sx={{ mb: 2 }}>{rzpError}</Alert>}
+        {/* ── Title ── */}
+        <Typography sx={{ ...typography.scale.h1, color: colors.primary.dark, mb: 2 }}>
+          {t('checkout')}
+        </Typography>
 
-      {cartItems.length === 0 ? (
-        <EmptyState
-          title="Your cart is empty"
-          description="Add products to continue checkout."
-          actionLabel="Go to Cart"
-          onAction={() => navigate('/cart')}
-        />
-      ) : (
-        <Grid container spacing={3}>
-          {/* ---------- LEFT COLUMN ---------- */}
-          <Grid item xs={12} md={8}>
-            {/* Address */}
-            <Paper sx={{ p: 3, mb: 3 }}>
-              <Typography variant="h6" gutterBottom>{t('addresses')}</Typography>
-              <AddressManager onSelectAddress={setSelectedAddress} />
-              {!selectedAddress && <Alert severity="info" sx={{ mt: 2 }}>{t('selectLanguage')}</Alert>}
-            </Paper>
+        {/* ── Step Indicator ── */}
+        <StepIndicator steps={CHECKOUT_STEPS} activeStep={activeStep} />
 
-            {/* Payment */}
-            <Paper sx={{ p: 3, mb: 3 }}>
-              <PaymentMethodSelector value={paymentMethod} onChange={handlePaymentChange} />
-              {paymentMethod === 'cod' && !isMinOrderMet && (
-                <Alert severity="warning" sx={{ mt: 2 }}>
-                  Minimum ₹1500 required for COD. Current: ₹{totalAmount.toFixed(2)}
-                </Alert>
-              )}
-            </Paper>
-          </Grid>
+        {isLoading && <Loader />}
+        {orderError && <Alert severity="error" sx={{ mb: 2, borderRadius: `${radius.sm}px` }}>{orderError}</Alert>}
+        {rzpError && <Alert severity="error" sx={{ mb: 2, borderRadius: `${radius.sm}px` }}>{rzpError}</Alert>}
 
-          {/* ---------- RIGHT COLUMN (SUMMARY) ---------- */}
-          <Grid item xs={12} md={4}>
-            <Paper sx={{ p: 3, position: 'sticky', top: 20 }}>
-              <Typography variant="h6" gutterBottom>{t('orderSummary') || 'Order Summary'}</Typography>
-
-              {cartItems.map((item, idx) => (
-                <Box key={item.product._id} sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  {/* \u2705 Checkbox for item selection */}
-                  <Checkbox
-                    checked={selectedItems.includes(item.product._id)}
-                    onChange={() => handleItemToggle(item.product._id)}
-                    sx={{ mr: 1 }}
-                  />
-                  <Box sx={{ flexGrow: 1 }}>
-                    <Typography variant="body2">{item.product.name}</Typography>
-                    <Typography variant="caption">
-                      ₹{(item.product.offerPrice > 0 && item.product.offerPrice < item.product.price)
-                        ? item.product.offerPrice
-                        : item.product.price} × {item.quantity}
-                    </Typography>
-                  </Box>
-
-                  <IconButton
-                    size="small"
-                    onClick={() => handleQtyChange(idx, -1)}
-                    disabled={item.quantity <= 1}
-                  >
-                    <Remove />
-                  </IconButton>
-
-                  <Typography sx={{ mx: 1, minWidth: 30, textAlign: 'center' }}>
-                    {item.quantity}
-                  </Typography>
-
-                  <IconButton
-                    size="small"
-                    onClick={() => handleQtyChange(idx, 1)}
-                  >
-                    <Add />
-                  </IconButton>
-
-                  <Typography sx={{ ml: 2 }}>
-                    ₹{(((item.product.offerPrice > 0 && item.product.offerPrice < item.product.price)
-                      ? item.product.offerPrice
-                      : item.product.price) * item.quantity).toFixed(2)}
-                  </Typography>
+        {cartItems.length === 0 ? (
+          <EmptyState
+            title="Your cart is empty"
+            description="Add products to continue checkout."
+            actionLabel="Go to Cart"
+            onAction={() => navigate('/cart')}
+          />
+        ) : (
+          <Grid container spacing={4}>
+            {/* ── Left Column ── */}
+            <Grid item xs={12} md={8}>
+              {/* Address */}
+              <Paper sx={{ p: 3.5, mb: 3, borderRadius: `${radius.xl}px`, border: `1px solid ${colors.neutral[200]}`, boxShadow: shadows.xs }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
+                  <LocationOn sx={{ color: colors.primary.main }} />
+                  <Typography sx={{ fontWeight: 700, fontSize: '1.1rem' }}>{t('addresses')}</Typography>
                 </Box>
-              ))}
-
-              <Divider sx={{ my: 2 }} />
-
-              {/* Delivery Charge */}
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                <Typography>{t('subtotal')}:</Typography>
-                <Typography>₹{totalAmount.toFixed(2)}</Typography>
-              </Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                <Typography>{t('delivery')}:</Typography>
-                {freeDelivery ? (
-                  <Typography color="success.main" fontWeight="bold">FREE</Typography>
-                ) : (
-                  <Typography>₹{deliveryCharge.toFixed(2)}</Typography>
+                <AddressManager onSelectAddress={setSelectedAddress} />
+                {!selectedAddress && (
+                  <Alert severity="info" sx={{ mt: 2, borderRadius: `${radius.sm}px` }}>
+                    Please select a delivery address to continue
+                  </Alert>
                 )}
-              </Box>
+              </Paper>
 
-              {/* Rewards Toggle */}
-              {rewards && rewards.points > 0 && (
-                <Box sx={{ mb: 2, p: 1, bgcolor: '#f1f8e9', borderRadius: 1 }}>
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={useRewards}
-                        onChange={(e) => setUseRewards(e.target.checked)}
-                        color="success"
-                      />
-                    }
-                    label={`Use Rewards (${rewards.points} pts)`}
-                  />
-                  {useRewards && (
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0 }}>
-                      <Typography variant="body2" color="success.main">Discount Applied:</Typography>
-                      <Typography variant="body2" color="success.main">-₹{discount.toFixed(2)}</Typography>
-                    </Box>
-                  )}
+              {/* Payment */}
+              <Paper sx={{ p: 3.5, mb: 3, borderRadius: `${radius.xl}px`, border: `1px solid ${colors.neutral[200]}`, boxShadow: shadows.xs }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
+                  <Payment sx={{ color: colors.primary.main }} />
+                  <Typography sx={{ fontWeight: 700, fontSize: '1.1rem' }}>Payment Method</Typography>
                 </Box>
-              )}
+                <PaymentMethodSelector value={paymentMethod} onChange={handlePaymentChange} />
+                {paymentMethod === 'cod' && !isMinOrderMet && (
+                  <Alert severity="warning" sx={{ mt: 2, borderRadius: `${radius.sm}px` }}>
+                    Minimum ₹1500 required for COD. Current: ₹{totalAmount.toFixed(2)}
+                  </Alert>
+                )}
+              </Paper>
+            </Grid>
 
-              {freeDelivery && (
-                <Typography variant="caption" color="success.main" sx={{ mb: 1, display: 'block' }}>
-                  🎉 Free delivery on orders ≥ ₹1000
+            {/* ── Right Column (Order Summary) ── */}
+            <Grid item xs={12} md={4}>
+              <Paper sx={{
+                p: 3.5, borderRadius: `${radius.xl}px`, position: 'sticky', top: 20,
+                border: `1px solid ${colors.neutral[200]}`, boxShadow: shadows.sm,
+              }}>
+                <Typography sx={{ fontWeight: 800, fontSize: '1.15rem', mb: 2.5 }}>
+                  {t('orderSummary') || 'Order Summary'}
                 </Typography>
-              )}
-              <Divider sx={{ my: 1 }} />
-              <Typography variant="h6">{t('grandTotal')}: ₹{finalTotal.toFixed(2)}</Typography>
 
-              <Button
-                fullWidth
-                variant="contained"
-                color="success"
-                sx={{ mt: 3 }}
-                onClick={placeOrderHandler}
-                disabled={isLoading || !selectedAddress || (paymentMethod === 'cod' && !isMinOrderMet)}
-              >
-                {isLoading ? <CircularProgress size={24} /> :
-                  (paymentMethod === 'razorpay' ? 'Proceed to Pay' : 'Place Order (COD)')}
-              </Button>
-            </Paper>
+                {/* Items */}
+                <Stack spacing={2} sx={{ maxHeight: 300, overflowY: 'auto', pr: 0.5 }}>
+                  {cartItems.map((item, idx) => {
+                    const itemPrice = (item.product.offerPrice > 0 && item.product.offerPrice < item.product.price)
+                      ? item.product.offerPrice : item.product.price;
+                    return (
+                      <Box key={item.product._id} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Checkbox
+                          checked={selectedItems.includes(item.product._id)}
+                          onChange={() => handleItemToggle(item.product._id)}
+                          sx={{ '&.Mui-checked': { color: colors.primary.main } }}
+                          size="small"
+                        />
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography sx={{ fontSize: '0.88rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {item.product.name}
+                          </Typography>
+                          <Typography sx={{ fontSize: '0.78rem', color: colors.neutral[500] }}>
+                            ₹{itemPrice} × {item.quantity}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <IconButton size="small" onClick={() => handleQtyChange(idx, -1)} disabled={item.quantity <= 1}><Remove sx={{ fontSize: 16 }} /></IconButton>
+                          <Typography sx={{ minWidth: 24, textAlign: 'center', fontWeight: 700, fontSize: '0.88rem' }}>{item.quantity}</Typography>
+                          <IconButton size="small" onClick={() => handleQtyChange(idx, 1)}><Add sx={{ fontSize: 16 }} /></IconButton>
+                        </Box>
+                        <Typography sx={{ fontWeight: 700, fontSize: '0.92rem', minWidth: 60, textAlign: 'right' }}>
+                          ₹{(itemPrice * item.quantity).toFixed(0)}
+                        </Typography>
+                      </Box>
+                    );
+                  })}
+                </Stack>
+
+                <Divider sx={{ my: 2.5 }} />
+
+                {/* Price Breakdown */}
+                <Stack spacing={1.5}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography sx={{ color: colors.neutral[500] }}>{t('subtotal')}:</Typography>
+                    <Typography sx={{ fontWeight: 600 }}>₹{totalAmount.toFixed(2)}</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography sx={{ color: colors.neutral[500] }}>{t('delivery')}:</Typography>
+                    {freeDelivery ? (
+                      <Typography sx={{ color: colors.success, fontWeight: 700 }}>FREE</Typography>
+                    ) : (
+                      <Typography sx={{ fontWeight: 600 }}>₹{deliveryCharge.toFixed(2)}</Typography>
+                    )}
+                  </Box>
+                </Stack>
+
+                {/* Rewards */}
+                {rewards && rewards.points > 0 && (
+                  <Box sx={{ mt: 2, p: 2, bgcolor: tints.green, borderRadius: `${radius.sm}px`, border: `1px solid ${colors.primary.lighter}33` }}>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={useRewards}
+                          onChange={(e) => setUseRewards(e.target.checked)}
+                          sx={{ '&.Mui-checked': { color: colors.primary.main } }}
+                          size="small"
+                        />
+                      }
+                      label={<Typography sx={{ fontSize: '0.88rem', fontWeight: 600 }}>Use Rewards ({rewards.points} pts)</Typography>}
+                    />
+                    {useRewards && (
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
+                        <Typography sx={{ fontSize: '0.85rem', color: colors.success }}>Discount Applied:</Typography>
+                        <Typography sx={{ fontSize: '0.85rem', color: colors.success, fontWeight: 700 }}>-₹{discount.toFixed(2)}</Typography>
+                      </Box>
+                    )}
+                  </Box>
+                )}
+
+                {freeDelivery && (
+                  <Typography sx={{ fontSize: '0.78rem', color: colors.success, mt: 1 }}>
+                    🎉 Free delivery on orders ≥ ₹1000
+                  </Typography>
+                )}
+
+                <Divider sx={{ my: 2.5 }} />
+
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+                  <Typography sx={{ fontWeight: 700, fontSize: '1.15rem' }}>{t('grandTotal')}:</Typography>
+                  <Typography sx={{ fontWeight: 800, fontSize: '1.3rem', color: colors.primary.dark }}>₹{finalTotal.toFixed(2)}</Typography>
+                </Box>
+
+                <Button
+                  component={motion.button}
+                  whileTap={{ scale: 0.97 }}
+                  fullWidth
+                  variant="contained"
+                  size="large"
+                  onClick={placeOrderHandler}
+                  disabled={isLoading || !selectedAddress || (paymentMethod === 'cod' && !isMinOrderMet)}
+                  startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : <LockOutlined />}
+                  sx={{
+                    bgcolor: colors.primary.main, '&:hover': { bgcolor: colors.primary.dark },
+                    borderRadius: `${radius.md}px`, py: 1.5, fontWeight: 800, fontSize: '1rem',
+                    boxShadow: shadows.greenGlow,
+                    '&.Mui-disabled': { bgcolor: colors.neutral[200] },
+                  }}
+                >
+                  {isLoading ? 'Processing...' : (paymentMethod === 'razorpay' ? 'Proceed to Pay' : 'Place Order (COD)')}
+                </Button>
+
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mt: 2 }}>
+                  <LockOutlined sx={{ fontSize: 14, color: colors.neutral[500] }} />
+                  <Typography sx={{ fontSize: '0.75rem', color: colors.neutral[500] }}>
+                    Secure & encrypted checkout
+                  </Typography>
+                </Box>
+              </Paper>
+            </Grid>
           </Grid>
-        </Grid>
-      )}
-    </Container>
+        )}
+      </Container>
+    </Box>
   );
 };
 

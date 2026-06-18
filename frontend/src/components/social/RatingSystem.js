@@ -75,8 +75,10 @@ const RatingSystem = ({ type = 'recipes', itemId, currentUserRating, onRate }) =
 
     if (!distribution) return null;
 
-    const { averageRating, totalRatings, distribution: dist, percentages } = distribution;
-
+    const averageRating = distribution.averageRating || 0;
+    const totalRatings = distribution.totalRatings || 0;
+    const dist = distribution.distribution || { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    const percentages = distribution.percentages || { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
     return (
         <Paper elevation={2} sx={{ p: 3, borderRadius: 2 }}>
             <Typography variant="h5" gutterBottom fontWeight="bold">

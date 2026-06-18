@@ -9,26 +9,23 @@
 
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { useParams, Link as RouterLink, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Box, Typography, Button, TextField, Rating, CircularProgress, Paper, Grid,
-  List, ListItem, ListItemText, Divider, Avatar, Card, CardHeader, CardContent, Chip,
-  IconButton, Dialog, DialogTitle, DialogContent, DialogActions, ListItemAvatar, Alert,
-  Stack, LinearProgress, Menu, MenuItem, Tooltip, Badge, Collapse, Snackbar
+  Box, Typography, Button, Paper, Grid,
+  List, ListItem, ListItemText, Divider, Avatar, Card, Chip,
+  IconButton, Dialog, DialogTitle, DialogContent, Alert,
+  Stack, Tooltip, Snackbar
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import {
-  Favorite, FavoriteBorder, Comment as CommentIcon, Share as ShareIcon,
-  Send as SendIcon, Sort as SortIcon, Star as StarIcon,
-  MoreVert as MoreVertIcon, Flag as FlagIcon, Reply as ReplyIcon
+  Favorite, FavoriteBorder, Comment as CommentIcon, Share as ShareIcon
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { getRecipeDetails, rateRecipe } from '../../redux/actions/recipeActions';
 import { addToCart } from '../../redux/actions/cartActions';
 import {
-  likeItem, addComment, trackShare,
-  getSortedComments, getRatingDistribution
+  likeItem, trackShare
 } from '../../redux/actions/socialActions';
 import { getCurrentSocket } from '../../utils/socket';
 
@@ -59,9 +56,7 @@ const RecipeDetail = () => {
   const commentInputRef = useRef(null);
 
   // Pagination and sorting (managed by CommentSystem now, but keep sortBy if needed locally)
-  const [sortBy, setSortBy] = useState('recent');
   const [showShareDialog, setShowShareDialog] = useState(false);
-  const [anchorElSort, setAnchorElSort] = useState(null);
   const [copySuccess, setCopySuccess] = useState(false);
 
   // Toast notification state
@@ -73,10 +68,7 @@ const RecipeDetail = () => {
   const userLogin = useSelector((state) => state.userLogin);
   const { userInfo } = userLogin;
 
-  const socialLike = useSelector((state) => state.socialLike);
-  const socialComment = useSelector((state) => state.socialComment);
   const socialCommentsList = useSelector((state) => state.socialCommentsList);
-  const socialRatingDist = useSelector((state) => state.socialRatingDist);
 
   useEffect(() => {
     if (recipeId) {
@@ -159,33 +151,7 @@ const RecipeDetail = () => {
     navigate('/cart');
   };
 
-  // Organize comments into tree
-  const commentTree = useMemo(() => {
-    const comments = socialCommentsList.comments || [];
-    const commentMap = {};
-    const roots = [];
-
-    // First pass: create map
-    comments.forEach(c => {
-      commentMap[c._id] = { ...c, replies: [] };
-    });
-
-    // Second pass: link children to parents
-    comments.forEach(c => {
-      if (c.parentComment) {
-        if (commentMap[c.parentComment]) {
-          commentMap[c.parentComment].replies.push(commentMap[c._id]);
-        }
-      } else {
-        roots.push(commentMap[c._id]);
-      }
-    });
-
-    return roots;
-  }, [socialCommentsList.comments]);
-
   const hasLiked = recipe.userLiked || false;
-  const displayRating = recipe.averageRating || 0;
 
   if (loading) return <Loader />;
   if (error) return <Message severity="error">{error}</Message>;

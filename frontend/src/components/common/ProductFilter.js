@@ -38,8 +38,9 @@ import { addToCart } from '../../redux/actions/cartActions';
 import { addToWishlist } from '../../redux/actions/userActions';
 import { useNavigate } from 'react-router-dom';
 import Price from '../common/Price';
-
-const ProductFilter = () => {
+import ProductCard from '../ui/ProductCard';
+import LoadingSkeleton from '../ui/LoadingSkeleton';
+import EmptyState from '../ui/EmptyState';const ProductFilter = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { products = [], loading: productLoading, error: productError } =
@@ -509,37 +510,21 @@ const ProductFilter = () => {
       {/* Products Grid */}
       {productLoading ? (
         <Grid container spacing={3}>
-          {[1, 2, 3, 4, 5, 6].map((item) => (
+          {[...Array(8)].map((_, item) => (
             <Grid item xs={12} sm={6} md={4} lg={3} key={item}>
-              <Card>
-                <Skeleton variant="rectangular" height={200} />
-                <CardContent>
-                  <Skeleton variant="text" height={30} />
-                  <Skeleton variant="text" height={20} />
-                  <Skeleton variant="text" height={20} width="60%" />
-                </CardContent>
-              </Card>
+              <LoadingSkeleton type="product" />
             </Grid>
           ))}
         </Grid>
       ) : productError ? (
         <Alert severity="error">{productError}</Alert>
       ) : sortedProducts.length === 0 ? (
-        <Box sx={{ textAlign: 'center', py: 8 }}>
-          <Typography variant="h6" color="text.secondary" gutterBottom>
-            No products found
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Try adjusting your filters or search query
-          </Typography>
-          <Button
-            variant="contained"
-            startIcon={<ClearAllIcon />}
-            onClick={handleClearAllFilters}
-          >
-            Clear All Filters
-          </Button>
-        </Box>
+        <EmptyState 
+            icon="🔍"
+            title="No products found"
+            description="Try adjusting your filters or search query"
+            action={{ label: "Clear All Filters", onClick: handleClearAllFilters }}
+        />
       ) : (
         <Grid container spacing={3}>
           {sortedProducts.map((product) => {
@@ -548,93 +533,33 @@ const ProductFilter = () => {
               product.offerPrice > 0 &&
               product.offerPrice < product.price;
             const displayPrice = hasOffer ? product.offerPrice : product.price;
-            const isImageLoading = imageLoading[product._id] !== false;
+            const discount = hasOffer ? Math.round(((product.price - product.offerPrice) / product.price) * 100) : 0;
+            const isWishlisted = false; // Add wishlist check if available in state
 
             return (
               <Grid item xs={12} sm={6} md={4} lg={3} key={product._id}>
-                <Card
-                  onClick={() => navigate(`/products/${product._id}`)}
-                  sx={{
-                    cursor: 'pointer',
-                    height: '100%',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    transition: 'transform 0.2s, box-shadow 0.2s',
-                    '&:hover': {
-                      transform: 'translateY(-4px)',
-                      boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                    },
+                <ProductCard
+                  product={{
+                      _id: product._id,
+                      name: product.name,
+                      image: product.images?.[0] || null,
+                      price: displayPrice || 0,
+                      mrp: hasOffer ? product.price : null,
+                      discount: discount,
+                      rating: Number(product.rating || 0),
+                      countInStock: product.countInStock
                   }}
-                >
-                  {isImageLoading ? (
-                    <Skeleton variant="rectangular" height={200} />
-                  ) : (
-                    <CardMedia
-                      component="img"
-                      height="200"
-                      image={product.images?.[0] || '/default-image.jpg'}
-                      alt={product.name}
-                      onLoad={() => handleImageLoad(product._id)}
-                      onError={() => handleImageError(product._id)}
-                      sx={{ objectFit: 'contain', backgroundColor: '#f5f5f5', p: 2 }}
-                    />
-                  )}
-                  <CardContent sx={{ flexGrow: 1 }}>
-                    <Typography variant="h6" noWrap gutterBottom>
-                      {product.name}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" noWrap sx={{ mb: 1 }}>
-                      {product.brand}
-                    </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                      <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'success.main' }}>
-                        <Price amount={displayPrice || 0} />
-                      </Typography>
-                      {hasOffer && (
-                        <>
-                          <Typography
-                            variant="body2"
-                            sx={{ textDecoration: 'line-through', color: 'text.secondary' }}
-                          >
-                            <Price amount={product.price || 0} />
-                          </Typography>
-                          <Chip label="OFFER" size="small" color="error" sx={{ height: 20 }} />
-                        </>
-                      )}
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <StarIcon sx={{ color: 'warning.main', fontSize: 18 }} />
-                      <Typography variant="body2">
-                        {product.rating || 0} ({product.numReviews || 0})
-                      </Typography>
-                    </Box>
-                  </CardContent>
-                  <CardActions sx={{ p: 2, pt: 0 }}>
-                    <Button
-                      variant="contained"
-                      size="small"
-                      fullWidth
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleBuyNow(product._id);
-                      }}
-                      sx={{ mb: 1 }}
-                    >
-                      Buy Now
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      fullWidth
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAddToCart(product._id);
-                      }}
-                    >
-                      Add to Cart
-                    </Button>
-                  </CardActions>
-                </Card>
+                  wishlisted={isWishlisted}
+                  onAddToCart={(e) => {
+                    e.stopPropagation();
+                    handleAddToCart(product._id);
+                  }}
+                  onToggleWishlist={(e) => {
+                    e.stopPropagation();
+                    // Dispatch wishlist toggle if applicable
+                  }}
+                  onClick={() => navigate(`/products/${product._id}`)}
+                />
               </Grid>
             );
           })}

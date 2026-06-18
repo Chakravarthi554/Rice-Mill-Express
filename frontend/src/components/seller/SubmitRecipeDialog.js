@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions,
     TextField, Button, Box, Typography, IconButton,
-    MenuItem, Grid, Chip, Autocomplete, Alert, CircularProgress
+    MenuItem, Grid, Autocomplete, Alert, CircularProgress
 } from '@mui/material';
 import { Add as AddIcon, Delete as DeleteIcon, CloudUpload as UploadIcon } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
