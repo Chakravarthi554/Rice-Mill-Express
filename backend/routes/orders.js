@@ -26,6 +26,15 @@ try {
   };
 }
 
+let deliveryController;
+try {
+  deliveryController = require("../controllers/deliveryController");
+} catch (error) {
+  deliveryController = {
+    assignDeliveryToOrder: (req, res) => res.status(501).json({ message: "Delivery controller not loaded" })
+  };
+}
+
 // ✅ FIXED: Import middlewares with proper error handling
 let authMiddleware;
 try {
@@ -66,6 +75,8 @@ const {
   uploadCodProof,
   getSellerAnalytics,
 } = orderController;
+
+const { assignDeliveryToOrder } = deliveryController;
 
 // ✅ FIXED: Validate all controller functions exist
 const validateController = (controller, functionName) => {

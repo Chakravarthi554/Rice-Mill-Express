@@ -380,7 +380,11 @@ const ProductPage = () => {
                       product={{
                         _id: prod._id,
                         name: prod.name,
+<<<<<<< HEAD
                         image: getImageUrl(prod.images?.[0] || prod.image),
+=======
+                        image: getImageUrl(prod.images?.[0]),
+>>>>>>> a66af4ba90d62021e80410263e806adc23403bd9
                         price: pOffer ? prod.offerPrice : prod.price,
                         mrp: pOffer ? prod.price : null,
                         discount: pOffer ? Math.round(((prod.price - prod.offerPrice) / prod.price) * 100) : 0,

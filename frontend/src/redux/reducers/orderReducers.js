@@ -70,6 +70,8 @@ export const orderListMyReducer = (state = { orders: [] }, action) => {
           order._id === action.payload._id ? action.payload : order
         ),
       };
+    case ORDER_UPDATE_FAIL:
+      return { ...state, error: action.payload };
     case ORDER_CANCEL_SUCCESS:
       return {
         ...state,

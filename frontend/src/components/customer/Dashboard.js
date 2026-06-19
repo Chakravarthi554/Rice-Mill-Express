@@ -78,10 +78,15 @@ const Dashboard = () => {
     const [recentlyViewed, setRecentlyViewed] = useState([]);
 
     useEffect(() => {
+<<<<<<< HEAD
         dispatch(listProducts({ limit: 40 }));
         const viewed = JSON.parse(localStorage.getItem('recentlyViewed') || '[]');
         setRecentlyViewed(viewed);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+=======
+      dispatch(listProducts());
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+>>>>>>> a66af4ba90d62021e80410263e806adc23403bd9
     }, [dispatch]);
 
     const handleAddToCart = async (productId) => {

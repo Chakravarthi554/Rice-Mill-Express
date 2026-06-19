@@ -510,6 +510,9 @@ exports.updateOrderStatus = asyncHandler(async (req, res) => {
 
   const previousStatus = order.orderStatus;
   const validTransitions = {
+    pending_payment: ['confirmed', 'cancelled'],
+    pending: ['processing', 'packed', 'shipped', 'cancelled', 'confirmed'],
+    confirmed: ['processing', 'packed', 'shipped', 'cancelled'],
     placed: ['processing', 'packed', 'shipped', 'cancelled'],
     processing: ['packed', 'shipped', 'cancelled'],
     packed: ['shipped', 'out_for_delivery', 'cancelled'],

@@ -7,6 +7,7 @@ import {
   productCreateReducer, productUpdateReducer, productReviewCreateReducer,
   productSellerListReducer, productBulkUploadReducer, productAnalyticsReducer,
   sellerAnalyticsReducer, recipeSuggestionReducer,
+  productApproveReducer, productListPendingReducer,
 } from './reducers/productReducers';
 
 import { adminSettingsReducer } from './reducers/adminSettingsReducers';
@@ -223,6 +224,8 @@ const combinedReducer = combineReducers({
   productBulkUpload: productBulkUploadReducer,
   productAnalytics: productAnalyticsReducer,
   sellerAnalytics: sellerAnalyticsReducer,
+  productApprove: productApproveReducer,
+  productListPending: productListPendingReducer,
 
   // Cart
   cart: cartReducer,

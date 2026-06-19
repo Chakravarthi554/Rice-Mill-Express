@@ -8,11 +8,13 @@ import { Add as AddIcon, Delete as DeleteIcon, CloudUpload as UploadIcon } from 
 import { useDispatch, useSelector } from 'react-redux';
 import { submitRecipe } from '../../redux/actions/recipeActions';
 import { listSellerProducts } from '../../redux/actions/productActions';
+import { useTheme } from '@mui/material/styles';
 
 const RICE_TYPES = ['Sona Masuri', 'Samba Masuri', 'Telangana Sona', 'Swarna', 'Jagtial Sannalu', 'Tellahamsa', 'Brown Rice', 'Basmati'];
 
 const SubmitRecipeDialog = ({ open, onClose, onSuccess }) => {
     const dispatch = useDispatch();
+  const theme = useTheme();
     const { products = [] } = useSelector(state => state.productSellerList || {});
     const { loading, error } = useSelector(state => state.recipeSubmit || {});
 
@@ -140,7 +142,7 @@ const SubmitRecipeDialog = ({ open, onClose, onSuccess }) => {
 
     return (
         <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-            <DialogTitle fontWeight={800}>Submit New Recipe</DialogTitle>
+            <DialogTitle sx={{ fontWeight: 800, color: theme.palette.text.primary }}>Submit New Recipe</DialogTitle>
             <DialogContent dividers>
                 {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
                 <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
@@ -222,7 +224,7 @@ const SubmitRecipeDialog = ({ open, onClose, onSuccess }) => {
                         </Grid>
 
                         <Grid item xs={12} md={4}>
-                            <Box sx={{ border: '2px dashed #E5E7EB', borderRadius: 3, p: 2, textAlign: 'center', bgcolor: '#F9FAFB', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', mb: 2 }}>
+                            <Box sx={{ border: `2px dashed ${theme.palette.divider}`, borderRadius: theme.shape.borderRadius, boxShadow: theme.shadows.sm, p: 2, textAlign: 'center', bgcolor: theme.palette.background.paper, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', mb: 2 }}>
                                 {imagePreviews.length > 0 ? (
                                     <Box sx={{ width: '100%', position: 'relative' }}>
                                         {imagePreviews.map((preview, index) => (
@@ -239,11 +241,11 @@ const SubmitRecipeDialog = ({ open, onClose, onSuccess }) => {
                                     </Box>
                                 ) : (
                                     <>
-                                        <UploadIcon sx={{ fontSize: 48, color: '#9CA3AF', mb: 1 }} />
+                                                                              <UploadIcon sx={{ fontSize: 48, color: theme.palette.grey[400], mb: 1 }} />
                                         <Typography variant="body2" color="text.secondary" gutterBottom>Upload Recipe Photos (Max 5)</Typography>
                                     </>
                                 )}
-                                <input accept="image/*" multiple style={{ display: 'none' }} id="recipe-image-upload" type="file" onChange={handleImageChange} />
+                                <input accept="image/*" multiple style={{ display: 'none' }} id="recipe-image-upload" type="file" onChange={handleImageChange} aria-label="Upload recipe images" />
                                 {imagePreviews.length === 0 && (
                                   <label htmlFor="recipe-image-upload">
                                       <Button variant="outlined" component="span" size="small">Select Images</Button>
@@ -251,7 +253,7 @@ const SubmitRecipeDialog = ({ open, onClose, onSuccess }) => {
                                 )}
                             </Box>
 
-                            <Box sx={{ border: '2px dashed #E5E7EB', borderRadius: 3, p: 2, textAlign: 'center', bgcolor: '#F9FAFB', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                            <Box sx={{ border: `2px dashed ${theme.palette.divider}`, borderRadius: theme.shape.borderRadius, boxShadow: theme.shadows.sm, p: 2, textAlign: 'center', bgcolor: theme.palette.background.paper, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                                 {videoError && <Alert severity="error" sx={{ mb: 1, p: 0 }}>{videoError}</Alert>}
                                 {videoPreview ? (
                                     <Box sx={{ width: '100%', position: 'relative' }}>
@@ -260,9 +262,9 @@ const SubmitRecipeDialog = ({ open, onClose, onSuccess }) => {
                                     </Box>
                                 ) : (
                                     <>
-                                        <UploadIcon sx={{ fontSize: 48, color: '#9CA3AF', mb: 1 }} />
+                                                                                  <UploadIcon sx={{ fontSize: 48, color: theme.palette.grey[400], mb: 1 }} />
                                         <Typography variant="body2" color="text.secondary" gutterBottom>Upload Recipe Video (Max 20s)</Typography>
-                                        <input accept="video/mp4,video/webm,video/quicktime" style={{ display: 'none' }} id="recipe-video-upload" type="file" onChange={handleVideoChange} />
+                                        <input accept="video/mp4,video/webm,video/quicktime" style={{ display: 'none' }} id="recipe-video-upload" type="file" onChange={handleVideoChange} aria-label="Upload recipe video" />
                                         <label htmlFor="recipe-video-upload">
                                             <Button variant="outlined" component="span" size="small">Select Video</Button>
                                         </label>
@@ -279,7 +281,7 @@ const SubmitRecipeDialog = ({ open, onClose, onSuccess }) => {
                     onClick={handleSubmit}
                     variant="contained"
                     disabled={loading}
-                    sx={{ bgcolor: '#16A34A', '&:hover': { bgcolor: '#15803D' }, fontWeight: 700, px: 4 }}
+                    sx={{ bgcolor: theme.palette.secondary.main, '&:hover': { bgcolor: theme.palette.secondary.dark }, fontWeight: 700, px: 4, borderRadius: theme.shape.borderRadius }}
                 >
                     {loading ? <CircularProgress size={24} /> : 'Submit for Approval'}
                 </Button>

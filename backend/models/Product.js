@@ -48,6 +48,9 @@ const productSchema = mongoose.Schema(
     ratings: { type: Number, default: 0 }, // Searchable rating field
     discounts: { type: String },
     stockAvailability: { type: String, enum: ['In-stock', 'Pre-order'], default: 'In-stock' },
+    // Admin Approval Flow
+    approvalStatus: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+    approvalRejectionReason: { type: String },
   },
   {
     timestamps: true,

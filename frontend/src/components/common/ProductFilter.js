@@ -663,7 +663,68 @@ const ProductFilter = () => {
           </Box>
         </Box>
       </Drawer>
+<<<<<<< HEAD
     </Box>
+=======
+
+      {/* Products Grid */}
+      {productLoading ? (
+        <Grid container spacing={3}>
+          {[...Array(8)].map((_, item) => (
+            <Grid item xs={12} sm={6} md={4} lg={3} key={item}>
+              <LoadingSkeleton type="product" />
+            </Grid>
+          ))}
+        </Grid>
+      ) : productError ? (
+        <Alert severity="error">{productError}</Alert>
+      ) : sortedProducts.length === 0 ? (
+        <EmptyState 
+            icon="🔍"
+            title="No products found"
+            description="Try adjusting your filters or search query"
+            action={{ label: "Clear All Filters", onClick: handleClearAllFilters }}
+        />
+      ) : (
+        <Grid container spacing={3}>
+          {sortedProducts.map((product) => {
+            const hasOffer =
+              typeof product.offerPrice === 'number' &&
+              product.offerPrice > 0 &&
+              product.offerPrice < product.price;
+            const displayPrice = hasOffer ? product.offerPrice : product.price;
+            const discount = hasOffer ? Math.round(((product.price - product.offerPrice) / product.price) * 100) : 0;
+            const isWishlisted = false; // Add wishlist check if available in state
+
+            return (
+              <Grid item xs={12} sm={6} md={4} lg={3} key={product._id}>
+                <ProductCard
+                  product={{
+                      _id: product._id,
+                      name: product.name,
+                      image: product.images?.[0] || null,
+                      price: displayPrice || 0,
+                      mrp: hasOffer ? product.price : null,
+                      discount: discount,
+                      rating: Number(product.rating || 0),
+                      countInStock: product.countInStock
+                  }}
+                  wishlisted={isWishlisted}
+                  onAddToCart={() => {
+                    handleAddToCart(product._id);
+                  }}
+                  onToggleWishlist={() => {
+                    // Dispatch wishlist toggle if applicable
+                  }}
+                  onClick={() => navigate(`/products/${product._id}`)}
+                />
+              </Grid>
+            );
+          })}
+        </Grid>
+      )}
+    </Container>
+>>>>>>> a66af4ba90d62021e80410263e806adc23403bd9
   );
 };
 

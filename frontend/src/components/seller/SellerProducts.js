@@ -234,7 +234,25 @@ const SellerProducts = () => {
                 <Box sx={{ p: 2, flex: 1, display: 'flex', flexDirection: 'column' }}>
                   <Typography variant="caption" color="text.secondary" fontWeight={600} gutterBottom textTransform="uppercase">{product.brand}</Typography>
                   <Typography variant="body1" fontWeight={800} sx={{ mb: 1, lineHeight: 1.2, height: 40, overflow: 'hidden' }}>{product.name}</Typography>
-                  <Chip label={statusColors.label} size="small" sx={{ bgcolor: statusColors.bg, color: statusColors.text, fontWeight: 700, fontSize: '0.7rem', alignSelf: 'flex-start', mb: 2 }} />
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
+                    <Chip label={statusColors.label} size="small" sx={{ bgcolor: statusColors.bg, color: statusColors.text, fontWeight: 700, fontSize: '0.7rem' }} />
+                    <Chip 
+                      label={product.approvalStatus === 'approved' ? 'Approved' : product.approvalStatus === 'rejected' ? 'Rejected' : 'Pending Approval'} 
+                      size="small" 
+                      title={product.approvalStatus === 'rejected' ? `Reason: ${product.approvalRejectionReason || 'No reason provided'}` : ''}
+                      sx={{ 
+                        bgcolor: product.approvalStatus === 'approved' ? '#DCFCE7' : product.approvalStatus === 'rejected' ? '#FEE2E2' : '#FEF3C7', 
+                        color: product.approvalStatus === 'approved' ? '#166534' : product.approvalStatus === 'rejected' ? '#B91C1C' : '#D97706', 
+                        fontWeight: 700, 
+                        fontSize: '0.7rem' 
+                      }} 
+                    />
+                  </Box>
+                  {product.approvalStatus === 'rejected' && (
+                    <Typography variant="caption" color="error" sx={{ display: 'block', mt: -1, mb: 1, fontWeight: 600 }}>
+                      Reason: {product.approvalRejectionReason || 'No reason provided'}
+                    </Typography>
+                  )}
 
                   <Box sx={{ mt: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #F3F4F6', pt: 1.5 }}>
                     <Typography variant="h6" fontWeight={800} color="#3B82F6">₹{product.price}</Typography>

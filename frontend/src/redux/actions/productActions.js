@@ -39,6 +39,12 @@ import {
   FORUM_MESSAGES_REQUEST,
   FORUM_MESSAGES_SUCCESS,
   FORUM_MESSAGES_FAIL,
+  PRODUCT_APPROVE_REQUEST,
+  PRODUCT_APPROVE_SUCCESS,
+  PRODUCT_APPROVE_FAIL,
+  PRODUCT_LIST_PENDING_REQUEST,
+  PRODUCT_LIST_PENDING_SUCCESS,
+  PRODUCT_LIST_PENDING_FAIL,
 } from '../constants/productConstants';
 import handleApiError from '../../utils/handleApiError';
 
@@ -417,6 +423,52 @@ export const listForumMessages = () => async (dispatch, getState) => {
   } catch (error) {
     dispatch({
       type: FORUM_MESSAGES_FAIL,
+      payload: error.response?.data?.message || error.message,
+    });
+  }
+};
+
+// =======================
+// Admin Product Approval
+// =======================
+
+export const listPendingProducts = () => async (dispatch, getState) => {
+  try {
+    dispatch({ type: PRODUCT_LIST_PENDING_REQUEST });
+
+    const {
+      userLogin: { userInfo },
+    } = getState();
+
+    const { data } = await api.get('/api/products/admin/pending', {
+      headers: { Authorization: `Bearer ${userInfo?.token || ''}` },
+    });
+
+    dispatch({ type: PRODUCT_LIST_PENDING_SUCCESS, payload: data });
+  } catch (error) {
+    dispatch({
+      type: PRODUCT_LIST_PENDING_FAIL,
+      payload: error.response?.data?.message || error.message,
+    });
+  }
+};
+
+export const approveProduct = (id, status, reason = '') => async (dispatch, getState) => {
+  try {
+    dispatch({ type: PRODUCT_APPROVE_REQUEST });
+
+    const {
+      userLogin: { userInfo },
+    } = getState();
+
+    const { data } = await api.put(`/api/products/${id}/approve`, { status, reason }, {
+      headers: { Authorization: `Bearer ${userInfo?.token || ''}` },
+    });
+
+    dispatch({ type: PRODUCT_APPROVE_SUCCESS, payload: data });
+  } catch (error) {
+    dispatch({
+      type: PRODUCT_APPROVE_FAIL,
       payload: error.response?.data?.message || error.message,
     });
   }
