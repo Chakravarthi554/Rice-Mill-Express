@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import ProductSelectionModal from '../components/ProductSelectionModal';
+import ProductSelectionModal from './ProductSelectionModal';
 
 test('renders product selection modal', () => {
   render(

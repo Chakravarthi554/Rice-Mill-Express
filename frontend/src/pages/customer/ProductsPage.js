@@ -3,21 +3,33 @@ import Header from '../../components/common/Header';
 import ProductFilter from '../../components/common/ProductFilter';
 import { Box, Container, Paper, Typography } from '@mui/material';
 
+// Theme & Tokens
+import { colors, radius } from '../../theme/designTokens';
+
 const ProductsPage = () => {
     return (
-        <Box sx={{ minHeight: '100vh', bgcolor: '#F9FAFB' }}>
+        <Box sx={{ minHeight: '100vh', bgcolor: colors.surface.default }}>
             <Header />
-            <Container maxWidth="xl" sx={{ pt: 3, pb: 6 }}>
-                <Paper elevation={0} sx={{ p: 0, borderRadius: 3, overflow: 'hidden', border: '1px solid #F3F4F6' }}>
-                    <Box sx={{ bgcolor: '#fff', p: 3, borderBottom: '1px solid #F3F4F6' }}>
-                        <Typography variant="h5" fontWeight={700} color="text.primary">
-                            All Products & Offers
+            <Container maxWidth="xl" sx={{ pt: 4, pb: 8 }}>
+                <Paper
+                    elevation={0}
+                    sx={{
+                        p: 0,
+                        borderRadius: radius.xl,
+                        overflow: 'hidden',
+                        border: `1px solid ${colors.neutral[100]}`,
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.03)'
+                    }}
+                >
+                    <Box sx={{ bgcolor: '#fff', p: { xs: 3, md: 5 }, borderBottom: `1px solid ${colors.neutral[100]}` }}>
+                        <Typography variant="h2" sx={{ fontWeight: 800, color: colors.neutral[900], mb: 1 }}>
+                            Premium Collection
                         </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                            Browse our complete catalog and find the best deals.
+                        <Typography variant="body1" sx={{ color: colors.neutral[500], maxWidth: 700 }}>
+                            Directly from the finest mills to your kitchen. Explore our curated selection of Basmati, Sona Masoori, and Organic rice.
                         </Typography>
                     </Box>
-                    <Box sx={{ p: 3 }}>
+                    <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: colors.surface.default }}>
                         <ProductFilter />
                     </Box>
                 </Paper>
