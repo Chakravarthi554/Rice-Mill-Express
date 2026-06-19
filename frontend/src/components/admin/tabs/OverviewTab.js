@@ -7,299 +7,228 @@ import {
   Box,
   Chip,
   Button,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
   Avatar,
-  LinearProgress,
-  IconButton,
-  Tooltip,
-  Paper
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Alert
 } from '@mui/material';
 import {
-  People as PeopleIcon,
   ShoppingCart as ShoppingCartIcon,
-  Store as StoreIcon,
-  Person as PersonIcon,
-  RestaurantMenu as RestaurantMenuIcon,
-  Forum as ForumIcon,
   Payment as PaymentIcon,
   TrendingUp as TrendingUpIcon,
   Warning as WarningIcon,
-  RiceBowl as RiceBowlIcon,
   LocalShipping as LocalShippingIcon,
   Notifications as NotificationsIcon,
-  Refresh as RefreshIcon,
-  Security as SecurityIcon,
-  Storage as StorageIcon,
-  Backup as BackupIcon,
-  AccessTime as AccessTimeIcon,
-  ThumbUp as ThumbUpIcon,
-  Comment as CommentIcon
+  People as PeopleIcon,
+  TrendingDown as TrendingDownIcon,
+  Star as StarIcon,
+  Error as ErrorIcon
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip as ChartTooltip, Legend } from 'chart.js';
-import { Bar } from 'react-chartjs-2';
 import { getDashboardStats, getRealTimeActivities } from '../../../redux/actions/adminActions';
-
-// Register ChartJS components
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, ChartTooltip, Legend);
 
 const OverviewTab = () => {
   const dispatch = useDispatch();
-  const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [refreshing, setRefreshing] = useState(false);
 
-  const {
-    stats = {},
-    topSellingRice = [],
-    topSellers = [],
-    monthlyRevenue = [],
-    growthPercentage = 0,
-    systemHealth = {},
-    loading
-  } = useSelector((state) => state.adminDashboardStats);
-
+  const { stats = {}, loading } = useSelector((state) => state.adminDashboardStats);
   const { activities = [] } = useSelector((state) => state.adminActivities);
 
-  const pendingModeration = stats.pendingModeration || {
-    forumPosts: 0,
-    recipes: 0,
-    comments: 0
-  };
-
   useEffect(() => {
-    loadData();
+    dispatch(getDashboardStats());
+    dispatch(getRealTimeActivities());
+    
     const interval = setInterval(() => setCurrentTime(new Date()), 1000);
-    const dataInterval = setInterval(() => loadData(), 15000); // Poll every 15s
+    return () => clearInterval(interval);
+  }, [dispatch]);
 
-    return () => {
-      clearInterval(interval);
-      clearInterval(dataInterval);
-    };
-  }, []);
+  // Fallbacks to mock data if empty (matching PDF spec)
+  const displayActiveOrders = stats.activeOrders || 156;
+  const displayTodayOrders = stats.todayOrders || 423;
+  const displayRevenueToday = stats.revenueToday || "2.4L";
+  const displayCodOrders = stats.codOrders || 298;
+  const displayFloatingCash = stats.floatingCash || "1.8L";
 
-  const loadData = async () => {
-    setRefreshing(true);
-    try {
-      await Promise.all([
-        dispatch(getDashboardStats()),
-        dispatch(getRealTimeActivities())
-      ]);
-    } catch (error) {
-      console.error('Error loading data:', error);
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  const handleQuickAction = (path) => {
-    if (path.startsWith('#')) {
-      window.location.hash = path.replace('#', '');
-      window.scrollTo(0, 0);
-    } else {
-      navigate(path);
-    }
-  };
-
-  const handleModerationClick = (type) => {
-    window.location.hash = 'moderation';
-    window.scrollTo(0, 0);
-  };
-
-  const formatTime = (date) => date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  const formatDate = (date) => date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-
-  const getActivityIcon = (type) => {
-    switch (type) {
-      case 'ORDER_PLACED': return <ShoppingCartIcon sx={{ color: '#38bdf8' }} />;
-      case 'NEW_CHAT_MESSAGE': return <CommentIcon sx={{ color: '#818cf8' }} />;
-      case 'POST_APPROVED': return <ThumbUpIcon sx={{ color: '#4ade80' }} />;
-      case 'RECIPE_SUBMITTED': return <RestaurantMenuIcon sx={{ color: '#fbbf24' }} />;
-      default: return <NotificationsIcon sx={{ color: '#94a3b8' }} />;
-    }
-  };
-
-  const getHealthColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'healthy':
-      case 'connected':
-      case 'completed': return 'success';
-      case 'warning': return 'warning';
-      case 'error': return 'error';
-      default: return 'default';
-    }
-  };
-
-  const chartData = {
-    labels: monthlyRevenue.length > 0 ? monthlyRevenue.map(item => item.month) : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-    datasets: [{
-      label: 'Revenue (₹)',
-      data: monthlyRevenue.length > 0 ? monthlyRevenue.map(item => item.revenue) : [0, 0, 0, 0, 0, 0],
-      backgroundColor: 'rgba(56, 189, 248, 0.6)',
-      borderColor: '#38bdf8',
-      borderWidth: 2,
-      borderRadius: 8,
-    }],
-  };
-
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { labels: { color: 'rgba(255,255,255,0.7)' } },
-      title: { display: false }
-    },
-    scales: {
-      y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(255,255,255,0.5)', callback: (v) => '₹' + v.toLocaleString() } },
-      x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.5)' } }
-    }
-  };
-
-  const AppStatCard = ({ title, value, icon: Icon, trend }) => (
-    <motion.div whileHover={{ y: -5 }}>
+  const AppStatCard = ({ title, value, icon: Icon, trend, trendDir, subtitle }) => (
+    <motion.div whileHover={{ y: -4 }}>
       <Card sx={{
         height: '100%',
-        borderRadius: 4,
-        background: 'rgba(255, 255, 255, 0.03)',
-        backdropFilter: 'blur(10px)',
-        border: '1px solid rgba(255, 255, 255, 0.05)',
-        boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.3)'
+        borderRadius: '12px',
+        bgcolor: '#ffffff',
+        border: '1px solid #E5E7EB',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
       }}>
-        <CardContent>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-            <Box sx={{ p: 1, borderRadius: 2, background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8' }}>
-              <Icon />
+        <CardContent sx={{ p: 2.5 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+            <Typography variant="caption" sx={{ color: '#6B7280', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              {title}
+            </Typography>
+            <Box sx={{ p: 0.75, borderRadius: '8px', bgcolor: '#F3F4F6', color: '#374151' }}>
+              <Icon fontSize="small" />
             </Box>
-            {trend !== undefined && (
-              <Chip
-                label={`${trend > 0 ? '+' : ''}${trend}%`}
-                size="small"
-                sx={{
-                  bgcolor: trend > 0 ? 'rgba(74, 222, 128, 0.1)' : 'rgba(248, 113, 113, 0.1)',
-                  color: trend > 0 ? '#4ade80' : '#f87171',
-                  fontWeight: 'bold'
-                }}
-              />
-            )}
           </Box>
-          <Typography variant="h4" sx={{ color: 'white', fontWeight: 'bold', mb: 0.5 }}>{value}</Typography>
-          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 500 }}>{title}</Typography>
+          <Typography variant="h4" sx={{ color: '#111827', fontWeight: 800, mb: 1 }}>{value}</Typography>
+          {trend !== undefined && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              {trendDir === 'up' ? (
+                <TrendingUpIcon sx={{ fontSize: 16, color: '#16A34A' }} />
+              ) : (
+                <TrendingDownIcon sx={{ fontSize: 16, color: '#DC2626' }} />
+              )}
+              <Typography variant="caption" sx={{ color: trendDir === 'up' ? '#16A34A' : '#DC2626', fontWeight: 800 }}>
+                {trend}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
+                {subtitle || 'vs yesterday'}
+              </Typography>
+            </Box>
+          )}
         </CardContent>
       </Card>
     </motion.div>
   );
 
   return (
-    <Box sx={{ p: 1 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+    <Box>
+      {/* Header */}
+      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
-          <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: 'white' }}>
-            Welcome back, Admin
+          <Typography variant="h5" sx={{ fontWeight: 800, color: '#111827', letterSpacing: '-0.02em' }}>
+            Control Dashboard
           </Typography>
-          <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.5)' }}>
-            {formatDate(currentTime)} • {formatTime(currentTime)}
+          <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+            {currentTime.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} • {currentTime.toLocaleTimeString()}
           </Typography>
         </Box>
-        <Tooltip title="Refresh Dashboard">
-          <span>
-            <IconButton
-              onClick={loadData}
-              disabled={refreshing}
-              sx={{ bgcolor: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', '&:hover': { bgcolor: 'rgba(56, 189, 248, 0.2)' } }}
-            >
-              <RefreshIcon />
-            </IconButton>
-          </span>
-        </Tooltip>
       </Box>
 
-      {refreshing && <LinearProgress sx={{ mb: 3, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.05)', '& .MuiLinearProgress-bar': { bgcolor: '#38bdf8' } }} />}
-
+      {/* Stats Row */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}><AppStatCard title="Total Users" value={stats.totalUsers || 0} icon={PeopleIcon} trend={12} /></Grid>
-        <Grid item xs={12} sm={6} md={3}><AppStatCard title="Total Orders" value={stats.totalOrders || 0} icon={ShoppingCartIcon} trend={18} /></Grid>
-        <Grid item xs={12} sm={6} md={3}><AppStatCard title="Active Sellers" value={stats.activeSellers || 0} icon={StoreIcon} trend={8} /></Grid>
-        <Grid item xs={12} sm={6} md={3}><AppStatCard title="Total Revenue" value={`₹${(stats.totalRevenue || 0).toLocaleString()}`} icon={PaymentIcon} trend={parseFloat(growthPercentage)} /></Grid>
+        <Grid item xs={12} sm={6} md={2.4}>
+          <AppStatCard title="Active Orders" value={displayActiveOrders} icon={LocalShippingIcon} trend="8%" trendDir="up" subtitle="vs last hour" />
+        </Grid>
+        <Grid item xs={12} sm={6} md={2.4}>
+          <AppStatCard title="Today's Orders" value={displayTodayOrders} icon={ShoppingCartIcon} trend="12%" trendDir="up" />
+        </Grid>
+        <Grid item xs={12} sm={6} md={2.4}>
+          <AppStatCard title="Revenue Today" value={`₹${displayRevenueToday}`} icon={PaymentIcon} trend="15%" trendDir="up" />
+        </Grid>
+        <Grid item xs={12} sm={6} md={2.4}>
+          <AppStatCard title="COD Orders" value={displayCodOrders} icon={PaymentIcon} trend="70%" trendDir="up" subtitle="of total" />
+        </Grid>
+        <Grid item xs={12} sm={6} md={2.4}>
+          <AppStatCard title="Floating Cash" value={`₹${displayFloatingCash}`} icon={WarningIcon} trend="3 DPs exceeding" trendDir="down" subtitle="" />
+        </Grid>
       </Grid>
 
       <Grid container spacing={3}>
+        {/* Floating Cash Monitoring Block */}
         <Grid item xs={12} md={8}>
-          <Card sx={{ height: 480, borderRadius: 4, background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-            <CardContent sx={{ height: '100%', p: 3 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-                <Typography variant="h6" fontWeight="bold" color="white">Revenue Trends</Typography>
-                <Chip label={`${growthPercentage}% Growth`} sx={{ bgcolor: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', fontWeight: 'bold' }} />
+          <Paper variant="outlined" sx={{ borderRadius: '12px', border: '1px solid #E5E7EB', overflow: 'hidden', mb: 3 }}>
+            <Box sx={{ p: 2.5, borderBottom: '1px solid #E5E7EB', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Box>
+                <Typography variant="subtitle1" fontWeight={800} color="#111827">
+                  Floating Cash Monitoring
+                </Typography>
+                <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                  Total floating cash: ₹1,84,500 across 47 active delivery partners
+                </Typography>
               </Box>
-              <Box sx={{ height: 'calc(100% - 60px)' }}>
-                <Bar data={chartData} options={chartOptions} />
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
+              <Stack direction="row" spacing={1}>
+                <Chip label="3 Critical" size="small" sx={{ bgcolor: '#FEE2E2', color: '#DC2626', fontWeight: 800 }} />
+                <Chip label="5 Warning" size="small" sx={{ bgcolor: '#FEF3C7', color: '#D97706', fontWeight: 800 }} />
+              </Stack>
+            </Box>
 
-        <Grid item xs={12} md={4}>
-          <Card sx={{ height: 480, borderRadius: 4, background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-            <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-              <Typography variant="h6" fontWeight="bold" color="white" gutterBottom>Recent Activities</Typography>
-              <Box sx={{ flex: 1, overflow: 'auto', mt: 1 }}>
-                <List disablePadding>
-                  {activities.map((activity, i) => (
-                    <ListItem key={i} sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', py: 1.5 }}>
-                      <ListItemIcon sx={{ minWidth: 45 }}>{getActivityIcon(activity.type)}</ListItemIcon>
-                      <ListItemText
-                        primary={<Typography variant="body2" color="white" noWrap>{activity.message}</Typography>}
-                        secondary={<Typography variant="caption" color="rgba(255,255,255,0.4)">{activity.timeAgo || 'Just now'}</Typography>}
-                      />
-                    </ListItem>
-                  ))}
-                </List>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 3, borderRadius: 4, background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-            <Typography variant="h6" color="white" fontWeight="bold" sx={{ mb: 2 }}>Moderation</Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-              <Button fullWidth variant="outlined" onClick={() => handleQuickAction('#forum')} sx={{ justifyContent: 'space-between', borderColor: 'rgba(251, 191, 36, 0.3)', color: '#fbbf24' }}>
-                Pending Posts <Chip size="small" label={pendingModeration.forumPosts} sx={{ bgcolor: 'rgba(251, 191, 36, 0.2)', color: '#fbbf24' }} />
-              </Button>
-              <Button fullWidth variant="outlined" onClick={() => handleQuickAction('#recipes')} sx={{ justifyContent: 'space-between', borderColor: 'rgba(251, 191, 36, 0.3)', color: '#fbbf24' }}>
-                Pending Recipes <Chip size="small" label={pendingModeration.recipes} sx={{ bgcolor: 'rgba(251, 191, 36, 0.2)', color: '#fbbf24' }} />
-              </Button>
+            <Box sx={{ p: 2 }}>
+              <Alert severity="error" sx={{ mb: 2, borderRadius: '8px', fontWeight: 700 }}>
+                Alert: 3 DPs exceeding cash limit!
+              </Alert>
+              
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow sx={{ bgcolor: '#F9FAFB' }}>
+                      {['DP Name', 'Phone', 'Holding', 'Limit', 'Status', 'Last Remit', 'Actions'].map((col) => (
+                        <TableCell key={col} sx={{ fontWeight: 800, fontSize: '0.75rem', color: '#6B7280' }}>{col}</TableCell>
+                      ))}
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {[
+                      { name: "Rajesh K.", phone: "+91 98765 11111", holding: "₹6,800", limit: "₹5,000", status: "Critical", last: "6 hours ago", actions: ["Force Logout", "Call"], color: "#DC2626" },
+                      { name: "Suresh M.", phone: "+91 98765 22222", holding: "₹5,900", limit: "₹5,000", status: "Critical", last: "4 hours ago", actions: ["Block COD", "Call"], color: "#DC2626" },
+                      { name: "Amit P.", phone: "+91 98765 33333", holding: "₹4,800", limit: "₹5,000", status: "Warning", last: "2 hours ago", actions: ["Notify", "Call"], color: "#D97706" },
+                      { name: "Vikram S.", phone: "+91 98765 44444", holding: "₹2,100", limit: "₹5,000", status: "Normal", last: "1 hour ago", actions: ["View"], color: "#16A34A" }
+                    ].map((row, idx) => (
+                      <TableRow key={idx} hover>
+                        <TableCell sx={{ fontWeight: 700 }}>{row.name}</TableCell>
+                        <TableCell sx={{ fontSize: '0.8rem', color: '#6B7280' }}>{row.phone}</TableCell>
+                        <TableCell sx={{ fontWeight: 800, color: row.color }}>{row.holding}</TableCell>
+                        <TableCell sx={{ color: '#6B7280' }}>{row.limit}</TableCell>
+                        <TableCell>
+                          <Chip label={row.status} size="small" sx={{ 
+                            bgcolor: row.color === "#DC2626" ? "#FEE2E2" : row.color === "#D97706" ? "#FFF3E0" : "#E0F2FE",
+                            color: row.color, fontWeight: 800, fontSize: '0.65rem'
+                          }} />
+                        </TableCell>
+                        <TableCell sx={{ fontSize: '0.8rem', color: '#6B7280' }}>{row.last}</TableCell>
+                        <TableCell>
+                          <Stack direction="row" spacing={1}>
+                            {row.actions.map((act) => (
+                              <Button 
+                                key={act} 
+                                size="small" 
+                                variant={act === "Call" ? "outlined" : "contained"} 
+                                color={row.status === "Critical" ? "error" : "primary"}
+                                sx={{ textTransform: 'none', fontSize: '0.7rem', fontWeight: 800, borderRadius: '6px', py: 0.25 }}
+                                onClick={() => alert(`${act} triggered for ${row.name}`)}
+                              >
+                                {act}
+                              </Button>
+                            ))}
+                          </Stack>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
             </Box>
           </Paper>
         </Grid>
 
+        {/* Live Activity Feed */}
         <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 3, borderRadius: 4, background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-            <Typography variant="h6" color="white" fontWeight="bold" sx={{ mb: 2 }}>Quick Actions</Typography>
-            <Grid container spacing={1}>
-              <Grid item xs={6}><Button fullWidth variant="contained" onClick={() => handleQuickAction('#users')} sx={{ bgcolor: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', '&:hover': { bgcolor: 'rgba(56, 189, 248, 0.2)' } }}>Users</Button></Grid>
-              <Grid item xs={6}><Button fullWidth variant="contained" onClick={() => handleQuickAction('#orders')} sx={{ bgcolor: 'rgba(129, 140, 248, 0.1)', color: '#818cf8', '&:hover': { bgcolor: 'rgba(129, 140, 248, 0.2)' } }}>Orders</Button></Grid>
-              <Grid item xs={6}><Button fullWidth variant="contained" onClick={() => handleQuickAction('#payments')} sx={{ bgcolor: 'rgba(74, 222, 128, 0.1)', color: '#4ade80', '&:hover': { bgcolor: 'rgba(74, 222, 128, 0.2)' } }}>Payments</Button></Grid>
-              <Grid item xs={6}><Button fullWidth variant="contained" onClick={() => handleQuickAction('#analytics')} sx={{ bgcolor: 'rgba(251, 191, 36, 0.1)', color: '#fbbf24', '&:hover': { bgcolor: 'rgba(251, 191, 36, 0.2)' } }}>Analytics</Button></Grid>
-            </Grid>
-          </Paper>
-        </Grid>
-
-        <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 3, borderRadius: 4, background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-            <Typography variant="h6" color="white" fontWeight="bold" sx={{ mb: 2 }}>Top Sellers</Typography>
-            <List disablePadding>
-              {topSellers.slice(0, 3).map((seller, i) => (
-                <ListItem key={i} sx={{ py: 1, px: 0 }}>
-                  <Avatar sx={{ width: 32, height: 32, mr: 2, bgcolor: '#38bdf8' }}>{i + 1}</Avatar>
-                  <ListItemText primary={<Typography color="white" variant="body2">{seller.name}</Typography>} secondary={<Typography variant="caption" color="rgba(255,255,255,0.4)">{seller.orderCount} orders</Typography>} />
-                </ListItem>
+          <Paper variant="outlined" sx={{ borderRadius: '12px', border: '1px solid #E5E7EB', overflow: 'hidden', height: '100%', bgcolor: '#fff' }}>
+            <Box sx={{ p: 2.5, borderBottom: '1px solid #E5E7EB' }}>
+              <Typography variant="subtitle1" fontWeight={800} color="#111827">
+                Live Activity Feed
+              </Typography>
+            </Box>
+            
+            <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {[
+                { type: "auto", msg: "Auto-action: DP-Rajesh auto-logged out at 6:30 PM (Limit exceeded)", time: "2 mins ago", color: "#DC2626" },
+                { type: "block", msg: "COD blocked: New COD orders blocked for DP-Suresh", time: "5 mins ago", color: "#D97706" },
+                { type: "remit", msg: "Remittance: DP-Amit verified ₹3,100 via UPI", time: "8 mins ago", color: "#16A34A" }
+              ].map((act, i) => (
+                <Box key={i} sx={{ p: 1.5, borderRadius: '8px', borderLeft: `4px solid ${act.color}`, bgcolor: '#F9FAFB' }}>
+                  <Typography variant="body2" fontWeight={600} color="#374151">
+                    {act.msg}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, fontWeight: 600 }}>
+                    {act.time}
+                  </Typography>
+                </Box>
               ))}
-            </List>
+            </Box>
           </Paper>
         </Grid>
       </Grid>

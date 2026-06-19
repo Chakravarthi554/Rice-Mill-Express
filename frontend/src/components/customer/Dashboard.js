@@ -1,10 +1,11 @@
-// [Premium Figma-level Redesign — Customer Dashboard (Web)]
-// Refactored to use premium UI components from the design system
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { Box, Container, Grid } from '@mui/material';
-import { useTranslation } from 'react-i18next';
+import { Box, Container, Grid, Typography, IconButton, InputBase, Paper, Chip } from '@mui/material';
+import { 
+  PinDrop, Notifications, Search, ShoppingBag, 
+  Favorite, LocalOffer, Person, ChevronRight 
+} from '@mui/icons-material';
 
 // Redux Actions
 import { listProducts } from '../../redux/actions/productActions';
@@ -26,21 +27,21 @@ import { getImageUrl } from '../../utils/urlHelper';
 import { spacing, colors, tints } from '../../theme/designTokens';
 
 const CATEGORIES = [
-    { id: 'basmati', name: 'Basmati Rice', emoji: '🍚', bg: tints.orange, color: '#EA580C' },
-    { id: 'sona', name: 'Sona Masoori', emoji: '🌾', bg: tints.green, color: '#16A34A' },
-    { id: 'kolam', name: 'Kolam Rice', emoji: '🥣', bg: tints.blue, color: '#3B82F6' },
+    { id: 'basmati', name: 'Basmati', emoji: '🍚', bg: tints.orange, color: '#E65100' },
+    { id: 'sona', name: 'Sona Masuri', emoji: '🌾', bg: tints.green, color: '#2E7D32' },
+    { id: 'kolam', name: 'Kolam', emoji: '🥣', bg: tints.blue, color: '#1565C0' },
     { id: 'brown', name: 'Brown Rice', emoji: '🌿', bg: tints.purple, color: '#7C3AED' },
-    { id: 'organic', name: 'Organic', emoji: '🍃', bg: tints.green, color: '#16A34A' },
+    { id: 'organic', name: 'Organic', emoji: '🍃', bg: tints.green, color: '#2E7D32' },
     { id: 'bulk', name: 'Wholesale', emoji: '📦', bg: tints.yellow, color: '#CA8A04' },
 ];
 
 const BANNERS = [
     { 
       id: 1, 
-      title: 'Festival Special', 
-      subtitle: '20% OFF on Bulk Basmati Orders!', 
+      title: 'FESTIVAL OFFER', 
+      subtitle: '20% OFF on all premium rice varieties', 
       ctaText: 'Shop Now', 
-      bgGradient: 'linear-gradient(135deg, #F97316 0%, #FB923C 100%)', 
+      bgGradient: 'linear-gradient(135deg, #FF6D00 0%, #FF9100 100%)', 
       emoji: '🎉',
       onClick: () => {} 
     },
@@ -49,7 +50,7 @@ const BANNERS = [
       title: 'New Harvest Season', 
       subtitle: 'Fresh Sona Masoori just arrived!', 
       ctaText: 'Explore Now', 
-      bgGradient: 'linear-gradient(135deg, #16A34A 0%, #22C55E 100%)', 
+      bgGradient: 'linear-gradient(135deg, #2E7D32 0%, #4CAF50 100%)', 
       emoji: '🌾',
       onClick: () => {} 
     },
@@ -58,7 +59,7 @@ const BANNERS = [
       title: 'Free Delivery', 
       subtitle: 'On all orders above ₹500!', 
       ctaText: 'Order Now', 
-      bgGradient: 'linear-gradient(135deg, #4F46E5 0%, #6366F1 100%)', 
+      bgGradient: 'linear-gradient(135deg, #1565C0 0%, #1976D2 100%)', 
       emoji: '🚚',
       onClick: () => {} 
     },
@@ -67,79 +68,126 @@ const BANNERS = [
 const Dashboard = () => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
-    const { t } = useTranslation();
     
     const [activeCategory, setActiveCategory] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [timeLeft, setTimeLeft] = useState(9930); // 2h 45m 30s countdown
 
     const { loading: productLoading, error: productError, products = [] } = useSelector((state) => state.productList || {});
     const { wishlistItems = [] } = useSelector(state => state.wishlist || {});
 
-    // Recently Viewed (Mocked with local storage for now)
+    // Recently Viewed
     const [recentlyViewed, setRecentlyViewed] = useState([]);
 
     useEffect(() => {
-<<<<<<< HEAD
         dispatch(listProducts({ limit: 40 }));
         const viewed = JSON.parse(localStorage.getItem('recentlyViewed') || '[]');
         setRecentlyViewed(viewed);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-=======
-      dispatch(listProducts());
-      // eslint-disable-next-line react-hooks/exhaustive-deps
->>>>>>> a66af4ba90d62021e80410263e806adc23403bd9
     }, [dispatch]);
 
+    // Flash Sale Timer countdown
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setTimeLeft(prev => prev > 0 ? prev - 1 : 9930);
+        }, 1000);
+        return () => clearInterval(timer);
+    }, []);
+
+    const formatTime = (seconds) => {
+        const hrs = Math.floor(seconds / 3600);
+        const mins = Math.floor((seconds % 3600) / 60);
+        const secs = seconds % 60;
+        return [
+            hrs.toString().padStart(2, '0'),
+            mins.toString().padStart(2, '0'),
+            secs.toString().padStart(2, '0')
+        ].join(':');
+    };
+
     const handleAddToCart = async (productId) => {
-        try { await dispatch(addToCart(productId, 1)); }
-        catch (err) { alert(err.message || 'Failed to add to cart'); }
+        try { 
+            await dispatch(addToCart(productId, 1)); 
+        } catch (err) { 
+            alert(err.message || 'Failed to add to cart'); 
+        }
     };
 
     const handleAddToWishlist = async (productId) => {
-        try { await dispatch(addToWishlist(productId)); }
-        catch (err) { alert(err.message || 'Failed to add to wishlist'); }
+        try { 
+            await dispatch(addToWishlist(productId)); 
+        } catch (err) { 
+            alert(err.message || 'Failed to add to wishlist'); 
+        }
     };
 
     const isWishlisted = (id) => wishlistItems.some(x => (x._id || x) === id);
 
+    const handleSearchSubmit = (e) => {
+        e.preventDefault();
+        if (searchQuery.trim()) {
+            navigate(`/products?search=${searchQuery}`);
+        }
+    };
+
+    // Filter products
     const filteredProducts = activeCategory
         ? products.filter(p => p.category?.toLowerCase().includes(activeCategory) || p.name?.toLowerCase().includes(activeCategory))
         : products;
 
-    // derived collections
     const bestSellers = useMemo(() => [...products].sort((a, b) => (b.numReviews || 0) - (a.numReviews || 0)).slice(0, 8), [products]);
     const trendingProducts = useMemo(() => [...products].sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 8), [products]);
     const organicRice = useMemo(() => products.filter(p => p.category?.toLowerCase().includes('organic') || p.name?.toLowerCase().includes('organic')).slice(0, 8), [products]);
     const wholesaleRice = useMemo(() => products.filter(p => p.category?.toLowerCase().includes('bulk') || p.category?.toLowerCase().includes('wholesale') || (p.minQty && p.minQty > 10)).slice(0, 8), [products]);
     const todaysOffers = useMemo(() => products.filter(p => p.offerPrice && p.offerPrice < p.price).slice(0, 8), [products]);
-    const seasonalPromotions = useMemo(() => products.slice(10, 18), [products]); // Fallback mock
-    const recommendedProducts = useMemo(() => [...products].sort(() => 0.5 - Math.random()).slice(0, 8), [products]);
 
-    const renderProductRow = (title, subtitle, items, viewAllPath = '/products') => {
+    const renderProductRow = (title, subtitle, items, isFlashSale = false) => {
         if (items.length === 0) return null;
         return (
-            <Box sx={{ mb: spacing.section }}>
-                <SectionHeader
-                    title={title}
-                    subtitle={subtitle}
-                    action={{ label: "View All", onClick: () => navigate(viewAllPath) }}
-                />
-                <Box sx={{ display: 'flex', gap: 3, overflowX: 'auto', pb: 2, px: 1, mx: -1, '&::-webkit-scrollbar': { display: 'none' } }}>
+            <Box sx={{ mb: 4 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Typography variant="h5" fontWeight={800} color="#1F2937" sx={{ letterSpacing: '-0.02em' }}>
+                            {title}
+                        </Typography>
+                        {isFlashSale && (
+                            <Box sx={{ 
+                                bgcolor: '#E65100', color: '#fff', px: 1.5, py: 0.5, 
+                                borderRadius: '6px', fontSize: '0.85rem', fontWeight: 800,
+                                fontFamily: 'monospace', letterSpacing: 0.5
+                            }}>
+                                {formatTime(timeLeft)}
+                            </Box>
+                        )}
+                    </Box>
+                    <IconButton size="small" onClick={() => navigate('/products')} sx={{ color: '#2E7D32' }}>
+                        <ChevronRight />
+                    </IconButton>
+                </Box>
+
+                <Box sx={{ 
+                    display: 'flex', 
+                    gap: 2, 
+                    overflowX: 'auto', 
+                    pb: 1.5, 
+                    px: 0.5,
+                    mx: -0.5,
+                    '&::-webkit-scrollbar': { display: 'none' } 
+                }}>
                     {items.map(product => {
                         const hasOffer = typeof product.offerPrice === 'number' && product.offerPrice > 0 && product.offerPrice < product.price;
                         const displayPrice = hasOffer ? product.offerPrice : product.price;
                         const discount = hasOffer ? Math.round((1 - product.offerPrice / product.price) * 100) : 0;
-                        const rating = product.rating || (Math.random() * 1 + 4).toFixed(1);
                         return (
-                            <Box key={product._id} sx={{ minWidth: 260, flexShrink: 0 }}>
+                            <Box key={product._id} sx={{ width: 170, flexShrink: 0 }}>
                                 <ProductCard
                                     product={{
                                         _id: product._id,
                                         name: product.name,
-                                        image: getImageUrl(product.images?.[0]),
+                                        image: getImageUrl(product.images?.[0] || product.image),
                                         price: displayPrice || 0,
                                         mrp: hasOffer ? product.price : null,
                                         discount: discount,
-                                        rating: Number(rating),
+                                        rating: Number(product.rating || 0),
                                         countInStock: product.countInStock
                                     }}
                                     wishlisted={isWishlisted(product._id)}
@@ -156,121 +204,195 @@ const Dashboard = () => {
     };
 
     return (
-        <Box sx={{ bgcolor: colors.surface.default, minHeight: '100vh', pb: 8 }}>
-            <Container maxWidth="xl" sx={{ pt: 4 }}>
+        <Box sx={{ bgcolor: '#F9FAFB', minHeight: '100vh', pb: 8 }}>
+            
+            {/* ── TOP BAR (Location & Notification) ── */}
+            <Box sx={{ bgcolor: '#fff', px: 2, py: 1.5, borderBottom: '1px solid #F3F4F6' }}>
+                <Container maxWidth="xl" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: '0 !important' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <PinDrop sx={{ color: '#2E7D32' }} />
+                        <Box>
+                            <Typography sx={{ fontSize: '0.72rem', color: '#9CA3AF', fontWeight: 600 }}>DELIVER TO</Typography>
+                            <Typography sx={{ fontSize: '0.9rem', fontWeight: 800, color: '#1F2937', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                Home <span style={{ fontSize: '0.6rem', color: '#2E7D32' }}>▼</span>
+                            </Typography>
+                        </Box>
+                    </Box>
+                    <IconButton onClick={() => navigate('/notifications')} sx={{ bgcolor: '#F9FAFB' }}>
+                        <Notifications sx={{ color: '#1F2937' }} />
+                    </IconButton>
+                </Container>
+            </Box>
+
+            {/* ── SEARCH BAR ── */}
+            <Box sx={{ bgcolor: '#fff', px: 2, py: 1.5, mb: 2 }}>
+                <Container maxWidth="xl" sx={{ p: '0 !important' }}>
+                    <form onSubmit={handleSearchSubmit}>
+                        <Box sx={{ 
+                            display: 'flex', alignItems: 'center', bgcolor: '#F3F4F6', 
+                            height: 48, borderRadius: '24px', px: 2 
+                        }}>
+                            <Search sx={{ color: '#9CA3AF', mr: 1 }} />
+                            <InputBase 
+                                fullWidth
+                                placeholder="Search basmati rice, organic grains, bulk packs..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                sx={{ fontSize: '0.9rem', fontWeight: 600 }}
+                            />
+                        </Box>
+                    </form>
+                </Container>
+            </Box>
+
+            <Container maxWidth="xl" sx={{ px: 2 }}>
                 
                 {/* ── HERO CAROUSEL ── */}
-                <Box sx={{ mb: spacing.xl }}>
+                <Box sx={{ mb: 4, borderRadius: '16px', overflow: 'hidden' }}>
                     <HeroBanner banners={BANNERS} autoPlayInterval={5000} />
                 </Box>
 
-                {/* ── FEATURED CATEGORIES ── */}
-                <Box sx={{ mb: spacing.xl }}>
-                    <SectionHeader title="Featured Categories" subtitle="Explore rice by variety" />
-                    <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 1, '&::-webkit-scrollbar': { display: 'none' }, msOverflowStyle: 'none', scrollbarWidth: 'none' }}>
-                        <CategoryCard
-                            name="All"
-                            emoji="🛒"
-                            active={!activeCategory}
-                            onClick={() => setActiveCategory('')}
-                            color={colors.primary.main}
-                            bg={tints.green}
-                        />
+                {/* ── CATEGORY SCROLL (80px Circular Icons) ── */}
+                <Box sx={{ mb: 4 }}>
+                    <Typography variant="h6" fontWeight={800} color="#1F2937" sx={{ mb: 2, letterSpacing: '-0.02em' }}>
+                        Shop by Category
+                    </Typography>
+                    <Box sx={{ 
+                        display: 'flex', 
+                        gap: 3, 
+                        overflowX: 'auto', 
+                        pb: 1, 
+                        '&::-webkit-scrollbar': { display: 'none' }
+                    }}>
+                        <Box onClick={() => setActiveCategory('')} sx={{ textAlign: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                            <Box sx={{ 
+                                width: 80, height: 80, borderRadius: '50%', bgcolor: '#E2E8F0',
+                                display: 'flex', alignItems: 'center', justifyContext: 'center', justifyContent: 'center',
+                                border: !activeCategory ? '3px solid #2E7D32' : '3px solid transparent',
+                                transition: 'all 0.2s', mb: 1
+                            }}>
+                                <Typography fontSize={32}>🛒</Typography>
+                            </Box>
+                            <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: '#4B5563' }}>All Rice</Typography>
+                        </Box>
+
                         {CATEGORIES.map(cat => (
-                            <CategoryCard
-                                key={cat.id}
-                                name={cat.name}
-                                emoji={cat.emoji}
-                                active={activeCategory === cat.id}
-                                onClick={() => setActiveCategory(activeCategory === cat.id ? '' : cat.id)}
-                                color={cat.color}
-                                bg={cat.bg}
-                            />
+                            <Box 
+                                key={cat.id} 
+                                onClick={() => setActiveCategory(activeCategory === cat.id ? '' : cat.id)} 
+                                sx={{ textAlign: 'center', cursor: 'pointer', flexShrink: 0 }}
+                            >
+                                <Box sx={{ 
+                                    width: 80, height: 80, borderRadius: '50%', bgcolor: cat.bg,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    border: activeCategory === cat.id ? `3px solid ${cat.color}` : '3px solid transparent',
+                                    transition: 'all 0.2s', mb: 1
+                                }}>
+                                    <Typography fontSize={32}>{cat.emoji}</Typography>
+                                </Box>
+                                <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: '#4B5563' }}>{cat.name}</Typography>
+                            </Box>
                         ))}
                     </Box>
                 </Box>
 
+                {/* Loading skeleton */}
                 {productLoading ? (
-                    <Box sx={{ mb: spacing.section }}>
-                        <Grid container spacing={3}>
-                            {[...Array(8)].map((_, i) => (
-                                <Grid item xs={12} sm={6} md={4} lg={3} key={i}>
+                    <Box sx={{ mb: 4 }}>
+                        <Grid container spacing={2}>
+                            {[...Array(6)].map((_, i) => (
+                                <Grid item xs={6} sm={4} md={3} lg={2} key={i}>
                                     <LoadingSkeleton type="product" />
                                 </Grid>
                             ))}
                         </Grid>
                     </Box>
                 ) : productError ? (
-                    <Box sx={{ p: 3, textAlign: 'center', color: colors.error, bgcolor: tints.red, borderRadius: 4, mb: spacing.section }}>
-                        {productError}
+                    <Box sx={{ mb: 4 }}>
+                        <EmptyState icon="⚠️" title="Oops!" description={productError} />
                     </Box>
                 ) : (
                     <>
-                        {/* ── TODAY'S OFFERS ── */}
-                        {renderProductRow("Today's Offers", "Best prices, grab before they are gone", todaysOffers)}
+                        {/* ── FLASH SALE ROW ── */}
+                        {renderProductRow("Flash Sale", "Grab offers before they close!", todaysOffers, true)}
+
+                        {/* ── ACTIVE FILTER PRODUCTS IF CATEGORY SELECT ── */}
+                        {activeCategory && (
+                            <Box sx={{ mb: 4 }}>
+                                <Typography variant="h5" fontWeight={800} color="#1F2937" sx={{ mb: 2 }}>
+                                    Selected Collection
+                                </Typography>
+                                <Grid container spacing={2}>
+                                    {filteredProducts.map(prod => (
+                                        <Grid item xs={6} sm={4} md={3} key={prod._id}>
+                                            <ProductCard
+                                                product={{
+                                                    _id: prod._id,
+                                                    name: prod.name,
+                                                    image: getImageUrl(prod.images?.[0] || prod.image),
+                                                    price: prod.offerPrice || prod.price,
+                                                    mrp: prod.offerPrice ? prod.price : null,
+                                                    discount: prod.offerPrice ? Math.round((1 - prod.offerPrice / prod.price) * 100) : 0,
+                                                    rating: Number(prod.rating || 0),
+                                                    countInStock: prod.countInStock
+                                                }}
+                                                wishlisted={isWishlisted(prod._id)}
+                                                onAddToCart={() => handleAddToCart(prod._id)}
+                                                onToggleWishlist={() => handleAddToWishlist(prod._id)}
+                                                onClick={() => navigate(`/products/${prod._id}`)}
+                                            />
+                                        </Grid>
+                                    ))}
+                                </Grid>
+                            </Box>
+                        )}
 
                         {/* ── BEST SELLERS ── */}
                         {renderProductRow("Best Sellers", "Most loved by our customers", bestSellers)}
 
                         {/* ── REFER BANNER ── */}
-                        <Box sx={{ mb: spacing.section }}>
+                        <Box sx={{ mb: 4 }}>
                             <Box sx={{
                                 background: 'linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)',
-                                borderRadius: 6, p: { xs: 3, md: 5 },
+                                borderRadius: '16px', p: 3,
                                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                                 border: '1px solid #D1FAE5',
-                                boxShadow: '0 10px 30px rgba(22,163,74,0.05)'
+                                boxShadow: '0 4px 16px rgba(46,125,50,0.04)'
                             }}>
                                 <Box>
-                                    <Box sx={{ fontSize: 14, fontWeight: 700, color: colors.primary.main, mb: 1, textTransform: 'uppercase', letterSpacing: 1 }}>🎁 Refer & Earn</Box>
-                                    <Box sx={{ fontSize: { xs: 24, md: 32 }, fontWeight: 800, color: colors.neutral[900], lineHeight: 1.2, mb: 2 }}>
-                                        Invite friends,<br />get ₹50 in your wallet!
-                                    </Box>
+                                    <Typography sx={{ fontSize: '0.72rem', fontWeight: 800, color: '#2E7D32', mb: 0.5, textTransform: 'uppercase', letterSpacing: 0.5 }}>🎁 REFER & EARN</Typography>
+                                    <Typography sx={{ fontSize: { xs: '1.25rem', md: '1.5rem' }, fontWeight: 800, color: '#1F2937', lineHeight: 1.2, mb: 1.5 }}>
+                                        Invite friends, get ₹100 inside your wallet!
+                                    </Typography>
                                     <Box
                                         component="button"
                                         onClick={() => navigate('/settings/rewards')}
                                         sx={{
-                                            background: colors.primary.main, color: '#fff', fontSize: 16, fontWeight: 700,
-                                            py: 1.5, px: 4, borderRadius: 99, border: 'none', cursor: 'pointer',
-                                            boxShadow: '0 4px 12px rgba(22,163,74,0.25)',
+                                            background: '#2E7D32', color: '#fff', fontSize: '0.85rem', fontWeight: 700,
+                                            py: 1, px: 3, borderRadius: 99, border: 'none', cursor: 'pointer',
                                             transition: 'transform 0.2s',
-                                            '&:hover': { transform: 'translateY(-2px)' }
+                                            '&:hover': { transform: 'translateY(-1px)' }
                                         }}
                                     >
-                                        Invite Friends Now →
+                                        Invite Now
                                     </Box>
                                 </Box>
-                                <Box sx={{ fontSize: { xs: 60, md: 100 }, display: { xs: 'none', sm: 'block' } }}>🤝</Box>
+                                <Typography sx={{ fontSize: { xs: 50, md: 80 }, display: { xs: 'none', sm: 'block' } }}>🤝</Typography>
                             </Box>
                         </Box>
 
-                        {/* ── TRENDING PRODUCTS ── */}
-                        {renderProductRow("Trending Now", "What's popular this week", trendingProducts)}
+                        {/* ── TRENDING PRODUCTS (2-column mobile, multi-column desktop) ── */}
+                        {renderProductRow("Trending Products", "What's popular this week", trendingProducts)}
 
-                        {/* ── ORGANIC RICE COLLECTION ── */}
-                        {renderProductRow("Organic Rice Collection", "Pure, pesticide-free & healthy", organicRice)}
+                        {/* ── ORGANIC COLLECTION ── */}
+                        {renderProductRow("Organic Collection", "Pesticide-free grains", organicRice)}
 
-                        {/* ── WHOLESALE SECTION ── */}
-                        {renderProductRow("Wholesale & Bulk", "Save big on large orders", wholesaleRice)}
-
-                        {/* ── SEASONAL PROMOTIONS ── */}
-                        {renderProductRow("Seasonal Promotions", "Exclusive picks for the season", seasonalPromotions)}
-
-                        {/* ── RECOMMENDED PRODUCTS ── */}
-                        {renderProductRow("Recommended Products", "Handpicked for you", recommendedProducts)}
+                        {/* ── WHOLESALE / BULK ── */}
+                        {renderProductRow("Wholesale Collection", "Save big on bulk orders", wholesaleRice)}
 
                         {/* ── RECENTLY VIEWED ── */}
-                        {renderProductRow("Recently Viewed", "Jump back into your interests", recentlyViewed)}
+                        {recentlyViewed.length > 0 && renderProductRow("Recently Viewed", "Based on your activity", recentlyViewed)}
                     </>
-                )}
-
-                {/* Empty State Fallback */}
-                {!productLoading && products.length === 0 && (
-                    <EmptyState
-                        icon="🔍"
-                        title="No products available"
-                        description="Check back later for fresh harvest!"
-                    />
                 )}
             </Container>
         </Box>
