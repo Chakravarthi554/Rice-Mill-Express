@@ -22,6 +22,11 @@ export const colors = {
     dark: '#1B5E20',
     contrast: '#FFFFFF',
   },
+  secondary: {
+    main: '#16A34A', // teal accent (green)
+    dark: '#15803D', // darker teal for hover
+    contrastText: '#FFFFFF',
+  },
   // Commerce accent — amber
   accent: {
     main: '#FFB300',

@@ -74,8 +74,8 @@ const Dashboard = () => {
     const { wishlistItems = [] } = useSelector(state => state.wishlist || {});
 
     useEffect(() => {
-        dispatch(listProducts({ limit: 20 }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      dispatch(listProducts());
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [dispatch]);
 
     const handleAddToCart = async (productId) => {

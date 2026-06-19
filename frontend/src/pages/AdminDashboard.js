@@ -11,6 +11,7 @@ import ModerationTab from '../components/admin/tabs/ModerationTab';
 import PaymentsTab from '../components/admin/tabs/PaymentsTab';
 import AnalyticsTab from '../components/admin/tabs/AnalyticsTab';
 import DeliveryKYCApproval from '../components/admin/DeliveryKYCApproval';
+import PendingProductsTab from '../components/admin/tabs/PendingProductsTab';
 
 import AdminReportsPanel from '../components/admin/AdminReportsPanel';
 import AdminSupportDashboard from '../components/admin/AdminSupportDashboard';
@@ -21,6 +22,7 @@ const tabs = [
   { label: 'Support Tickets', icon: 'SupportAgent', component: <AdminSupportDashboard /> },
   { label: 'Users', icon: 'People', component: <UsersTab /> }, // NEW
   { label: 'Orders', icon: 'ShoppingCart', component: <OrdersTab /> }, // NEW
+  { label: 'Pending Products', icon: 'Inventory', component: <PendingProductsTab /> },
   { label: 'Analytics', icon: 'Assessment', component: <AnalyticsTab /> },
   { label: 'Payments', icon: 'Payments', component: <PaymentsTab /> },
   { label: 'Referral Withdrawals', icon: 'AccountBalanceWallet', component: <WithdrawalManagement /> },

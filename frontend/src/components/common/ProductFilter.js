@@ -550,12 +550,10 @@ import EmptyState from '../ui/EmptyState';const ProductFilter = () => {
                       countInStock: product.countInStock
                   }}
                   wishlisted={isWishlisted}
-                  onAddToCart={(e) => {
-                    e.stopPropagation();
+                  onAddToCart={() => {
                     handleAddToCart(product._id);
                   }}
-                  onToggleWishlist={(e) => {
-                    e.stopPropagation();
+                  onToggleWishlist={() => {
                     // Dispatch wishlist toggle if applicable
                   }}
                   onClick={() => navigate(`/products/${product._id}`)}

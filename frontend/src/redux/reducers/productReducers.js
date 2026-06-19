@@ -47,6 +47,13 @@ import {
   SUGGEST_RECIPE_REQUEST,
   SUGGEST_RECIPE_SUCCESS,
   SUGGEST_RECIPE_FAIL,
+  PRODUCT_APPROVE_REQUEST,
+  PRODUCT_APPROVE_SUCCESS,
+  PRODUCT_APPROVE_FAIL,
+  PRODUCT_APPROVE_RESET,
+  PRODUCT_LIST_PENDING_REQUEST,
+  PRODUCT_LIST_PENDING_SUCCESS,
+  PRODUCT_LIST_PENDING_FAIL,
 } from '../constants/productConstants';
 
 export const productListReducer = (state = { products: [], total: 0, page: 1, pages: 1 }, action) => {
@@ -262,6 +269,34 @@ export const suggestRecipeReducer = (state = {}, action) => {
     case SUGGEST_RECIPE_SUCCESS:
       return { loading: false, success: true, recipe: action.payload };
     case SUGGEST_RECIPE_FAIL:
+      return { loading: false, error: action.payload };
+    default:
+      return state;
+  }
+};
+
+export const productApproveReducer = (state = {}, action) => {
+  switch (action.type) {
+    case PRODUCT_APPROVE_REQUEST:
+      return { loading: true };
+    case PRODUCT_APPROVE_SUCCESS:
+      return { loading: false, success: true };
+    case PRODUCT_APPROVE_FAIL:
+      return { loading: false, error: action.payload };
+    case PRODUCT_APPROVE_RESET:
+      return {};
+    default:
+      return state;
+  }
+};
+
+export const productListPendingReducer = (state = { products: [] }, action) => {
+  switch (action.type) {
+    case PRODUCT_LIST_PENDING_REQUEST:
+      return { loading: true, products: [] };
+    case PRODUCT_LIST_PENDING_SUCCESS:
+      return { loading: false, products: action.payload.products || [] };
+    case PRODUCT_LIST_PENDING_FAIL:
       return { loading: false, error: action.payload };
     default:
       return state;

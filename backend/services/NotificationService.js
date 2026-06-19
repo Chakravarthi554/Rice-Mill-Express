@@ -2,6 +2,7 @@ const Notification = require('../models/Notification');
 const User = require('../models/User');
 const OrderStatusHistory = require('../models/OrderStatusHistory');
 const Order = require('../models/Order');
+const sendEmail = require('../utils/sendEmail');
 
 class NotificationService {
     constructor(io) {
@@ -63,8 +64,56 @@ class NotificationService {
                 });
             }
 
-            // 4. Send Email/SMS (Mocked for now - can be expanded with Twilio/SendGrid)
-            console.log(`[NotificationService] Emails/SMS sent to ${customer.email} for order ${order.orderNumber}`);
+            // 4. Send Email to Customer
+            if (customer && customer.email) {
+                try {
+                    await sendEmail({
+                        email: customer.email,
+                        subject: `Order #${order.orderNumber || order._id.toString().slice(-6)} Update: ${order.orderStatus.toUpperCase()}`,
+                        message: `
+                            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                                <h2 style="color: #1e2b4a; border-bottom: 2px solid #16a34a; padding-bottom: 10px;">Order Status Updated</h2>
+                                <p>Hello <strong>${customer.name || 'Customer'}</strong>,</p>
+                                <p>The status of your order <strong>#${order.orderNumber || order._id}</strong> has been updated:</p>
+                                <div style="background-color: #f9fafb; padding: 15px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #16a34a;">
+                                    <p style="margin: 0; font-size: 16px;">Status: <strong style="color: #16a34a;">${order.orderStatus.toUpperCase()}</strong></p>
+                                    ${notes ? `<p style="margin: 10px 0 0 0; font-size: 14px; color: #555;">Note: ${notes}</p>` : ''}
+                                </div>
+                                <p>We are processing your order as quickly as possible. You can track your order status in your dashboard.</p>
+                                <p style="margin-top: 30px; font-size: 12px; color: #888;">Thank you for shopping with Rice Mill Express!</p>
+                            </div>
+                        `
+                    });
+                    console.log(`[NotificationService] Status email sent to customer: ${customer.email}`);
+                } catch (emailErr) {
+                    console.error('[NotificationService] Failed to send status email to customer:', emailErr.message);
+                }
+            }
+
+            // 5. Send Email to Seller
+            if (seller && seller.email) {
+                try {
+                    await sendEmail({
+                        email: seller.email,
+                        subject: `Order #${order.orderNumber || order._id.toString().slice(-6)} Update: ${order.orderStatus.toUpperCase()}`,
+                        message: `
+                            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                                <h2 style="color: #1e2b4a; border-bottom: 2px solid #16a34a; padding-bottom: 10px;">Order Status Updated</h2>
+                                <p>Hello <strong>${seller.name || 'Seller'}</strong>,</p>
+                                <p>The status of order <strong>#${order.orderNumber || order._id}</strong> has been updated to <strong>${order.orderStatus.toUpperCase()}</strong> by ${updatedBy?.name || 'Seller/Admin'}.</p>
+                                <div style="background-color: #f9fafb; padding: 15px; border-radius: 6px; margin: 20px 0;">
+                                    <p style="margin: 0; font-size: 15px;">New Status: <strong>${order.orderStatus.toUpperCase()}</strong></p>
+                                    ${notes ? `<p style="margin: 10px 0 0 0; font-size: 14px; color: #555;">Note/Reason: ${notes}</p>` : ''}
+                                </div>
+                                <p>Please manage this order in your Seller Dashboard.</p>
+                            </div>
+                        `
+                    });
+                    console.log(`[NotificationService] Status email sent to seller: ${seller.email}`);
+                } catch (emailErr) {
+                    console.error('[NotificationService] Failed to send status email to seller:', emailErr.message);
+                }
+            }
 
             return true;
         } catch (error) {
@@ -88,8 +137,33 @@ class NotificationService {
                 entityModel: 'Order'
             });
 
-            // Notify Partner (if they have a user account)
-            // In this system, delivery partners are linked via partnerId, we might need a separate login for them
+            // Send Email to Customer
+            const customer = await User.findById(order.user);
+            if (customer && customer.email) {
+                try {
+                    await sendEmail({
+                        email: customer.email,
+                        subject: `Delivery Partner Assigned - Order #${order.orderNumber || order._id.toString().slice(-6)}`,
+                        message: `
+                            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                                <h2 style="color: #1e2b4a; border-bottom: 2px solid #16a34a; padding-bottom: 10px;">Delivery Partner Assigned</h2>
+                                <p>Hello <strong>${customer.name || 'Customer'}</strong>,</p>
+                                <p>Your order <strong>#${order.orderNumber || order._id}</strong> has been assigned to a delivery partner and is on its way!</p>
+                                <div style="background-color: #f9fafb; padding: 15px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #16a34a;">
+                                    <p style="margin: 0; font-size: 15px;">Delivery Partner: <strong>${partner.name}</strong></p>
+                                    <p style="margin: 5px 0 0 0; font-size: 15px;">Contact Phone: <strong>${partner.phone || 'N/A'}</strong></p>
+                                    <p style="margin: 5px 0 0 0; font-size: 15px;">Vehicle Number: <strong>${partner.vehicle_number || 'N/A'}</strong></p>
+                                </div>
+                                <p>You can track the live status in your Customer Dashboard.</p>
+                                <p style="margin-top: 30px; font-size: 12px; color: #888;">Thank you for shopping with Rice Mill Express!</p>
+                            </div>
+                        `
+                    });
+                    console.log(`[NotificationService] Assignment email sent to customer: ${customer.email}`);
+                } catch (emailErr) {
+                    console.error('[NotificationService] Failed to send assignment email to customer:', emailErr.message);
+                }
+            }
 
             if (this.io) {
                 this.io.to(`user_${order.user}`).emit('ORDER_UPDATE', {

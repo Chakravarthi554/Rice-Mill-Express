@@ -303,14 +303,17 @@ const ProductPage = () => {
                 return (
                   <Box key={prod._id} sx={{ minWidth: 260, flexShrink: 0 }}>
                     <ProductCard
-                      id={prod._id}
-                      name={prod.name}
-                      image={getImageUrl(prod.images?.[0])}
-                      price={pOffer ? prod.offerPrice : prod.price}
-                      originalPrice={pOffer ? prod.price : null}
-                      discount={pOffer ? Math.round(((prod.price - prod.offerPrice) / prod.price) * 100) : 0}
-                      rating={Number(prod.rating || 4.5)}
-                      isWishlisted={isWishlisted(prod._id)}
+                      product={{
+                        _id: prod._id,
+                        name: prod.name,
+                        image: getImageUrl(prod.images?.[0]),
+                        price: pOffer ? prod.offerPrice : prod.price,
+                        mrp: pOffer ? prod.price : null,
+                        discount: pOffer ? Math.round(((prod.price - prod.offerPrice) / prod.price) * 100) : 0,
+                        rating: Number(prod.rating || 4.5),
+                        countInStock: prod.countInStock
+                      }}
+                      wishlisted={isWishlisted(prod._id)}
                       onAddToCart={() => dispatch(addToCart(prod._id, 1))}
                       onToggleWishlist={() => dispatch(addToWishlist(prod._id))}
                       onClick={() => navigate(`/products/${prod._id}`)}

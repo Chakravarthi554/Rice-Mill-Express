@@ -19,8 +19,10 @@ const getProducts = asyncHandler(async (req, res) => {
       }
       : {};
 
-    const count = await Product.countDocuments({ ...keyword });
-    const products = await Product.find({ ...keyword })
+    const query = { ...keyword, approvalStatus: 'approved' };
+
+    const count = await Product.countDocuments(query);
+    const products = await Product.find(query)
       .populate('seller', 'name businessName')
       .limit(pageSize)
       .skip(pageSize * (page - 1))
@@ -149,6 +151,9 @@ const filterProducts = asyncHandler(async (req, res) => {
 
     // Ensure we only show available products
     query.countInStock = { $gte: 1 };
+    
+    // Only show approved products
+    query.approvalStatus = 'approved';
 
     // Calculate pagination
     const skip = (page - 1) * limit;
@@ -314,7 +319,8 @@ const createProduct = asyncHandler(async (req, res) => {
       quality,
       dietPreference: Array.isArray(dietPreference) ? dietPreference : (dietPreference ? [dietPreference] : []),
       cookingPurpose: Array.isArray(cookingPurpose) ? cookingPurpose : (cookingPurpose ? [cookingPurpose] : []),
-      minBulkQuantity: Number(minBulkQuantity)
+      minBulkQuantity: Number(minBulkQuantity),
+      approvalStatus: 'pending'
     });
 
     const createdProduct = await product.save();
@@ -323,6 +329,42 @@ const createProduct = asyncHandler(async (req, res) => {
     await createdProduct.populate('seller', 'name businessName');
 
     console.log('✅ Product created successfully:', createdProduct._id);
+
+    // Notify Admins
+    try {
+      const sendEmail = require('../utils/sendEmail');
+      const admins = await User.find({ role: 'admin' }).select('email _id');
+      
+      const adminEmails = admins.map(a => a.email).filter(Boolean);
+      
+      if (adminEmails.length > 0) {
+        // Send email to first admin (or map through them)
+        for (const email of adminEmails) {
+          await sendEmail({
+            email,
+            subject: 'New Product Pending Approval',
+            message: `
+              <h2>New Product Awaiting Approval</h2>
+              <p>Seller <b>${req.user.name}</b> has added a new product: <b>${name}</b>.</p>
+              <p>Please log in to the Admin Dashboard to review and approve/reject it.</p>
+            `
+          });
+        }
+      }
+
+      // Create in-app notifications for admins
+      for (const admin of admins) {
+        await Notification.create({
+          user: admin._id,
+          type: 'PRODUCT_APPROVAL_REQUIRED',
+          message: `New product "${name}" by ${req.user.name} requires approval.`,
+          relatedEntity: createdProduct._id,
+          entityModel: 'Product'
+        });
+      }
+    } catch (notifErr) {
+      console.error('Failed to notify admin about new product:', notifErr.message);
+    }
 
     res.status(201).json({
       success: true,
@@ -515,6 +557,83 @@ const getRecipeSuggestion = asyncHandler(async (req, res) => {
   res.json({ recipes: [] });
 });
 
+const getPendingProducts = asyncHandler(async (req, res) => {
+  try {
+    const products = await Product.find({ approvalStatus: 'pending' })
+      .populate('seller', 'name email phone businessName')
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      products
+    });
+  } catch (error) {
+    console.error('❌ Get pending products error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching pending products' });
+  }
+});
+
+const approveProduct = asyncHandler(async (req, res) => {
+  try {
+    const { status, reason } = req.body;
+    const product = await Product.findById(req.params.id).populate('seller', 'name email');
+
+    if (!product) {
+      return res.status(404).json({ success: false, message: 'Product not found' });
+    }
+
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid status' });
+    }
+
+    product.approvalStatus = status;
+    if (status === 'rejected') {
+      product.approvalRejectionReason = reason || 'No reason provided';
+    } else {
+      product.approvalRejectionReason = undefined;
+    }
+
+    await product.save();
+
+    // Notify seller
+    try {
+      const sendEmail = require('../utils/sendEmail');
+      const seller = product.seller;
+      
+      if (seller && seller.email) {
+        await sendEmail({
+          email: seller.email,
+          subject: \`Product \${status === 'approved' ? 'Approved' : 'Rejected'}\`,
+          message: \`
+            <h2>Product Approval Status Update</h2>
+            <p>Your product <b>\${product.name}</b> has been <b>\${status}</b> by the admin.</p>
+            \${status === 'rejected' ? \`<p>Reason: \${product.approvalRejectionReason}</p>\` : ''}
+          \`
+        });
+      }
+
+      await Notification.create({
+        user: seller._id,
+        type: \`PRODUCT_\${status.toUpperCase()}\`,
+        message: \`Your product "\${product.name}" has been \${status}.\${status === 'rejected' ? ' Reason: ' + product.approvalRejectionReason : ''}\`,
+        relatedEntity: product._id,
+        entityModel: 'Product'
+      });
+    } catch (notifErr) {
+      console.error('Failed to notify seller about product approval:', notifErr.message);
+    }
+
+    res.json({
+      success: true,
+      message: \`Product \${status} successfully\`,
+      product
+    });
+  } catch (error) {
+    console.error('❌ Approve product error:', error);
+    res.status(500).json({ success: false, message: 'Error updating product status' });
+  }
+});
+
 module.exports = {
   getProducts,
   filterProducts,
@@ -526,4 +645,6 @@ module.exports = {
   bulkUploadProducts,
   getProductAnalytics,
   getRecipeSuggestion,
+  getPendingProducts,
+  approveProduct,
 };

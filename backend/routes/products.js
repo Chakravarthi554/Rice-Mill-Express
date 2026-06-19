@@ -17,6 +17,8 @@ const {
   getProductAnalytics,
   getRecipeSuggestion,
   filterProducts,
+  getPendingProducts,
+  approveProduct,
 } = require("../controllers/productController");
 
 const { likeItem, addComment, getComments, trackShare, rateItem, getProductReviews } = require('../controllers/socialController');
@@ -32,6 +34,8 @@ router.post("/bulk", auth.protect, auth.role("seller"), auth.kycVerified, bulkUp
 
 // ===== ADMIN ROUTES (Static) =====
 router.get("/analytics", auth.protect, auth.role("admin"), getProductAnalytics);
+router.get("/admin/pending", auth.protect, auth.role("admin"), getPendingProducts);
+router.put("/:id/approve", auth.protect, auth.role("admin"), approveProduct);
 
 // ===== GET BY ID (Dynamic) - Must stay below static routes =====
 router.get("/:id", getProductById);
