@@ -4,21 +4,20 @@ import { useSelector, useDispatch } from 'react-redux';
 import { Box, Container, Grid, Typography, IconButton, InputBase, Paper, Chip } from '@mui/material';
 import { 
   PinDrop, Notifications, Search, ShoppingBag, 
-  Favorite, LocalOffer, Person, ChevronRight 
+  Favorite, LocalOffer, Person, ChevronRight, Home, ListAlt, ShoppingCart
 } from '@mui/icons-material';
 
 // Redux Actions
 import { listProducts } from '../../redux/actions/productActions';
 import { addToCart } from '../../redux/actions/cartActions';
 import { addToWishlist } from '../../redux/actions/userActions';
+import { listMyCart } from '../../redux/actions/cartActions';
 
 // Premium UI Components
 import HeroBanner from '../ui/HeroBanner';
-import CategoryCard from '../ui/CategoryCard';
 import ProductCard from '../ui/ProductCard';
-import SectionHeader from '../ui/SectionHeader';
-import LoadingSkeleton from '../ui/LoadingSkeleton';
 import EmptyState from '../ui/EmptyState';
+import LoadingSkeleton from '../ui/LoadingSkeleton';
 
 // Utils
 import { getImageUrl } from '../../utils/urlHelper';
@@ -27,68 +26,34 @@ import { getImageUrl } from '../../utils/urlHelper';
 import { spacing, colors, tints } from '../../theme/designTokens';
 
 const CATEGORIES = [
-    { id: 'basmati', name: 'Basmati', emoji: '🍚', bg: tints.orange, color: '#E65100' },
-    { id: 'sona', name: 'Sona Masuri', emoji: '🌾', bg: tints.green, color: '#2E7D32' },
-    { id: 'kolam', name: 'Kolam', emoji: '🥣', bg: tints.blue, color: '#1565C0' },
-    { id: 'brown', name: 'Brown Rice', emoji: '🌿', bg: tints.purple, color: '#7C3AED' },
-    { id: 'organic', name: 'Organic', emoji: '🍃', bg: tints.green, color: '#2E7D32' },
-    { id: 'bulk', name: 'Wholesale', emoji: '📦', bg: tints.yellow, color: '#CA8A04' },
-];
-
-const BANNERS = [
-    { 
-      id: 1, 
-      title: 'FESTIVAL OFFER', 
-      subtitle: '20% OFF on all premium rice varieties', 
-      ctaText: 'Shop Now', 
-      bgGradient: 'linear-gradient(135deg, #FF6D00 0%, #FF9100 100%)', 
-      emoji: '🎉',
-      onClick: () => {} 
-    },
-    { 
-      id: 2, 
-      title: 'New Harvest Season', 
-      subtitle: 'Fresh Sona Masoori just arrived!', 
-      ctaText: 'Explore Now', 
-      bgGradient: 'linear-gradient(135deg, #2E7D32 0%, #4CAF50 100%)', 
-      emoji: '🌾',
-      onClick: () => {} 
-    },
-    { 
-      id: 3, 
-      title: 'Free Delivery', 
-      subtitle: 'On all orders above ₹500!', 
-      ctaText: 'Order Now', 
-      bgGradient: 'linear-gradient(135deg, #1565C0 0%, #1976D2 100%)', 
-      emoji: '🚚',
-      onClick: () => {} 
-    },
+    { id: 'basmati', name: 'Basmati', emoji: '🍚', bg: '#FFF7ED', color: '#E65100' },
+    { id: 'sona', name: 'Sona', emoji: '🌾', bg: '#F0FDF4', color: '#2E7D32' },
+    { id: 'organic', name: 'Organic', emoji: '🍃', bg: '#E0F2FE', status: 'new' },
+    { id: 'bulk', name: 'Bulk', emoji: '📦', bg: '#FEF3C7' },
+    { id: 'premium', name: 'Premium', emoji: '⭐', bg: '#FCE7F3' },
 ];
 
 const Dashboard = () => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
     
-    const [activeCategory, setActiveCategory] = useState('');
+    const [activeCategory, setActiveCategory] = useState('sona');
     const [searchQuery, setSearchQuery] = useState('');
-    const [timeLeft, setTimeLeft] = useState(9930); // 2h 45m 30s countdown
+    const [timeLeft, setTimeLeft] = useState(7942); // 2h 12m 22s as in the new mockup
 
     const { loading: productLoading, error: productError, products = [] } = useSelector((state) => state.productList || {});
     const { wishlistItems = [] } = useSelector(state => state.wishlist || {});
-
-    // Recently Viewed
-    const [recentlyViewed, setRecentlyViewed] = useState([]);
+    const { cartItems = [] } = useSelector(state => state.cart || {});
 
     useEffect(() => {
         dispatch(listProducts({ limit: 40 }));
-        const viewed = JSON.parse(localStorage.getItem('recentlyViewed') || '[]');
-        setRecentlyViewed(viewed);
+        dispatch(listMyCart());
     }, [dispatch]);
 
-    // Flash Sale Timer countdown
+    // Flash Sale countdown
     useEffect(() => {
         const timer = setInterval(() => {
-            setTimeLeft(prev => prev > 0 ? prev - 1 : 9930);
+            setTimeLeft(prev => prev > 0 ? prev - 1 : 7942);
         }, 1000);
         return () => clearInterval(timer);
     }, []);
@@ -134,111 +99,72 @@ const Dashboard = () => {
         ? products.filter(p => p.category?.toLowerCase().includes(activeCategory) || p.name?.toLowerCase().includes(activeCategory))
         : products;
 
-    const bestSellers = useMemo(() => [...products].sort((a, b) => (b.numReviews || 0) - (a.numReviews || 0)).slice(0, 8), [products]);
-    const trendingProducts = useMemo(() => [...products].sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 8), [products]);
-    const organicRice = useMemo(() => products.filter(p => p.category?.toLowerCase().includes('organic') || p.name?.toLowerCase().includes('organic')).slice(0, 8), [products]);
-    const wholesaleRice = useMemo(() => products.filter(p => p.category?.toLowerCase().includes('bulk') || p.category?.toLowerCase().includes('wholesale') || (p.minQty && p.minQty > 10)).slice(0, 8), [products]);
-    const todaysOffers = useMemo(() => products.filter(p => p.offerPrice && p.offerPrice < p.price).slice(0, 8), [products]);
+    // Derived collections mapped to mockup lists
+    const flashSaleProducts = useMemo(() => {
+        return products.filter(p => p.offerPrice && p.offerPrice < p.price).slice(0, 4);
+    }, [products]);
 
-    const renderProductRow = (title, subtitle, items, isFlashSale = false) => {
-        if (items.length === 0) return null;
-        return (
-            <Box sx={{ mb: 4 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Typography variant="h5" fontWeight={800} color="#1F2937" sx={{ letterSpacing: '-0.02em' }}>
-                            {title}
-                        </Typography>
-                        {isFlashSale && (
-                            <Box sx={{ 
-                                bgcolor: '#E65100', color: '#fff', px: 1.5, py: 0.5, 
-                                borderRadius: '6px', fontSize: '0.85rem', fontWeight: 800,
-                                fontFamily: 'monospace', letterSpacing: 0.5
-                            }}>
-                                {formatTime(timeLeft)}
-                            </Box>
-                        )}
-                    </Box>
-                    <IconButton size="small" onClick={() => navigate('/products')} sx={{ color: '#2E7D32' }}>
-                        <ChevronRight />
-                    </IconButton>
-                </Box>
+    const buyAgainProducts = useMemo(() => {
+        return [...products].sort((a, b) => (b.numReviews || 0) - (a.numReviews || 0)).slice(0, 4);
+    }, [products]);
 
-                <Box sx={{ 
-                    display: 'flex', 
-                    gap: 2, 
-                    overflowX: 'auto', 
-                    pb: 1.5, 
-                    px: 0.5,
-                    mx: -0.5,
-                    '&::-webkit-scrollbar': { display: 'none' } 
-                }}>
-                    {items.map(product => {
-                        const hasOffer = typeof product.offerPrice === 'number' && product.offerPrice > 0 && product.offerPrice < product.price;
-                        const displayPrice = hasOffer ? product.offerPrice : product.price;
-                        const discount = hasOffer ? Math.round((1 - product.offerPrice / product.price) * 100) : 0;
-                        return (
-                            <Box key={product._id} sx={{ width: 170, flexShrink: 0 }}>
-                                <ProductCard
-                                    product={{
-                                        _id: product._id,
-                                        name: product.name,
-                                        image: getImageUrl(product.images?.[0] || product.image),
-                                        price: displayPrice || 0,
-                                        mrp: hasOffer ? product.price : null,
-                                        discount: discount,
-                                        rating: Number(product.rating || 0),
-                                        countInStock: product.countInStock
-                                    }}
-                                    wishlisted={isWishlisted(product._id)}
-                                    onAddToCart={() => handleAddToCart(product._id)}
-                                    onToggleWishlist={() => handleAddToWishlist(product._id)}
-                                    onClick={() => navigate(`/products/${product._id}`)}
-                                />
-                            </Box>
-                        );
-                    })}
-                </Box>
-            </Box>
-        );
-    };
+    const recommendedProducts = useMemo(() => {
+        return [...products].sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 6);
+    }, [products]);
+
+    // Mock products fallback matching Image 1
+    const mockFlashSale = [
+        { _id: 'fs-1', name: 'Sona Masoori 25kg', price: 1200, mrp: 1500, discount: 20, rating: 4.5, countInStock: 10, image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=150&q=80' },
+        { _id: 'fs-2', name: 'Basmati Gold Premium 10kg', price: 950, mrp: 1100, discount: 15, rating: 4.8, countInStock: 5, image: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=150&q=80' }
+    ];
+
+    const mockBuyAgain = [
+        { _id: 'ba-1', name: 'Royal Basmati Rice 5kg', price: 850, rating: 4.7, countInStock: 20, image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=150&q=80' },
+        { _id: 'ba-2', name: 'Idli Rice 10kg', price: 620, rating: 4.3, countInStock: 15, image: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=150&q=80' }
+    ];
+
+    const mockRecommended = [
+        { _id: 'rc-1', name: 'Organic Brown Rice', price: 900, rating: 4.5, countInStock: 8, image: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=150&q=80' },
+        { _id: 'rc-2', name: 'Ponni Rice 10kg', price: 1100, rating: 4.5, countInStock: 12, image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=150&q=80' }
+    ];
+
+    const finalFlashSale = flashSaleProducts.length > 0 ? flashSaleProducts : mockFlashSale;
+    const finalBuyAgain = buyAgainProducts.length > 0 ? buyAgainProducts : mockBuyAgain;
+    const finalRecommended = recommendedProducts.length > 0 ? recommendedProducts : mockRecommended;
 
     return (
-        <Box sx={{ bgcolor: '#F9FAFB', minHeight: '100vh', pb: 8 }}>
+        <Box sx={{ bgcolor: '#F9FAFB', minHeight: '100vh', pb: 12 }}>
             
-            {/* ── TOP BAR (Location & Notification) ── */}
-            <Box sx={{ bgcolor: '#fff', px: 2, py: 1.5, borderBottom: '1px solid #F3F4F6' }}>
+            {/* ── TOP BAR (Vijayawada location) ── */}
+            <Box sx={{ bgcolor: '#fff', px: 2.5, py: 2, borderBottom: '1px solid #F3F4F6' }}>
                 <Container maxWidth="xl" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: '0 !important' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <PinDrop sx={{ color: '#2E7D32' }} />
-                        <Box>
-                            <Typography sx={{ fontSize: '0.72rem', color: '#9CA3AF', fontWeight: 600 }}>DELIVER TO</Typography>
-                            <Typography sx={{ fontSize: '0.9rem', fontWeight: 800, color: '#1F2937', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                Home <span style={{ fontSize: '0.6rem', color: '#2E7D32' }}>▼</span>
-                            </Typography>
-                        </Box>
+                        <PinDrop sx={{ color: '#16A34A', fontSize: 24 }} />
+                        <Typography sx={{ fontSize: '1rem', fontWeight: 800, color: '#1F2937', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            Vijayawada <span style={{ fontSize: '0.65rem', color: '#6B7280' }}>▼</span>
+                        </Typography>
                     </Box>
-                    <IconButton onClick={() => navigate('/notifications')} sx={{ bgcolor: '#F9FAFB' }}>
-                        <Notifications sx={{ color: '#1F2937' }} />
+                    <IconButton onClick={() => navigate('/notifications')} sx={{ bgcolor: '#F3F4F6', p: 1 }}>
+                        <Notifications sx={{ color: '#1F2937', fontSize: 20 }} />
                     </IconButton>
                 </Container>
             </Box>
 
             {/* ── SEARCH BAR ── */}
-            <Box sx={{ bgcolor: '#fff', px: 2, py: 1.5, mb: 2 }}>
+            <Box sx={{ bgcolor: '#fff', px: 2.5, py: 1.5, mb: 2 }}>
                 <Container maxWidth="xl" sx={{ p: '0 !important' }}>
                     <form onSubmit={handleSearchSubmit}>
                         <Box sx={{ 
                             display: 'flex', alignItems: 'center', bgcolor: '#F3F4F6', 
-                            height: 48, borderRadius: '24px', px: 2 
+                            height: 48, borderRadius: '12px', px: 2 
                         }}>
                             <Search sx={{ color: '#9CA3AF', mr: 1 }} />
                             <InputBase 
                                 fullWidth
-                                placeholder="Search basmati rice, organic grains, bulk packs..."
+                                placeholder="Search rice, brands, 25kg..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                sx={{ fontSize: '0.9rem', fontWeight: 600 }}
+                                sx={{ fontSize: '0.9rem', fontWeight: 600, color: '#1F2937' }}
                             />
                         </Box>
                     </form>
@@ -247,35 +173,15 @@ const Dashboard = () => {
 
             <Container maxWidth="xl" sx={{ px: 2 }}>
                 
-                {/* ── HERO CAROUSEL ── */}
-                <Box sx={{ mb: 4, borderRadius: '16px', overflow: 'hidden' }}>
-                    <HeroBanner banners={BANNERS} autoPlayInterval={5000} />
-                </Box>
-
-                {/* ── CATEGORY SCROLL (80px Circular Icons) ── */}
-                <Box sx={{ mb: 4 }}>
-                    <Typography variant="h6" fontWeight={800} color="#1F2937" sx={{ mb: 2, letterSpacing: '-0.02em' }}>
-                        Shop by Category
-                    </Typography>
+                {/* ── CATEGORY SCROLL (Circular category badges) ── */}
+                <Box sx={{ mb: 3 }}>
                     <Box sx={{ 
                         display: 'flex', 
-                        gap: 3, 
+                        gap: 2.5, 
                         overflowX: 'auto', 
-                        pb: 1, 
+                        pb: 1.5, 
                         '&::-webkit-scrollbar': { display: 'none' }
                     }}>
-                        <Box onClick={() => setActiveCategory('')} sx={{ textAlign: 'center', cursor: 'pointer', flexShrink: 0 }}>
-                            <Box sx={{ 
-                                width: 80, height: 80, borderRadius: '50%', bgcolor: '#E2E8F0',
-                                display: 'flex', alignItems: 'center', justifyContext: 'center', justifyContent: 'center',
-                                border: !activeCategory ? '3px solid #2E7D32' : '3px solid transparent',
-                                transition: 'all 0.2s', mb: 1
-                            }}>
-                                <Typography fontSize={32}>🛒</Typography>
-                            </Box>
-                            <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: '#4B5563' }}>All Rice</Typography>
-                        </Box>
-
                         {CATEGORIES.map(cat => (
                             <Box 
                                 key={cat.id} 
@@ -283,118 +189,215 @@ const Dashboard = () => {
                                 sx={{ textAlign: 'center', cursor: 'pointer', flexShrink: 0 }}
                             >
                                 <Box sx={{ 
-                                    width: 80, height: 80, borderRadius: '50%', bgcolor: cat.bg,
+                                    width: 72, height: 72, borderRadius: '50%', bgcolor: cat.bg,
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    border: activeCategory === cat.id ? `3px solid ${cat.color}` : '3px solid transparent',
-                                    transition: 'all 0.2s', mb: 1
+                                    border: activeCategory === cat.id ? '2.5px solid #16A34A' : '2.5px solid transparent',
+                                    transition: 'all 0.2s', mb: 1,
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
                                 }}>
                                     <Typography fontSize={32}>{cat.emoji}</Typography>
                                 </Box>
-                                <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: '#4B5563' }}>{cat.name}</Typography>
+                                <Typography sx={{ 
+                                    fontSize: '0.78rem', 
+                                    fontWeight: activeCategory === cat.id ? 800 : 600, 
+                                    color: activeCategory === cat.id ? '#16A34A' : '#4B5563' 
+                                }}>
+                                    {cat.name}
+                                </Typography>
+                                {activeCategory === cat.id && (
+                                    <Box sx={{ width: 16, height: 3, bgcolor: '#16A34A', mx: 'auto', mt: 0.5, borderRadius: 1 }} />
+                                )}
                             </Box>
                         ))}
                     </Box>
                 </Box>
 
-                {/* Loading skeleton */}
+                {/* ── PROMO BANNER ── */}
+                <Box sx={{ mb: 4 }}>
+                    <Box sx={{
+                        background: 'linear-gradient(135deg, #1B5E20 0%, #2E7D32 50%, #4CAF50 100%)',
+                        borderRadius: '16px', p: 2.5,
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        boxShadow: '0 8px 24px rgba(46,125,50,0.15)',
+                        color: '#fff',
+                        position: 'relative',
+                        overflow: 'hidden'
+                    }}>
+                        <Box sx={{ zIndex: 2 }}>
+                            <Typography sx={{ fontSize: '1.625rem', fontWeight: 900, lineHeight: 1.1 }}>
+                                <span style={{ color: '#FBBF24' }}>20% OFF</span> ON BULK ORDERS
+                            </Typography>
+                            <Button 
+                                variant="contained" 
+                                size="small"
+                                onClick={() => navigate('/products')}
+                                sx={{ 
+                                    mt: 2, bgcolor: '#FBBF24', color: '#1B5E20', fontWeight: 800,
+                                    borderRadius: '20px', textTransform: 'none', px: 2, py: 0.6,
+                                    '&:hover': { bgcolor: '#F59E0B' }, fontSize: '0.75rem'
+                                }}
+                            >
+                                Shop Now &gt;
+                            </Button>
+                        </Box>
+                        
+                        {/* Rice bag mock art */}
+                        <Box sx={{ fontSize: 72, display: 'flex', alignItems: 'center', opacity: 0.85, zIndex: 1 }}>
+                            🌾
+                        </Box>
+                    </Box>
+                </Box>
+
+                {/* Loading states */}
                 {productLoading ? (
                     <Box sx={{ mb: 4 }}>
                         <Grid container spacing={2}>
-                            {[...Array(6)].map((_, i) => (
-                                <Grid item xs={6} sm={4} md={3} lg={2} key={i}>
+                            {[...Array(4)].map((_, i) => (
+                                <Grid item xs={6} key={i}>
                                     <LoadingSkeleton type="product" />
                                 </Grid>
                             ))}
                         </Grid>
                     </Box>
-                ) : productError ? (
-                    <Box sx={{ mb: 4 }}>
-                        <EmptyState icon="⚠️" title="Oops!" description={productError} />
-                    </Box>
                 ) : (
                     <>
-                        {/* ── FLASH SALE ROW ── */}
-                        {renderProductRow("Flash Sale", "Grab offers before they close!", todaysOffers, true)}
-
-                        {/* ── ACTIVE FILTER PRODUCTS IF CATEGORY SELECT ── */}
-                        {activeCategory && (
-                            <Box sx={{ mb: 4 }}>
-                                <Typography variant="h5" fontWeight={800} color="#1F2937" sx={{ mb: 2 }}>
-                                    Selected Collection
-                                </Typography>
-                                <Grid container spacing={2}>
-                                    {filteredProducts.map(prod => (
-                                        <Grid item xs={6} sm={4} md={3} key={prod._id}>
-                                            <ProductCard
-                                                product={{
-                                                    _id: prod._id,
-                                                    name: prod.name,
-                                                    image: getImageUrl(prod.images?.[0] || prod.image),
-                                                    price: prod.offerPrice || prod.price,
-                                                    mrp: prod.offerPrice ? prod.price : null,
-                                                    discount: prod.offerPrice ? Math.round((1 - prod.offerPrice / prod.price) * 100) : 0,
-                                                    rating: Number(prod.rating || 0),
-                                                    countInStock: prod.countInStock
-                                                }}
-                                                wishlisted={isWishlisted(prod._id)}
-                                                onAddToCart={() => handleAddToCart(prod._id)}
-                                                onToggleWishlist={() => handleAddToWishlist(prod._id)}
-                                                onClick={() => navigate(`/products/${prod._id}`)}
-                                            />
-                                        </Grid>
-                                    ))}
-                                </Grid>
-                            </Box>
-                        )}
-
-                        {/* ── BEST SELLERS ── */}
-                        {renderProductRow("Best Sellers", "Most loved by our customers", bestSellers)}
-
-                        {/* ── REFER BANNER ── */}
+                        {/* ── FLASH SALE ROW (Horizontal Cards) ── */}
                         <Box sx={{ mb: 4 }}>
-                            <Box sx={{
-                                background: 'linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)',
-                                borderRadius: '16px', p: 3,
-                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                border: '1px solid #D1FAE5',
-                                boxShadow: '0 4px 16px rgba(46,125,50,0.04)'
-                            }}>
-                                <Box>
-                                    <Typography sx={{ fontSize: '0.72rem', fontWeight: 800, color: '#2E7D32', mb: 0.5, textTransform: 'uppercase', letterSpacing: 0.5 }}>🎁 REFER & EARN</Typography>
-                                    <Typography sx={{ fontSize: { xs: '1.25rem', md: '1.5rem' }, fontWeight: 800, color: '#1F2937', lineHeight: 1.2, mb: 1.5 }}>
-                                        Invite friends, get ₹100 inside your wallet!
-                                    </Typography>
-                                    <Box
-                                        component="button"
-                                        onClick={() => navigate('/settings/rewards')}
-                                        sx={{
-                                            background: '#2E7D32', color: '#fff', fontSize: '0.85rem', fontWeight: 700,
-                                            py: 1, px: 3, borderRadius: 99, border: 'none', cursor: 'pointer',
-                                            transition: 'transform 0.2s',
-                                            '&:hover': { transform: 'translateY(-1px)' }
-                                        }}
-                                    >
-                                        Invite Now
-                                    </Box>
+                            <Box display="flex" alignItems="center" gap={1.5} mb={2}>
+                                <Typography variant="h6" fontWeight={800} color="#1F2937" sx={{ letterSpacing: '-0.02em' }}>
+                                    Flash Sale
+                                </Typography>
+                                <Box sx={{ 
+                                    bgcolor: '#E65100', color: '#fff', px: 1, py: 0.25, 
+                                    borderRadius: '6px', fontSize: '0.8rem', fontWeight: 800,
+                                    display: 'flex', alignItems: 'center', gap: 0.5, fontFamily: 'monospace'
+                                }}>
+                                    ⏰ {formatTime(timeLeft)}
                                 </Box>
-                                <Typography sx={{ fontSize: { xs: 50, md: 80 }, display: { xs: 'none', sm: 'block' } }}>🤝</Typography>
+                            </Box>
+
+                            <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 1, '&::-webkit-scrollbar': { display: 'none' } }}>
+                                {finalFlashSale.map((prod) => (
+                                    <Box key={prod._id} sx={{ minWidth: 260, width: 280, flexShrink: 0 }}>
+                                        <ProductCard
+                                            product={{
+                                                _id: prod._id,
+                                                name: prod.name,
+                                                image: getImageUrl(prod.images?.[0] || prod.image),
+                                                price: prod.offerPrice || prod.price,
+                                                mrp: prod.offerPrice ? prod.price : null,
+                                                discount: prod.offerPrice ? Math.round((1 - prod.offerPrice / prod.price) * 100) : prod.discount,
+                                                rating: Number(prod.rating || 0),
+                                                countInStock: prod.countInStock
+                                            }}
+                                            layout="horizontal"
+                                            wishlisted={isWishlisted(prod._id)}
+                                            onAddToCart={() => handleAddToCart(prod._id)}
+                                            onToggleWishlist={() => handleAddToWishlist(prod._id)}
+                                            onClick={() => navigate(`/products/${prod._id}`)}
+                                        />
+                                    </Box>
+                                ))}
                             </Box>
                         </Box>
 
-                        {/* ── TRENDING PRODUCTS (2-column mobile, multi-column desktop) ── */}
-                        {renderProductRow("Trending Products", "What's popular this week", trendingProducts)}
+                        {/* ── BUY AGAIN ROW (Horizontal Cards) ── */}
+                        <Box sx={{ mb: 4 }}>
+                            <Typography variant="h6" fontWeight={800} color="#1F2937" sx={{ mb: 2, letterSpacing: '-0.02em' }}>
+                                Buy Again
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 1, '&::-webkit-scrollbar': { display: 'none' } }}>
+                                {finalBuyAgain.map((prod) => (
+                                    <Box key={prod._id} sx={{ minWidth: 260, width: 280, flexShrink: 0 }}>
+                                        <ProductCard
+                                            product={{
+                                                _id: prod._id,
+                                                name: prod.name,
+                                                image: getImageUrl(prod.images?.[0] || prod.image),
+                                                price: prod.price,
+                                                countInStock: prod.countInStock
+                                            }}
+                                            layout="horizontal"
+                                            wishlisted={isWishlisted(prod._id)}
+                                            onAddToCart={() => handleAddToCart(prod._id)}
+                                            onToggleWishlist={() => handleAddToWishlist(prod._id)}
+                                            onClick={() => navigate(`/products/${prod._id}`)}
+                                        />
+                                    </Box>
+                                ))}
+                            </Box>
+                        </Box>
 
-                        {/* ── ORGANIC COLLECTION ── */}
-                        {renderProductRow("Organic Collection", "Pesticide-free grains", organicRice)}
-
-                        {/* ── WHOLESALE / BULK ── */}
-                        {renderProductRow("Wholesale Collection", "Save big on bulk orders", wholesaleRice)}
-
-                        {/* ── RECENTLY VIEWED ── */}
-                        {recentlyViewed.length > 0 && renderProductRow("Recently Viewed", "Based on your activity", recentlyViewed)}
+                        {/* ── RECOMMENDED FOR YOU (2-Column Vertical Cards) ── */}
+                        <Box sx={{ mb: 4 }}>
+                            <Typography variant="h6" fontWeight={800} color="#1F2937" sx={{ mb: 2, letterSpacing: '-0.02em' }}>
+                                Recommended for You
+                            </Typography>
+                            <Grid container spacing={2}>
+                                {finalRecommended.map((prod) => (
+                                    <Grid item xs={6} key={prod._id}>
+                                        <ProductCard
+                                            product={{
+                                                _id: prod._id,
+                                                name: prod.name,
+                                                image: getImageUrl(prod.images?.[0] || prod.image),
+                                                price: prod.offerPrice || prod.price,
+                                                mrp: prod.offerPrice ? prod.price : null,
+                                                discount: prod.offerPrice ? Math.round((1 - prod.offerPrice / prod.price) * 100) : prod.discount,
+                                                rating: Number(prod.rating || 0),
+                                                countInStock: prod.countInStock
+                                            }}
+                                            layout="vertical"
+                                            wishlisted={isWishlisted(prod._id)}
+                                            onAddToCart={() => handleAddToCart(prod._id)}
+                                            onToggleWishlist={() => handleAddToWishlist(prod._id)}
+                                            onClick={() => navigate(`/products/${prod._id}`)}
+                                        />
+                                    </Grid>
+                                ))}
+                            </Grid>
+                        </Box>
                     </>
                 )}
             </Container>
+
+            {/* ── STICKY BOTTOM NAVIGATION BAR (Image 1 replica) ── */}
+            <Paper 
+                elevation={10} 
+                sx={{ 
+                    position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000,
+                    height: 64, borderTop: '1px solid #E5E7EB', display: 'flex', 
+                    justifyContent: 'space-around', alignItems: 'center', bgcolor: '#fff'
+                }}
+            >
+                <IconButton onClick={() => navigate('/customer/dashboard')} sx={{ display: 'flex', flexDirection: 'column', color: '#16A34A', py: 0.5 }}>
+                    <Home sx={{ fontSize: 24 }} />
+                    <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, mt: 0.25 }}>Home</Typography>
+                </IconButton>
+
+                <IconButton onClick={() => navigate('/products')} sx={{ display: 'flex', flexDirection: 'column', color: '#9CA3AF', py: 0.5 }}>
+                    <ListAlt sx={{ fontSize: 24 }} />
+                    <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, mt: 0.25 }}>Categories</Typography>
+                </IconButton>
+
+                <IconButton onClick={() => navigate('/cart')} sx={{ display: 'flex', flexDirection: 'column', color: '#9CA3AF', py: 0.5, position: 'relative' }}>
+                    <Badge badgeContent={cartItems.length || 3} color="error" sx={{ '& .MuiBadge-badge': { bgcolor: '#E65100', color: '#fff', fontWeight: 800 } }}>
+                        <ShoppingCart sx={{ fontSize: 24 }} />
+                    </Badge>
+                    <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, mt: 0.25 }}>Cart</Typography>
+                </IconButton>
+
+                <IconButton onClick={() => navigate('/settings/order-history')} sx={{ display: 'flex', flexDirection: 'column', color: '#9CA3AF', py: 0.5 }}>
+                    <ShoppingBag sx={{ fontSize: 24 }} />
+                    <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, mt: 0.25 }}>Orders</Typography>
+                </IconButton>
+
+                <IconButton onClick={() => navigate('/settings/profile')} sx={{ display: 'flex', flexDirection: 'column', color: '#9CA3AF', py: 0.5 }}>
+                    <Person sx={{ fontSize: 24 }} />
+                    <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, mt: 0.25 }}>Profile</Typography>
+                </IconButton>
+            </Paper>
         </Box>
     );
 };
