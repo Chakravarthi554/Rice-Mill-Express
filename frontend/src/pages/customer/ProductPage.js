@@ -13,12 +13,15 @@ import {
   useMediaQuery,
   Chip,
   IconButton,
-  Badge
+  Badge,
+  CircularProgress,
+  Alert
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { 
   ArrowBack, Share, FavoriteBorder, Favorite, 
-  KeyboardArrowDown, Home, ListAlt, ShoppingCart, ShoppingBag, Person 
+  KeyboardArrowDown, Home, ListAlt, ShoppingCart, ShoppingBag, Person,
+  Star
 } from "@mui/icons-material";
 
 // Redux Actions
@@ -34,6 +37,11 @@ import { getImageUrl } from "../../utils/urlHelper";
 // Theme
 import { colors, radius, shadows, tints } from "../../theme/designTokens";
 
+// UI Components
+import EmptyState from "../../components/ui/EmptyState";
+import SocialInteraction from "../../components/common/SocialInteraction";
+import ProductCard from "../../components/ui/ProductCard";
+
 const ProductPage = () => {
   const { id } = useParams();
   const dispatch = useDispatch();
@@ -47,6 +55,9 @@ const ProductPage = () => {
   const productDetails = useSelector((state) => state.productDetails || {});
   const { loading, error, product = {} } = productDetails;
   
+  const productList = useSelector((state) => state.productList || {});
+  const { products: allProducts = [] } = productList;
+
   const { userInfo } = useSelector((state) => state.userLogin || {});
   const { wishlistItems = [] } = useSelector(state => state.wishlist || {});
   const { cartItems = [] } = useSelector(state => state.cart || {});
@@ -111,18 +122,27 @@ const ProductPage = () => {
   const originalPrice = hasOffer ? product.price : null;
   const discountPercentage = hasOffer ? Math.round(((product.price - product.offerPrice) / product.price) * 100) : 22; // default mock as page 2
 
+  const relatedProducts = allProducts.filter(p => p._id !== id).slice(0, 6);
+
   return (
-    <Box sx={{ bgcolor: '#FFFDF9', minHeight: '100vh', pb: 12 }}>
+    <Box sx={{ bgcolor: '#FFFDF9', minHeight: '100vh', pb: { xs: 12, md: 8 } }}>
       
       {/* ── HEADER BANNER FLOW ── */}
-      <Box sx={{ display: 'flex', alignItems: 'center', px: 2, py: 1.5, borderBottom: '1px solid #F3F4F6', bgcolor: '#fff' }}>
+      <Box sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center', px: 2, py: 1.5, borderBottom: '1px solid #F3F4F6', bgcolor: '#fff' }}>
         <IconButton onClick={() => navigate('/customer/dashboard')} sx={{ mr: 1 }}><ArrowBack /></IconButton>
         <Typography variant="subtitle1" fontWeight={800} color="#1F2937">Product Details</Typography>
       </Box>
 
-      <Container maxWidth="xs" sx={{ px: 2, pt: 2 }}>
-        
-        {/* ── IMAGE GALLERY (Image 2 style) ── */}
+      {/* ── DESKTOP HEADER BANNER ── */}
+      <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', px: 6, py: 2, bgcolor: '#fff', mb: 3, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+        <Button startIcon={<ArrowBack />} onClick={() => navigate(-1)} sx={{ color: '#4B5563', textTransform: 'none', fontWeight: 700 }}>
+          Back to Shopping
+        </Button>
+      </Box>
+
+      <Container maxWidth={false} sx={{ px: { xs: 2, md: 6 }, pt: 2 }}>
+        <Grid container spacing={4}>
+          <Grid item xs={12} md={5}>
         <Box sx={{ position: 'relative', bgcolor: '#fff', borderRadius: '16px', border: '1px solid #F3F4F6', overflow: 'hidden', p: 1, mb: 2 }}>
           {/* Float Action buttons */}
           <IconButton 
@@ -180,9 +200,12 @@ const ProductPage = () => {
           </Stack>
         )}
 
-        {/* ── DESCRIPTION / DETAILS BLOCK ── */}
-        <Box sx={{ mt: 1 }}>
-          <Chip
+          </Grid>
+
+          {/* ── RIGHT COLUMN: DETAILS ── */}
+          <Grid item xs={12} md={7}>
+            <Box sx={{ mt: { xs: 1, md: 0 }, bgcolor: { md: '#fff' }, p: { md: 4 }, borderRadius: { md: '20px' }, boxShadow: { md: '0 4px 20px rgba(0,0,0,0.03)' }, border: { md: '1px solid #F3F4F6' } }}>
+              <Chip
             label={product.category || "Sona Masoori"}
             size="small"
             sx={{ bgcolor: '#F0FDF4', color: '#2E7D32', fontWeight: 800, borderRadius: '6px', mb: 1 }}
@@ -271,7 +294,7 @@ const ProductPage = () => {
           {/* Delivery section details */}
           <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1.5, textTransform: 'uppercase', letterSpacing: 0.5 }}>Delivery Details</Typography>
           
-          <Box sx={{ bgcolor: '#fff', borderRadius: '12px', border: '1px solid #F3F4F6', p: 2, mb: 4, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          <Box sx={{ bgcolor: '#fff', borderRadius: '12px', border: '1px solid #F3F4F6', p: 2, mb: 4, display: 'flex', flexDirection: 'column', gap: 1.5, boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
             <Box display="flex" alignItems="center" gap={1.5}>
               <Typography fontSize={18}>📍</Typography>
               <Typography variant="body2" fontWeight={700} color="#1F2937">Tomorrow, 7PM</Typography>
@@ -286,13 +309,69 @@ const ProductPage = () => {
             </Box>
           </Box>
 
+              {/* Desktop Action Buttons (Hidden on mobile) */}
+              <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: 2, mt: 4, mb: 2 }}>
+                <Button 
+                  variant="outlined" 
+                  onClick={addToCartHandler}
+                  sx={{ 
+                    flex: 1, height: 56, borderColor: '#2E7D32', color: '#2E7D32', borderWidth: 2,
+                    borderRadius: '16px', fontWeight: 800, fontSize: '1.1rem', textTransform: 'none',
+                    '&:hover': { borderColor: '#1B5E20', borderWidth: 2, bgcolor: '#F0FDF4' }
+                  }}
+                >
+                  Add to Cart
+                </Button>
+                <Button 
+                  variant="contained" 
+                  onClick={buyNowHandler}
+                  sx={{ 
+                    flex: 1, height: 56, bgcolor: '#2E7D32', color: '#fff',
+                    borderRadius: '16px', fontWeight: 800, fontSize: '1.1rem', textTransform: 'none',
+                    boxShadow: '0 8px 24px rgba(46, 125, 50, 0.25)',
+                    '&:hover': { bgcolor: '#1B5E20' }
+                  }}
+                >
+                  Buy Now
+                </Button>
+              </Box>
+            </Box>
+          </Grid>
+        </Grid>
+
+        {/* ── FULL WIDTH BOTTOM SECTION ── */}
+        <Box sx={{ mt: 6 }}>
+          {/* Social Interactions */}
+          <Box sx={{ mb: 6, p: { xs: 2, md: 4 }, borderRadius: '20px', bgcolor: '#fff', boxShadow: '0 8px 30px rgba(0,0,0,0.04)', border: '1px solid #F3F4F6' }}>
+             <Typography variant="h5" fontWeight={800} color="#1F2937" mb={2}>Community Discussion</Typography>
+             <Divider sx={{ mb: 3 }} />
+             <SocialInteraction itemType="products" itemId={product._id} itemUserId={product.seller} />
+          </Box>
+
+          {/* Related Products Grid */}
+          <Box sx={{ mb: 8 }}>
+            <Typography variant="h4" fontWeight={800} color="#1F2937" mb={4}>Related Products</Typography>
+            <Grid container spacing={3}>
+              {relatedProducts.map(rp => (
+                <Grid item xs={6} sm={4} md={2} key={rp._id}>
+                  <ProductCard 
+                    product={rp}
+                    layout="vertical"
+                    wishlisted={isWishlisted(rp._id)}
+                    onClick={() => navigate(`/products/${rp._id}`)}
+                  />
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
         </Box>
       </Container>
 
-      {/* ── ACTION BAR BUTTONS (Image 2 styles) ── */}
+      {/* ── MOBILE ACTION BAR BUTTONS (Hidden on Desktop) ── */}
       <Box sx={{ 
+        display: { xs: 'flex', md: 'none' },
         position: 'fixed', bottom: 64, left: 0, right: 0, zIndex: 999,
-        bgcolor: '#fff', p: 2, display: 'flex', gap: 2, borderTop: '1px solid #E5E7EB'
+        bgcolor: '#fff', p: 2, gap: 2, borderTop: '1px solid #E5E7EB'
       }}>
         <Button 
           variant="outlined" 
@@ -318,12 +397,13 @@ const ProductPage = () => {
         </Button>
       </Box>
 
-      {/* ── STICKY BOTTOM NAVIGATION BAR ── */}
+      {/* ── MOBILE STICKY BOTTOM NAVIGATION BAR (Hidden on Desktop) ── */}
       <Paper 
         elevation={10} 
         sx={{ 
+          display: { xs: 'flex', md: 'none' },
           position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000,
-          height: 64, borderTop: '1px solid #E5E7EB', display: 'flex', 
+          height: 64, borderTop: '1px solid #E5E7EB', 
           justifyContent: 'space-around', alignItems: 'center', bgcolor: '#fff'
         }}
       >

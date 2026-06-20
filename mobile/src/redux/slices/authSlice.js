@@ -9,15 +9,24 @@ export const login = createAsyncThunk(
     'auth/login',
     async ({ email, password }, { rejectWithValue }) => {
         try {
-            // 1. Sign in with Firebase
-            const userCredential = await signInWithEmailAndPassword(auth, email, password);
-            const idToken = await userCredential.user.getIdToken();
+            let token;
+            let response;
+            try {
+                // 1. Sign in with Firebase
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                token = await userCredential.user.getIdToken();
 
-            // 2. Get user profile from backend
-            const response = await api.post(
-                '/api/auth/firebase-login',
-                { idToken }
-            );
+                // 2. Get user profile from backend
+                response = await api.post(
+                    '/api/auth/firebase-login',
+                    { idToken: token }
+                );
+            } catch (firebaseError) {
+                console.log('Firebase login failed, falling back to legacy backend login', firebaseError.message);
+                // Fallback to legacy backend login (e.g. for delivery partners not in Firebase)
+                response = await api.post('/api/auth/login', { email, password });
+                token = response.data.accessToken;
+            }
 
             // ⚠️ 2FA Check
             if (response.data.requires2FA) {
@@ -25,10 +34,10 @@ export const login = createAsyncThunk(
             }
 
             // 3. Store token and user info
-            await AsyncStorage.setItem('userToken', idToken);
+            await AsyncStorage.setItem('userToken', token);
             await AsyncStorage.setItem('userInfo', JSON.stringify(response.data));
 
-            return { user: response.data, token: idToken };
+            return { user: response.data, token: token };
         } catch (error) {
             return rejectWithValue(error.response?.data?.message || error.message);
         }

@@ -52,9 +52,9 @@ const ProductCard = ({
         }}
       >
         {/* Left Product Image */}
-        <Box sx={{ width: 80, height: 80, borderRadius: '8px', overflow: 'hidden', bgcolor: '#F9FAFB', flexShrink: 0, position: 'relative' }}>
+        <Box sx={{ width: 80, height: 80, borderRadius: '8px', overflow: 'hidden', bgcolor: '#F9FAFB', flexShrink: 0, position: 'relative', p: 0.5 }}>
           {image ? (
-            <img src={image} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <img src={image} alt={name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
           ) : (
             <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#F0FDF4', fontSize: 28 }}>
               🌾
@@ -121,11 +121,11 @@ const ProductCard = ({
       }}
     >
       {/* Product Image */}
-      <Box sx={{ position: 'relative', height: 140, bgcolor: '#F9FAFB', overflow: 'hidden' }}>
+      <Box sx={{ position: 'relative', height: 140, bgcolor: '#fff', overflow: 'hidden', p: 1 }}>
         {image ? (
           <Box
             component="img" src={image} alt={name} loading="lazy"
-            sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            sx={{ width: '100%', height: '100%', objectFit: 'contain' }}
           />
         ) : (
           <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#F0FDF4', fontSize: 32 }}>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { Box, Container, Grid, Typography, IconButton, InputBase, Paper, Chip } from '@mui/material';
+import { Box, Container, Grid, Typography, IconButton, InputBase, Paper, Chip, Button, Badge } from '@mui/material';
 import { 
   PinDrop, Notifications, Search, ShoppingBag, 
   Favorite, LocalOffer, Person, ChevronRight, Home, ListAlt, ShoppingCart
@@ -336,7 +336,7 @@ const Dashboard = () => {
                             </Typography>
                             <Grid container spacing={2}>
                                 {finalRecommended.map((prod) => (
-                                    <Grid item xs={6} key={prod._id}>
+                                    <Grid item xs={6} sm={4} md={2} key={prod._id}>
                                         <ProductCard
                                             product={{
                                                 _id: prod._id,

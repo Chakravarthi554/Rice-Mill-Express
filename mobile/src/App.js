@@ -424,8 +424,18 @@ function AppNavigator() {
   // 3. Keep Redux in sync with Firebase sign-out
   useEffect(() => {
     if (isAuthReady && !auth.currentUser && isAuthenticated) {
-      console.log('🔄 Syncing Redux state: User signed out in Firebase, logging out of Redux...');
-      dispatch(logout());
+      // Only auto-logout if no backend token exists in AsyncStorage
+      // This allows delivery partners (non-Firebase users) to stay authenticated
+      AsyncStorage.getItem('userToken').then((token) => {
+        if (!token) {
+          console.log('🔄 Syncing Redux state: No token found, logging out...');
+          dispatch(logout());
+        } else {
+          console.log('🛄 Skipping auto-logout: backend token exists (non-Firebase user)');
+        }
+      }).catch(() => {
+        dispatch(logout());
+      });
     }
   }, [isAuthReady, isAuthenticated, dispatch]);
 

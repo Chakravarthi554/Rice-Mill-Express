@@ -85,17 +85,10 @@ const combinedReducer = combineReducers({
 });
 
 const rootReducer = (state, action) => {
-  if (action.type === 'CLEAR_CACHE_STATE') {
-    // Preserve authentication state but reset everything else
-    const { auth } = state;
-    state = {
-      auth,
-      cart: {
-        cartItems: [],
-        loading: false,
-        error: null
-      }
-    };
+  // On logout or cache clear, reset ALL user-scoped state to prevent data leaking between accounts
+  if (action.type === 'auth/logout/fulfilled' || action.type === 'CLEAR_CACHE_STATE') {
+    // Reset everything — let each reducer start fresh with initial state
+    state = undefined;
   }
   return combinedReducer(state, action);
 };

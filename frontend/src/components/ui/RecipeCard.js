@@ -25,9 +25,15 @@ const RecipeCard = ({
   onClick, onLike, onComment, onSave,
 }) => (
   <MotionBox
-    whileHover={{ y: -5, boxShadow: shadows.xl }}
+    whileHover={{ y: -5, boxShadow: '0 20px 40px -15px rgba(0,0,0,0.15)' }}
     transition={{ type: 'spring', stiffness: 320, damping: 28 }}
-    sx={{ bgcolor: 'background.paper', borderRadius: `${radius.lg}px`, border: '1px solid', borderColor: 'divider', overflow: 'hidden', cursor: onClick ? 'pointer' : 'default', display: 'flex', flexDirection: 'column', height: '100%' }}
+    sx={{ 
+      bgcolor: 'background.paper', borderRadius: `${radius.lg}px`, 
+      border: 'none', 
+      boxShadow: '0 10px 30px -10px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.05)',
+      overflow: 'hidden', cursor: onClick ? 'pointer' : 'default', 
+      display: 'flex', flexDirection: 'column', height: '100%' 
+    }}
     onClick={onClick}
     role="group"
     aria-label={title}

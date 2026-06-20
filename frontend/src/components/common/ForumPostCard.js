@@ -231,7 +231,15 @@ const ForumPostCard = ({ post, onUpdate }) => {
 
   return (
     <>
-      <Card sx={{ borderRadius: 3, boxShadow: 3, mb: 2, border: currentPost.status !== 'approved' && isAdmin ? '2px solid #ff9800' : 'none' }}>
+      <Card sx={{ 
+        borderRadius: 4, 
+        boxShadow: '0 10px 30px -10px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.05)', 
+        mb: 3, 
+        border: currentPost.status !== 'approved' && isAdmin ? '2px solid #ff9800' : 'none',
+        background: 'linear-gradient(to bottom, #ffffff, #fdfdfd)',
+        transition: 'transform 0.2s, box-shadow 0.2s',
+        '&:hover': { transform: 'translateY(-4px)', boxShadow: '0 20px 40px -15px rgba(0,0,0,0.15)' }
+      }}>
         <CardHeader
           avatar={<Avatar src={getImageUrl(currentPost.userId?.profilePic)}>{currentPost.userId?.name?.[0]}</Avatar>}
           action={<IconButton onClick={(e) => setAnchorEl(e.currentTarget)}><MoreVert /></IconButton>}

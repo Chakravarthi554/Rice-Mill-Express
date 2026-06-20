@@ -16,7 +16,7 @@ import {
 export const recipeListReducer = (state = { recipes: [] }, action) => {
     switch (action.type) {
         case RECIPE_LIST_REQUEST:
-            return { loading: true, recipes: [] };
+            return { ...state, loading: true, error: null };
         case RECIPE_LIST_SUCCESS:
             return {
                 loading: false,
@@ -26,7 +26,7 @@ export const recipeListReducer = (state = { recipes: [] }, action) => {
                 total: action.payload.total
             };
         case RECIPE_LIST_FAIL:
-            return { loading: false, error: action.payload };
+            return { ...state, loading: false, error: action.payload };
         case RECIPE_RATE_SUCCESS:
             return {
                 ...state,

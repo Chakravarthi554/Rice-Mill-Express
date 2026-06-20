@@ -603,19 +603,19 @@ const approveProduct = asyncHandler(async (req, res) => {
       if (seller && seller.email) {
         await sendEmail({
           email: seller.email,
-          subject: \`Product \${status === 'approved' ? 'Approved' : 'Rejected'}\`,
-          message: \`
+          subject: `Product ${status === 'approved' ? 'Approved' : 'Rejected'}`,
+          message: `
             <h2>Product Approval Status Update</h2>
-            <p>Your product <b>\${product.name}</b> has been <b>\${status}</b> by the admin.</p>
-            \${status === 'rejected' ? \`<p>Reason: \${product.approvalRejectionReason}</p>\` : ''}
-          \`
+            <p>Your product <b>${product.name}</b> has been <b>${status}</b> by the admin.</p>
+            ${status === 'rejected' ? `<p>Reason: ${product.approvalRejectionReason}</p>` : ''}
+          `
         });
       }
 
       await Notification.create({
         user: seller._id,
-        type: \`PRODUCT_\${status.toUpperCase()}\`,
-        message: \`Your product "\${product.name}" has been \${status}.\${status === 'rejected' ? ' Reason: ' + product.approvalRejectionReason : ''}\`,
+        type: `PRODUCT_${status.toUpperCase()}`,
+        message: `Your product "${product.name}" has been ${status}.${status === 'rejected' ? ' Reason: ' + product.approvalRejectionReason : ''}`,
         relatedEntity: product._id,
         entityModel: 'Product'
       });
@@ -625,7 +625,7 @@ const approveProduct = asyncHandler(async (req, res) => {
 
     res.json({
       success: true,
-      message: \`Product \${status} successfully\`,
+      message: `Product ${status} successfully`,
       product
     });
   } catch (error) {

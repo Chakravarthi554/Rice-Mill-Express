@@ -8,9 +8,9 @@ import { colors, radius } from '../../theme/designTokens';
 
 const ProductsPage = () => {
     return (
-        <Box sx={{ minHeight: '100vh', bgcolor: colors.surface.default }}>
+        <Box sx={{ minHeight: '100vh', bgcolor: '#F9FAFB' }}>
             <Header />
-            <Container maxWidth="xl" sx={{ pt: 4, pb: 8 }}>
+            <Container maxWidth={false} sx={{ pt: 4, pb: 8, px: { xs: 2, md: 6 } }}>
                 <Paper
                     elevation={0}
                     sx={{

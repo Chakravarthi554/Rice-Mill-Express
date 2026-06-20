@@ -15,7 +15,8 @@ import {
   TableHead,
   TableRow,
   Paper,
-  Alert
+  Alert,
+  Stack
 } from '@mui/material';
 import {
   ShoppingCart as ShoppingCartIcon,

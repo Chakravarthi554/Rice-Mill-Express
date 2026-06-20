@@ -411,8 +411,8 @@ const ProductFilter = () => {
       {/* Products Grid */}
       {productLoading ? (
         <Grid container spacing={2}>
-          {[...Array(8)].map((_, item) => (
-            <Grid item xs={6} sm={4} md={3} key={item}>
+          {[...Array(12)].map((_, item) => (
+            <Grid item xs={6} sm={4} md={2} key={item}>
               <LoadingSkeleton type="product" />
             </Grid>
           ))}
@@ -444,7 +444,7 @@ const ProductFilter = () => {
             const deliveryEta = `${15 + (product.name?.length % 15)} mins`;
 
             return (
-              <Grid item xs={6} sm={4} md={3} key={product._id}>
+              <Grid item xs={6} sm={4} md={2} key={product._id}>
                 <ProductCard
                   product={{
                       _id: product._id,

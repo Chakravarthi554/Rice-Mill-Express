@@ -277,7 +277,7 @@ const CheckoutPage = () => {
 
   return (
     <Box sx={{ bgcolor: colors.surface.default, minHeight: '100vh', pb: 8 }}>
-      <Container maxWidth="xl" sx={{ pt: 4 }}>
+      <Container maxWidth={false} sx={{ pt: 4, px: { xs: 2, md: 6 } }}>
 
         {/* ── Title ── */}
         <Typography sx={{ ...typography.scale.h1, color: colors.primary.dark, mb: 2 }}>
@@ -303,10 +303,17 @@ const CheckoutPage = () => {
             {/* ── Left Column ── */}
             <Grid item xs={12} md={8}>
               {/* Address */}
-              <Paper sx={{ p: 3.5, mb: 3, borderRadius: `${radius.xl}px`, border: `1px solid ${colors.neutral[200]}`, boxShadow: shadows.xs }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
-                  <LocationOn sx={{ color: colors.primary.main }} />
-                  <Typography sx={{ fontWeight: 700, fontSize: '1.1rem' }}>{t('addresses')}</Typography>
+              <Paper sx={{ 
+                p: 2.5, mb: 2.5, borderRadius: 4, 
+                border: 'none', 
+                boxShadow: '0 10px 30px -10px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.05)',
+                background: 'linear-gradient(to bottom, #ffffff, #fdfdfd)' 
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                  <Box sx={{ width: 36, height: 36, borderRadius: '10px', bgcolor: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <LocationOn sx={{ color: '#16A34A', fontSize: 20 }} />
+                  </Box>
+                  <Typography sx={{ fontWeight: 800, fontSize: '1.1rem', color: '#1F2937' }}>{t('addresses')}</Typography>
                 </Box>
                 <AddressManager onSelectAddress={setSelectedAddress} />
                 {!selectedAddress && (
@@ -317,10 +324,17 @@ const CheckoutPage = () => {
               </Paper>
 
               {/* Payment */}
-              <Paper sx={{ p: 3.5, mb: 3, borderRadius: `${radius.xl}px`, border: `1px solid ${colors.neutral[200]}`, boxShadow: shadows.xs }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
-                  <Payment sx={{ color: colors.primary.main }} />
-                  <Typography sx={{ fontWeight: 700, fontSize: '1.1rem' }}>Payment Method</Typography>
+              <Paper sx={{ 
+                p: 2.5, mb: 2.5, borderRadius: 4, 
+                border: 'none', 
+                boxShadow: '0 10px 30px -10px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.05)',
+                background: 'linear-gradient(to bottom, #ffffff, #fdfdfd)' 
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                  <Box sx={{ width: 36, height: 36, borderRadius: '10px', bgcolor: '#EEF2FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Payment sx={{ color: '#4F46E5', fontSize: 20 }} />
+                  </Box>
+                  <Typography sx={{ fontWeight: 800, fontSize: '1.1rem', color: '#1F2937' }}>Payment Method</Typography>
                 </Box>
                 <PaymentMethodSelector value={paymentMethod} onChange={handlePaymentChange} />
                 {paymentMethod === 'cod' && !isMinOrderMet && (
@@ -334,10 +348,12 @@ const CheckoutPage = () => {
             {/* ── Right Column (Order Summary) ── */}
             <Grid item xs={12} md={4}>
               <Paper sx={{
-                p: 3.5, borderRadius: `${radius.xl}px`, position: 'sticky', top: 20,
-                border: `1px solid ${colors.neutral[200]}`, boxShadow: shadows.sm,
+                p: 2.5, borderRadius: 4, position: 'sticky', top: 20,
+                border: 'none',
+                boxShadow: '0 20px 40px -15px rgba(0,0,0,0.15), 0 0 10px rgba(0,0,0,0.02)',
+                background: 'linear-gradient(to bottom, #ffffff, #fcfcfc)'
               }}>
-                <Typography sx={{ fontWeight: 800, fontSize: '1.15rem', mb: 2.5 }}>
+                <Typography sx={{ fontWeight: 800, fontSize: '1.15rem', mb: 2, color: '#1F2937' }}>
                   {t('orderSummary') || 'Order Summary'}
                 </Typography>
 
@@ -439,10 +455,10 @@ const CheckoutPage = () => {
                   disabled={isLoading || !selectedAddress || (paymentMethod === 'cod' && !isMinOrderMet)}
                   startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : <LockOutlined />}
                   sx={{
-                    bgcolor: colors.primary.main, '&:hover': { bgcolor: colors.primary.dark },
-                    borderRadius: `${radius.md}px`, py: 1.5, fontWeight: 800, fontSize: '1rem',
-                    boxShadow: shadows.greenGlow,
-                    '&.Mui-disabled': { bgcolor: colors.neutral[200] },
+                    bgcolor: '#2E7D32', '&:hover': { bgcolor: '#1B5E20' },
+                    borderRadius: '24px', py: 1.2, fontWeight: 800, fontSize: '1.05rem', textTransform: 'none',
+                    boxShadow: '0 8px 24px rgba(46, 125, 50, 0.35)',
+                    '&.Mui-disabled': { bgcolor: '#E5E7EB', boxShadow: 'none' },
                   }}
                 >
                   {isLoading ? 'Processing...' : (paymentMethod === 'razorpay' ? 'Proceed to Pay' : 'Place Order (COD)')}

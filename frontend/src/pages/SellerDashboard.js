@@ -11,7 +11,8 @@ import { useTheme } from '@mui/material/styles';
 import {
     Dashboard as DashboardIcon, ShoppingBag, Inventory2, AccountBalanceWallet,
     LocalShipping, BarChart, Settings, Logout, Search,
-    TrendingUp, TrendingDown, ArrowForward, PeopleAlt, Chat, Warning, CheckCircle
+    TrendingUp, TrendingDown, ArrowForward, PeopleAlt, Chat, Warning, CheckCircle,
+    Download as DownloadIcon
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -110,6 +111,8 @@ const OverviewPanel = ({ orders, products, onTabChange }) => {
 
     const statusChip = (s) => {
         const map = {
+            created: { label: 'NEW', color: '#FEE2E2', text: '#DC2626', pulse: true },
+            confirmed: { label: 'NEW', color: '#FEE2E2', text: '#DC2626', pulse: true },
             placed: { label: 'NEW', color: '#FEE2E2', text: '#DC2626', pulse: true },
             pending: { label: 'NEW', color: '#FEE2E2', text: '#DC2626', pulse: true },
             processing: { label: 'Processing', color: '#FEF3C7', text: '#D97706', pulse: false },
@@ -276,7 +279,7 @@ const OrdersPanel = ({ orders, partners, onAssign, onUpdateStatus, onDownloadInv
 
     const filtered = useMemo(() => orders.filter(o => {
         let matchStatus = true;
-        if (statusFilter === 'New') matchStatus = ['placed', 'pending'].includes(o.orderStatus?.toLowerCase());
+        if (statusFilter === 'New') matchStatus = ['placed', 'pending', 'created', 'confirmed'].includes(o.orderStatus?.toLowerCase());
         else if (statusFilter === 'Ready') matchStatus = o.orderStatus?.toLowerCase() === 'packed';
         else if (statusFilter !== 'All') matchStatus = o.orderStatus?.toLowerCase() === statusFilter.toLowerCase();
 
@@ -294,6 +297,8 @@ const OrdersPanel = ({ orders, partners, onAssign, onUpdateStatus, onDownloadInv
     }), [orders, statusFilter, search, dateFilter]);
 
     const STATUS_CONFIG = {
+        created: { label: 'NEW', bg: '#DC2626', text: '#fff' },
+        confirmed: { label: 'NEW', bg: '#DC2626', text: '#fff' },
         placed: { label: 'NEW', bg: '#DC2626', text: '#fff' },
         pending: { label: 'NEW', bg: '#DC2626', text: '#fff' },
         processing: { label: 'PROCESSING', bg: '#D97706', text: '#fff' },
@@ -340,7 +345,7 @@ const OrdersPanel = ({ orders, partners, onAssign, onUpdateStatus, onDownloadInv
                     </Grid>
                 ) : filtered.map(order => {
                     const sc = STATUS_CONFIG[order.orderStatus] || { label: order.orderStatus?.toUpperCase(), bg: '#9CA3AF', text: '#fff' };
-                    const isNew = ['placed', 'pending'].includes(order.orderStatus);
+                    const isNew = ['placed', 'pending', 'created', 'confirmed'].includes(order.orderStatus);
                     const addr = order.shippingAddress ? `${order.shippingAddress.street || ''}, ${order.shippingAddress.city || ''} - ${order.shippingAddress.pinCode || ''}`.trim() : 'No address';
 
                     return (

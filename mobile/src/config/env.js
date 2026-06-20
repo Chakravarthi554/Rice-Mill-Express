@@ -67,7 +67,7 @@ const getEnvConfig = () => {
 const config = getEnvConfig();
 
 // ─── Named exports (import these wherever needed) ──────────────────────────
-export const API_URL = 'http://10.17.170.143:5001';
+export const API_URL = 'http://10.55.30.143:5001';
 export const ENVIRONMENT = config.ENVIRONMENT;
 export const IS_DEV = config.ENVIRONMENT === 'development';
 export const IS_PROD = config.ENVIRONMENT === 'production';

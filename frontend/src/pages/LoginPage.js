@@ -6,7 +6,7 @@ import {
 } from '@mui/material';
 import { Close as CloseIcon, Google as GoogleIcon, Visibility, VisibilityOff, EmailOutlined, LockOutlined, PhoneOutlined, ArrowBack } from '@mui/icons-material';
 import { auth } from '../firebase';
-import { signInWithEmailAndPassword, signInWithPhoneNumber, RecaptchaVerifier, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { signInWithEmailAndPassword, signInWithPhoneNumber, RecaptchaVerifier, signInWithPopup, GoogleAuthProvider, FacebookAuthProvider, OAuthProvider } from 'firebase/auth';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -96,6 +96,30 @@ const LoginPage = () => {
     } catch (error) {
       console.error('❌ LoginPage: Google Sign-in Error:', error);
       setMessage(error.message || 'Failed to sign in with Google');
+    } finally { setLoading(false); }
+  };
+
+  const handleFacebookSignIn = async () => {
+    try {
+      setLoading(true); setMessage('');
+      const provider = new FacebookAuthProvider();
+      console.log('🔑 LoginPage: Initiating Facebook Sign-In popup...');
+      await signInWithPopup(auth, provider);
+    } catch (error) {
+      console.error('❌ LoginPage: Facebook Sign-in Error:', error);
+      setMessage(error.message || 'Failed to sign in with Facebook');
+    } finally { setLoading(false); }
+  };
+
+  const handleAppleSignIn = async () => {
+    try {
+      setLoading(true); setMessage('');
+      const provider = new OAuthProvider('apple.com');
+      console.log('🔑 LoginPage: Initiating Apple Sign-In popup...');
+      await signInWithPopup(auth, provider);
+    } catch (error) {
+      console.error('❌ LoginPage: Apple Sign-in Error:', error);
+      setMessage(error.message || 'Failed to sign in with Apple');
     } finally { setLoading(false); }
   };
 
@@ -308,7 +332,7 @@ const LoginPage = () => {
                   <GoogleIcon sx={{ color: '#EA4335', fontSize: 22 }} />
                 </IconButton>
 
-                <IconButton onClick={() => alert('Facebook Login coming soon!')} disabled={loading} sx={{
+                <IconButton onClick={handleFacebookSignIn} disabled={loading} sx={{
                   width: 48, height: 48, border: '1.5px solid #E5E7EB', bgcolor: '#fff',
                   boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
                   '&:hover': { bgcolor: '#F9FAFB', borderColor: '#2E7D32' }
@@ -316,7 +340,7 @@ const LoginPage = () => {
                   <Typography variant="body1" fontWeight="bold" sx={{ color: '#1877F2', fontSize: 22, fontFamily: 'sans-serif' }}>f</Typography>
                 </IconButton>
 
-                <IconButton onClick={() => alert('Apple Login coming soon!')} disabled={loading} sx={{
+                <IconButton onClick={handleAppleSignIn} disabled={loading} sx={{
                   width: 48, height: 48, border: '1.5px solid #E5E7EB', bgcolor: '#fff',
                   boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
                   '&:hover': { bgcolor: '#F9FAFB', borderColor: '#2E7D32' }

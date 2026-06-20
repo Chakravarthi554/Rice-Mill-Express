@@ -70,18 +70,21 @@ const CustomerDashboard = () => {
       <Header />
       <SettingsBanner />
       <Box sx={{ minHeight: '100vh', bgcolor: '#F9FAFB' }}>
-        <Container maxWidth="xl" sx={{ pt: 3, pb: 6 }}>
+        <Container maxWidth={false} sx={{ pt: 3, pb: 6, px: { xs: 2, md: 6 } }}>
 
           {/* Welcome Hero */}
           <Paper
-            elevation={0}
+            elevation={12}
             sx={{
-              mb: 3, p: 3, borderRadius: 4,
-              background: 'linear-gradient(135deg, #16A34A 0%, #059669 50%, #0D9488 100%)',
-              color: '#fff', position: 'relative', overflow: 'hidden'
+              mb: 4, p: 4, borderRadius: 6,
+              background: 'linear-gradient(135deg, #10B981 0%, #059669 40%, #047857 100%)',
+              color: '#fff', position: 'relative', overflow: 'hidden',
+              boxShadow: '0 25px 50px -12px rgba(5, 150, 105, 0.45)',
+              transform: 'perspective(1000px) translateZ(0)',
+              transformStyle: 'preserve-3d'
             }}>
-            <Box sx={{ position: 'absolute', top: -30, right: -30, width: 200, height: 200, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.06)' }} />
-            <Box sx={{ position: 'absolute', bottom: -40, right: 80, width: 140, height: 140, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.04)' }} />
+            <Box sx={{ position: 'absolute', top: -40, right: -40, width: 250, height: 250, borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 70%)', transform: 'translateZ(20px)' }} />
+            <Box sx={{ position: 'absolute', bottom: -60, right: 120, width: 180, height: 180, borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 70%)', transform: 'translateZ(10px)' }} />
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
               <Box>
                 <Typography variant="h5" fontWeight={800} gutterBottom>
@@ -103,13 +106,32 @@ const CustomerDashboard = () => {
           </Paper>
 
           {/* Quick Links */}
-          <Grid container spacing={2} sx={{ mb: 3 }}>
+          <Grid container spacing={2.5} sx={{ mb: 5 }}>
             {quickLinks.map(link => (
               <Grid item xs={6} sm={3} key={link.label}>
-                <Paper elevation={0} variant="outlined"
+                <Paper elevation={4}
                   onClick={() => navigate(link.path)}
-                  sx={{ borderRadius: 3, p: 2.5, cursor: 'pointer', border: '1px solid #F3F4F6', textAlign: 'center', transition: 'all 0.2s', '&:hover': { borderColor: link.color, boxShadow: `0 4px 20px ${link.color}20`, transform: 'translateY(-2px)' } }}>
-                  <Avatar sx={{ bgcolor: link.bg, color: link.color, width: 48, height: 48, mx: 'auto', mb: 1 }}>
+                  sx={{ 
+                    borderRadius: 4, p: 3, cursor: 'pointer', 
+                    background: 'linear-gradient(145deg, #ffffff, #f3f4f6)',
+                    boxShadow: '8px 8px 16px #e5e7eb, -8px -8px 16px #ffffff',
+                    textAlign: 'center', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', 
+                    position: 'relative', overflow: 'hidden',
+                    '&:hover': { 
+                      transform: 'translateY(-6px) scale(1.02)',
+                      boxShadow: `0 20px 25px -5px ${link.color}40`, 
+                      '&::before': { opacity: 1 }
+                    },
+                    '&::before': {
+                      content: '""', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                      background: `linear-gradient(135deg, ${link.color}15 0%, transparent 100%)`,
+                      opacity: 0, transition: 'opacity 0.3s'
+                    }
+                  }}>
+                  <Avatar sx={{ 
+                    bgcolor: link.bg, color: link.color, width: 56, height: 56, mx: 'auto', mb: 1.5,
+                    boxShadow: `inset 0 2px 4px rgba(255,255,255,0.8), 0 4px 10px ${link.color}30` 
+                  }}>
                     {link.icon}
                   </Avatar>
                   <Typography variant="body2" fontWeight={700} color="text.primary">{link.label}</Typography>

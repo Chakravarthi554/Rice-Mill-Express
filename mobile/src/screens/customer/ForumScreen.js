@@ -35,6 +35,13 @@ const ForumScreen = ({ navigation }) => {
         dispatch(getForumPosts());
 
         let socket = getSocket();
+        // Debounce helper to prevent rapid consecutive refetches
+        let refetchTimer = null;
+        const debouncedRefetch = () => {
+            if (refetchTimer) clearTimeout(refetchTimer);
+            refetchTimer = setTimeout(() => dispatch(getForumPosts()), 1500);
+        };
+
         if (!socket) {
             connectSocket().then((s) => {
                 socket = s;
@@ -47,27 +54,22 @@ const ForumScreen = ({ navigation }) => {
 
         function setupListeners(s) {
             if (!s) return;
-
-            s.on('NEW_FORUM_POST', () => dispatch(getForumPosts()));
-            s.on('SOCIAL_UPDATE', (data) => {
-                if (currentUser && data.userId === currentUser._id) return;
-                if (data.itemType === 'forum' || data.type === 'LIKE' || data.type === 'COMMENT_ADDED') {
-                    dispatch(getForumPosts());
-                }
-            });
-            s.on('POST_DELETED', () => dispatch(getForumPosts()));
-            s.on('POST_STATUS_CHANGED', () => dispatch(getForumPosts()));
+            // Only refetch on structural changes (new post, delete, status change)
+            // Do NOT refetch on SOCIAL_UPDATE (likes/comments) — those are handled by Redux
+            s.on('NEW_FORUM_POST', debouncedRefetch);
+            s.on('POST_DELETED', debouncedRefetch);
+            s.on('POST_STATUS_CHANGED', debouncedRefetch);
         }
 
         return () => {
+            if (refetchTimer) clearTimeout(refetchTimer);
             if (socket) {
                 socket.off('NEW_FORUM_POST');
-                socket.off('SOCIAL_UPDATE');
                 socket.off('POST_DELETED');
                 socket.off('POST_STATUS_CHANGED');
             }
         };
-    }, [dispatch, currentUser]);
+    }, [dispatch]);
 
     const handleRefresh = () => {
         setRefreshing(true);

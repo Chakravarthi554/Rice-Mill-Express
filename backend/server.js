@@ -251,7 +251,7 @@ const loadRoutes = () => {
         console.log(`⚠️ ${route.name} routes file not found: ${route.file}.js`);
       }
     } catch (error) {
-      console.log(`❌ Failed to load ${route.name} routes:`, error.message);
+      console.log(`❌ Failed to load ${route.name} routes:`, error.stack);
     }
   });
 };
