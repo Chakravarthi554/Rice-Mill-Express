@@ -67,11 +67,12 @@ const MessagesTab = () => {
   const socketRef = useRef();
 
   const fetchConversations = async () => {
+    if (!userInfo?.token) return;
     try {
       setLoading(true);
       const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
       const { data } = await axios.get('/api/chat/conversations', config);
-      setConversations(data);
+      setConversations(Array.isArray(data) ? data : data.conversations || []);
     } catch (error) {
       console.error('Error fetching conversations:', error);
     } finally {

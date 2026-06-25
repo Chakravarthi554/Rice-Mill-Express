@@ -84,10 +84,10 @@ const OrdersTab = () => {
         <Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Box>
-                    <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'white' }}>
+                    <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#111827' }}>
                         Order Management
                     </Typography>
-                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                    <Typography variant="body2" sx={{ color: '#6B7280' }}>
                         Monitor and manage all customer orders across the platform
                     </Typography>
                 </Box>
@@ -100,35 +100,17 @@ const OrdersTab = () => {
                         InputProps={{
                             startAdornment: (
                                 <InputAdornment position="start">
-                                    <SearchIcon sx={{ color: 'rgba(255,255,255,0.5)' }} />
+                                    <SearchIcon sx={{ color: '#6B7280' }} />
                                 </InputAdornment>
                             ),
                         }}
-                        sx={{
-                            width: 250,
-                            '& .MuiOutlinedInput-root': {
-                                color: 'white',
-                                '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.2)' },
-                                '&:hover fieldset': { borderColor: 'rgba(56, 189, 248, 0.5)' },
-                                '&.Mui-focused fieldset': { borderColor: '#38bdf8' },
-                            },
-                            '& .MuiInputBase-input::placeholder': {
-                                color: 'rgba(255,255,255,0.4)',
-                                opacity: 1
-                            }
-                        }}
+                        sx={{ width: 250 }}
                     />
                     <Button
-                        variant="contained"
+                        variant="outlined"
                         startIcon={<RefreshIcon />}
                         onClick={handleRefresh}
                         disabled={loading}
-                        sx={{
-                            background: 'rgba(56, 189, 248, 0.2)',
-                            color: '#38bdf8',
-                            border: '1px solid rgba(56, 189, 248, 0.3)',
-                            '&:hover': { background: 'rgba(56, 189, 248, 0.3)' }
-                        }}
                     >
                         Refresh
                     </Button>
@@ -141,7 +123,7 @@ const OrdersTab = () => {
             {/* Search Results Info */}
             {searchTerm && (
                 <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                    <Typography variant="body2" sx={{ color: '#374151' }}>
                         Found {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''} matching "{searchTerm}"
                     </Typography>
                 </Box>
@@ -149,10 +131,9 @@ const OrdersTab = () => {
 
             <TableContainer component={Paper} sx={{
                 borderRadius: 4,
-                background: 'rgba(255, 255, 255, 0.02)',
-                border: '1px solid rgba(255, 255, 255, 0.05)',
-                '& .MuiTableCell-root': { borderColor: 'rgba(255,255,255,0.05)', color: 'white' },
-                '& .MuiTableHead-root': { background: 'rgba(255, 255, 255, 0.03)' }
+                border: '1px solid #E5E7EB',
+                '& .MuiTableCell-root': { borderColor: '#E5E7EB', color: '#111827' },
+                '& .MuiTableHead-root': { background: '#F9FAFB' }
             }}>
                 <Table sx={{ minWidth: 650 }} size="medium">
                     <TableHead>
@@ -179,15 +160,15 @@ const OrdersTab = () => {
                             </TableRow>
                         ) : (
                             filteredOrders.map((order) => (
-                                <TableRow key={order._id} sx={{ '&:hover': { background: 'rgba(255,255,255,0.02)' } }}>
+                                <TableRow key={order._id} sx={{ '&:hover': { background: '#F9FAFB' } }}>
                                     <TableCell>
-                                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#1565C0' }}>
                                             #{order._id.substring(order._id.length - 8).toUpperCase()}
                                         </Typography>
                                     </TableCell>
                                     <TableCell>
                                         <Typography variant="body2">{order.user?.name || 'Guest'}</Typography>
-                                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)' }}>{order.user?.email}</Typography>
+                                        <Typography variant="caption" sx={{ color: '#6B7280' }}>{order.user?.email}</Typography>
                                     </TableCell>
                                     <TableCell>
                                         <Typography variant="body2">
@@ -195,7 +176,7 @@ const OrdersTab = () => {
                                         </Typography>
                                     </TableCell>
                                     <TableCell>
-                                        <Typography variant="subtitle2" sx={{ color: '#38bdf8', fontWeight: 'bold' }}>
+                                        <Typography variant="subtitle2" sx={{ color: '#1565C0', fontWeight: 'bold' }}>
                                             ₹{order.totalPrice.toLocaleString()}
                                         </Typography>
                                     </TableCell>
@@ -212,7 +193,7 @@ const OrdersTab = () => {
                                         <Tooltip title="View Details">
                                             <IconButton
                                                 size="small"
-                                                sx={{ color: '#38bdf8' }}
+                                                sx={{ color: '#1565C0' }}
                                                 onClick={() => handleViewDetails(order._id)}
                                             >
                                                 <ViewIcon fontSize="small" />
@@ -234,24 +215,21 @@ const OrdersTab = () => {
                 fullWidth
                 PaperProps={{
                     sx: {
-                        background: '#0f172a',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        color: 'white',
                         borderRadius: 3
                     }
                 }}
             >
                 <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     Order Details
-                    <IconButton onClick={() => setDetailsOpen(false)} sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                    <IconButton onClick={() => setDetailsOpen(false)} sx={{ color: '#6B7280' }}>
                         <CloseIcon />
                     </IconButton>
                 </DialogTitle>
-                <DialogContent dividers sx={{ borderColor: 'rgba(255,255,255,0.1)' }}>
+                <DialogContent dividers sx={{ borderColor: '#E5E7EB' }}>
                     {loadingDetails ? (
                         <Box sx={{ py: 4, textAlign: 'center' }}>
                             <Loader />
-                            <Typography sx={{ mt: 2, color: 'rgba(255,255,255,0.5)' }}>Fetching order information...</Typography>
+                            <Typography sx={{ mt: 2, color: '#6B7280' }}>Fetching order information...</Typography>
                         </Box>
                     ) : errorDetails ? (
                         <Message severity="error">{errorDetails}</Message>
@@ -262,21 +240,21 @@ const OrdersTab = () => {
                                 <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                     <BagIcon fontSize="small" color="primary" /> Order Items
                                 </Typography>
-                                <List sx={{ background: 'rgba(255,255,255,0.02)', borderRadius: 2 }}>
+                                <List sx={{ background: '#F9FAFB', borderRadius: 2 }}>
                                     {selectedOrder.orderItems?.map((item, index) => (
                                         <React.Fragment key={index}>
                                             <ListItem sx={{ py: 1.5 }}>
                                                 <Avatar
                                                     src={item.image}
                                                     variant="rounded"
-                                                    sx={{ width: 50, height: 50, mr: 2, border: '1px solid rgba(255,255,255,0.1)' }}
+                                                    sx={{ width: 50, height: 50, mr: 2, border: '1px solid #E5E7EB' }}
                                                 >
                                                     {item.name?.[0]}
                                                 </Avatar>
                                                 <ListItemText
                                                     primary={<Typography variant="subtitle2">{item.name}</Typography>}
                                                     secondary={
-                                                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                                                        <Typography variant="caption" sx={{ color: '#6B7280' }}>
                                                             {item.qty} x ₹{item.price.toLocaleString()}
                                                         </Typography>
                                                     }
@@ -285,28 +263,28 @@ const OrdersTab = () => {
                                                     ₹{(item.qty * item.price).toLocaleString()}
                                                 </Typography>
                                             </ListItem>
-                                            {index < selectedOrder.orderItems.length - 1 && <Divider sx={{ borderColor: 'rgba(255,255,255,0.05)' }} />}
+                                            {index < selectedOrder.orderItems.length - 1 && <Divider sx={{ borderColor: '#E5E7EB' }} />}
                                         </React.Fragment>
                                     ))}
                                 </List>
 
                                 <Box sx={{ mt: 3, p: 2, background: 'rgba(56, 189, 248, 0.05)', borderRadius: 2 }}>
                                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                                        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>Items Price</Typography>
+                                        <Typography variant="body2" sx={{ color: '#6B7280' }}>Items Price</Typography>
                                         <Typography variant="body2">₹{selectedOrder.itemsPrice?.toLocaleString()}</Typography>
                                     </Box>
                                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                                        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>Tax</Typography>
+                                        <Typography variant="body2" sx={{ color: '#6B7280' }}>Tax</Typography>
                                         <Typography variant="body2">₹{selectedOrder.taxPrice?.toLocaleString()}</Typography>
                                     </Box>
                                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                                        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>Shipping</Typography>
+                                        <Typography variant="body2" sx={{ color: '#6B7280' }}>Shipping</Typography>
                                         <Typography variant="body2">₹{selectedOrder.shippingPrice?.toLocaleString()}</Typography>
                                     </Box>
                                     <Divider sx={{ my: 1, borderColor: 'rgba(56, 189, 248, 0.2)' }} />
                                     <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#38bdf8' }}>Total Price</Typography>
-                                        <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#38bdf8' }}>₹{selectedOrder.totalPrice?.toLocaleString()}</Typography>
+                                        <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#1565C0' }}>Total Price</Typography>
+                                        <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#1565C0' }}>₹{selectedOrder.totalPrice?.toLocaleString()}</Typography>
                                     </Box>
                                 </Box>
                             </Grid>
@@ -318,10 +296,10 @@ const OrdersTab = () => {
                                         <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                             <PersonIcon fontSize="small" color="primary" /> Customer Info
                                         </Typography>
-                                        <Paper sx={{ p: 2, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                        <Paper sx={{ p: 2, background: '#F9FAFB', border: '1px solid #E5E7EB' }}>
                                             <Typography variant="subtitle2">{selectedOrder.user?.name}</Typography>
-                                            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>{selectedOrder.user?.email}</Typography>
-                                            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>{selectedOrder.user?.phone}</Typography>
+                                            <Typography variant="body2" sx={{ color: '#6B7280' }}>{selectedOrder.user?.email}</Typography>
+                                            <Typography variant="body2" sx={{ color: '#6B7280' }}>{selectedOrder.user?.phone}</Typography>
                                         </Paper>
                                     </Box>
 
@@ -329,7 +307,7 @@ const OrdersTab = () => {
                                         <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                             <ShippingIcon fontSize="small" color="primary" /> Shipping Address
                                         </Typography>
-                                        <Paper sx={{ p: 2, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                        <Paper sx={{ p: 2, background: '#F9FAFB', border: '1px solid #E5E7EB' }}>
                                             <Typography variant="body2">
                                                 {selectedOrder.shippingAddress?.address}, {selectedOrder.shippingAddress?.city}
                                             </Typography>
@@ -343,13 +321,13 @@ const OrdersTab = () => {
                                         <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                             <PaymentIcon fontSize="small" color="primary" /> Payment Status
                                         </Typography>
-                                        <Paper sx={{ p: 2, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                        <Paper sx={{ p: 2, background: '#F9FAFB', border: '1px solid #E5E7EB' }}>
                                             <Typography variant="body2" sx={{ mb: 1 }}>
                                                 Method: <strong>{selectedOrder.paymentMethod}</strong>
                                             </Typography>
                                             <PaymentStatusChip status={selectedOrder.isPaid ? 'paid' : 'unpaid'} />
                                             {selectedOrder.isPaid && (
-                                                <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'rgba(255,255,255,0.5)' }}>
+                                                <Typography variant="caption" sx={{ display: 'block', mt: 1, color: '#6B7280' }}>
                                                     On {new Date(selectedOrder.paidAt).toLocaleString()}
                                                 </Typography>
                                             )}
@@ -373,7 +351,7 @@ const OrdersTab = () => {
                     ) : null}
                 </DialogContent>
                 <DialogActions sx={{ p: 2 }}>
-                    <Button onClick={() => setDetailsOpen(false)} sx={{ color: '#38bdf8' }}>Close</Button>
+                    <Button onClick={() => setDetailsOpen(false)} sx={{ color: '#1565C0' }}>Close</Button>
                 </DialogActions>
             </Dialog>
         </Box>

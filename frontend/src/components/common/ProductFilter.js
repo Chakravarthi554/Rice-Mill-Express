@@ -230,11 +230,11 @@ const ProductFilter = () => {
     }
     if (filters.priceRange[0] !== 0 || filters.priceRange[1] !== 5000) {
       badges.push({
-        label: `Price: ₹${filters.priceRange[0]} - ₹${filters.priceRange[1]}`,
+        label: `Price: Rs.${filters.priceRange[0]} - Rs.${filters.priceRange[1]}`,
         key: 'priceRange'
       });
     }
-    if (filters.ratings > 0) badges.push({ label: `${filters.ratings}★ & above`, key: 'ratings' });
+    if (filters.ratings > 0) badges.push({ label: `${filters.ratings} star & above`, key: 'ratings' });
     if (filters.dietPreference.length > 0) {
       filters.dietPreference.forEach(diet =>
         badges.push({ label: diet, key: 'dietPreference', value: diet })
@@ -252,16 +252,16 @@ const ProductFilter = () => {
 
   return (
     <Box sx={{ pb: 8 }}>
-      {/* ── STICKY SEARCH & SORT BAR ── */}
+      {/* Ã¢â€â‚¬Ã¢â€â‚¬ STICKY SEARCH & SORT BAR Ã¢â€â‚¬Ã¢â€â‚¬ */}
       <Paper
         elevation={0}
         sx={{
           position: 'sticky',
-          top: 70, // Below header
+          top: 72, // Below header
           zIndex: 100,
-          bgcolor: 'rgba(255, 255, 255, 0.95)',
+          bgcolor: 'rgba(255, 255, 255, 0.96)',
           backdropFilter: 'blur(10px)',
-          borderBottom: '1px solid #F3F4F6',
+          border: '1px solid #E8EFE2',
           py: 2,
           mb: 4
         }}
@@ -344,7 +344,7 @@ const ProductFilter = () => {
         </Grid>
       </Paper>
 
-      {/* ── QUICK CATEGORY TABS ── */}
+      {/* Ã¢â€â‚¬Ã¢â€â‚¬ QUICK CATEGORY TABS Ã¢â€â‚¬Ã¢â€â‚¬ */}
       <Box sx={{ display: 'flex', gap: 1.5, overflowX: 'auto', pb: 2, mb: 3, '&::-webkit-scrollbar': { display: 'none' } }}>
         <Chip
           label="All Products"
@@ -412,21 +412,21 @@ const ProductFilter = () => {
       {productLoading ? (
         <Grid container spacing={2}>
           {[...Array(12)].map((_, item) => (
-            <Grid item xs={6} sm={4} md={2} key={item}>
+            <Grid item xs={12} sm={6} md={3} lg={2.4} key={item}>
               <LoadingSkeleton type="product" />
             </Grid>
           ))}
         </Grid>
       ) : productError ? (
         <EmptyState
-          icon="⚠️"
+          icon="Warning"
           title="Something went wrong"
           description={productError}
           action={{ label: "Try Again", onClick: () => dispatch(listProducts()) }}
         />
       ) : sortedProducts.length === 0 ? (
         <EmptyState 
-            icon="🔍"
+            icon="Ã°Å¸â€Â"
             title="No products found"
             description="Try adjusting your filters or search query"
             action={{ label: "Clear All Filters", onClick: handleClearAllFilters }}
@@ -444,7 +444,7 @@ const ProductFilter = () => {
             const deliveryEta = `${15 + (product.name?.length % 15)} mins`;
 
             return (
-              <Grid item xs={6} sm={4} md={2} key={product._id}>
+              <Grid item xs={12} sm={6} md={3} lg={2.4} key={product._id}>
                 <ProductCard
                   product={{
                       _id: product._id,
@@ -472,7 +472,7 @@ const ProductFilter = () => {
         </Grid>
       )}
 
-      {/* ── FILTER DRAWER ── */}
+      {/* Ã¢â€â‚¬Ã¢â€â‚¬ FILTER DRAWER Ã¢â€â‚¬Ã¢â€â‚¬ */}
       <Drawer
         anchor="right"
         open={openDrawer}
@@ -483,7 +483,7 @@ const ProductFilter = () => {
       >
         <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
           {/* Drawer Header */}
-          <Box sx={{ p: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #F3F4F6' }}>
+          <Box sx={{ p: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #E8EFE2' }}>
             <Typography variant="h6" fontWeight={800}>Filter Products</Typography>
             <IconButton onClick={() => setOpenDrawer(false)} sx={{ bgcolor: '#F3F4F6' }}>
               <CloseIcon />
@@ -527,7 +527,7 @@ const ProductFilter = () => {
 
               {/* Price Range Slider */}
               <Box>
-                <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 700, color: '#1F2937' }}>PRICE RANGE (₹)</Typography>
+                <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 700, color: '#1F2937' }}>PRICE RANGE (RS)</Typography>
                 <Box sx={{ px: 1 }}>
                   <Slider
                     value={filters.priceRange}
@@ -538,8 +538,8 @@ const ProductFilter = () => {
                     sx={{ color: '#2E7D32' }}
                   />
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                    <Typography variant="caption" fontWeight={700}>₹{filters.priceRange[0]}</Typography>
-                    <Typography variant="caption" fontWeight={700}>₹{filters.priceRange[1]}</Typography>
+                    <Typography variant="caption" fontWeight={700}>Rs.{filters.priceRange[0]}</Typography>
+                    <Typography variant="caption" fontWeight={700}>Rs.{filters.priceRange[1]}</Typography>
                   </Box>
                 </Box>
               </Box>

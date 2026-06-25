@@ -652,7 +652,7 @@ const SellerDashboard = () => {
                             </Avatar>
                             <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
                                 <Typography variant="body2" fontWeight={800} lineHeight={1}>{user?.name || 'Sharma Rice Mill'}</Typography>
-                                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>View Profile</Typography>
+                                <Typography variant="caption" color="primary" sx={{ fontWeight: 600, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }} onClick={() => setActiveTab(8)}>View Profile</Typography>
                             </Box>
                         </Box>
                     </Box>

@@ -22,7 +22,7 @@ import { EmptyState } from '../../components/common/PageStates';
 
 // Redux
 import { createOrder } from '../../redux/actions/orderActions';
-import { listMyCart, addToCart } from '../../redux/actions/cartActions';
+import { listMyCart, addToCart, clearCart } from '../../redux/actions/cartActions';
 import { getRewards } from '../../redux/actions/rewardsActions';
 import { createRazorpayOrder } from '../../redux/actions/paymentActions';
 import { loadScript } from '../../utils/loadScript';
@@ -134,6 +134,7 @@ const CheckoutPage = () => {
   useEffect(() => {
     if (orderSuccess && createdOrder) {
       const orderToShow = Array.isArray(createdOrder.orders) ? createdOrder.orders[0] : createdOrder;
+      dispatch(clearCart());
       navigate('/orders/success', { state: { order: orderToShow } });
       dispatch({ type: ORDER_CREATE_RESET });
     }
