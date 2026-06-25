@@ -4,7 +4,7 @@ import {
   Box, Typography, TextField, Button, Avatar, IconButton, Chip, CircularProgress,
   Alert, Paper, Divider, Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions
 } from '@mui/material';
-import { ThumbUp, ThumbUpOutlined, MoreVert, Flag, EmojiEmotions } from '@mui/icons-material';
+import { ThumbUp, ThumbUpOutlined, MoreVert, Flag, EmojiEmotions, Send } from '@mui/icons-material';
 import axios from '../../utils/axiosInstance';
 import { getSocket, joinPostRoom, leavePostRoom, emitSocialAction } from '../../utils/socket';
 import { addComment, reportForumComment } from '../../redux/actions/forumActions';
@@ -173,26 +173,54 @@ const ForumComments = ({ postId, post, onCommentUpdate }) => {
   const addEmoji = (e) => { setNewComment(prev => prev + e); setShowEmojiPicker(false); };
 
   return (
-    <Paper elevation={1} sx={{ p: 3, borderRadius: 2 }}>
-      <Box sx={{ mb: 3 }}><Typography variant="h6">Comments ({comments.length})</Typography><Divider /></Box>
-      {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
-      {success && <Alert severity="success" onClose={() => setSuccess('')}>{success}</Alert>}
+    <Paper sx={{ p: 3, borderRadius: 4, boxShadow: '0 4px 12px rgba(0,0,0,0.04)', bgcolor: '#FAFAFA', border: '1px solid #E5E7EB' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+        <Typography variant="h6" sx={{ fontWeight: 800, color: '#111827' }}>
+          Comments ({comments.length})
+        </Typography>
+      </Box>
+      <Divider sx={{ mb: 3 }} />
+
+      {error && <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2, borderRadius: 3 }}>{error}</Alert>}
+      {success && <Alert severity="success" onClose={() => setSuccess('')} sx={{ mb: 2, borderRadius: 3 }}>{success}</Alert>}
 
       {user ? (
-        <Box component="form" onSubmit={handleSubmit} sx={{ mb: 3 }}>
+        <Box component="form" onSubmit={handleSubmit} sx={{ mb: 4 }}>
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
-            <Avatar src={getImageUrl(user.profilePic)} sx={{ width: 40, height: 40 }} />
+            <Avatar src={getImageUrl(user.profilePic)} sx={{ width: 40, height: 40, border: '2px solid #F3F4F6' }} />
             <Box sx={{ flex: 1 }}>
-              <TextField fullWidth multiline rows={3} value={newComment} onChange={handleTyping} placeholder="Write a comment..." disabled={submitting} />
-              {typingUsers.length > 0 && <Typography variant="caption" color="text.secondary">{typingUsers.map(u => u.name).join(', ')} typing...</Typography>}
+              <TextField
+                fullWidth
+                multiline
+                rows={3}
+                value={newComment}
+                onChange={handleTyping}
+                placeholder="Write a comment..."
+                disabled={submitting}
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3, bgcolor: '#F9FAFB' } }}
+              />
+              {typingUsers.length > 0 && (
+                <Typography variant="caption" sx={{ color: '#16A34A', mt: 0.5, display: 'block' }}>
+                  {typingUsers.map(u => u.name).join(', ')} typing...
+                </Typography>
+              )}
               {showEmojiPicker && (
-                <Paper sx={{ position: 'absolute', bottom: '100%', p: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5, zIndex: 10 }}>
+                <Paper sx={{ mt: 1, p: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5, borderRadius: 3, border: '1px solid #F3F4F6' }}>
                   {emojis.map(e => <IconButton key={e} size="small" onClick={() => addEmoji(e)}>{e}</IconButton>)}
                 </Paper>
               )}
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                <IconButton size="small" onClick={() => setShowEmojiPicker(!showEmojiPicker)}><EmojiEmotions /></IconButton>
-                <Button type="submit" variant="contained" disabled={!newComment.trim() || submitting}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1.5 }}>
+                <IconButton size="small" onClick={() => setShowEmojiPicker(!showEmojiPicker)} sx={{ color: '#9CA3AF' }}>
+                  <EmojiEmotions />
+                </IconButton>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  color="success"
+                  disabled={!newComment.trim() || submitting}
+                  endIcon={<Send />}
+                  sx={{ borderRadius: 3, fontWeight: 700 }}
+                >
                   {submitting ? 'Posting...' : 'Post'}
                 </Button>
               </Box>
@@ -200,35 +228,51 @@ const ForumComments = ({ postId, post, onCommentUpdate }) => {
           </Box>
         </Box>
       ) : (
-        <Alert severity="info" sx={{ mb: 3 }}>Login to comment.</Alert>
+        <Alert severity="info" sx={{ mb: 3, borderRadius: 3 }}>Login to comment.</Alert>
       )}
 
-      {loading ? <CircularProgress /> : comments.length === 0 ? (
-        <Typography color="text.secondary" align="center" py={4}>No comments yet.</Typography>
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress color="success" /></Box>
+      ) : comments.length === 0 ? (
+        <Typography sx={{ color: '#9CA3AF', textAlign: 'center', py: 6, fontSize: 14 }}>
+          No comments yet. Be the first to share your thoughts!
+        </Typography>
       ) : (
-        <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
+        <Box sx={{ maxHeight: 480, overflow: 'auto', pr: 1 }}>
           {comments.map(c => (
-            <Box key={c._id} sx={{ mb: 3, pb: 2, borderBottom: 1, borderColor: 'divider' }}>
+            <Box key={c._id} sx={{ mb: 2.5, pb: 2.5, borderBottom: '1px solid #F3F4F6' }}>
               <Box sx={{ display: 'flex', gap: 2 }}>
                 <Avatar src={getImageUrl(c.userId?.profilePic)} sx={{ width: 40, height: 40 }} />
                 <Box sx={{ flex: 1 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <Box>
-                      <Typography variant="subtitle2" fontWeight="bold">{c.userId?.name}</Typography>
-                      <Typography variant="caption" color="text.secondary">{formatDate(c.createdAt)}</Typography>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#111827' }}>
+                        {c.userId?.name}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#9CA3AF' }}>{formatDate(c.createdAt)}</Typography>
                       <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>
-                        {!c.approved && <Chip label="Pending" size="small" color="warning" />}
-                        {c.isFlagged && <Chip label="Flagged" size="small" color="error" />}
+                        {!c.approved && <Chip label="Pending" size="small" sx={{ bgcolor: '#FEF3C7', color: '#92400E', fontWeight: 700, fontSize: 11, height: 22 }} />}
+                        {c.isFlagged && <Chip label="Flagged" size="small" sx={{ bgcolor: '#FEE2E2', color: '#EF4444', fontWeight: 700, fontSize: 11, height: 22 }} />}
                       </Box>
                     </Box>
-                    {user && <IconButton size="small" onClick={(e) => { setAnchorEl(e.currentTarget); setSelectedComment(c); }}><MoreVert /></IconButton>}
+                    {user && (
+                      <IconButton size="small" onClick={(e) => { setAnchorEl(e.currentTarget); setSelectedComment(c); }} sx={{ color: '#9CA3AF' }}>
+                        <MoreVert fontSize="small" />
+                      </IconButton>
+                    )}
                   </Box>
-                  <Typography variant="body2" sx={{ mt: 1, whiteSpace: 'pre-wrap' }}>{c.text}</Typography>
+                  <Typography variant="body2" sx={{ mt: 1, whiteSpace: 'pre-wrap', color: '#374151', lineHeight: 1.7 }}>
+                    {c.text}
+                  </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
-                    <IconButton size="small" onClick={() => handleLikeComment(c._id)} color={c.likes?.includes(user?._id) ? 'primary' : 'default'}>
-                      {c.likes?.includes(user?._id) ? <ThumbUp /> : <ThumbUpOutlined />}
+                    <IconButton
+                      size="small"
+                      onClick={() => handleLikeComment(c._id)}
+                      sx={{ color: c.likes?.includes(user?._id) ? '#16A34A' : '#9CA3AF' }}
+                    >
+                      {c.likes?.includes(user?._id) ? <ThumbUp fontSize="small" /> : <ThumbUpOutlined fontSize="small" />}
                     </IconButton>
-                    <Typography variant="caption">{c.likes?.length || 0} likes</Typography>
+                    <Typography variant="caption" sx={{ fontWeight: 600, color: '#6B7280' }}>{c.likes?.length || 0}</Typography>
                   </Box>
                 </Box>
               </Box>
@@ -240,18 +284,30 @@ const ForumComments = ({ postId, post, onCommentUpdate }) => {
 
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => { setAnchorEl(null); setSelectedComment(null); }}>
         {user && selectedComment && user._id !== selectedComment.userId?._id && (
-          <MenuItem onClick={() => { setReportDialogOpen(true); setAnchorEl(null); }}><Flag sx={{ mr: 1 }} /> Report</MenuItem>
+          <MenuItem onClick={() => { setReportDialogOpen(true); setAnchorEl(null); }}>
+            <Flag sx={{ mr: 1, fontSize: 18 }} /> Report
+          </MenuItem>
         )}
       </Menu>
 
-      <Dialog open={reportDialogOpen} onClose={() => setReportDialogOpen(false)}>
-        <DialogTitle>Report Comment</DialogTitle>
+      <Dialog open={reportDialogOpen} onClose={() => setReportDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 800 }}>Report Comment</DialogTitle>
         <DialogContent>
-          <TextField fullWidth multiline rows={3} value={reportReason} onChange={(e) => setReportReason(e.target.value)} placeholder="Reason..." />
+          <TextField
+            fullWidth
+            multiline
+            rows={3}
+            value={reportReason}
+            onChange={(e) => setReportReason(e.target.value)}
+            placeholder="Reason for reporting..."
+            sx={{ mt: 1, '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+          />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setReportDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleReportComment} variant="contained" disabled={!reportReason.trim()}>Submit</Button>
+          <Button onClick={() => setReportDialogOpen(false)} sx={{ borderRadius: 3, fontWeight: 700 }}>Cancel</Button>
+          <Button onClick={handleReportComment} variant="contained" color="error" disabled={!reportReason.trim()} sx={{ borderRadius: 3, fontWeight: 700 }}>
+            Submit
+          </Button>
         </DialogActions>
       </Dialog>
     </Paper>

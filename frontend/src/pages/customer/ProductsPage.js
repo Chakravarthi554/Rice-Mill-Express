@@ -1,38 +1,25 @@
 import React from 'react';
 import Header from '../../components/common/Header';
 import ProductFilter from '../../components/common/ProductFilter';
-import { Box, Container, Paper, Typography } from '@mui/material';
-
-// Theme & Tokens
-import { colors, radius } from '../../theme/designTokens';
+import { Box, Container, Typography } from '@mui/material';
 
 const ProductsPage = () => {
     return (
         <Box sx={{ minHeight: '100vh', bgcolor: '#F9FAFB' }}>
             <Header />
-            <Container maxWidth={false} sx={{ pt: 4, pb: 8, px: { xs: 2, md: 6 } }}>
-                <Paper
-                    elevation={0}
-                    sx={{
-                        p: 0,
-                        borderRadius: radius.xl,
-                        overflow: 'hidden',
-                        border: `1px solid ${colors.neutral[100]}`,
-                        boxShadow: '0 4px 20px rgba(0,0,0,0.03)'
-                    }}
-                >
-                    <Box sx={{ bgcolor: '#fff', p: { xs: 3, md: 5 }, borderBottom: `1px solid ${colors.neutral[100]}` }}>
-                        <Typography variant="h2" sx={{ fontWeight: 800, color: colors.neutral[900], mb: 1 }}>
-                            Premium Collection
-                        </Typography>
-                        <Typography variant="body1" sx={{ color: colors.neutral[500], maxWidth: 700 }}>
-                            Directly from the finest mills to your kitchen. Explore our curated selection of Basmati, Sona Masoori, and Organic rice.
-                        </Typography>
-                    </Box>
-                    <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: colors.surface.default }}>
-                        <ProductFilter />
-                    </Box>
-                </Paper>
+            {/* ── PAGE HEADER ── */}
+            <Box sx={{ bgcolor: '#fff', borderBottom: '1px solid #F3F4F6' }}>
+                <Container maxWidth={false} sx={{ px: { xs: 2, md: 6 }, py: 3 }}>
+                    <Typography variant="h3" sx={{ fontWeight: 900, color: '#1F2937', mb: 0.5 }}>
+                        Premium Rice Collection
+                    </Typography>
+                    <Typography variant="body1" sx={{ color: '#6B7280', maxWidth: 600, fontSize: '0.95rem' }}>
+                        Directly from the finest mills to your kitchen. Explore Basmati, Sona Masoori, Organic & more.
+                    </Typography>
+                </Container>
+            </Box>
+            <Container maxWidth={false} sx={{ px: { xs: 2, md: 6 }, py: 3 }}>
+                <ProductFilter />
             </Container>
         </Box>
     );

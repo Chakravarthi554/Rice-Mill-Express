@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { Box, Container, Grid, Typography, IconButton, InputBase, Paper, Chip, Button, Badge } from '@mui/material';
-import { 
-  PinDrop, Notifications, Search, ShoppingBag, 
-  Favorite, LocalOffer, Person, ChevronRight, Home, ListAlt, ShoppingCart
+import { Box, Grid, Typography, Chip, Button } from '@mui/material';
+import {
+  ArrowForwardIos, LocalFireDepartment, Star, FlashOn, Spa, Savings,
+  TrendingUp, History, EmojiEvents, AutoAwesome, LocalOffer
 } from '@mui/icons-material';
 
 // Redux Actions
@@ -16,390 +16,362 @@ import { listMyCart } from '../../redux/actions/cartActions';
 // Premium UI Components
 import HeroBanner from '../ui/HeroBanner';
 import ProductCard from '../ui/ProductCard';
-import EmptyState from '../ui/EmptyState';
 import LoadingSkeleton from '../ui/LoadingSkeleton';
+import SectionHeader from '../ui/SectionHeader';
+import CategoryCard from '../ui/CategoryCard';
 
 // Utils
 import { getImageUrl } from '../../utils/urlHelper';
 
-// Theme & Tokens
-import { spacing, colors, tints } from '../../theme/designTokens';
-
 const CATEGORIES = [
-    { id: 'basmati', name: 'Basmati', emoji: '🍚', bg: '#FFF7ED', color: '#E65100' },
-    { id: 'sona', name: 'Sona', emoji: '🌾', bg: '#F0FDF4', color: '#2E7D32' },
-    { id: 'organic', name: 'Organic', emoji: '🍃', bg: '#E0F2FE', status: 'new' },
-    { id: 'bulk', name: 'Bulk', emoji: '📦', bg: '#FEF3C7' },
-    { id: 'premium', name: 'Premium', emoji: '⭐', bg: '#FCE7F3' },
+  { id: 'basmati', name: 'Basmati', emoji: '🍚', bg: '#FFF7ED', color: '#E65100' },
+  { id: 'sona', name: 'Sona Masoori', emoji: '🌾', bg: '#F0FDF4', color: '#2E7D32' },
+  { id: 'organic', name: 'Organic', emoji: '🌿', bg: '#E0F2FE', color: '#0284C7' },
+  { id: 'brown', name: 'Brown Rice', emoji: '🌰', bg: '#FEF3C7', color: '#D97706' },
+  { id: 'premium', name: 'Premium', emoji: '⭐', bg: '#FCE7F3', color: '#DB2777' },
+  { id: 'wholesale', name: 'Wholesale', emoji: '📦', bg: '#F3E8FF', color: '#7C3AED' },
+  { id: 'idli', name: 'Idli Rice', emoji: '🍥', bg: '#FCE7F3', color: '#BE185D' },
+  { id: 'pulao', name: 'Pulao', emoji: '🍛', bg: '#FFF7ED', color: '#EA580C' },
 ];
 
 const Dashboard = () => {
-    const navigate = useNavigate();
-    const dispatch = useDispatch();
-    
-    const [activeCategory, setActiveCategory] = useState('sona');
-    const [searchQuery, setSearchQuery] = useState('');
-    const [timeLeft, setTimeLeft] = useState(7942); // 2h 12m 22s as in the new mockup
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
 
-    const { loading: productLoading, error: productError, products = [] } = useSelector((state) => state.productList || {});
-    const { wishlistItems = [] } = useSelector(state => state.wishlist || {});
-    const { cartItems = [] } = useSelector(state => state.cart || {});
+  const [activeCategory, setActiveCategory] = useState('');
+  const [timeLeft, setTimeLeft] = useState(7942);
 
-    useEffect(() => {
-        dispatch(listProducts({ limit: 40 }));
-        dispatch(listMyCart());
-    }, [dispatch]);
+  const { loading: productLoading, products = [] } = useSelector((state) => state.productList || {});
+  const { wishlistItems = [] } = useSelector(state => state.wishlist || {});
 
-    // Flash Sale countdown
-    useEffect(() => {
-        const timer = setInterval(() => {
-            setTimeLeft(prev => prev > 0 ? prev - 1 : 7942);
-        }, 1000);
-        return () => clearInterval(timer);
-    }, []);
+  useEffect(() => {
+    dispatch(listProducts({ limit: 40 }));
+    dispatch(listMyCart());
+  }, [dispatch]);
 
-    const formatTime = (seconds) => {
-        const hrs = Math.floor(seconds / 3600);
-        const mins = Math.floor((seconds % 3600) / 60);
-        const secs = seconds % 60;
-        return [
-            hrs.toString().padStart(2, '0'),
-            mins.toString().padStart(2, '0'),
-            secs.toString().padStart(2, '0')
-        ].join(':');
-    };
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeLeft(prev => prev > 0 ? prev - 1 : 7942);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
-    const handleAddToCart = async (productId) => {
-        try { 
-            await dispatch(addToCart(productId, 1)); 
-        } catch (err) { 
-            alert(err.message || 'Failed to add to cart'); 
-        }
-    };
+  const formatTime = (seconds) => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return [
+      hrs.toString().padStart(2, '0'),
+      mins.toString().padStart(2, '0'),
+      secs.toString().padStart(2, '0')
+    ].join(':');
+  };
 
-    const handleAddToWishlist = async (productId) => {
-        try { 
-            await dispatch(addToWishlist(productId)); 
-        } catch (err) { 
-            alert(err.message || 'Failed to add to wishlist'); 
-        }
-    };
+  const handleAddToCart = async (productId) => {
+    try { await dispatch(addToCart(productId, 1)); } catch (err) { alert(err.message || 'Failed to add to cart'); }
+  };
 
-    const isWishlisted = (id) => wishlistItems.some(x => (x._id || x) === id);
+  const handleAddToWishlist = async (productId) => {
+    try { await dispatch(addToWishlist(productId)); } catch (err) { alert(err.message || 'Failed to add to wishlist'); }
+  };
 
-    const handleSearchSubmit = (e) => {
-        e.preventDefault();
-        if (searchQuery.trim()) {
-            navigate(`/products?search=${searchQuery}`);
-        }
-    };
+  const isWishlisted = (id) => wishlistItems.some(x => (x._id || x) === id);
 
-    // Filter products
-    const filteredProducts = activeCategory
-        ? products.filter(p => p.category?.toLowerCase().includes(activeCategory) || p.name?.toLowerCase().includes(activeCategory))
-        : products;
+  // Recently viewed from localStorage
+  const recentlyViewed = useMemo(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('recentlyViewed') || '[]');
+      return stored.slice(0, 6);
+    } catch { return []; }
+  }, [products]);
 
-    // Derived collections mapped to mockup lists
-    const flashSaleProducts = useMemo(() => {
-        return products.filter(p => p.offerPrice && p.offerPrice < p.price).slice(0, 4);
-    }, [products]);
+  const flashSaleProducts = useMemo(() => {
+    return products.filter(p => p.offerPrice && p.offerPrice < p.price).slice(0, 6);
+  }, [products]);
 
-    const buyAgainProducts = useMemo(() => {
-        return [...products].sort((a, b) => (b.numReviews || 0) - (a.numReviews || 0)).slice(0, 4);
-    }, [products]);
+  const bestSellerProducts = useMemo(() => {
+    return [...products].sort((a, b) => (b.numReviews || 0) - (a.numReviews || 0)).slice(0, 6);
+  }, [products]);
 
-    const recommendedProducts = useMemo(() => {
-        return [...products].sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 6);
-    }, [products]);
+  const organicProducts = useMemo(() => {
+    return products.filter(p => p.category?.toLowerCase().includes('organic')).slice(0, 6);
+  }, [products]);
 
-    // Mock products fallback matching Image 1
-    const mockFlashSale = [
-        { _id: 'fs-1', name: 'Sona Masoori 25kg', price: 1200, mrp: 1500, discount: 20, rating: 4.5, countInStock: 10, image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=150&q=80' },
-        { _id: 'fs-2', name: 'Basmati Gold Premium 10kg', price: 950, mrp: 1100, discount: 15, rating: 4.8, countInStock: 5, image: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=150&q=80' }
-    ];
+  const wholesaleProducts = useMemo(() => {
+    return products.filter(p => p.category?.toLowerCase().includes('wholesale') || p.name?.toLowerCase().includes('bulk')).slice(0, 6);
+  }, [products]);
 
-    const mockBuyAgain = [
-        { _id: 'ba-1', name: 'Royal Basmati Rice 5kg', price: 850, rating: 4.7, countInStock: 20, image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=150&q=80' },
-        { _id: 'ba-2', name: 'Idli Rice 10kg', price: 620, rating: 4.3, countInStock: 15, image: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=150&q=80' }
-    ];
+  const trendingProducts = useMemo(() => {
+    return [...products].sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 6);
+  }, [products]);
 
-    const mockRecommended = [
-        { _id: 'rc-1', name: 'Organic Brown Rice', price: 900, rating: 4.5, countInStock: 8, image: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=150&q=80' },
-        { _id: 'rc-2', name: 'Ponni Rice 10kg', price: 1100, rating: 4.5, countInStock: 12, image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=150&q=80' }
-    ];
+  const offersProducts = useMemo(() => {
+    return products.filter(p => p.offerPrice && p.offerPrice < p.price).slice(0, 6);
+  }, [products]);
 
-    const finalFlashSale = flashSaleProducts.length > 0 ? flashSaleProducts : mockFlashSale;
-    const finalBuyAgain = buyAgainProducts.length > 0 ? buyAgainProducts : mockBuyAgain;
-    const finalRecommended = recommendedProducts.length > 0 ? recommendedProducts : mockRecommended;
+  const recommendedProducts = useMemo(() => {
+    return [...products].sort((a, b) => ((b.rating || 0) + (b.numReviews || 0)) - ((a.rating || 0) + (a.numReviews || 0))).slice(0, 6);
+  }, [products]);
 
-    return (
-        <Box sx={{ bgcolor: '#F9FAFB', minHeight: '100vh', pb: 12 }}>
-            
-            {/* ── TOP BAR (Vijayawada location) ── */}
-            <Box sx={{ bgcolor: '#fff', px: 2.5, py: 2, borderBottom: '1px solid #F3F4F6' }}>
-                <Container maxWidth="xl" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: '0 !important' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <PinDrop sx={{ color: '#16A34A', fontSize: 24 }} />
-                        <Typography sx={{ fontSize: '1rem', fontWeight: 800, color: '#1F2937', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            Vijayawada <span style={{ fontSize: '0.65rem', color: '#6B7280' }}>▼</span>
-                        </Typography>
-                    </Box>
-                    <IconButton onClick={() => navigate('/notifications')} sx={{ bgcolor: '#F3F4F6', p: 1 }}>
-                        <Notifications sx={{ color: '#1F2937', fontSize: 20 }} />
-                    </IconButton>
-                </Container>
-            </Box>
+  // Mock products fallback
+  const mockProducts = [
+    { _id: 'm-1', name: 'Sona Masoori 25kg', price: 1200, mrp: 1500, discount: 20, rating: 4.5, countInStock: 10, image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=150&q=80', category: 'sona' },
+    { _id: 'm-2', name: 'Basmati Gold Premium 10kg', price: 950, mrp: 1100, discount: 15, rating: 4.8, countInStock: 5, image: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=150&q=80', category: 'basmati' },
+    { _id: 'm-3', name: 'Organic Brown Rice 5kg', price: 900, rating: 4.5, countInStock: 8, image: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=150&q=80', category: 'organic' },
+    { _id: 'm-4', name: 'Ponni Rice 10kg', price: 1100, rating: 4.5, countInStock: 12, image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=150&q=80', category: 'premium' },
+    { _id: 'm-5', name: 'Idli Rice 5kg', price: 550, mrp: 650, discount: 15, rating: 4.3, countInStock: 15, image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=150&q=80', category: 'idli' },
+    { _id: 'm-6', name: 'Royal Basmati 1kg', price: 220, mrp: 280, discount: 21, rating: 4.6, countInStock: 20, image: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=150&q=80', category: 'basmati' },
+  ];
 
-            {/* ── SEARCH BAR ── */}
-            <Box sx={{ bgcolor: '#fff', px: 2.5, py: 1.5, mb: 2 }}>
-                <Container maxWidth="xl" sx={{ p: '0 !important' }}>
-                    <form onSubmit={handleSearchSubmit}>
-                        <Box sx={{ 
-                            display: 'flex', alignItems: 'center', bgcolor: '#F3F4F6', 
-                            height: 48, borderRadius: '12px', px: 2 
-                        }}>
-                            <Search sx={{ color: '#9CA3AF', mr: 1 }} />
-                            <InputBase 
-                                fullWidth
-                                placeholder="Search rice, brands, 25kg..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                sx={{ fontSize: '0.9rem', fontWeight: 600, color: '#1F2937' }}
-                            />
-                        </Box>
-                    </form>
-                </Container>
-            </Box>
+  const getFinalProducts = (realProducts) => realProducts.length > 0 ? realProducts : mockProducts;
 
-            <Container maxWidth="xl" sx={{ px: 2 }}>
-                
-                {/* ── CATEGORY SCROLL (Circular category badges) ── */}
-                <Box sx={{ mb: 3 }}>
-                    <Box sx={{ 
-                        display: 'flex', 
-                        gap: 2.5, 
-                        overflowX: 'auto', 
-                        pb: 1.5, 
-                        '&::-webkit-scrollbar': { display: 'none' }
-                    }}>
-                        {CATEGORIES.map(cat => (
-                            <Box 
-                                key={cat.id} 
-                                onClick={() => setActiveCategory(activeCategory === cat.id ? '' : cat.id)} 
-                                sx={{ textAlign: 'center', cursor: 'pointer', flexShrink: 0 }}
-                            >
-                                <Box sx={{ 
-                                    width: 72, height: 72, borderRadius: '50%', bgcolor: cat.bg,
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    border: activeCategory === cat.id ? '2.5px solid #16A34A' : '2.5px solid transparent',
-                                    transition: 'all 0.2s', mb: 1,
-                                    boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
-                                }}>
-                                    <Typography fontSize={32}>{cat.emoji}</Typography>
-                                </Box>
-                                <Typography sx={{ 
-                                    fontSize: '0.78rem', 
-                                    fontWeight: activeCategory === cat.id ? 800 : 600, 
-                                    color: activeCategory === cat.id ? '#16A34A' : '#4B5563' 
-                                }}>
-                                    {cat.name}
-                                </Typography>
-                                {activeCategory === cat.id && (
-                                    <Box sx={{ width: 16, height: 3, bgcolor: '#16A34A', mx: 'auto', mt: 0.5, borderRadius: 1 }} />
-                                )}
-                            </Box>
-                        ))}
-                    </Box>
-                </Box>
+  const ProductRow = ({ title, icon, subtitle, products: prods, layout = 'vertical', bgcolor, columns = { xs: 6, sm: 4, md: 3 } }) => (
+    <Box sx={{ mb: 2.5, bgcolor: bgcolor || 'transparent', borderRadius: '16px', p: bgcolor ? 2.5 : 0 }}>
+      <SectionHeader title={title} subtitle={subtitle} icon={icon} />
+      <Grid container spacing={1.5}>
+        {getFinalProducts(prods).slice(0, 6).map((prod) => (
+          <Grid item {...columns} key={prod._id}>
+            <ProductCard
+              product={{
+                _id: prod._id,
+                name: prod.name,
+                image: getImageUrl(prod.images?.[0] || prod.image),
+                price: prod.offerPrice || prod.price,
+                mrp: prod.offerPrice ? prod.price : (prod.mrp || null),
+                discount: prod.offerPrice ? Math.round((1 - prod.offerPrice / prod.price) * 100) : (prod.discount || 0),
+                rating: Number(prod.rating || 4.5),
+                countInStock: prod.countInStock
+              }}
+              layout={layout}
+              wishlisted={isWishlisted(prod._id)}
+              onAddToCart={() => handleAddToCart(prod._id)}
+              onToggleWishlist={() => handleAddToWishlist(prod._id)}
+              onClick={() => navigate(`/products/${prod._id}`)}
+            />
+          </Grid>
+        ))}
+      </Grid>
+    </Box>
+  );
 
-                {/* ── PROMO BANNER ── */}
-                <Box sx={{ mb: 4 }}>
-                    <Box sx={{
-                        background: 'linear-gradient(135deg, #1B5E20 0%, #2E7D32 50%, #4CAF50 100%)',
-                        borderRadius: '16px', p: 2.5,
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        boxShadow: '0 8px 24px rgba(46,125,50,0.15)',
-                        color: '#fff',
-                        position: 'relative',
-                        overflow: 'hidden'
-                    }}>
-                        <Box sx={{ zIndex: 2 }}>
-                            <Typography sx={{ fontSize: '1.625rem', fontWeight: 900, lineHeight: 1.1 }}>
-                                <span style={{ color: '#FBBF24' }}>20% OFF</span> ON BULK ORDERS
-                            </Typography>
-                            <Button 
-                                variant="contained" 
-                                size="small"
-                                onClick={() => navigate('/products')}
-                                sx={{ 
-                                    mt: 2, bgcolor: '#FBBF24', color: '#1B5E20', fontWeight: 800,
-                                    borderRadius: '20px', textTransform: 'none', px: 2, py: 0.6,
-                                    '&:hover': { bgcolor: '#F59E0B' }, fontSize: '0.75rem'
-                                }}
-                            >
-                                Shop Now &gt;
-                            </Button>
-                        </Box>
-                        
-                        {/* Rice bag mock art */}
-                        <Box sx={{ fontSize: 72, display: 'flex', alignItems: 'center', opacity: 0.85, zIndex: 1 }}>
-                            🌾
-                        </Box>
-                    </Box>
-                </Box>
+  const HorizontalRow = ({ title, icon, subtitle, products: prods }) => (
+    <Box sx={{ mb: 2.5, bgcolor: '#fff', borderRadius: '16px', p: 2.5, border: '1px solid #F3F4F6', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      <SectionHeader title={title} subtitle={subtitle} icon={icon} />
+      <Box sx={{ display: 'flex', gap: 1.5, overflowX: 'auto', pb: 1, '&::-webkit-scrollbar': { display: 'none' }, mx: -0.5, px: 0.5 }}>
+        {getFinalProducts(prods).slice(0, 8).map((prod) => (
+          <Box key={prod._id} sx={{ minWidth: 260, maxWidth: 280, flexShrink: 0 }}>
+            <ProductCard
+              product={{
+                _id: prod._id,
+                name: prod.name,
+                image: getImageUrl(prod.images?.[0] || prod.image),
+                price: prod.offerPrice || prod.price,
+                mrp: prod.offerPrice ? prod.price : (prod.mrp || null),
+                discount: prod.offerPrice ? Math.round((1 - prod.offerPrice / prod.price) * 100) : (prod.discount || 0),
+                rating: Number(prod.rating || 4.5),
+                countInStock: prod.countInStock
+              }}
+              layout="horizontal"
+              wishlisted={isWishlisted(prod._id)}
+              onAddToCart={() => handleAddToCart(prod._id)}
+              onToggleWishlist={() => handleAddToWishlist(prod._id)}
+              onClick={() => navigate(`/products/${prod._id}`)}
+            />
+          </Box>
+        ))}
+      </Box>
+    </Box>
+  );
 
-                {/* Loading states */}
-                {productLoading ? (
-                    <Box sx={{ mb: 4 }}>
-                        <Grid container spacing={2}>
-                            {[...Array(4)].map((_, i) => (
-                                <Grid item xs={6} key={i}>
-                                    <LoadingSkeleton type="product" />
-                                </Grid>
-                            ))}
-                        </Grid>
-                    </Box>
-                ) : (
-                    <>
-                        {/* ── FLASH SALE ROW (Horizontal Cards) ── */}
-                        <Box sx={{ mb: 4 }}>
-                            <Box display="flex" alignItems="center" gap={1.5} mb={2}>
-                                <Typography variant="h6" fontWeight={800} color="#1F2937" sx={{ letterSpacing: '-0.02em' }}>
-                                    Flash Sale
-                                </Typography>
-                                <Box sx={{ 
-                                    bgcolor: '#E65100', color: '#fff', px: 1, py: 0.25, 
-                                    borderRadius: '6px', fontSize: '0.8rem', fontWeight: 800,
-                                    display: 'flex', alignItems: 'center', gap: 0.5, fontFamily: 'monospace'
-                                }}>
-                                    ⏰ {formatTime(timeLeft)}
-                                </Box>
-                            </Box>
+  return (
+    <Box sx={{ bgcolor: '#F9FAFB', minHeight: '100vh', pb: 8 }}>
 
-                            <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 1, '&::-webkit-scrollbar': { display: 'none' } }}>
-                                {finalFlashSale.map((prod) => (
-                                    <Box key={prod._id} sx={{ minWidth: 260, width: 280, flexShrink: 0 }}>
-                                        <ProductCard
-                                            product={{
-                                                _id: prod._id,
-                                                name: prod.name,
-                                                image: getImageUrl(prod.images?.[0] || prod.image),
-                                                price: prod.offerPrice || prod.price,
-                                                mrp: prod.offerPrice ? prod.price : null,
-                                                discount: prod.offerPrice ? Math.round((1 - prod.offerPrice / prod.price) * 100) : prod.discount,
-                                                rating: Number(prod.rating || 0),
-                                                countInStock: prod.countInStock
-                                            }}
-                                            layout="horizontal"
-                                            wishlisted={isWishlisted(prod._id)}
-                                            onAddToCart={() => handleAddToCart(prod._id)}
-                                            onToggleWishlist={() => handleAddToWishlist(prod._id)}
-                                            onClick={() => navigate(`/products/${prod._id}`)}
-                                        />
-                                    </Box>
-                                ))}
-                            </Box>
-                        </Box>
-
-                        {/* ── BUY AGAIN ROW (Horizontal Cards) ── */}
-                        <Box sx={{ mb: 4 }}>
-                            <Typography variant="h6" fontWeight={800} color="#1F2937" sx={{ mb: 2, letterSpacing: '-0.02em' }}>
-                                Buy Again
-                            </Typography>
-                            <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 1, '&::-webkit-scrollbar': { display: 'none' } }}>
-                                {finalBuyAgain.map((prod) => (
-                                    <Box key={prod._id} sx={{ minWidth: 260, width: 280, flexShrink: 0 }}>
-                                        <ProductCard
-                                            product={{
-                                                _id: prod._id,
-                                                name: prod.name,
-                                                image: getImageUrl(prod.images?.[0] || prod.image),
-                                                price: prod.price,
-                                                countInStock: prod.countInStock
-                                            }}
-                                            layout="horizontal"
-                                            wishlisted={isWishlisted(prod._id)}
-                                            onAddToCart={() => handleAddToCart(prod._id)}
-                                            onToggleWishlist={() => handleAddToWishlist(prod._id)}
-                                            onClick={() => navigate(`/products/${prod._id}`)}
-                                        />
-                                    </Box>
-                                ))}
-                            </Box>
-                        </Box>
-
-                        {/* ── RECOMMENDED FOR YOU (2-Column Vertical Cards) ── */}
-                        <Box sx={{ mb: 4 }}>
-                            <Typography variant="h6" fontWeight={800} color="#1F2937" sx={{ mb: 2, letterSpacing: '-0.02em' }}>
-                                Recommended for You
-                            </Typography>
-                            <Grid container spacing={2}>
-                                {finalRecommended.map((prod) => (
-                                    <Grid item xs={6} sm={4} md={2} key={prod._id}>
-                                        <ProductCard
-                                            product={{
-                                                _id: prod._id,
-                                                name: prod.name,
-                                                image: getImageUrl(prod.images?.[0] || prod.image),
-                                                price: prod.offerPrice || prod.price,
-                                                mrp: prod.offerPrice ? prod.price : null,
-                                                discount: prod.offerPrice ? Math.round((1 - prod.offerPrice / prod.price) * 100) : prod.discount,
-                                                rating: Number(prod.rating || 0),
-                                                countInStock: prod.countInStock
-                                            }}
-                                            layout="vertical"
-                                            wishlisted={isWishlisted(prod._id)}
-                                            onAddToCart={() => handleAddToCart(prod._id)}
-                                            onToggleWishlist={() => handleAddToWishlist(prod._id)}
-                                            onClick={() => navigate(`/products/${prod._id}`)}
-                                        />
-                                    </Grid>
-                                ))}
-                            </Grid>
-                        </Box>
-                    </>
-                )}
-            </Container>
-
-            {/* ── STICKY BOTTOM NAVIGATION BAR (Image 1 replica) ── */}
-            <Paper 
-                elevation={10} 
-                sx={{ 
-                    position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000,
-                    height: 64, borderTop: '1px solid #E5E7EB', display: 'flex', 
-                    justifyContent: 'space-around', alignItems: 'center', bgcolor: '#fff'
-                }}
-            >
-                <IconButton onClick={() => navigate('/customer/dashboard')} sx={{ display: 'flex', flexDirection: 'column', color: '#16A34A', py: 0.5 }}>
-                    <Home sx={{ fontSize: 24 }} />
-                    <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, mt: 0.25 }}>Home</Typography>
-                </IconButton>
-
-                <IconButton onClick={() => navigate('/products')} sx={{ display: 'flex', flexDirection: 'column', color: '#9CA3AF', py: 0.5 }}>
-                    <ListAlt sx={{ fontSize: 24 }} />
-                    <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, mt: 0.25 }}>Categories</Typography>
-                </IconButton>
-
-                <IconButton onClick={() => navigate('/cart')} sx={{ display: 'flex', flexDirection: 'column', color: '#9CA3AF', py: 0.5, position: 'relative' }}>
-                    <Badge badgeContent={cartItems.length || 3} color="error" sx={{ '& .MuiBadge-badge': { bgcolor: '#E65100', color: '#fff', fontWeight: 800 } }}>
-                        <ShoppingCart sx={{ fontSize: 24 }} />
-                    </Badge>
-                    <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, mt: 0.25 }}>Cart</Typography>
-                </IconButton>
-
-                <IconButton onClick={() => navigate('/settings/order-history')} sx={{ display: 'flex', flexDirection: 'column', color: '#9CA3AF', py: 0.5 }}>
-                    <ShoppingBag sx={{ fontSize: 24 }} />
-                    <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, mt: 0.25 }}>Orders</Typography>
-                </IconButton>
-
-                <IconButton onClick={() => navigate('/settings/profile')} sx={{ display: 'flex', flexDirection: 'column', color: '#9CA3AF', py: 0.5 }}>
-                    <Person sx={{ fontSize: 24 }} />
-                    <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, mt: 0.25 }}>Profile</Typography>
-                </IconButton>
-            </Paper>
+      {/* ── CATEGORIES STRIP ── */}
+      <Box sx={{ bgcolor: '#fff', borderRadius: '16px', p: 2.5, mb: 2, border: '1px solid #E5E7EB', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+        <SectionHeader title="Shop by Category" />
+        <Box sx={{ display: 'flex', gap: 1.5, justifyContent: 'space-between', flexWrap: 'wrap' }}>
+          {CATEGORIES.map(cat => (
+            <CategoryCard
+              key={cat.id}
+              name={cat.name}
+              emoji={cat.emoji}
+              tint={cat.bg}
+              color={cat.color}
+              active={activeCategory === cat.id}
+              onClick={() => {
+                setActiveCategory(activeCategory === cat.id ? '' : cat.id);
+                navigate(`/products?category=${cat.name}`);
+              }}
+            />
+          ))}
         </Box>
-    );
+      </Box>
+
+      {/* ── HERO BANNERS ── */}
+      <Box sx={{ mb: 2.5 }}>
+        <Grid container spacing={1.5}>
+          <Grid item xs={12} md={8}>
+            <HeroBanner
+              badge="New Arrivals"
+              title={<span>Premium Basmati<br /><span style={{ color: '#FBBF24' }}>Up to 30% Off</span></span>}
+              subtitle="Directly sourced from the finest mills. Experience the rich aroma and long grains."
+              cta="Shop Basmati"
+              onCta={() => navigate('/products?category=Basmati')}
+              gradient="linear-gradient(135deg, #1B5E20 0%, #2E7D32 50%, #388E3C 100%)"
+              height={{ xs: 200, md: 320 }}
+            />
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <Grid container spacing={1.5} direction="column" sx={{ height: '100%' }}>
+              <Grid item xs={6}>
+                <HeroBanner
+                  badge="Organic"
+                  title={<span style={{ fontSize: '1.4rem' }}>100% Organic<br />Certified Rice</span>}
+                  cta="Explore"
+                  onCta={() => navigate('/products?category=Organic')}
+                  gradient="linear-gradient(135deg, #065F46 0%, #059669 100%)"
+                  height={{ xs: 120, md: 152 }}
+                />
+              </Grid>
+              <Grid item xs={6}>
+                <HeroBanner
+                  badge="Wholesale"
+                  title={<span style={{ fontSize: '1.4rem' }}>Bulk Orders<br /><span style={{ color: '#FCD34D' }}>Extra 10% Off</span></span>}
+                  cta="Order Now"
+                  onCta={() => navigate('/bulk-order')}
+                  gradient="linear-gradient(135deg, #92400E 0%, #D97706 100%)"
+                  height={{ xs: 120, md: 152 }}
+                />
+              </Grid>
+            </Grid>
+          </Grid>
+        </Grid>
+      </Box>
+
+      {/* ── FLASH SALE HORIZONTAL ROW ── */}
+      <Box sx={{ mb: 2.5, bgcolor: '#fff', borderRadius: '16px', p: 2.5, border: '1px solid #E5E7EB', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+        <Box display="flex" alignItems="center" gap={1.5} mb={1.5}>
+          <LocalFireDepartment sx={{ color: '#E65100', fontSize: 28 }} />
+          <Typography sx={{ fontSize: '1.2rem', fontWeight: 800, color: '#1F2937' }}>
+            Flash Sale
+          </Typography>
+          <Box sx={{
+            bgcolor: '#DC2626', color: '#fff', px: 1.5, py: 0.25,
+            borderRadius: '8px', fontSize: '0.9rem', fontWeight: 800,
+            fontFamily: 'monospace', letterSpacing: 1
+          }}>
+            {formatTime(timeLeft)}
+          </Box>
+          <Box sx={{ flex: 1 }} />
+          <Button
+            variant="contained"
+            size="small"
+            onClick={() => navigate('/products?sale=true')}
+            endIcon={<ArrowForwardIos sx={{ fontSize: '0.7rem' }} />}
+            sx={{ borderRadius: '20px', bgcolor: '#E65100', fontWeight: 700, textTransform: 'none', px: 2, '&:hover': { bgcolor: '#C24100' } }}
+          >
+            View All
+          </Button>
+        </Box>
+        <HorizontalRow title="" products={flashSaleProducts} />
+      </Box>
+
+      {productLoading ? (
+        <Box sx={{ mb: 3 }}>
+          <Grid container spacing={1.5}>
+            {[...Array(6)].map((_, i) => (
+              <Grid item xs={6} sm={4} md={2} key={i}>
+                <LoadingSkeleton type="card" />
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
+      ) : (
+        <>
+          {/* ── BEST SELLERS ── */}
+          <ProductRow
+            title="Best Sellers"
+            subtitle="Most loved by our customers"
+            icon={<EmojiEvents sx={{ color: '#F59E0B' }} />}
+            products={bestSellerProducts}
+            bgcolor="#FFFBEB"
+          />
+
+          {/* ── TRENDING PRODUCTS ── */}
+          <ProductRow
+            title="Trending Now"
+            subtitle="Popular picks this week"
+            icon={<TrendingUp sx={{ color: '#2E7D32' }} />}
+            products={trendingProducts}
+            bgcolor="#F0FDF4"
+          />
+
+          {/* ── ORGANIC RICE SECTION ── */}
+          <ProductRow
+            title="Organic Rice"
+            subtitle="Naturally grown, chemical-free"
+            icon={<Spa sx={{ color: '#059669' }} />}
+            products={organicProducts}
+            bgcolor="#ECFDF5"
+          />
+
+          {/* ── WHOLESALE RICE SECTION ── */}
+          {wholesaleProducts.length > 0 && (
+            <ProductRow
+              title="Wholesale Rice"
+              subtitle="Bulk orders at best prices"
+              icon={<Savings sx={{ color: '#D97706' }} />}
+              products={wholesaleProducts}
+              bgcolor="#FFF7ED"
+            />
+          )}
+
+          {/* ── OFFERS / DISCOUNTED ── */}
+          {offersProducts.length > 0 && (
+            <ProductRow
+              title="Today's Offers"
+              subtitle="Limited time deals"
+              icon={<LocalOffer sx={{ color: '#DC2626' }} />}
+              products={offersProducts}
+              bgcolor="#FEF2F2"
+            />
+          )}
+
+          {/* ── RECOMMENDED FOR YOU ── */}
+          <ProductRow
+            title="Recommended for You"
+            subtitle="Based on your preferences"
+            icon={<AutoAwesome sx={{ color: '#7C3AED' }} />}
+            products={recommendedProducts}
+            bgcolor="#F5F3FF"
+          />
+
+          {/* ── RECENTLY VIEWED ── */}
+          {recentlyViewed.length > 0 && (
+            <ProductRow
+            title="Recently Viewed"
+            subtitle="Pick up where you left off"
+            icon={<History sx={{ color: '#6B7280' }} />}
+            products={recentlyViewed}
+            bgcolor="#F9FAFB"
+          />
+          )}
+
+          {/* ── BROWSE ALL CTA ── */}
+          <Box sx={{ textAlign: 'center', mt: 1 }}>
+            <Button
+              variant="outlined"
+              onClick={() => navigate('/products')}
+              endIcon={<AutoAwesome sx={{ fontSize: 18 }} />}
+              sx={{ borderRadius: '24px', px: 5, py: 1.2, fontWeight: 700, borderColor: '#2E7D32', color: '#2E7D32', '&:hover': { borderColor: '#1B5E20', bgcolor: '#F0FDF4' } }}
+            >
+              Browse All Products
+            </Button>
+          </Box>
+        </>
+      )}
+    </Box>
+  );
 };
 
 export default Dashboard;
