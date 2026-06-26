@@ -6,6 +6,7 @@ const connectDB = async () => {
     serverSelectionTimeoutMS: 8000,  // Give up selecting a server after 8s
     connectTimeoutMS: 10000,          // Give up on initial connection after 10s
     socketTimeoutMS: 45000,           // Close sockets after 45s of inactivity
+    compressors: ['zlib'],            // Enable zlib compression for network data transfer
   };
 
   try {
