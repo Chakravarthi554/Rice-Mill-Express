@@ -132,12 +132,15 @@ const CheckoutPage = () => {
   }, [cartItems, dispatch]);
 
   useEffect(() => {
-    if (orderSuccess && createdOrder) {
-      const orderToShow = Array.isArray(createdOrder.orders) ? createdOrder.orders[0] : createdOrder;
-      dispatch(clearCart());
-      navigate('/orders/success', { state: { order: orderToShow } });
-      dispatch({ type: ORDER_CREATE_RESET });
-    }
+    const handleOrderSuccess = async () => {
+      if (orderSuccess && createdOrder) {
+        const orderToShow = Array.isArray(createdOrder.orders) ? createdOrder.orders[0] : createdOrder;
+        await dispatch(clearCart());
+        navigate('/orders/success', { state: { order: orderToShow } });
+        dispatch({ type: ORDER_CREATE_RESET });
+      }
+    };
+    handleOrderSuccess();
   }, [orderSuccess, createdOrder, navigate, dispatch]);
 
   // Total calculation - selected items only

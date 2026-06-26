@@ -28,13 +28,14 @@ const ForumPostDetail = () => {
     if (id) {
       dispatch(getPostById(id));
 
-      const handler = (data) => {
-        if (data.itemId === id) {
+      const handler = (e) => {
+        const data = e.detail;
+        if (data.itemId === id && data.userId && data.userId !== userInfo?._id) {
           dispatch(getPostById(id));
         }
       };
 
-      window.addEventListener('socialUpdate', (e) => handler(e.detail));
+      window.addEventListener('socialUpdate', handler);
       joinPostRoom(id);
 
       return () => {
@@ -42,7 +43,7 @@ const ForumPostDetail = () => {
         leavePostRoom(id);
       };
     }
-  }, [dispatch, id]);
+  }, [dispatch, id, userInfo]);
 
   const handleLike = async () => {
     if (!userInfo) return alert('Please login to like posts');
