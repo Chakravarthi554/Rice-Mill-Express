@@ -222,9 +222,16 @@ const ProductFilter = () => {
       );
     }
     if (filters.priceRange[0] !== 0 || filters.priceRange[1] !== 5000) {
+<<<<<<< HEAD
       badges.push({ label: `Price: ₹${filters.priceRange[0]} - ₹${filters.priceRange[1]}`, key: 'priceRange' });
+=======
+      badges.push({
+        label: `Price: Rs.${filters.priceRange[0]} - Rs.${filters.priceRange[1]}`,
+        key: 'priceRange'
+      });
+>>>>>>> 6c04c0ae7a861128a81194bfd721f55372fac76d
     }
-    if (filters.ratings > 0) badges.push({ label: `${filters.ratings}★ & above`, key: 'ratings' });
+    if (filters.ratings > 0) badges.push({ label: `${filters.ratings} star & above`, key: 'ratings' });
     if (filters.dietPreference.length > 0) {
       filters.dietPreference.forEach(diet =>
         badges.push({ label: diet, key: 'dietPreference', value: diet })
@@ -239,6 +246,7 @@ const ProductFilter = () => {
     return badges;
   }, [filters]);
 
+<<<<<<< HEAD
   // ── SIDEBAR FILTER PANEL ──
   const FilterPanel = ({ inDrawer = false }) => (
     <Box sx={{
@@ -280,6 +288,51 @@ const ProductFilter = () => {
                 borderRadius: '8px', py: 1.5, px: 1.5, height: 'auto',
                 '&:hover': { bgcolor: '#F0FDF4' },
                 width: '100%'
+=======
+  return (
+    <Box sx={{ pb: 8 }}>
+      {/* Ã¢â€â‚¬Ã¢â€â‚¬ STICKY SEARCH & SORT BAR Ã¢â€â‚¬Ã¢â€â‚¬ */}
+      <Paper
+        elevation={0}
+        sx={{
+          position: 'sticky',
+          top: 72, // Below header
+          zIndex: 100,
+          bgcolor: 'rgba(255, 255, 255, 0.96)',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid #E8EFE2',
+          py: 2,
+          mb: 4
+        }}
+      >
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs={12} md={7}>
+            <TextField
+              fullWidth
+              placeholder="Search premium rice, brands, or collections..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon sx={{ color: '#2E7D32' }} />
+                  </InputAdornment>
+                ),
+                endAdornment: searchQuery && (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => setSearchQuery('')}>
+                      <CloseIcon />
+                    </IconButton>
+                  </InputAdornment>
+                ),
+                sx: {
+                  borderRadius: '24px',
+                  bgcolor: '#F3F4F6',
+                  '& fieldset': { borderColor: 'transparent' },
+                  '&:hover fieldset': { borderColor: '#4CAF50' },
+                  '&.Mui-focused fieldset': { borderColor: '#2E7D32' }
+                }
+>>>>>>> 6c04c0ae7a861128a81194bfd721f55372fac76d
               }}
             />
           ))}
@@ -428,6 +481,7 @@ const ProductFilter = () => {
               </FormControl>
             </Box>
 
+<<<<<<< HEAD
             {/* Active Filter Badges */}
             {(activeFilterBadges.length > 0 || searchQuery) && (
               <Box sx={{ mb: 2.5, display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -449,6 +503,206 @@ const ProductFilter = () => {
                     size="small"
                   />
                 ))}
+=======
+      {/* Ã¢â€â‚¬Ã¢â€â‚¬ QUICK CATEGORY TABS Ã¢â€â‚¬Ã¢â€â‚¬ */}
+      <Box sx={{ display: 'flex', gap: 1.5, overflowX: 'auto', pb: 2, mb: 3, '&::-webkit-scrollbar': { display: 'none' } }}>
+        <Chip
+          label="All Products"
+          onClick={() => handleFilterChange('category', '')}
+          sx={{
+            bgcolor: !filters.category ? '#2E7D32' : '#F3F4F6',
+            color: !filters.category ? '#fff' : '#4B5563',
+            fontWeight: 700,
+            fontSize: '0.8rem',
+            '&:hover': { bgcolor: !filters.category ? '#1B5E20' : '#E5E7EB' }
+          }}
+        />
+        {categories.map(cat => (
+          <Chip
+            key={cat}
+            label={cat}
+            onClick={() => handleFilterChange('category', cat)}
+            sx={{
+              bgcolor: filters.category === cat ? '#2E7D32' : '#F3F4F6',
+              color: filters.category === cat ? '#fff' : '#4B5563',
+              fontWeight: 700,
+              fontSize: '0.8rem',
+              '&:hover': { bgcolor: filters.category === cat ? '#1B5E20' : '#E5E7EB' }
+            }}
+          />
+        ))}
+      </Box>
+
+      {/* Active Filter Badges */}
+      {(activeFilterBadges.length > 0 || searchQuery) && (
+        <Box sx={{ mb: 3, display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Typography variant="caption" sx={{ fontWeight: 800, color: '#9CA3AF', mr: 1, textTransform: 'uppercase' }}>
+            Active Filters:
+          </Typography>
+          {searchQuery && (
+            <Chip
+              label={`"${searchQuery}"`}
+              onDelete={() => setSearchQuery('')}
+              sx={{ bgcolor: '#2E7D32', color: '#fff', fontWeight: 700 }}
+              size="small"
+            />
+          )}
+          {activeFilterBadges.map((badge, index) => (
+            <Chip
+              key={`${badge.key}-${badge.value || index}`}
+              label={badge.label}
+              onDelete={() => handleRemoveFilter(badge.key, badge.value)}
+              variant="outlined"
+              sx={{ borderColor: '#4CAF50', color: '#2E7D32', fontWeight: 700 }}
+              size="small"
+            />
+          ))}
+          <Button
+            size="small"
+            startIcon={<ClearAllIcon />}
+            onClick={handleClearAllFilters}
+            sx={{ color: '#DC2626', fontWeight: 700, textTransform: 'none' }}
+          >
+            Clear All
+          </Button>
+        </Box>
+      )}
+
+      {/* Products Grid */}
+      {productLoading ? (
+        <Grid container spacing={2}>
+          {[...Array(12)].map((_, item) => (
+            <Grid item xs={12} sm={6} md={3} lg={2.4} key={item}>
+              <LoadingSkeleton type="product" />
+            </Grid>
+          ))}
+        </Grid>
+      ) : productError ? (
+        <EmptyState
+          icon="Warning"
+          title="Something went wrong"
+          description={productError}
+          action={{ label: "Try Again", onClick: () => dispatch(listProducts()) }}
+        />
+      ) : sortedProducts.length === 0 ? (
+        <EmptyState 
+            icon="Ã°Å¸â€Â"
+            title="No products found"
+            description="Try adjusting your filters or search query"
+            action={{ label: "Clear All Filters", onClick: handleClearAllFilters }}
+        />
+      ) : (
+        <Grid container spacing={2}>
+          {sortedProducts.map((product) => {
+            const hasOffer =
+              typeof product.offerPrice === 'number' &&
+              product.offerPrice > 0 &&
+              product.offerPrice < product.price;
+            const displayPrice = hasOffer ? product.offerPrice : product.price;
+            const discount = hasOffer ? Math.round(((product.price - product.offerPrice) / product.price) * 100) : 0;
+            const isProdWishlisted = isWishlisted(product._id);
+            const deliveryEta = `${15 + (product.name?.length % 15)} mins`;
+
+            return (
+              <Grid item xs={12} sm={6} md={3} lg={2.4} key={product._id}>
+                <ProductCard
+                  product={{
+                      _id: product._id,
+                      name: product.name,
+                      image: getImageUrl(product.images?.[0] || product.image),
+                      price: displayPrice || 0,
+                      mrp: hasOffer ? product.price : null,
+                      discount: discount,
+                      rating: Number(product.rating || 0),
+                      countInStock: product.countInStock,
+                      deliveryEta: deliveryEta
+                  }}
+                  wishlisted={isProdWishlisted}
+                  onAddToCart={() => {
+                    handleAddToCart(product._id);
+                  }}
+                  onToggleWishlist={() => {
+                    handleAddToWishlist(product._id);
+                  }}
+                  onClick={() => navigate(`/products/${product._id}`)}
+                />
+              </Grid>
+            );
+          })}
+        </Grid>
+      )}
+
+      {/* Ã¢â€â‚¬Ã¢â€â‚¬ FILTER DRAWER Ã¢â€â‚¬Ã¢â€â‚¬ */}
+      <Drawer
+        anchor="right"
+        open={openDrawer}
+        onClose={() => setOpenDrawer(false)}
+        PaperProps={{
+          sx: { width: { xs: '100%', sm: 380 }, p: 0, borderRadius: { xs: 0, sm: '24px 0 0 24px' } }
+        }}
+      >
+        <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+          {/* Drawer Header */}
+          <Box sx={{ p: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #E8EFE2' }}>
+            <Typography variant="h6" fontWeight={800}>Filter Products</Typography>
+            <IconButton onClick={() => setOpenDrawer(false)} sx={{ bgcolor: '#F3F4F6' }}>
+              <CloseIcon />
+            </IconButton>
+          </Box>
+
+          {/* Drawer Content */}
+          <Box sx={{ p: 3, flex: 1, overflowY: 'auto' }}>
+            <Stack spacing={4}>
+              {/* Category Filter */}
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 700, color: '#1F2937' }}>CATEGORY</Typography>
+                <FormControl fullWidth>
+                  <Select
+                    value={filters.category}
+                    onChange={(e) => handleFilterChange('category', e.target.value)}
+                    displayEmpty
+                    sx={{ borderRadius: '12px', bgcolor: '#F3F4F6' }}
+                  >
+                    <MenuItem value="">All Categories</MenuItem>
+                    {categories.map((cat) => (
+                      <MenuItem key={cat} value={cat}>{cat}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+
+              {/* Brand Filter */}
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 700, color: '#1F2937' }}>BRANDS</Typography>
+                <Autocomplete
+                  multiple
+                  options={brands}
+                  value={filters.brand}
+                  onChange={(e, newValue) => handleFilterChange('brand', newValue)}
+                  renderInput={(params) => (
+                    <TextField {...params} placeholder="Select brands" sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px', bgcolor: '#F3F4F6' } }} />
+                  )}
+                />
+              </Box>
+
+              {/* Price Range Slider */}
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 700, color: '#1F2937' }}>PRICE RANGE (RS)</Typography>
+                <Box sx={{ px: 1 }}>
+                  <Slider
+                    value={filters.priceRange}
+                    onChange={(e, newValue) => handleFilterChange('priceRange', newValue)}
+                    valueLabelDisplay="auto"
+                    min={0}
+                    max={5000}
+                    sx={{ color: '#2E7D32' }}
+                  />
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+                    <Typography variant="caption" fontWeight={700}>Rs.{filters.priceRange[0]}</Typography>
+                    <Typography variant="caption" fontWeight={700}>Rs.{filters.priceRange[1]}</Typography>
+                  </Box>
+                </Box>
+>>>>>>> 6c04c0ae7a861128a81194bfd721f55372fac76d
               </Box>
             )}
 

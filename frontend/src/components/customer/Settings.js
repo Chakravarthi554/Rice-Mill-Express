@@ -6,7 +6,7 @@ import { useSelector } from 'react-redux';
 import {
     Person, LocationOn, Security, Lock, ShoppingBag,
     Star, CardGiftcard, Notifications, Language, Brightness4,
-    HelpOutline, Description, Logout,
+    HelpOutline, Description, Logout, Home,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
@@ -104,6 +104,24 @@ const Settings = () => {
                             Edit Profile
                         </Box>
                     </Box>
+                </Box>
+
+                {/* Home Button */}
+                <Box sx={{ px: 1.5, pt: 1.5, pb: 0.5 }}>
+                    <ListItemButton
+                        onClick={() => navigate('/customer/dashboard')}
+                        sx={{ borderRadius: 3, bgcolor: '#F0FDF4', '&:hover': { bgcolor: '#DCFCE7' } }}
+                    >
+                        <ListItemIcon sx={{ minWidth: 42 }}>
+                            <Box sx={{ width: 34, height: 34, borderRadius: 2.5, bgcolor: '#E8F5E9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <Home sx={{ fontSize: 18, color: '#16A34A' }} />
+                            </Box>
+                        </ListItemIcon>
+                        <ListItemText
+                            primary="Home"
+                            primaryTypographyProps={{ fontSize: 14, fontWeight: 700, color: '#16A34A' }}
+                        />
+                    </ListItemButton>
                 </Box>
 
                 {/* Nav Groups */}

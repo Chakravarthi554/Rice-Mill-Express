@@ -51,7 +51,7 @@ import {
 const SettingsTab = () => {
   const dispatch = useDispatch();
   const { settings, loading, error } = useSelector(state => state.adminSettings);
-  const { recipes } = useSelector(state => state.adminSettings.availableRecipes || {});
+  const recipes = useSelector(state => state.adminSettings.availableRecipes || []);
 
   const [formData, setFormData] = useState({});
   const [notification, setNotification] = useState({ title: '', message: '' });

@@ -28,11 +28,14 @@ const AdminSupportDashboard = () => {
     const { userInfo } = useSelector(state => state.userLogin);
     const [tickets, setTickets] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [fetchError, setFetchError] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
 
     const fetchTickets = async () => {
+        if (!userInfo?.token) return;
         try {
             setLoading(true);
+            setFetchError('');
             const config = {
                 headers: { Authorization: `Bearer ${userInfo.token}` }
             };
@@ -40,9 +43,10 @@ const AdminSupportDashboard = () => {
                 ? `/api/support/admin/tickets?status=${statusFilter}`
                 : '/api/support/admin/tickets';
             const { data } = await axios.get(url, config);
-            setTickets(data.data);
+            setTickets(data.data || data.tickets || data || []);
         } catch (error) {
             console.error('Error fetching tickets:', error);
+            setFetchError(error.response?.data?.message || 'Failed to load support tickets');
         } finally {
             setLoading(false);
         }

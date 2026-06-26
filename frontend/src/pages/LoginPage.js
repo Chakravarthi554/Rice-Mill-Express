@@ -103,11 +103,17 @@ const LoginPage = () => {
     try {
       setLoading(true); setMessage('');
       const provider = new FacebookAuthProvider();
-      console.log('🔑 LoginPage: Initiating Facebook Sign-In popup...');
+      provider.addScope('email');
       await signInWithPopup(auth, provider);
     } catch (error) {
       console.error('❌ LoginPage: Facebook Sign-in Error:', error);
-      setMessage(error.message || 'Failed to sign in with Facebook');
+      let msg = 'Failed to sign in with Facebook.';
+      if (error.code === 'auth/popup-blocked') msg = 'Popup was blocked. Please allow popups for this site.';
+      else if (error.code === 'auth/popup-closed-by-user') msg = 'Sign-in was cancelled.';
+      else if (error.code === 'auth/account-exists-with-different-credential') msg = 'An account already exists with this email. Try signing in with Google or email.';
+      else if (error.code === 'auth/operation-not-allowed') msg = 'Facebook login is not enabled. Please use email or Google sign-in.';
+      else if (error.message) msg = error.message;
+      setMessage(msg);
     } finally { setLoading(false); }
   };
 
@@ -142,8 +148,14 @@ const LoginPage = () => {
       }
     } catch (error) {
       let errorMessage = 'Authentication failed. Please try again.';
-      if (error.code === 'auth/user-not-found') errorMessage = 'No account found. Please register.';
-      else if (error.code === 'auth/wrong-password') errorMessage = 'Incorrect password.';
+      if (error.code === 'auth/user-not-found') errorMessage = 'No account found with this email. Please register.';
+      else if (error.code === 'auth/wrong-password') errorMessage = 'Incorrect password. Please try again.';
+      else if (error.code === 'auth/invalid-phone-number') errorMessage = 'Invalid phone number. Please enter a valid 10-digit number.';
+      else if (error.code === 'auth/too-many-requests') errorMessage = 'Too many attempts. Please wait a few minutes and try again.';
+      else if (error.code === 'auth/invalid-verification-code') errorMessage = 'Incorrect OTP. Please check and try again.';
+      else if (error.code === 'auth/code-expired') errorMessage = 'OTP has expired. Please request a new one.';
+      else if (error.code === 'auth/missing-phone-number') errorMessage = 'Please enter a valid phone number.';
+      else if (error.code === 'auth/captcha-check-failed') errorMessage = 'Security check failed. Please refresh and try again.';
       else if (error.message) errorMessage = error.message;
       setMessage(errorMessage);
     } finally { setLoading(false); }

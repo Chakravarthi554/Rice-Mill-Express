@@ -112,10 +112,10 @@ const UsersTab = () => {
         <Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Box>
-                    <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'white' }}>
+                    <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#111827' }}>
                         User Management
                     </Typography>
-                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                    <Typography variant="body2" sx={{ color: '#6B7280' }}>
                         Manage platform access and roles for all users
                     </Typography>
                 </Box>
@@ -128,35 +128,17 @@ const UsersTab = () => {
                         InputProps={{
                             startAdornment: (
                                 <InputAdornment position="start">
-                                    <SearchIcon sx={{ color: 'rgba(255,255,255,0.5)' }} />
+                                    <SearchIcon sx={{ color: '#6B7280' }} />
                                 </InputAdornment>
                             ),
                         }}
-                        sx={{
-                            width: 250,
-                            '& .MuiOutlinedInput-root': {
-                                color: 'white',
-                                '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.2)' },
-                                '&:hover fieldset': { borderColor: 'rgba(56, 189, 248, 0.5)' },
-                                '&.Mui-focused fieldset': { borderColor: '#38bdf8' },
-                            },
-                            '& .MuiInputBase-input::placeholder': {
-                                color: 'rgba(255,255,255,0.4)',
-                                opacity: 1
-                            }
-                        }}
+                        sx={{ width: 250 }}
                     />
                     <Button
-                        variant="contained"
+                        variant="outlined"
                         startIcon={<RefreshIcon />}
                         onClick={handleRefresh}
                         disabled={loading}
-                        sx={{
-                            background: 'rgba(56, 189, 248, 0.2)',
-                            color: '#38bdf8',
-                            border: '1px solid rgba(56, 189, 248, 0.3)',
-                            '&:hover': { background: 'rgba(56, 189, 248, 0.3)' }
-                        }}
                     >
                         Refresh
                     </Button>
@@ -169,7 +151,7 @@ const UsersTab = () => {
             {/* Search Results Info */}
             {searchTerm && (
                 <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                    <Typography variant="body2" sx={{ color: '#374151' }}>
                         Found {filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''} matching "{searchTerm}"
                     </Typography>
                 </Box>
@@ -177,10 +159,9 @@ const UsersTab = () => {
 
             <TableContainer component={Paper} sx={{
                 borderRadius: 4,
-                background: 'rgba(255, 255, 255, 0.02)',
-                border: '1px solid rgba(255, 255, 255, 0.05)',
-                '& .MuiTableCell-root': { borderColor: 'rgba(255,255,255,0.05)', color: 'white' },
-                '& .MuiTableHead-root': { background: 'rgba(255, 255, 255, 0.03)' }
+                border: '1px solid #E5E7EB',
+                '& .MuiTableCell-root': { borderColor: '#E5E7EB', color: '#111827' },
+                '& .MuiTableHead-root': { background: '#F9FAFB' }
             }}>
                 <Table sx={{ minWidth: 650 }} size="medium">
                     <TableHead>
@@ -203,13 +184,13 @@ const UsersTab = () => {
                             </TableRow>
                         ) : (
                             filteredUsers.map((user) => (
-                                <TableRow key={user._id} sx={{ '&:hover': { background: 'rgba(255,255,255,0.02)' } }}>
+                                <TableRow key={user._id} sx={{ '&:hover': { background: '#F9FAFB' } }}>
                                     <TableCell>
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                                             <Avatar src={user.profilePic} sx={{ bgcolor: '#38bdf8' }}>{user.name?.[0]}</Avatar>
                                             <Box>
                                                 <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>{user.name}</Typography>
-                                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)' }}>ID: {user._id.substring(0, 8)}...</Typography>
+                                                <Typography variant="caption" sx={{ color: '#6B7280' }}>ID: {user._id.substring(0, 8)}...</Typography>
                                             </Box>
                                         </Box>
                                     </TableCell>

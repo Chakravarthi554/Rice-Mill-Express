@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { Link as RouterLink, useSearchParams } from 'react-router-dom';
+import { Link as RouterLink, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Box,
   Card,
@@ -26,6 +26,7 @@ import {
   Star,
   LocalDining,
   ShoppingBagOutlined,
+  Home,
 } from '@mui/icons-material';
 import { listRecipes } from '../../redux/actions/recipeActions';
 import Loader from './Loader';
@@ -44,6 +45,7 @@ const toneByRiceType = {
 
 const RecipeList = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const page = Number(searchParams.get('pageNumber')) || 1;
@@ -92,6 +94,13 @@ const RecipeList = () => {
         }}
       >
         <Box sx={{ position: 'absolute', top: -80, right: -60, width: 220, height: 220, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.08)' }} />
+        <Button
+          startIcon={<Home />}
+          onClick={() => navigate('/customer/dashboard')}
+          sx={{ mb: 2, bgcolor: 'rgba(255,255,255,0.18)', color: '#fff', borderRadius: 999, px: 2, py: 0.5, fontSize: 13, fontWeight: 700, textTransform: 'none', '&:hover': { bgcolor: 'rgba(255,255,255,0.28)' } }}
+        >
+          Back to Home
+        </Button>
         <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.78, mb: 1 }}>
           Recipe Studio
         </Typography>

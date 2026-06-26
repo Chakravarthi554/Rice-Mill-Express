@@ -24,6 +24,7 @@ import {
   ChatBubbleOutline,
   PushPin,
   EditNote,
+  Home,
 } from '@mui/icons-material';
 import { getForumPosts } from '../../redux/actions/forumActions';
 import ForumPostCard from './ForumPostCard';
@@ -73,6 +74,13 @@ const ForumList = () => {
         }}
       >
         <Box sx={{ position: 'absolute', top: -80, right: -40, width: 240, height: 240, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.08)' }} />
+        <Button
+          startIcon={<Home />}
+          onClick={() => navigate('/customer/dashboard')}
+          sx={{ mb: 2, bgcolor: 'rgba(255,255,255,0.18)', color: '#fff', borderRadius: 999, px: 2, py: 0.5, fontSize: 13, fontWeight: 700, textTransform: 'none', '&:hover': { bgcolor: 'rgba(255,255,255,0.28)' } }}
+        >
+          Back to Home
+        </Button>
         <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.8, mb: 1 }}>
           Customer Community
         </Typography>
