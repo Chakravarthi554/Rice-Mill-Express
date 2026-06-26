@@ -228,7 +228,7 @@ const RecipeList = () => {
 
               return (
                 <Grid item xs={12} sm={6} lg={4} key={recipe._id}>
-                  <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                  <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', transition: 'all 0.2s ease', '&:hover': { boxShadow: '0 12px 28px rgba(0,0,0,0.08)', transform: 'translateY(-2px)' } }}>
                     <Box sx={{ position: 'relative' }}>
                       <CardMedia
                         component={recipe.video ? "video" : "img"}

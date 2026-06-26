@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import {
   Box,
   Button,
@@ -24,6 +24,7 @@ import {
   Storefront,
   TrendingUp,
   WorkspacePremium,
+
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 
@@ -31,8 +32,8 @@ import { listProducts } from '../../redux/actions/productActions';
 import { addToCart, listMyCart } from '../../redux/actions/cartActions';
 import { addToWishlist } from '../../redux/actions/userActions';
 import ProductCard from '../ui/ProductCard';
-import EmptyState from '../ui/EmptyState';
 import LoadingSkeleton from '../ui/LoadingSkeleton';
+import EmptyState from '../ui/EmptyState';
 import { getImageUrl } from '../../utils/urlHelper';
 import { colors, shadows } from '../../theme/designTokens';
 

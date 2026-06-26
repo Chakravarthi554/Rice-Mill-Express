@@ -64,8 +64,8 @@ const CartPage = () => {
   // ── Empty Cart ──
   if (cartItems.length === 0) {
     return (
-      <Box sx={{ bgcolor: colors.surface.default, minHeight: '100vh' }}>
-        <Container maxWidth="md" sx={{ py: 10 }}>
+      <Box sx={{ bgcolor: '#FFFBEB', minHeight: '100vh' }}>
+        <Container maxWidth="md" sx={{ py: 8 }}>
           <EmptyState
             icon="🛒"
             title="Your cart is empty"
@@ -82,7 +82,7 @@ const CartPage = () => {
       <Container maxWidth="xl" sx={{ pt: 4 }}>
 
         {/* ── Header ── */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 4 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
           <Typography variant="h4" sx={{ fontWeight: 800, color: colors.neutral[900] }}>
             My Cart
           </Typography>
@@ -232,10 +232,11 @@ const CartPage = () => {
           <Grid item xs={12} md={4}>
             <Paper
               sx={{
-                borderRadius: `${radius.xl}px`, p: 3.5,
+                borderRadius: `${radius.xl}px`, p: 3,
                 border: `1px solid ${colors.neutral[200]}`,
                 position: 'sticky', top: 80,
                 boxShadow: shadows.sm,
+                bgcolor: '#FFFBEB',
               }}
             >
               <Typography sx={{ fontWeight: 800, fontSize: '1.2rem', mb: 2.5 }}>Order Summary</Typography>
@@ -292,8 +293,8 @@ const CartPage = () => {
 
         {/* ── Recommendations ── */}
         {recommendedProducts.length > 0 && (
-          <Box sx={{ mt: spacing.section }}>
-            <Divider sx={{ mb: 4 }} />
+          <Box sx={{ mt: 5 }}>
+            <Divider sx={{ mb: 3 }} />
             <SectionHeader title="You may also like" subtitle="Handpicked recommendations" />
             <Grid container spacing={3}>
               {recommendedProducts.map(product => (

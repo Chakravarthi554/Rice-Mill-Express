@@ -117,6 +117,33 @@ if (localIPs.length > 0) {
 }
 console.log("=".repeat(50) + "\n");
 
+const allowedOrigins = [
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  "http://localhost:3001",
+  "http://rice-mill-frontend-chakravarthi.s3-website.eu-north-1.amazonaws.com",
+  "http://13.62.55.108:5001",
+  "https://c111b7c7.rice-mill-frontend.pages.dev",
+  process.env.FRONTEND_URL,
+  ...localIPs.map(ip => `http://${ip}:${PORT}`),
+  ...localIPs.map(ip => `http://${ip}:8081`),
+  ...localIPs.map(ip => `exp://${ip}:${PORT}`),
+  ...localIPs.map(ip => `exp://${ip}:8081`),
+];
+
+const allowedOriginRegex = [
+  /^exp:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/,
+  /^http:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/,
+  /^exp:\/\/192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$/,
+  /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$/,
+  /^exp:\/\/172\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/,
+  /^https:\/\/.*\.loca\.lt$/,
+  /^https:\/\/.*\.ngrok-free\.app$/,
+  /^https:\/\/.*\.lhr\.life$/,
+  /^https:\/\/.*\.localhost\.run$/,
+  /^https:\/\/.*\.pages\.dev$/,
+];
+
 // 🌐 Aggressive Network Logger (Must be at TOP)
 app.use((req, res, next) => {
     console.log(`🔌 [BRIDGE HIT] ${new Date().toLocaleTimeString()} - ${req.method} ${req.url} (Origin: ${req.get('origin') || 'None'})`);
@@ -147,27 +174,12 @@ app.use((req, res, next) => {
 
 app.use(
   cors({
-    origin: [
-      "http://localhost:3000",
-      "http://127.0.0.1:3000",
-      "http://localhost:3001",
-      "http://rice-mill-frontend-chakravarthi.s3-website.eu-north-1.amazonaws.com",
-      "http://13.62.55.108:5001",
-      process.env.FRONTEND_URL,
-      ...localIPs.map(ip => `http://${ip}:${PORT}`),
-      ...localIPs.map(ip => `http://${ip}:8081`),
-      ...localIPs.map(ip => `exp://${ip}:${PORT}`),
-      ...localIPs.map(ip => `exp://${ip}:8081`),
-      /^exp:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/,
-      /^http:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/,
-      /^exp:\/\/192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$/,
-      /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$/,
-      /^exp:\/\/172\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/,
-      /^https:\/\/.*\.loca\.lt$/,
-      /^https:\/\/.*\.ngrok-free\.app$/,
-      /^https:\/\/.*\.lhr\.life$/,
-      /^https:\/\/.*\.localhost\.run$/,
-    ],
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      if (allowedOriginRegex.some(pattern => pattern.test(origin))) return callback(null, true);
+      callback(null, false);
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Bypass-Tunnel-Reminder", "bypass-tunnel-reminder", "ngrok-skip-browser-warning"],
@@ -293,10 +305,9 @@ if (!fs.existsSync(customerImagesDir)) {
   console.log("✅ Created customer images directory");
 }
 
-// Serve uploads statically
+// Serve uploads statically (ACAO handled by cors() middleware, no need to override)
 app.use("/uploads", express.static(uploadDir, {
   setHeaders: (res, filePath) => {
-    res.setHeader("Access-Control-Allow-Origin", "http://localhost:3000");
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     if (filePath.endsWith(".jpg") || filePath.endsWith(".jpeg")) {
       res.setHeader("Content-Type", "image/jpeg");
@@ -309,7 +320,6 @@ app.use("/uploads", express.static(uploadDir, {
 // Serve customer images specifically
 app.use("/customer", express.static(customerImagesDir, {
   setHeaders: (res, filePath) => {
-    res.setHeader("Access-Control-Allow-Origin", "http://localhost:3000");
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     if (filePath.endsWith(".jpg") || filePath.endsWith(".jpeg")) {
       res.setHeader("Content-Type", "image/jpeg");

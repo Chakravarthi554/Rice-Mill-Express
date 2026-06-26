@@ -87,9 +87,8 @@ const PaymentsTab = () => {
   }, [filters, activeTab]);
 
   const loadData = () => {
-    dispatch(getAdminPaymentStats());
-
     if (activeTab === 0) {
+      dispatch(getAdminPaymentStats());
       dispatch(getAdminTransactions(filters));
     } else if (activeTab === 1) {
       dispatch(getPayoutsList(filters));

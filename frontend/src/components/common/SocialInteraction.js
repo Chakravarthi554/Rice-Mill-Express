@@ -28,7 +28,7 @@ import {
   Send as SendIcon
 } from '@mui/icons-material';
 import { likeItem, addComment, getComments, trackShare } from '../../redux/actions/socialActions';
-import { socket, emitSocialAction } from '../../utils/socket';
+import { socket } from '../../utils/socket';
 
 const SocialInteraction = ({ itemType, itemId, itemUserId, showComments = true }) => {
   const dispatch = useDispatch();
@@ -49,16 +49,17 @@ const SocialInteraction = ({ itemType, itemId, itemUserId, showComments = true }
   useEffect(() => {
     // Load initial social data
     dispatch(getComments(itemType, itemId));
-  }, [dispatch, itemType, itemId]);
+
+    // Initialize likes from Redux if previous like action data exists
+    if (socialLike?.data?.likesCount != null) {
+      setLikes(socialLike.data.likesCount);
+      setHasLiked(socialLike.data.userLiked ?? false);
+    }
+  }, [dispatch, itemType, itemId, socialLike?.data?.likesCount]);
 
   useEffect(() => {
     if (socialCommentsList.comments) {
       setComments(socialCommentsList.comments);
-      // Calculate total likes from comments (for demo - in real app, get from item)
-      const totalLikes = socialCommentsList.comments.reduce((sum, comment) =>
-        sum + (comment.likes ? comment.likes.length : 0), 0
-      );
-      setLikes(totalLikes);
     }
   }, [socialCommentsList]);
 
@@ -66,22 +67,29 @@ const SocialInteraction = ({ itemType, itemId, itemUserId, showComments = true }
   useEffect(() => {
     if (!socket || !itemId) return;
 
-    socket.on(`SOCIAL_UPDATE_${itemType.toUpperCase()}_${itemId}`, (data) => {
-      if (data.type === 'LIKE') {
-        setLikes(data.likes || likes);
-        setHasLiked(data.hasLiked || false);
-      }
+    const handler = (data) => {
+      if (data.itemId === itemId && data.itemType?.toLowerCase() === itemType.toLowerCase()) {
+        const isLike = data.type === 'LIKE' || data.type === 'LIKE_UPDATED';
+        const isComment = data.type === 'COMMENT' || data.type === 'COMMENT_ADDED';
 
-      if (data.type === 'COMMENT') {
-        setComments(prev => [...prev, data.comment]);
-        dispatch(getComments(itemType, itemId)); // Refresh comments
+        if (isLike && data.likesCount != null) {
+          setLikes(data.likesCount);
+          setHasLiked(data.userLiked ?? false);
+        }
+
+        if (isComment) {
+          setComments(prev => [...prev, data.comment].filter(Boolean));
+          dispatch(getComments(itemType, itemId));
+        }
       }
-    });
+    };
+
+    socket.on('SOCIAL_UPDATE', handler);
 
     return () => {
-      socket.off(`SOCIAL_UPDATE_${itemType.toUpperCase()}_${itemId}`);
+      socket.off('SOCIAL_UPDATE', handler);
     };
-  }, [itemType, itemId, dispatch, likes]);
+  }, [itemType, itemId, dispatch]);
 
   const handleLike = () => {
     if (!userInfo) {
@@ -94,20 +102,6 @@ const SocialInteraction = ({ itemType, itemId, itemUserId, showComments = true }
     }
 
     dispatch(likeItem(itemType, itemId));
-    setHasLiked(!hasLiked);
-    setLikes(hasLiked ? likes - 1 : likes + 1);
-
-    // Emit socket event
-    emitSocialAction({
-      type: 'LIKE',
-      itemType,
-      itemId,
-      userId: userInfo._id,
-      itemUserId,
-      userRole: userInfo.role,
-      hasLiked: !hasLiked,
-      likes: hasLiked ? likes - 1 : likes + 1
-    });
   };
 
   const handleAddComment = () => {
@@ -122,18 +116,6 @@ const SocialInteraction = ({ itemType, itemId, itemUserId, showComments = true }
 
     if (commentText.trim()) {
       dispatch(addComment(itemType, itemId, commentText));
-
-      // Emit socket event
-      emitSocialAction({
-        type: 'COMMENT',
-        itemType,
-        itemId,
-        userId: userInfo._id,
-        itemUserId,
-        userRole: userInfo.role,
-        comment: { text: commentText, user: userInfo }
-      });
-
       setCommentText('');
       setShowCommentDialog(false);
     }

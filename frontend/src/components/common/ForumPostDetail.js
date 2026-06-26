@@ -2,13 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
-  Box, Typography, Button, TextField, Container, Card, CardContent,
-  Avatar, IconButton, Chip, Breadcrumbs, CircularProgress, Alert,
-  Divider, Paper, Dialog, DialogTitle, DialogContent, DialogActions
+  Box, Typography, Button, Container, Card, CardContent,
+  Avatar, Chip, Breadcrumbs, CircularProgress, Alert,
+  Divider, Paper, Dialog, DialogTitle, DialogContent, DialogActions, Stack
 } from '@mui/material';
 import {
   ThumbUp, ThumbUpOutlined, Comment, Share, Bookmark, BookmarkBorder,
-  ArrowBack, Report, Send, WhatsApp, Twitter, Facebook, Link as LinkIcon
+  ArrowBack, WhatsApp, Twitter, Facebook, Link as LinkIcon
 } from '@mui/icons-material';
 import { getPostById, likePost, toggleBookmark } from '../../redux/actions/forumActions';
 import CommentSystem from '../social/CommentSystem';
@@ -28,17 +28,14 @@ const ForumPostDetail = () => {
     if (id) {
       dispatch(getPostById(id));
 
-      const handler = (data) => {
-        if (data.itemId === id) {
-          // We re-fetch or update local state? Re-fetching is safer for now 
-          // but maybe we can just manually update the post in redux?
-          // forumActions.js should probably handle this.
-          // For now, let's just re-fetch to be safe.
+      const handler = (e) => {
+        const data = e.detail;
+        if (data.itemId === id && data.userId && data.userId !== userInfo?._id) {
           dispatch(getPostById(id));
         }
       };
 
-      window.addEventListener('socialUpdate', (e) => handler(e.detail));
+      window.addEventListener('socialUpdate', handler);
       joinPostRoom(id);
 
       return () => {
@@ -46,7 +43,7 @@ const ForumPostDetail = () => {
         leavePostRoom(id);
       };
     }
-  }, [dispatch, id]);
+  }, [dispatch, id, userInfo]);
 
   const handleLike = async () => {
     if (!userInfo) return alert('Please login to like posts');
@@ -61,13 +58,10 @@ const ForumPostDetail = () => {
     if (!userInfo) return alert('Please login to bookmark posts');
     try {
       await dispatch(toggleBookmark(id));
-      // Re-fetch is handled by the socket listener as well, but we can do it here for extra safety
-      // although the socket listener already dispatches getPostById(id)
     } catch (error) {
       console.error('Error bookmarking post:', error);
     }
   };
-
 
   const handleShare = (platform) => {
     const url = `${window.location.origin}/forum/post/${id}`;
@@ -107,7 +101,7 @@ const ForumPostDetail = () => {
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
-        <CircularProgress />
+        <CircularProgress color="success" />
       </Box>
     );
   }
@@ -115,10 +109,8 @@ const ForumPostDetail = () => {
   if (error) {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-        <Button variant="contained" onClick={() => navigate('/forum')} startIcon={<ArrowBack />}>
+        <Alert severity="error" sx={{ mb: 2, borderRadius: 3 }}>{error}</Alert>
+        <Button variant="contained" onClick={() => navigate('/forum')} startIcon={<ArrowBack />} sx={{ borderRadius: 3 }}>
           Back to Forum
         </Button>
       </Container>
@@ -128,10 +120,8 @@ const ForumPostDetail = () => {
   if (!post) {
     return (
       <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          Post not found
-        </Alert>
-        <Button variant="contained" onClick={() => navigate('/forum')} startIcon={<ArrowBack />}>
+        <Alert severity="warning" sx={{ mb: 2, borderRadius: 3 }}>Post not found</Alert>
+        <Button variant="contained" onClick={() => navigate('/forum')} startIcon={<ArrowBack />} sx={{ borderRadius: 3 }}>
           Back to Forum
         </Button>
       </Container>
@@ -140,221 +130,178 @@ const ForumPostDetail = () => {
 
   const hasLiked = post.userLiked;
   const isBookmarked = post.isBookmarked;
-  const isOwner = userInfo?._id === post.userId?._id;
   const isAdmin = userInfo?.role === 'admin';
 
-  // Filter comments for non-admins
   const displayComments = isAdmin
     ? post.comments || []
     : (post.comments || []).filter(c => c.approved && !c.isFlagged);
 
   return (
-    <Container maxWidth="lg" sx={{ py: 3 }}>
-      {/* Breadcrumb Navigation */}
-      <Breadcrumbs sx={{ mb: 3 }}>
-        <Link to="/forum" style={{ textDecoration: 'none', color: 'inherit' }}>
-          Forum
-        </Link>
-        <Link to={`/forum?category=${post.category}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-          {post.category}
-        </Link>
-        <Typography color="text.primary">{post.title}</Typography>
-      </Breadcrumbs>
+    <Box sx={{ bgcolor: '#FAFAFA', minHeight: '100vh', pb: 8 }}>
+      <Container maxWidth="lg" sx={{ pt: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+          <Button
+            variant="text"
+            startIcon={<ArrowBack />}
+            onClick={() => navigate('/forum')}
+            sx={{ fontWeight: 700, color: '#6B7280', borderRadius: 3 }}
+          >
+            Back
+          </Button>
+          <Breadcrumbs sx={{ color: '#9CA3AF', fontSize: 13 }}>
+            <Link to="/forum" style={{ textDecoration: 'none', color: '#9CA3AF' }}>Forum</Link>
+            <Link to={`/forum?category=${post.category}`} style={{ textDecoration: 'none', color: '#9CA3AF' }}>{post.category}</Link>
+            <Typography color="#111827" sx={{ fontWeight: 600, fontSize: 13 }}>{post.title}</Typography>
+          </Breadcrumbs>
+        </Box>
 
-      {/* Back Button */}
-      <Button
-        variant="outlined"
-        startIcon={<ArrowBack />}
-        onClick={() => navigate('/forum')}
-        sx={{ mb: 3 }}
-      >
-        Back to Forum
-      </Button>
+        <Card sx={{ borderRadius: 4, boxShadow: '0 8px 24px rgba(0,0,0,0.06)', overflow: 'hidden', border: '1px solid #F3F4F6' }}>
+          <CardContent sx={{ p: 4 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+              <Avatar
+                src={getImageUrl(post.userId?.profilePic)}
+                sx={{ width: 52, height: 52, mr: 2, border: '2px solid #F3F4F6' }}
+              >
+                {post.userId?.name?.[0]}
+              </Avatar>
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="h6" sx={{ fontWeight: 800, color: '#111827' }}>
+                  {post.userId?.name}
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#9CA3AF' }}>
+                  {new Date(post.createdAt).toLocaleString()}
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                {post.pinned && <Chip label="Pinned" size="small" sx={{ bgcolor: '#FEF3C7', color: '#92400E', fontWeight: 700 }} />}
+                {post.status !== 'approved' && isAdmin && (
+                  <Chip label="Pending" size="small" sx={{ bgcolor: '#FEF3C7', color: '#92400E', fontWeight: 700 }} />
+                )}
+              </Box>
+            </Box>
 
-      {/* Main Post Card */}
-      <Card sx={{ mb: 3, borderRadius: 3, boxShadow: 3 }}>
-        {/* Post Header */}
-        <CardContent>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-            <Avatar
-              src={getImageUrl(post.userId?.profilePic)}
-              sx={{ width: 56, height: 56, mr: 2 }}
-            >
-              {post.userId?.name?.[0]}
-            </Avatar>
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="h6" fontWeight="bold">
-                {post.userId?.name}
+            <Divider sx={{ mb: 3 }} />
+
+            <Typography variant="h4" sx={{ fontWeight: 800, color: '#111827', mb: 2 }}>
+              {post.title}
+            </Typography>
+
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
+              <Chip label={post.category} size="small" sx={{ bgcolor: '#F0FDF4', color: '#166534', fontWeight: 700 }} />
+              {post.tags?.map((tag) => (
+                <Chip key={tag} label={`#${tag}`} size="small" variant="outlined" sx={{ borderColor: '#E5E7EB', color: '#6B7280', fontWeight: 600 }} />
+              ))}
+            </Box>
+
+            <Typography sx={{ whiteSpace: 'pre-wrap', mb: 4, fontSize: '1.05rem', lineHeight: 1.8, color: '#374151' }}>
+              {post.content}
+            </Typography>
+
+            {post.linkedRecipe && (
+              <Paper sx={{ p: 2.5, mb: 2, borderRadius: 3, bgcolor: '#F0FDF4', border: '1px solid #BBF7D0' }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#166534', mb: 1 }}>
+                  Linked Recipe
+                </Typography>
+                <Button component={Link} to={`/recipes/${post.linkedRecipe._id}`} variant="contained" color="success" size="small" sx={{ borderRadius: 3 }}>
+                  View Recipe: {post.linkedRecipe.name}
+                </Button>
+              </Paper>
+            )}
+
+            {post.linkedProduct && (
+              <Paper sx={{ p: 2.5, mb: 2, borderRadius: 3, bgcolor: '#FFF7ED', border: '1px solid #FED7AA' }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#C2410C', mb: 1 }}>
+                  Linked Product
+                </Typography>
+                <Button component={Link} to={`/products/${post.linkedProduct._id}`} variant="contained" color="warning" size="small" sx={{ borderRadius: 3 }}>
+                  View Product: {post.linkedProduct.name}
+                </Button>
+              </Paper>
+            )}
+
+            <Divider sx={{ my: 3 }} />
+
+            <Box sx={{ display: 'flex', gap: 3, mb: 3 }}>
+              <Typography variant="body2" sx={{ color: '#6B7280', fontWeight: 600 }}>
+                {post.likesCount || 0} likes
               </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {new Date(post.createdAt).toLocaleString()}
+              <Typography variant="body2" sx={{ color: '#6B7280', fontWeight: 600 }}>
+                {displayComments.length} comments
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#6B7280', fontWeight: 600 }}>
+                {post.viewCount || 0} views
               </Typography>
             </Box>
-            {post.pinned && <Chip label="📌 Pinned" color="primary" size="small" />}
-            {post.status !== 'approved' && isAdmin && (
-              <Chip label="⚠️ Pending" color="warning" size="small" sx={{ ml: 1 }} />
-            )}
-          </Box>
 
-          <Divider sx={{ my: 2 }} />
-
-          {/* Post Title */}
-          <Typography variant="h4" fontWeight="bold" gutterBottom>
-            {post.title}
-          </Typography>
-
-          {/* Post Category & Tags */}
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
-            <Chip label={post.category} color="primary" size="small" />
-            {post.tags?.map((tag) => (
-              <Chip key={tag} label={`#${tag}`} size="small" variant="outlined" />
-            ))}
-          </Box>
-
-          {/* Post Content */}
-          <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', mb: 3, fontSize: '1.1rem', lineHeight: 1.8 }}>
-            {post.content}
-          </Typography>
-
-          {/* Linked Recipe/Product */}
-          {post.linkedRecipe && (
-            <Paper sx={{ p: 2, mb: 2, bgcolor: 'primary.light', color: 'primary.contrastText' }}>
-              <Typography variant="subtitle2" gutterBottom>
-                🍚 Linked Recipe
-              </Typography>
+            <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap>
               <Button
-                component={Link}
-                to={`/recipes/${post.linkedRecipe._id}`}
-                variant="contained"
-                size="small"
+                variant={hasLiked ? 'contained' : 'outlined'}
+                color={hasLiked ? 'error' : 'inherit'}
+                startIcon={hasLiked ? <ThumbUp /> : <ThumbUpOutlined />}
+                onClick={handleLike}
+                disabled={!userInfo}
+                sx={{ borderRadius: 3, fontWeight: 700 }}
               >
-                View Recipe: {post.linkedRecipe.name}
+                {hasLiked ? 'Liked' : 'Like'}
               </Button>
-            </Paper>
-          )}
-
-          {post.linkedProduct && (
-            <Paper sx={{ p: 2, mb: 2, bgcolor: 'secondary.light', color: 'secondary.contrastText' }}>
-              <Typography variant="subtitle2" gutterBottom>
-                🛒 Linked Product
-              </Typography>
               <Button
-                component={Link}
-                to={`/products/${post.linkedProduct._id}`}
-                variant="contained"
-                size="small"
+                variant="outlined"
+                startIcon={<Comment />}
+                onClick={() => document.getElementById('comment-section')?.scrollIntoView({ behavior: 'smooth' })}
+                sx={{ borderRadius: 3, fontWeight: 700, color: '#6B7280', borderColor: '#D1D5DB' }}
               >
-                View Product: {post.linkedProduct.name}
+                Comment
               </Button>
-            </Paper>
-          )}
+              <Button
+                variant="outlined"
+                startIcon={<Share />}
+                onClick={() => setShareOpen(true)}
+                sx={{ borderRadius: 3, fontWeight: 700, color: '#6B7280', borderColor: '#D1D5DB' }}
+              >
+                Share
+              </Button>
+              <Button
+                variant={isBookmarked ? 'contained' : 'outlined'}
+                color="success"
+                startIcon={isBookmarked ? <Bookmark /> : <BookmarkBorder />}
+                onClick={handleBookmark}
+                disabled={!userInfo}
+                sx={{ borderRadius: 3, fontWeight: 700 }}
+              >
+                {isBookmarked ? 'Bookmarked' : 'Bookmark'}
+              </Button>
+            </Stack>
+          </CardContent>
+        </Card>
 
-          <Divider sx={{ my: 2 }} />
+        <Box sx={{ mt: 4 }} id="comment-section">
+          <CommentSystem type="forum" itemId={id} />
+        </Box>
 
-          {/* Engagement Stats */}
-          <Box sx={{ display: 'flex', gap: 3, mb: 2 }}>
-            <Typography variant="body2" color="text.secondary">
-              ❤️ {post.likesCount || 0} likes
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              💬 {displayComments.length} comments
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              👁️ {post.viewCount || 0} views
-            </Typography>
-          </Box>
-
-          {/* Action Buttons */}
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-            <Button
-              variant={hasLiked ? 'contained' : 'outlined'}
-              startIcon={hasLiked ? <ThumbUp /> : <ThumbUpOutlined />}
-              onClick={handleLike}
-              disabled={!userInfo}
-            >
-              {hasLiked ? 'Liked' : 'Like'}
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<Comment />}
-              onClick={() => document.getElementById('comment-section')?.scrollIntoView({ behavior: 'smooth' })}
-            >
-              Comment
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<Share />}
-              onClick={() => setShareOpen(true)}
-            >
-              Share
-            </Button>
-            <Button
-              variant={isBookmarked ? 'contained' : 'outlined'}
-              startIcon={isBookmarked ? <Bookmark /> : <BookmarkBorder />}
-              onClick={handleBookmark}
-              disabled={!userInfo}
-              color="secondary"
-            >
-              {isBookmarked ? 'Bookmarked' : 'Bookmark'}
-            </Button>
-          </Box>
-        </CardContent>
-      </Card>
-
-      {/* Comments Section */}
-      {/* Comment Section */}
-      <Box sx={{ mt: 3 }} id="comment-section">
-        <CommentSystem type="forum" itemId={id} />
-      </Box>
-
-      {/* Share Dialog */}
-      <Dialog open={shareOpen} onClose={() => setShareOpen(false)}>
-        <DialogTitle>Share Post</DialogTitle>
-        <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 300 }}>
-            <Button
-              fullWidth
-              variant="outlined"
-              startIcon={<WhatsApp />}
-              onClick={() => handleShare('whatsapp')}
-              sx={{ justifyContent: 'flex-start' }}
-            >
-              Share on WhatsApp
-            </Button>
-            <Button
-              fullWidth
-              variant="outlined"
-              startIcon={<Twitter />}
-              onClick={() => handleShare('twitter')}
-              sx={{ justifyContent: 'flex-start' }}
-            >
-              Share on Twitter
-            </Button>
-            <Button
-              fullWidth
-              variant="outlined"
-              startIcon={<Facebook />}
-              onClick={() => handleShare('facebook')}
-              sx={{ justifyContent: 'flex-start' }}
-            >
-              Share on Facebook
-            </Button>
-            <Button
-              fullWidth
-              variant="outlined"
-              startIcon={<LinkIcon />}
-              onClick={() => handleShare('copy')}
-              sx={{ justifyContent: 'flex-start' }}
-            >
-              Copy Link
-            </Button>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShareOpen(false)}>Close</Button>
-        </DialogActions>
-      </Dialog>
-    </Container>
+        <Dialog open={shareOpen} onClose={() => setShareOpen(false)} maxWidth="xs" fullWidth>
+          <DialogTitle sx={{ fontWeight: 800 }}>Share Post</DialogTitle>
+          <DialogContent>
+            <Stack spacing={1.5} sx={{ mt: 1 }}>
+              <Button fullWidth variant="outlined" startIcon={<WhatsApp />} onClick={() => handleShare('whatsapp')} sx={{ borderRadius: 3, justifyContent: 'flex-start', py: 1.2 }}>
+                Share on WhatsApp
+              </Button>
+              <Button fullWidth variant="outlined" startIcon={<Twitter />} onClick={() => handleShare('twitter')} sx={{ borderRadius: 3, justifyContent: 'flex-start', py: 1.2 }}>
+                Share on Twitter
+              </Button>
+              <Button fullWidth variant="outlined" startIcon={<Facebook />} onClick={() => handleShare('facebook')} sx={{ borderRadius: 3, justifyContent: 'flex-start', py: 1.2 }}>
+                Share on Facebook
+              </Button>
+              <Button fullWidth variant="outlined" startIcon={<LinkIcon />} onClick={() => handleShare('copy')} sx={{ borderRadius: 3, justifyContent: 'flex-start', py: 1.2 }}>
+                Copy Link
+              </Button>
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setShareOpen(false)} sx={{ borderRadius: 3, fontWeight: 700 }}>Close</Button>
+          </DialogActions>
+        </Dialog>
+      </Container>
+    </Box>
   );
 };
 

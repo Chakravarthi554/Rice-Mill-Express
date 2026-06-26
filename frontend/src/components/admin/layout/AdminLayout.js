@@ -6,7 +6,7 @@ import {
   Assessment as AssessmentIcon, LocalShipping as LocalShippingIcon, Forum as ForumIcon,
   Payments as PaymentsIcon, RestaurantMenu as RestaurantMenuIcon, Settings as SettingsIcon,
   Message as MessageIcon, Security as SecurityIcon, Report as ReportIcon, People as PeopleIcon,
-  ShoppingCart as ShoppingCartIcon, Search
+  ShoppingCart as ShoppingCartIcon, Search, SupportAgent as SupportAgentIcon
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../../context/AuthContext';
@@ -18,6 +18,7 @@ const iconMap = {
   LocalShipping: LocalShippingIcon, RestaurantMenu: RestaurantMenuIcon, Forum: ForumIcon,
   People: PeopleIcon, ShoppingCart: ShoppingCartIcon, Settings: SettingsIcon,
   Message: MessageIcon, Security: SecurityIcon, Report: ReportIcon,
+  SupportAgent: SupportAgentIcon,
 };
 
 const AdminLayout = ({ tabs, title }) => {

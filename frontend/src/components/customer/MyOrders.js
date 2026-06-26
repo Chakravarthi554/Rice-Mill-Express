@@ -49,7 +49,7 @@ const MyOrders = () => {
     return (
         <Box sx={{ fontFamily: "'Inter', sans-serif" }}>
             {/* Header */}
-            <Box sx={{ mb: 4 }}>
+            <Box sx={{ mb: 3 }}>
                 <Box sx={{ fontSize: 26, fontWeight: 800, color: '#111827', letterSpacing: '-0.5px', mb: 0.5 }}>
                     My Orders
                 </Box>

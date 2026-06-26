@@ -70,6 +70,30 @@ export const forumPostDetailsReducer = (state = { post: { comments: [] } }, acti
       return { loading: false, post: action.payload };
     case FORUM_POST_DETAILS_FAIL:
       return { loading: false, error: action.payload };
+    case FORUM_POST_LIKE_SUCCESS:
+      if (state.post) {
+        return {
+          ...state,
+          post: {
+            ...state.post,
+            likesCount: action.payload?.likesCount ?? state.post.likesCount,
+            userLiked: action.payload?.hasLiked ?? !state.post.userLiked,
+          }
+        };
+      }
+      return state;
+    case FORUM_POST_REPLY_SUCCESS:
+      if (state.post) {
+        return {
+          ...state,
+          post: {
+            ...state.post,
+            comments: [...(state.post.comments || []), action.payload],
+            commentsCount: (state.post.commentsCount || 0) + 1,
+          }
+        };
+      }
+      return state;
     default:
       return state;
   }

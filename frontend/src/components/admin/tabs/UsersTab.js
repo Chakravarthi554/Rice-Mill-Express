@@ -177,7 +177,7 @@ const UsersTab = () => {
                         {filteredUsers.length === 0 && !loading ? (
                             <TableRow>
                                 <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
-                                    <Typography variant="body1" color="rgba(255,255,255,0.4)">
+                                    <Typography variant="body1" color="#6B7280">
                                         {searchTerm ? 'No users match your search' : 'No users found'}
                                     </Typography>
                                 </TableCell>
@@ -196,7 +196,7 @@ const UsersTab = () => {
                                     </TableCell>
                                     <TableCell>
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                            <MailIcon sx={{ fontSize: 16, color: 'rgba(255,255,255,0.4)' }} />
+                                            <MailIcon sx={{ fontSize: 16, color: '#9CA3AF' }} />
                                             <Typography variant="body2">{user.email}</Typography>
                                         </Box>
                                     </TableCell>

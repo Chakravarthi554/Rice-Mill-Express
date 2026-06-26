@@ -303,9 +303,6 @@ export const likePost = (postId) => async (dispatch, getState) => {
       payload: data,
     });
 
-    // Refresh post details to show updated like count
-    dispatch(getPostById(postId));
-
     return Promise.resolve(data);
   } catch (error) {
     const message = handleApiError(error);
@@ -340,9 +337,6 @@ export const addComment = (postId, content) => async (dispatch, getState) => {
       type: FORUM_POST_REPLY_SUCCESS,
       payload: data,
     });
-
-    // Refresh post details to show new comment
-    dispatch(getPostById(postId));
 
     return Promise.resolve(data);
   } catch (error) {

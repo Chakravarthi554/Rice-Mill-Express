@@ -7,7 +7,13 @@ const { auth: firebaseAuth } = require('../config/firebase');
 const setupSocketServer = (server) => {
   const io = socketio(server, {
     cors: {
-      origin: ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:3001'],
+      origin: [
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+        'http://localhost:3001',
+        'https://c111b7c7.rice-mill-frontend.pages.dev',
+        /^https:\/\/.*\.pages\.dev$/,
+      ],
       methods: ['GET', 'POST'],
       credentials: true,
     },
