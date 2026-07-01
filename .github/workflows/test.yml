@@ -10,6 +10,12 @@ jobs:
   test:
     runs-on: ubuntu-latest
     
+    env:
+      JWT_SECRET: "test_jwt_secret_which_needs_to_be_long_enough_for_security"
+      REFRESH_TOKEN_SECRET: "test_refresh_secret"
+      MONGO_URI: "mongodb://127.0.0.1:27017/dummy" # Mocked out by mongodb-memory-server
+      NODE_ENV: "test"
+
     defaults:
       run:
         working-directory: ./backend
