@@ -3,8 +3,10 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const logger = require('./logger');
 const { auth: firebaseAuth } = require('../config/firebase');
+const { createClient } = require('redis');
+const { createAdapter } = require('@socket.io/redis-adapter');
 
-const setupSocketServer = (server) => {
+const setupSocketServer = async (server) => {
   const io = socketio(server, {
     cors: {
       origin: [
@@ -19,6 +21,28 @@ const setupSocketServer = (server) => {
     },
     transports: ['websocket', 'polling'],
   });
+
+  // Attach Redis adapter for scaling across multiple instances
+  const pubClient = createClient({
+    socket: {
+      host: process.env.REDIS_HOST || '127.0.0.1',
+      port: process.env.REDIS_PORT || 6379,
+    }
+  });
+  const subClient = pubClient.duplicate();
+
+  pubClient.on('error', (err) => {
+    logger.error('❌ Redis pubClient Error (Socket.io Adapter):', err.message);
+    // Optional: Could process.exit(1) here if strict scaling is required
+  });
+  subClient.on('error', (err) => {
+    logger.error('❌ Redis subClient Error (Socket.io Adapter):', err.message);
+  });
+
+  // Await adapter connection before allowing sockets to connect
+  await Promise.all([pubClient.connect(), subClient.connect()]);
+  io.adapter(createAdapter(pubClient, subClient));
+  logger.info('✅ Socket.io Redis adapter connected');
 
   // 🔥 ENHANCED AUTH: Better token validation with role checking
   io.use(async (socket, next) => {

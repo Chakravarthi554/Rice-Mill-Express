@@ -12,16 +12,16 @@ const {
     adminUpdateWithdrawal
 } = require('../controllers/rewardsController');
 
-const { protect, admin } = require('../middleware/auth');
+const { protect, admin, requireVerifiedEmail } = require('../middleware/auth');
 
 router.get('/', protect, getUserRewards);
-router.post('/redeem', protect, redeemRewards);
+router.post('/redeem', protect, requireVerifiedEmail, redeemRewards);
 router.get('/referral', protect, getReferralInfo);
 router.get('/sync', protect, syncRewards);
 
 // Wallet & Withdrawal Routes
 router.get('/wallet', protect, getWalletData);
-router.post('/withdraw', protect, requestWithdrawal);
+router.post('/withdraw', protect, requireVerifiedEmail, requestWithdrawal);
 router.get('/withdrawals', protect, getWithdrawalHistory);
 
 // Admin Routes

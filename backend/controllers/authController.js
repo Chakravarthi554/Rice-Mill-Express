@@ -67,9 +67,16 @@ const registerUser = asyncHandler(async (req, res) => {
     }
   }
 
-  const userExists = await User.findOne({ email });
-  if (userExists) {
-    if (userExists.firebaseUid === firebaseUid && userExists.role === 'customer') {
+  const lookupQuery = [{ email }];
+  if (sanitisedPhone) lookupQuery.push({ phone: sanitisedPhone });
+  
+  const existingUsers = await User.find({ $or: lookupQuery });
+  
+  if (existingUsers.length > 0) {
+    const userExists = existingUsers.find(u => u.email === email);
+    const phoneExists = existingUsers.find(u => u.phone === sanitisedPhone);
+
+    if (userExists && userExists.firebaseUid === firebaseUid && userExists.role === 'customer') {
       console.log('🔄 registerUser: Found auto-provisioned user, updating to full registration details');
       userExists.name = name;
       userExists.phone = sanitisedPhone || userExists.phone;
@@ -80,7 +87,6 @@ const registerUser = asyncHandler(async (req, res) => {
 
       await userExists.save();
 
-      // Update refreshToken later
       const accessToken = generateToken(userExists._id, 'access');
       const refreshToken = generateRefreshToken(userExists._id);
 
@@ -113,7 +119,8 @@ const registerUser = asyncHandler(async (req, res) => {
     }
 
     res.status(400);
-    throw new Error('User already exists');
+    if (userExists) throw new Error('Email address already exists');
+    if (phoneExists) throw new Error('Mobile number already exists');
   }
 
   // Normal creation
@@ -183,8 +190,8 @@ const loginUser = asyncHandler(async (req, res) => {
       return res.status(400).json({ message: 'Phone number does not match' });
     }
 
-    // ✅ FIREBASE: Sync user to Firestore for Firebase rules
-    await firebaseUserSync.syncUser(user).catch(err =>
+    // ✅ FIREBASE: Sync user to Firestore for Firebase rules (Fire-and-forget to speed up login)
+    firebaseUserSync.syncUser(user).catch(err =>
       console.error('⚠️  Firestore sync failed (non-critical):', err.message)
     );
 
@@ -737,7 +744,11 @@ const verify2FA = asyncHandler(async (req, res) => {
 });
 
 const logoutUser = asyncHandler(async (req, res) => {
-  res.clearCookie('refreshToken');
+  res.clearCookie('refreshToken', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+  });
   res.json({ message: 'Logged out successfully' });
 });
 

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { protect } = require('../middleware/auth');
+const { protect, requireVerifiedEmail } = require('../middleware/auth');
 const User = require('../models/User');
 
 // GET /api/cart
@@ -9,7 +9,7 @@ router.get('/', protect, async (req, res) => {
     const user = await User.findById(req.user._id)
       .populate({
         path: 'cartItems.product',
-        select: 'name price offerPrice images stock weight'   // Now includes offerPrice and weight
+        select: 'name price offerPrice images stock countInStock weight'   // Now includes offerPrice and weight
       });
     res.json(user.cartItems || []);
   } catch (err) {
@@ -19,7 +19,7 @@ router.get('/', protect, async (req, res) => {
 });
 
 // POST /api/cart  (add / update)
-router.post('/', protect, async (req, res) => {
+router.post('/', protect, requireVerifiedEmail, async (req, res) => {
   try {
     const { product: productId, qty, location } = req.body;
     if (!productId) return res.status(400).json({ message: 'Product ID required' });
@@ -71,7 +71,7 @@ router.post('/', protect, async (req, res) => {
 });
 
 // DELETE /api/cart/:productId
-router.delete('/:productId', protect, async (req, res) => {
+router.delete('/:productId', protect, requireVerifiedEmail, async (req, res) => {
   try {
     const updatedUser = await User.findOneAndUpdate(
       { _id: req.user._id },
@@ -91,7 +91,7 @@ router.delete('/:productId', protect, async (req, res) => {
 });
 
 // DELETE /api/cart  (clear)
-router.delete('/', protect, async (req, res) => {
+router.delete('/', protect, requireVerifiedEmail, async (req, res) => {
   try {
     const updatedUser = await User.findOneAndUpdate(
       { _id: req.user._id },

@@ -15,7 +15,7 @@ const api = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
-  timeout: 15000,
+  timeout: 30000,
 });
 
 let isRefreshing = false;
@@ -65,6 +65,22 @@ api.interceptors.response.use(
 
     // Log API errors
     console.error(`❌ API Error ${status} ${originalRequest.method?.toUpperCase()} ${path}:`, error.response?.data || error.message);
+
+    const errorCode = error.response?.data?.code;
+
+    // Handle 403 EMAIL_NOT_VERIFIED
+    if (status === 403 && errorCode === 'EMAIL_NOT_VERIFIED') {
+      console.warn('⚠️ API: Email not verified, redirecting to pending screen');
+      if (!window.location.pathname.includes('/verify-email-notice')) {
+        window.location.href = '/verify-email-notice';
+      }
+      // Return a structured error so components can handle it if needed
+      return Promise.reject({
+        ...error,
+        isEmailUnverified: true,
+        message: error.response.data.message
+      });
+    }
 
     const isAuthEndpoint =
       path.includes('/auth/login') ||

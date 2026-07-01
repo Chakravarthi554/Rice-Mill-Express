@@ -48,6 +48,12 @@
                 {
                     "locationAlwaysAndWhenInUsePermission": "Allow Rice Mill Express to use your location for delivery tracking"
                 }
+            ],
+            [
+                "@sentry/react-native/expo",
+                {
+                    "url": "https://sentry.io/"
+                }
             ]
         ]
     }

@@ -6,7 +6,7 @@ const bcrypt = require('bcryptjs');
 const asyncHandler = require('express-async-handler');
 const mongoose = require('mongoose');
 const crypto = require('crypto');
-const sendEmail = require('../utils/sendEmail');
+const { emailQueue } = require('../jobs/queues');
 const { getSocket } = require('../utils/socketServer');
 const Order = require('../models/Order');
 
@@ -116,7 +116,15 @@ const registerUser = asyncHandler(async (req, res) => {
     ]
   });
 
-  if (userExists) return res.status(400).json({ message: 'User with this email or phone already exists' });
+  if (userExists) {
+    if (userExists.email === email?.toLowerCase()) {
+      return res.status(400).json({ message: 'Email address is already registered' });
+    }
+    if (userExists.phone === phone) {
+      return res.status(400).json({ message: 'Mobile number is already registered' });
+    }
+    return res.status(400).json({ message: 'User with this email or phone already exists' });
+  }
 
   let referredBy = null;
   if (referralCode) {
@@ -238,11 +246,11 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     updates.integrations = typeof req.body.integrations === 'string' ? JSON.parse(req.body.integrations) : req.body.integrations;
   }
 
-  if (user.role === 'seller') {
-    let bd = {};
-    if (req.body.businessDetails) {
-      bd = typeof req.body.businessDetails === 'string' ? JSON.parse(req.body.businessDetails) : req.body.businessDetails;
-    }
+  // Allow any user to have business details updated (in case of role anomalies)
+  let bd = {};
+  if (req.body.businessDetails) {
+    bd = typeof req.body.businessDetails === 'string' ? JSON.parse(req.body.businessDetails) : req.body.businessDetails;
+  }
 
     // Handle root-level business fields sent from FormData
     const rootBusFields = ['businessName', 'businessType', 'gstNumber', 'panNumber'];
@@ -284,7 +292,6 @@ const updateUserProfile = asyncHandler(async (req, res) => {
 
       updates.businessDetails = mergedBD;
     }
-  }
 
   console.log('🔄 Profile Update: Applying updates to user:', user._id, JSON.stringify(updates, null, 2));
 
@@ -818,7 +825,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
   const message = `<h1>Password Reset Request</h1><p>Click below to reset your password (link expires in 10 minutes):</p><a href="${resetUrl}" clicktracking=off>${resetUrl}</a>`;
 
   try {
-    await sendEmail({ email: user.email, subject: 'Password Reset Request', message });
+    await emailQueue.add({ email: user.email, subject: 'Password Reset Request', message });
     res.status(200).json({ message: 'Password reset link sent successfully' });
   } catch (err) {
     console.error("FORGOT PASSWORD EMAIL ERROR:", err);
@@ -887,7 +894,7 @@ const sendTestNotification = asyncHandler(async (req, res) => {
   const { type } = req.body; // 'email', 'sms', 'push'
 
   if (type === 'email' && user.notificationPreferences.email) {
-    await sendEmail({
+    await emailQueue.add({
       email: user.email,
       subject: 'Test Notification',
       message: `<p>This is a test email from Rice Mill App.</p>`
@@ -1086,7 +1093,7 @@ const reportProblem = asyncHandler(async (req, res) => {
   if (!description || description.trim() === "") {
     return res.status(400).json({ message: "Description is required" });
   }
-  await sendEmail({
+  await emailQueue.add({
     email: "support@ricemill.com",
     subject: "Problem Report",
     message: description
@@ -1236,7 +1243,7 @@ const exportUserData = asyncHandler(async (req, res) => {
   }
 
   try {
-    const emailResult = await sendEmail({
+    const emailResult = await emailQueue.add({
       email: user.email,
       subject: 'Your Data Export Request',
       message

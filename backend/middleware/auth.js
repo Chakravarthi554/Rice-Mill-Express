@@ -49,10 +49,6 @@ const protect = asyncHandler(async (req, res, next) => {
     } catch (error) {
       console.error('Auth header parse error', error);
     }
-  } else if (req.query && req.query.token) {
-    // Allow token via query param for downloads
-    token = req.query.token;
-    console.log('🔄 Auth Middleware: Token found in query params');
   }
 
   if (token) {
@@ -116,17 +112,7 @@ const protect = asyncHandler(async (req, res, next) => {
           });
         }
 
-        // ⚠️ TEMPORARILY DISABLED: Email verification check (to allow testing)
-        // if (['seller', 'customer'].includes(user.role) && decoded.email && !decoded.email_verified) {
-        //   console.log(`❌ Auth Middleware: ${user.role} email not verified in Firebase:`, user.email);
-        //   res.status(403).json({
-        //     message: `Email verification is mandatory for ${user.role}s. Please verify your email via the link sent to your Gmail.`,
-        //     code: 'EMAIL_NOT_VERIFIED',
-        //     email: user.email
-        //   });
-        //   return; // Stop execution
-        // }
-
+        // Note: Email verification check was moved to requireVerifiedEmail middleware
       } catch (err) {
         // Distinguish between Firebase verification errors and DB errors
         const isFirebaseError = err.code && err.code.startsWith('auth/');
@@ -155,6 +141,7 @@ const protect = asyncHandler(async (req, res, next) => {
       }
 
       req.user = user;
+      req.firebaseToken = decoded; // Expose decoded token for subsequent middlewares
       console.log('✅ Auth Middleware: Authenticated User:', user.email || user.phone, 'Role:', user.role);
       next();
     } catch (error) {
@@ -170,6 +157,22 @@ const protect = asyncHandler(async (req, res, next) => {
     throw new Error('Not authorized, no token');
   }
 });
+
+// Middleware to enforce email verification (must be used AFTER protect)
+const requireVerifiedEmail = (req, res, next) => {
+  const user = req.user;
+  const decoded = req.firebaseToken;
+
+  if (['seller', 'customer'].includes(user?.role) && decoded?.email && !decoded?.email_verified) {
+    console.log(`❌ Auth Middleware: ${user.role} email not verified in Firebase:`, user.email);
+    return res.status(403).json({
+      message: `Email verification is mandatory for ${user.role}s. Please verify your email via the link sent to your Gmail.`,
+      code: 'EMAIL_NOT_VERIFIED',
+      email: user.email
+    });
+  }
+  next();
+};
 
 // Optional auth for public routes that might need user context
 const optionalAuth = asyncHandler(async (req, res, next) => {
@@ -263,6 +266,7 @@ const sellerOrOrderOwner = asyncHandler(async (req, res, next) => {
 
 module.exports = {
   protect,
+  requireVerifiedEmail,
   authorize,
   admin,
   role: authorize,

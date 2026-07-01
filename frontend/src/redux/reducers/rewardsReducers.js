@@ -29,6 +29,12 @@ import {
     ADMIN_WITHDRAWAL_UPDATE_SUCCESS,
     ADMIN_WITHDRAWAL_UPDATE_FAIL,
     ADMIN_WITHDRAWAL_UPDATE_RESET,
+    REFERRAL_CODE_REQUEST,
+    REFERRAL_CODE_SUCCESS,
+    REFERRAL_CODE_FAIL,
+    REFERRALS_REQUEST,
+    REFERRALS_SUCCESS,
+    REFERRALS_FAIL,
 } from '../constants/rewardsConstants';
 
 export const rewardsReducer = (state = { rewards: {} }, action) => {
@@ -149,6 +155,32 @@ export const adminWithdrawalUpdateReducer = (state = {}, action) => {
             return { loading: false, error: action.payload };
         case ADMIN_WITHDRAWAL_UPDATE_RESET:
             return {};
+        default:
+            return state;
+    }
+};
+
+export const referralCodeReducer = (state = { code: null, loading: false }, action) => {
+    switch (action.type) {
+        case REFERRAL_CODE_REQUEST:
+            return { ...state, loading: true };
+        case REFERRAL_CODE_SUCCESS:
+            return { loading: false, code: action.payload?.code || action.payload?.referralCode, ...action.payload };
+        case REFERRAL_CODE_FAIL:
+            return { loading: false, error: action.payload };
+        default:
+            return state;
+    }
+};
+
+export const referralsReducer = (state = { referrals: [], loading: false }, action) => {
+    switch (action.type) {
+        case REFERRALS_REQUEST:
+            return { loading: true, referrals: [] };
+        case REFERRALS_SUCCESS:
+            return { loading: false, referrals: action.payload?.referrals || action.payload || [] };
+        case REFERRALS_FAIL:
+            return { loading: false, error: action.payload };
         default:
             return state;
     }

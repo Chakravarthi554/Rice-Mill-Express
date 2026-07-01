@@ -71,6 +71,7 @@ const formatProduct = (product) => {
     mrp: hasOffer ? product.price : product.mrp,
     discount: discount || 0,
     rating: Number(product.rating || 0),
+    numReviews: product.numReviews || 0,
     countInStock: product.countInStock ?? 1,
     brand: product.brand || 'Rice Mill Express',
     deliveryEta: `${12 + ((product.name || '').length % 16)} mins`,
@@ -105,10 +106,10 @@ const Dashboard = () => {
 
   const { loading: productLoading, error: productError, products = [] } = useSelector((state) => state.productList || {});
   const { wishlistItems = [] } = useSelector((state) => state.wishlist || {});
+  const { user: profile } = useSelector((state) => state.userDetails || {});
 
   useEffect(() => {
     dispatch(listProducts('', ''));
-    dispatch(listMyCart());
   }, [dispatch]);
 
   useEffect(() => {
@@ -182,7 +183,7 @@ const Dashboard = () => {
               </Box>
               <Box>
                 <Typography sx={{ fontSize: 11, color: '#6B7280', fontWeight: 800 }}>Delivering to</Typography>
-                <Typography sx={{ fontSize: 14, color: '#111827', fontWeight: 900 }}>Vijayawada</Typography>
+                <Typography sx={{ fontSize: 14, color: '#111827', fontWeight: 900 }}>{profile?.address?.city || profile?.city || 'Delivering to you'}</Typography>
               </Box>
             </Stack>
             <Stack direction="row" spacing={1} alignItems="center">

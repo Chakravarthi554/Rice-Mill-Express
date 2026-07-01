@@ -20,7 +20,7 @@ try {
   };
 }
 
-const { protect, authorize } = authMiddleware;
+const { protect, authorize, requireVerifiedEmail } = authMiddleware;
 
 // ✅ FIXED: Health check for admin payments API
 router.get('/health', (req, res) => {
@@ -51,17 +51,17 @@ const validateController = (controller, functionName) => {
   return controller[functionName];
 };
 
-router.post('/add-card', validateController(userController, 'addPaymentMethod'));
-router.delete('/cards/:id', validateController(userController, 'deletePaymentMethod'));
+router.post('/add-card', requireVerifiedEmail, validateController(userController, 'addPaymentMethod'));
+router.delete('/cards/:id', requireVerifiedEmail, validateController(userController, 'deletePaymentMethod'));
 
 // ✅ FIXED: Razorpay routes for customers (Secure)
-router.post('/razorpay/order', paymentController.createRazorpayOrder);
-router.post('/razorpay/verify', paymentController.verifyRazorpayPayment);
+router.post('/razorpay/order', requireVerifiedEmail, paymentController.createRazorpayOrder);
+router.post('/razorpay/verify', requireVerifiedEmail, paymentController.verifyRazorpayPayment);
 
 // ✅ NEW: Seller payment routes
 router.get('/seller', authorize('seller'), paymentController.getSellerPayments);
-router.post('/cod-report/:orderId', authorize('seller'), paymentController.recordCodPayment);
-router.post('/request-payout', authorize('seller'), paymentController.requestPayout);
+router.post('/cod-report/:orderId', requireVerifiedEmail, authorize('seller'), paymentController.recordCodPayment);
+router.post('/request-payout', requireVerifiedEmail, authorize('seller'), paymentController.requestPayout);
 
 // Admin Routes (Apply admin check to all subsequent routes or individually)
 router.use(authorize('admin'));

@@ -17,7 +17,24 @@ const initialState = {
 export const cartReducer = (state = initialState, action) => {
   switch (action.type) {
     case CART_REPLACE_ITEMS:
-      return { ...state, cartItems: action.payload || [] };
+      const normalizedItems = (action.payload || []).map(item => {
+        let productObj = item.product;
+        // If it's a string, we mock it. If it's null, we return empty object.
+        if (typeof productObj === 'string') {
+          productObj = { _id: productObj };
+        } else if (!productObj) {
+          productObj = {};
+        }
+        // Backend stores as 'quantity', frontend uses 'qty' — normalise both
+        const qty = item.qty || item.quantity || 1;
+        return {
+          ...item,
+          qty,
+          quantity: qty,
+          product: productObj,
+        };
+      });
+      return { ...state, cartItems: normalizedItems };
 
     case CART_ADD_ITEM:
       const item = action.payload;

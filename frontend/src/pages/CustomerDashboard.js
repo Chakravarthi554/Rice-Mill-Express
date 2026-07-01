@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import Header from '../components/common/Header';
 import Dashboard from '../components/customer/Dashboard';
 import SettingsBanner from '../components/common/SettingsBanner';
 import {
@@ -62,8 +61,6 @@ const CustomerDashboard = () => {
 
   return (
     <>
-      <Header />
-      <SettingsBanner />
       <Box sx={{ minHeight: '100vh', bgcolor: '#F9FAFB' }}>
         {/* ── ZEPTO-STYLE TOP SEARCH BAR ── */}
         <Box sx={{ bgcolor: '#fff', borderBottom: '1px solid #F3F4F6', position: 'sticky', top: 0, zIndex: 100 }}>
@@ -77,7 +74,7 @@ const CustomerDashboard = () => {
                   RiceMill
                 </Typography>
                 <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: '#6B7280', bgcolor: '#F3F4F6', px: 1, py: 0.25, borderRadius: '4px' }}>
-                  Vijayawada
+                  {userInfo?.address?.city || userInfo?.city || 'Delivering to you'}
                 </Typography>
               </Box>
               <Box sx={{ flex: 1, maxWidth: 640, mx: 'auto' }}>
@@ -122,6 +119,8 @@ const CustomerDashboard = () => {
             </Box>
           </Container>
         </Box>
+
+        <SettingsBanner />
 
         <Container maxWidth={false} sx={{ px: { xs: 2, md: 6 }, pt: 1, pb: 6 }}>
 

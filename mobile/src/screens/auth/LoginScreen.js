@@ -99,7 +99,7 @@ export default function LoginScreen({ navigation }) {
                         </View>
 
                         {/* Forgot */}
-                        <TouchableOpacity style={styles.forgotBtn}>
+                        <TouchableOpacity style={styles.forgotBtn} onPress={() => navigation.navigate('ForgotPassword')}>
                             <Text style={styles.forgotText}>Forgot Password?</Text>
                         </TouchableOpacity>
 

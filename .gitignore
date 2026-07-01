@@ -28,6 +28,10 @@ backend/dist/
 # They live in frontend/ and mobile/ subdirectories
 # Add secrets to EC2 directly, not to these files!
 
+# ─── Firebase Admin SDK Credentials ───────────────────────────────────────
+# NEVER commit service-account JSON files — load via env vars instead
+*-firebase-adminsdk-*.json
+
 # Logs
 logs/
 *.log
@@ -122,3 +126,5 @@ playwright/.cache/
 # =========================
 # END OF FILE
 # =========================
+
+backend/.env

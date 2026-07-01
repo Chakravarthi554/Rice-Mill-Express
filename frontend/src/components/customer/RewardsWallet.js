@@ -92,7 +92,7 @@ const RewardsWallet = () => {
                 <PersonIcon />
               </Avatar>
               <Typography variant="h6" fontWeight={800}>{userInfo?.name || 'Rahul Sharma'}</Typography>
-              <Typography variant="body2" sx={{ opacity: 0.9 }}>{userInfo?.phone || '+91 98765 43210'}</Typography>
+              <Typography variant="body2" sx={{ opacity: 0.9 }}>{userInfo?.phone || 'No phone added'}</Typography>
               <Typography variant="caption" sx={{ mt: 1, textDecoration: 'underline', cursor: 'pointer', fontWeight: 600 }} onClick={() => navigate('/profile')}>Edit Profile</Typography>
             </Box>
             
@@ -126,7 +126,7 @@ const RewardsWallet = () => {
             <Box sx={{ p: 2 }}>
               <Box sx={{ bgcolor: '#16A34A', borderRadius: 2, p: 2.5, color: '#fff', mb: 3 }}>
                 <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 500 }}>Available Balance</Typography>
-                <Typography variant="h4" fontWeight={800} sx={{ mt: 0.5, mb: 2 }}>₹{walletData?.balance?.toFixed(2) || '250.00'}</Typography>
+                <Typography variant="h4" fontWeight={800} sx={{ mt: 0.5, mb: 2 }}>₹{walletData?.balance != null ? walletData.balance.toFixed(2) : '0.00'}</Typography>
                 <Grid container spacing={1.5}>
                   <Grid item xs={6}>
                     <Button fullWidth variant="contained" sx={{ bgcolor: 'rgba(255,255,255,0.2)', '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' }, color: '#fff', fontWeight: 700, borderRadius: 1.5 }}>
@@ -159,22 +159,11 @@ const RewardsWallet = () => {
                     </Typography>
                   </Box>
                 )) : (
-                  <>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, border: '1px solid #F3F4F6', borderRadius: 2 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <Box sx={{ width: 32, height: 32, borderRadius: '50%', bgcolor: '#DCFCE7', color: '#16A34A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Add fontSize="small" /></Box>
-                        <Box><Typography variant="body2" fontWeight={600}>Added Money</Typography><Typography variant="caption" color="text.secondary">Today, 10:30 AM</Typography></Box>
-                      </Box>
-                      <Typography variant="body2" fontWeight={800} color="#16A34A">+₹500</Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, border: '1px solid #F3F4F6', borderRadius: 2 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <Box sx={{ width: 32, height: 32, borderRadius: '50%', bgcolor: '#FEE2E2', color: '#EF4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Typography fontWeight={800}>-</Typography></Box>
-                        <Box><Typography variant="body2" fontWeight={600}>Order Payment</Typography><Typography variant="caption" color="text.secondary">Yesterday, 6:45 PM</Typography></Box>
-                      </Box>
-                      <Typography variant="body2" fontWeight={800} color="#EF4444">-₹1,250</Typography>
-                    </Box>
-                  </>
+                  <Box sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>
+                    <AccountBalanceWallet sx={{ fontSize: 40, opacity: 0.3, mb: 1 }} />
+                    <Typography variant="body2" fontWeight={600}>No transactions yet</Typography>
+                    <Typography variant="caption">Your wallet activity will appear here</Typography>
+                  </Box>
                 )}
               </Box>
             </Box>
@@ -199,7 +188,7 @@ const RewardsWallet = () => {
               <Box sx={{ display: 'flex', gap: 1, mb: 3 }}>
                 <Box sx={{ flex: 1, bgcolor: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Typography variant="body1" fontWeight={800} letterSpacing={2} color="#111827">
-                    {referralCodeObj?.code || rewards?.referralCode || 'RICE250'}
+                    {referralCodeObj?.code || rewards?.referralCode || (codeLoading ? 'Loading...' : userInfo?.referralCode || 'Not set')}
                   </Typography>
                 </Box>
                 <Button variant="contained" onClick={copyReferralCode} sx={{ bgcolor: '#16A34A', '&:hover': { bgcolor: '#15803D' }, fontWeight: 700, borderRadius: 2 }}>
@@ -218,13 +207,13 @@ const RewardsWallet = () => {
               <Grid container spacing={1.5}>
                 <Grid item xs={6}>
                   <Box sx={{ bgcolor: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 2, p: 2, textAlign: 'center' }}>
-                    <Typography variant="h5" fontWeight={800} color="#16A34A">₹{rewards?.balance || '500'}</Typography>
+                    <Typography variant="h5" fontWeight={800} color="#16A34A">₹{rewards?.balance != null ? rewards.balance : 0}</Typography>
                     <Typography variant="caption" color="text.secondary" fontWeight={600}>Total Earned</Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={6}>
                   <Box sx={{ bgcolor: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: 2, p: 2, textAlign: 'center' }}>
-                    <Typography variant="h5" fontWeight={800} color="#111827">{referrals?.length || '5'}</Typography>
+                    <Typography variant="h5" fontWeight={800} color="#111827">{referrals?.length ?? 0}</Typography>
                     <Typography variant="caption" color="text.secondary" fontWeight={600}>Friends Joined</Typography>
                   </Box>
                 </Grid>

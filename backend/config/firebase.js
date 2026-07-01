@@ -3,18 +3,22 @@ let isFirebaseInitialized = false;
 
 try {
     const firebaseAdmin = require('firebase-admin');
-    const path = require('path');
-    const fs = require('fs');
 
-    const serviceAccountPath = path.join(__dirname, './rice-express-7eef4-firebase-adminsdk-fbsvc-01dd764cb9.json');
+    // Load credentials from environment variables (never from a committed JSON file)
+    const projectId = process.env.FIREBASE_PROJECT_ID;
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY
+        ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') // Handle escaped newlines from .env
+        : undefined;
 
-    if (fs.existsSync(serviceAccountPath)) {
-        const serviceAccount = require(serviceAccountPath);
-
-        // Initialize Firebase Admin
+    if (projectId && clientEmail && privateKey) {
         firebaseAdmin.initializeApp({
-            credential: firebaseAdmin.credential.cert(serviceAccount),
-            storageBucket: 'rice-express-7eef4.appspot.com'
+            credential: firebaseAdmin.credential.cert({
+                projectId,
+                clientEmail,
+                privateKey,
+            }),
+            storageBucket: `${projectId}.appspot.com`
         });
 
         admin = firebaseAdmin;
@@ -24,8 +28,8 @@ try {
         isFirebaseInitialized = true;
         console.log('✅ Firebase Admin initialized successfully');
     } else {
-        console.warn('⚠️ Firebase service account file not found. Firebase features will be disabled.');
-        throw new Error('Service account missing');
+        console.warn('⚠️ Firebase Admin SDK env vars missing (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY). Firebase features will be disabled.');
+        throw new Error('Firebase environment variables missing');
     }
 } catch (error) {
     console.error('⚠️ Firebase Admin could not be initialized:', error.message);

@@ -6,9 +6,24 @@ import { BrowserRouter } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import store from './redux/store';
 import { AuthProvider } from './context/AuthContext';
+import GlobalErrorBoundary from './components/common/GlobalErrorBoundary';
 import App from './App';
 import './i18n';
 import { io } from 'socket.io-client';
+import * as Sentry from "@sentry/react";
+
+if (process.env.REACT_APP_SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.REACT_APP_SENTRY_DSN,
+    integrations: [
+      Sentry.browserTracingIntegration(),
+      Sentry.replayIntegration(),
+    ],
+    tracesSampleRate: 1.0,
+    replaysSessionSampleRate: 0.1,
+    replaysOnErrorSampleRate: 1.0,
+  });
+}
 
 // Polyfills
 import { Buffer } from 'buffer';
@@ -26,13 +41,15 @@ root.render(
   <React.StrictMode>
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Provider store={store}>
-        <BrowserRouter>
-          <AuthProvider>
-            <App />
-          </AuthProvider>
-        </BrowserRouter>
-      </Provider>
+      <GlobalErrorBoundary>
+        <Provider store={store}>
+          <BrowserRouter>
+            <AuthProvider>
+              <App />
+            </AuthProvider>
+          </BrowserRouter>
+        </Provider>
+      </GlobalErrorBoundary>
     </ThemeProvider>
   </React.StrictMode>
 );

@@ -19,7 +19,7 @@ import {
 } from '@mui/material';
 import MuiAlert from '@mui/material/Alert';
 import { submitKycApplication, getKycStatus } from '../../redux/actions/kycActions';
-import FileUpload from '../components/FileUpload';
+import FileUpload from '../components/common/FileUpload';
 
 // Custom Alert component for Snackbar
 const AlertSnackbar = React.forwardRef(function Alert(props, ref) {

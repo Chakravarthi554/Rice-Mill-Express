@@ -23,6 +23,16 @@ import { loadUserFromStorage, setCredentials, setAuthReady, logout } from './red
 import { fetchSettings } from './redux/slices/settingsSlice';
 import { auth } from './config/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+import * as Sentry from '@sentry/react-native';
+import MobileErrorBoundary from './components/MobileErrorBoundary';
+
+if (process.env.EXPO_PUBLIC_SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+    tracesSampleRate: 1.0,
+  });
+}
+
 const { LightTheme, DarkTheme } = adaptNavigationTheme({
   reactNavigationLight: NavigationDefaultTheme,
   reactNavigationDark: NavigationDarkTheme,
@@ -34,7 +44,7 @@ setupInterceptors(store);
 // Auth Screens
 import LoginScreen from './screens/auth/LoginScreen';
 import RegisterScreen from './screens/auth/RegisterScreen';
-// import ForgotPasswordScreen from './screens/auth/ForgotPasswordScreen'; // File missing
+import ForgotPasswordScreen from './screens/auth/ForgotPasswordScreen';
 import TwoFactorVerifyScreen from './screens/auth/TwoFactorVerifyScreen';
 
 // Customer Screens
@@ -109,7 +119,7 @@ function AuthStack() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
-      {/* <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} /> */}
+      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
       <Stack.Screen name="TwoFactorVerify" component={TwoFactorVerifyScreen} />
     </Stack.Navigator>
   );
@@ -523,9 +533,11 @@ function MainContent() {
 
 export default function App() {
   return (
-    <Provider store={store}>
-      <MainContent />
-    </Provider>
+    <MobileErrorBoundary>
+      <Provider store={store}>
+        <MainContent />
+      </Provider>
+    </MobileErrorBoundary>
   );
 }
 

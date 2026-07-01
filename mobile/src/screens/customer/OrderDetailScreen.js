@@ -6,6 +6,8 @@ import {
     Alert, TouchableOpacity, Linking, Image, SafeAreaView, StatusBar,
 } from 'react-native';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { apiService } from '../../services/api';
 import { API_URL } from '../../config/env';
 
@@ -69,10 +71,54 @@ const OrderDetailScreen = ({ route, navigation }) => {
         try {
             setDownloading(true);
             const auth = await apiService.getAuthToken();
-            const invoiceUrl = `${API_URL}/api/orders/${id}/invoice?token=${auth}`;
-            await Linking.openURL(invoiceUrl);
+            const headers = { Authorization: `Bearer ${auth}` };
+
+            // 1. Enqueue the generation job
+            const enqueueRes = await fetch(`${API_URL}/api/orders/${id}/invoice`, { headers });
+            if (enqueueRes.status !== 202 && enqueueRes.status !== 200) {
+                throw new Error('Failed to start invoice generation');
+            }
+
+            // 2. Poll for completion
+            let isReady = false;
+            let attempts = 0;
+            const maxAttempts = 30; // 60 seconds timeout
+            while (!isReady && attempts < maxAttempts) {
+                const statusRes = await fetch(`${API_URL}/api/orders/${id}/invoice/status`, { headers });
+                const statusData = await statusRes.json();
+                if (statusData.status === 'completed') {
+                    isReady = true;
+                } else {
+                    attempts++;
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                }
+            }
+
+            if (!isReady) {
+                throw new Error('Invoice generation timed out. Please try again later.');
+            }
+
+            // 3. Download the actual PDF file
+            const downloadUrl = `${API_URL}/api/orders/${id}/invoice/download`;
+            const fileUri = FileSystem.documentDirectory + `invoice_${id.slice(-8).toUpperCase()}.pdf`;
+            
+            const downloadRes = await FileSystem.downloadAsync(
+                downloadUrl,
+                fileUri,
+                { headers }
+            );
+            
+            if (downloadRes.status !== 200) {
+                throw new Error('Failed to download invoice');
+            }
+            
+            if (await Sharing.isAvailableAsync()) {
+                await Sharing.shareAsync(downloadRes.uri);
+            } else {
+                Alert.alert('Success', 'Invoice downloaded successfully to your device.');
+            }
         } catch (error) {
-            Alert.alert('Error', 'Could not download invoice. Please try again later.');
+            Alert.alert('Error', error.message || 'Could not download invoice. Please try again later.');
         } finally {
             setDownloading(false);
         }

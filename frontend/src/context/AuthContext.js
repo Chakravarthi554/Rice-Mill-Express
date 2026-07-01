@@ -515,11 +515,13 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (userData) => {
     dispatch({ type: USER_REGISTER_REQUEST });
+    let firebaseUser = null;
+    
     try {
       // 1. Create user in Firebase FIRST
       const { createUserWithEmailAndPassword, updateProfile } = await import('firebase/auth');
       const userCredential = await createUserWithEmailAndPassword(auth, userData.email, userData.password);
-      const firebaseUser = userCredential.user;
+      firebaseUser = userCredential.user;
 
       // Update Firebase display name
       await updateProfile(firebaseUser, { displayName: userData.name });
@@ -562,9 +564,8 @@ export const AuthProvider = ({ children }) => {
         setMessage('Registration successful! Welcome to Rice-Express.');
         return { success: true };
       } else {
-        // MongoDB registration failed - clean up Firebase account
-        console.error('❌ AuthContext: MongoDB registration failed, cleaning up Firebase account');
-        await firebaseUser.delete();
+        // MongoDB registration returned success: false
+        if (firebaseUser) await firebaseUser.delete();
 
         const msg = data.message || 'Registration failed at profile sync';
         dispatch({ type: USER_REGISTER_FAIL, payload: msg });
@@ -583,7 +584,18 @@ export const AuthProvider = ({ children }) => {
       } else if (error.code === 'auth/invalid-email') {
         errMsg = 'Invalid email address format.';
       } else if (error.response?.data?.message) {
+        // Backend API error (like "Mobile number is already registered")
         errMsg = error.response.data.message;
+        
+        // Clean up orphaned Firebase user if backend registration failed
+        if (firebaseUser) {
+          try {
+            await firebaseUser.delete();
+            console.log('🧹 Cleaned up Firebase user because MongoDB registration failed');
+          } catch (delErr) {
+            console.error('Failed to cleanup Firebase user', delErr);
+          }
+        }
       }
 
       dispatch({ type: USER_REGISTER_FAIL, payload: errMsg });

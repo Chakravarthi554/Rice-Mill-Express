@@ -11,7 +11,7 @@ const sendEmail = async (options) => {
 
   // ⚠️ Mock check: If no valid real-time config is provided, mock it.
   // Note: 'your.email@gmail.com' is a placeholder from .env
-  if (!sendgridKey && (!smtpHost || smtpUser.includes('your.email'))) {
+  if (!sendgridKey && (!smtpHost || !smtpUser || smtpUser.includes('your.email'))) {
     console.warn('⚠️ Email configuration is missing or using placeholders. Skipping actual email.');
     console.log('--- MOCK EMAIL ---');
     console.log('To:', options.email);

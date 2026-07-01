@@ -19,7 +19,6 @@ export const submitKycApplication = (formData, navigate) => async (dispatch, get
     dispatch({ type: KYC_SUBMIT_REQUEST });
     const config = {
       headers: {
-        'Content-Type': 'multipart/form-data',
         Authorization: `Bearer ${getState().userLogin.userInfo.token}`,
       },
     };

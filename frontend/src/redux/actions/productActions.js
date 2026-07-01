@@ -87,6 +87,7 @@ export const listProducts = (keyword = '', pageNumber = '') => async (dispatch) 
 export const listFilteredProducts = (filters = {}) => async (dispatch) => {
   try {
     dispatch({ type: PRODUCT_FILTER_REQUEST });
+    dispatch({ type: PRODUCT_LIST_REQUEST });
     console.log('Filtering products with:', filters);
 
     const queryParams = new URLSearchParams();

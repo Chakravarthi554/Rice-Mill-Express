@@ -130,9 +130,7 @@ const SellerProfile = () => {
         formData.append('businessDetails[bankAccount][ifscCode]', profileData.bankAccount.ifscCode);
         formData.append('businessDetails[bankAccount][accountHolderName]', profileData.bankAccount.accountHolderName);
       } else if (key === 'integrations') {
-        formData.append('integrations[amazon]', profileData.integrations.amazon);
-        formData.append('integrations[zepto]', profileData.integrations.zepto);
-        formData.append('integrations[flipkart]', profileData.integrations.flipkart);
+        formData.append('integrations', JSON.stringify(profileData.integrations));
       } else if (key === 'profileImage' && profileData.profileImage instanceof File) {
         formData.append('profileImage', profileData.profileImage);
       } else {

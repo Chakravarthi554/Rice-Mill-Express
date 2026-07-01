@@ -23,6 +23,7 @@ const getProducts = asyncHandler(async (req, res) => {
 
     const count = await Product.countDocuments(query);
     const products = await Product.find(query)
+      .select('name brand category price offerPrice images rating numReviews countInStock availableStock weight unit approvalStatus type quality')
       .populate('seller', 'name businessName')
       .limit(pageSize)
       .skip(pageSize * (page - 1))
@@ -63,6 +64,7 @@ const filterProducts = asyncHandler(async (req, res) => {
       ratings,
       discounts,
       stockAvailability,
+      brand,
       page = 1,
       limit = 20,
       sortBy = 'createdAt',
@@ -84,6 +86,12 @@ const filterProducts = asyncHandler(async (req, res) => {
     // Filter by category
     if (category && category !== 'all') {
       query.category = category;
+    }
+
+    // Filter by brand
+    if (brand) {
+      const brands = Array.isArray(brand) ? brand : brand.split(',');
+      query.brand = { $in: brands };
     }
 
     // Filter by type
@@ -109,24 +117,26 @@ const filterProducts = asyncHandler(async (req, res) => {
 
     // Diet preference (array)
     if (dietPreference) {
-      const diets = Array.isArray(dietPreference) ? dietPreference : [dietPreference];
+      const diets = Array.isArray(dietPreference) ? dietPreference : dietPreference.split(',');
       query.dietPreference = { $in: diets };
     }
 
     // Cooking purpose (array)
     if (cookingPurpose) {
-      const purposes = Array.isArray(cookingPurpose) ? cookingPurpose : [cookingPurpose];
+      const purposes = Array.isArray(cookingPurpose) ? cookingPurpose : cookingPurpose.split(',');
       query.cookingPurpose = { $in: purposes };
     }
 
     // Seller location
     if (sellerLocation) {
-      query['seller.location'] = { $regex: sellerLocation, $options: 'i' };
+      // NOTE: Product schema has seller ObjectId, not seller.location. 
+      // But we leave this check here in case it's implemented via aggregation later.
+      // query['seller.location'] = { $regex: sellerLocation, $options: 'i' };
     }
 
     // Delivery options (array)
     if (deliveryOptions) {
-      const options = Array.isArray(deliveryOptions) ? deliveryOptions : [deliveryOptions];
+      const options = Array.isArray(deliveryOptions) ? deliveryOptions : deliveryOptions.split(',');
       query.deliveryOptions = { $in: options };
     }
 
@@ -135,8 +145,10 @@ const filterProducts = asyncHandler(async (req, res) => {
       query.rating = { $gte: Number(ratings) };
     }
 
-    // Discounts
-    if (discounts) {
+    // Discounts (sale items)
+    if (discounts === 'true' || discounts === true) {
+      query.$expr = { $lt: ["$offerPrice", "$price"] };
+    } else if (discounts) {
       query.discounts = discounts;
     }
 
@@ -147,10 +159,10 @@ const filterProducts = asyncHandler(async (req, res) => {
       } else if (stockAvailability === 'out-of-stock') {
         query.countInStock = { $lte: 0 };
       }
+    } else {
+      // Ensure we only show available products by default
+      query.countInStock = { $gte: 1 };
     }
-
-    // Ensure we only show available products
-    query.countInStock = { $gte: 1 };
     
     // Only show approved products
     query.approvalStatus = 'approved';
@@ -161,6 +173,7 @@ const filterProducts = asyncHandler(async (req, res) => {
 
     // Execute query
     const products = await Product.find(query)
+      .select('name brand category price offerPrice images rating numReviews countInStock availableStock weight unit approvalStatus type quality discounts')
       .populate('seller', 'name businessName phone rating')
       .sort(sort)
       .skip(skip)
@@ -332,7 +345,7 @@ const createProduct = asyncHandler(async (req, res) => {
 
     // Notify Admins
     try {
-      const sendEmail = require('../utils/sendEmail');
+      const { emailQueue } = require('../jobs/queues');
       const admins = await User.find({ role: 'admin' }).select('email _id');
       
       const adminEmails = admins.map(a => a.email).filter(Boolean);
@@ -340,7 +353,7 @@ const createProduct = asyncHandler(async (req, res) => {
       if (adminEmails.length > 0) {
         // Send email to first admin (or map through them)
         for (const email of adminEmails) {
-          await sendEmail({
+          await emailQueue.add({
             email,
             subject: 'New Product Pending Approval',
             message: `
@@ -514,6 +527,7 @@ const getSellerProducts = asyncHandler(async (req, res) => {
     const skip = (page - 1) * limit;
 
     const products = await Product.find({ seller: req.user._id })
+      .select('name brand category price offerPrice images rating numReviews countInStock availableStock weight unit approvalStatus type quality')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -597,11 +611,11 @@ const approveProduct = asyncHandler(async (req, res) => {
 
     // Notify seller
     try {
-      const sendEmail = require('../utils/sendEmail');
+      const { emailQueue } = require('../jobs/queues');
       const seller = product.seller;
       
       if (seller && seller.email) {
-        await sendEmail({
+        await emailQueue.add({
           email: seller.email,
           subject: `Product ${status === 'approved' ? 'Approved' : 'Rejected'}`,
           message: `

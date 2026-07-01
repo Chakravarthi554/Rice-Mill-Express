@@ -499,6 +499,8 @@ orderSchema.index({ orderStatus: 1 });
 orderSchema.index({ createdAt: -1 });
 orderSchema.index({ isBulkOrder: 1 });
 orderSchema.index({ bulkOrderRef: 1 });
+orderSchema.index({ user: 1, orderStatus: 1 });
+orderSchema.index({ seller: 1, createdAt: -1 });
 
 // Virtual for formatted order number
 orderSchema.virtual('orderNumber').get(function () {

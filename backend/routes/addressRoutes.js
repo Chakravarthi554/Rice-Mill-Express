@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { protect } = require('../middleware/auth');
+const { protect, requireVerifiedEmail } = require('../middleware/auth');
 const Address = require('../models/Address');
 const User = require('../models/User');
 
@@ -15,7 +15,7 @@ router.get('/', protect, async (req, res) => {
 });
 
 // Add new address
-router.post('/', protect, async (req, res) => {
+router.post('/', protect, requireVerifiedEmail, async (req, res) => {
   try {
     const newAddress = new Address({
       ...req.body,
@@ -39,7 +39,7 @@ router.post('/', protect, async (req, res) => {
 });
 
 // Update address
-router.put('/:id', protect, async (req, res) => {
+router.put('/:id', protect, requireVerifiedEmail, async (req, res) => {
   try {
     const address = await Address.findOne({ _id: req.params.id, user: req.user._id });
     if (!address) return res.status(404).json({ message: 'Address not found' });
@@ -62,7 +62,7 @@ router.put('/:id', protect, async (req, res) => {
 });
 
 // Delete address
-router.delete('/:id', protect, async (req, res) => {
+router.delete('/:id', protect, requireVerifiedEmail, async (req, res) => {
   try {
     const address = await Address.findOneAndDelete({ _id: req.params.id, user: req.user._id });
     if (!address) return res.status(404).json({ message: 'Address not found' });
@@ -75,7 +75,7 @@ router.delete('/:id', protect, async (req, res) => {
 });
 
 // Set default
-router.put('/:id/default', protect, async (req, res) => {
+router.put('/:id/default', protect, requireVerifiedEmail, async (req, res) => {
   try {
     await Address.updateMany({ user: req.user._id }, { isDefault: false });
     const address = await Address.findOneAndUpdate(

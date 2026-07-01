@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, lazy, Suspense } from 'react';
+import RouteErrorBoundary from './components/common/RouteErrorBoundary';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import {
   ThemeProvider,
@@ -15,28 +16,30 @@ import SocketInitializer from './components/common/SocketInitializer';
 import EnvBadge from './components/EnvBadge';
 import './theme.css';
 
-// --- Pages ---
+// --- Pages (Eagerly Loaded) ---
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
-import CustomerDashboard from './pages/CustomerDashboard';
-import SellerDashboard from './pages/SellerDashboard';
-import DeliveryDashboard from './pages/DeliveryDashboard';
-import AdminDashboard from './pages/AdminDashboard';
-import SellerKycPage from './pages/seller/SellerKycPage';
-import AdminForumPanel from './components/admin/AdminForumPanel';
-import ProductPage from './pages/customer/ProductPage';
-import CheckoutPage from './pages/customer/CheckoutPage';
-import OrderDetailPage from './pages/customer/OrderDetailPage';
-import BulkOrderPage from './pages/customer/BulkOrderPage';
-import CartPage from './pages/customer/CartPage';
-import WishlistPage from './pages/customer/WishlistPage';
-import NotificationsPage from './pages/customer/NotificationsPage';
-import DeliveryKYCApproval from './components/admin/DeliveryKYCApproval';
-import OrderSuccessPage from './pages/customer/OrderSuccessPage';
-import VerifyEmailNotice from './pages/VerifyEmailNotice';
-import ProductsPage from './pages/customer/ProductsPage';
+
+// --- Pages (Lazy Loaded) ---
+const CustomerDashboard = lazy(() => import('./pages/CustomerDashboard'));
+const SellerDashboard = lazy(() => import('./pages/SellerDashboard'));
+const DeliveryDashboard = lazy(() => import('./pages/DeliveryDashboard'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const SellerKycPage = lazy(() => import('./pages/seller/SellerKycPage'));
+const AdminForumPanel = lazy(() => import('./components/admin/AdminForumPanel'));
+const ProductPage = lazy(() => import('./pages/customer/ProductPage'));
+const CheckoutPage = lazy(() => import('./pages/customer/CheckoutPage'));
+const OrderDetailPage = lazy(() => import('./pages/customer/OrderDetailPage'));
+const BulkOrderPage = lazy(() => import('./pages/customer/BulkOrderPage'));
+const CartPage = lazy(() => import('./pages/customer/CartPage'));
+const WishlistPage = lazy(() => import('./pages/customer/WishlistPage'));
+const NotificationsPage = lazy(() => import('./pages/customer/NotificationsPage'));
+const DeliveryKYCApproval = lazy(() => import('./components/admin/DeliveryKYCApproval'));
+const OrderSuccessPage = lazy(() => import('./pages/customer/OrderSuccessPage'));
+const VerifyEmailNotice = lazy(() => import('./pages/VerifyEmailNotice'));
+const ProductsPage = lazy(() => import('./pages/customer/ProductsPage'));
 
 
 
@@ -204,6 +207,7 @@ function App() {
       <CustomThemeProvider>
         <I18nProvider>
           <SocketInitializer />
+          <Suspense fallback={<div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</div>}>
           <Routes>
 
             {/* --- AUTH --- */}
@@ -217,74 +221,74 @@ function App() {
               path="/customer/dashboard"
               element={
                 <ProtectedRoute roles={['customer']}>
-                  <CustomerDashboard />
+                  <RouteErrorBoundary><CustomerDashboard /></RouteErrorBoundary>
                 </ProtectedRoute>
               }
             />
 
             {/* --- CUSTOMER PAGES --- */}
-            <Route path="/products" element={<ProtectedRoute><ProductsPage /></ProtectedRoute>} />
-            <Route path="/products/:id" element={<ProtectedRoute><ProductPage /></ProtectedRoute>} />
-            <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
-            <Route path="/wishlist" element={<ProtectedRoute><WishlistPage /></ProtectedRoute>} />
-            <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
-            <Route path="/orders/:id" element={<ProtectedRoute><OrderDetailPage /></ProtectedRoute>} />
-            <Route path="/orders/success" element={<ProtectedRoute><OrderSuccessPage /></ProtectedRoute>} />
-            <Route path="/bulk-order" element={<ProtectedRoute><BulkOrderPage /></ProtectedRoute>} />
-            <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
-            <Route path="/contact" element={<ProtectedRoute><ContactForm /></ProtectedRoute>} />
-            <Route path="/verify-email-notice" element={<ProtectedRoute><VerifyEmailNotice /></ProtectedRoute>} />
+            <Route path="/products" element={<ProtectedRoute><RouteErrorBoundary><ProductsPage /></RouteErrorBoundary></ProtectedRoute>} />
+            <Route path="/products/:id" element={<ProtectedRoute><RouteErrorBoundary><ProductPage /></RouteErrorBoundary></ProtectedRoute>} />
+            <Route path="/cart" element={<ProtectedRoute><RouteErrorBoundary><CartPage /></RouteErrorBoundary></ProtectedRoute>} />
+            <Route path="/wishlist" element={<ProtectedRoute><RouteErrorBoundary><WishlistPage /></RouteErrorBoundary></ProtectedRoute>} />
+            <Route path="/checkout" element={<ProtectedRoute><RouteErrorBoundary><CheckoutPage /></RouteErrorBoundary></ProtectedRoute>} />
+            <Route path="/orders/:id" element={<ProtectedRoute><RouteErrorBoundary><OrderDetailPage /></RouteErrorBoundary></ProtectedRoute>} />
+            <Route path="/orders/success" element={<ProtectedRoute><RouteErrorBoundary><OrderSuccessPage /></RouteErrorBoundary></ProtectedRoute>} />
+            <Route path="/bulk-order" element={<ProtectedRoute><RouteErrorBoundary><BulkOrderPage /></RouteErrorBoundary></ProtectedRoute>} />
+            <Route path="/notifications" element={<ProtectedRoute><RouteErrorBoundary><NotificationsPage /></RouteErrorBoundary></ProtectedRoute>} />
+            <Route path="/contact" element={<ProtectedRoute><RouteErrorBoundary><ContactForm /></RouteErrorBoundary></ProtectedRoute>} />
+            <Route path="/verify-email-notice" element={<ProtectedRoute><RouteErrorBoundary><VerifyEmailNotice /></RouteErrorBoundary></ProtectedRoute>} />
 
             {/* --- SELLER --- */}
             <Route
               path="/seller/dashboard"
-              element={<ProtectedRoute roles={['seller']}><SellerDashboard /></ProtectedRoute>}
+              element={<ProtectedRoute roles={['seller']}><RouteErrorBoundary><SellerDashboard /></RouteErrorBoundary></ProtectedRoute>}
             />
             <Route
               path="/seller/kyc"
-              element={<ProtectedRoute roles={['seller']}><SellerKycPage /></ProtectedRoute>}
+              element={<ProtectedRoute roles={['seller']}><RouteErrorBoundary><SellerKycPage /></RouteErrorBoundary></ProtectedRoute>}
             />
 
             {/* --- DELIVERY --- */}
             <Route
               path="/delivery/dashboard"
-              element={<ProtectedRoute roles={['deliveryPartner']}><DeliveryDashboard /></ProtectedRoute>}
+              element={<ProtectedRoute roles={['deliveryPartner']}><RouteErrorBoundary><DeliveryDashboard /></RouteErrorBoundary></ProtectedRoute>}
             />
 
             {/* --- ADMIN --- */}
             <Route
               path="/admin/dashboard"
-              element={<ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>}
+              element={<ProtectedRoute roles={['admin']}><RouteErrorBoundary><AdminDashboard /></RouteErrorBoundary></ProtectedRoute>}
             />
             <Route
               path="/admin/forum"
-              element={<ProtectedRoute roles={['admin']}><AdminForumPanel /></ProtectedRoute>}
+              element={<ProtectedRoute roles={['admin']}><RouteErrorBoundary><AdminForumPanel /></RouteErrorBoundary></ProtectedRoute>}
             />
             <Route
               path="/admin/delivery-kyc"
-              element={<ProtectedRoute roles={['admin']}><DeliveryKYCApproval /></ProtectedRoute>}
+              element={<ProtectedRoute roles={['admin']}><RouteErrorBoundary><DeliveryKYCApproval /></RouteErrorBoundary></ProtectedRoute>}
             />
             <Route
               path="/admin/replacements"
-              element={<ProtectedRoute roles={['admin']}><ReplacementManagement /></ProtectedRoute>}
+              element={<ProtectedRoute roles={['admin']}><RouteErrorBoundary><ReplacementManagement /></RouteErrorBoundary></ProtectedRoute>}
             />
 
             {/* --- SELLER REPLACEMENT MANAGEMENT --- */}
             <Route
               path="/seller/replacements"
-              element={<ProtectedRoute roles={['seller']}><ReplacementManagement /></ProtectedRoute>}
+              element={<ProtectedRoute roles={['seller']}><RouteErrorBoundary><ReplacementManagement /></RouteErrorBoundary></ProtectedRoute>}
             />
 
             {/* --- COMMUNITY --- */}
             {/* 🔥 CRITICAL FIX: Forum routes allow all authenticated roles */}
-            <Route path="/forum" element={<ProtectedRoute><ForumList /></ProtectedRoute>} />
+            <Route path="/forum" element={<ProtectedRoute><RouteErrorBoundary><ForumList /></RouteErrorBoundary></ProtectedRoute>} />
             {/* 🔥 NEW: Dedicated route for viewing individual forum posts */}
-            <Route path="/forum/post/:id" element={<ProtectedRoute><ForumPostDetail /></ProtectedRoute>} />
-            <Route path="/forum/:id" element={<ProtectedRoute><ForumComments /></ProtectedRoute>} />
-            <Route path="/forum/create" element={<ProtectedRoute><CreatePostForm /></ProtectedRoute>} />
-            <Route path="/bookmarks" element={<ProtectedRoute><BookmarksPage /></ProtectedRoute>} />
-            <Route path="/recipes" element={<ProtectedRoute><RecipeList /></ProtectedRoute>} />
-            <Route path="/recipes/:id" element={<ProtectedRoute><RecipeDetail /></ProtectedRoute>} />
+            <Route path="/forum/post/:id" element={<ProtectedRoute><RouteErrorBoundary><ForumPostDetail /></RouteErrorBoundary></ProtectedRoute>} />
+            <Route path="/forum/:id" element={<ProtectedRoute><RouteErrorBoundary><ForumComments /></RouteErrorBoundary></ProtectedRoute>} />
+            <Route path="/forum/create" element={<ProtectedRoute><RouteErrorBoundary><CreatePostForm /></RouteErrorBoundary></ProtectedRoute>} />
+            <Route path="/bookmarks" element={<ProtectedRoute><RouteErrorBoundary><BookmarksPage /></RouteErrorBoundary></ProtectedRoute>} />
+            <Route path="/recipes" element={<ProtectedRoute><RouteErrorBoundary><RecipeList /></RouteErrorBoundary></ProtectedRoute>} />
+            <Route path="/recipes/:id" element={<ProtectedRoute><RouteErrorBoundary><RecipeDetail /></RouteErrorBoundary></ProtectedRoute>} />
 
             {/* --- CUSTOMER SETTINGS (NESTED) --- */}
             <Route
@@ -348,6 +352,7 @@ function App() {
             />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </Suspense>
           <EnvBadge />
         </I18nProvider>
       </CustomThemeProvider>

@@ -45,14 +45,16 @@ const CartPage = () => {
 
   useEffect(() => {
     dispatch(listMyCart());
-    dispatch(listAllProducts());
   }, [dispatch]);
 
   const handleQtyChange = (id, qty) => dispatch(addToCart(id, Number(qty)));
   const handleRemove = (id) => dispatch(removeFromCart(id));
   const proceedToCheckout = () => navigate('/checkout');
 
-  const subtotal = cartItems.reduce((s, i) => s + ((i.product?.offerPrice || i.product?.price) || 0) * (i.qty || 0), 0);
+  const subtotal = cartItems.reduce((s, i) => {
+    const quantity = i.qty || i.quantity || 0;
+    return s + ((i.product?.offerPrice || i.product?.price) || 0) * quantity;
+  }, 0);
   const deliveryFee = subtotal > 500 ? 0 : 50;
   const grandTotal = subtotal + deliveryFee;
   const freeDeliveryThreshold = 500;
@@ -124,7 +126,7 @@ const CartPage = () => {
                   const product = item.product || {};
                   const imageUrl = getImageUrl(product.images?.[0] || product.image);
                   const price = product.offerPrice || product.price || 0;
-                  const qty = item.qty || 1;
+                  const qty = item.qty || item.quantity || 1;
                   const hasOffer = product.offerPrice && product.offerPrice < product.price;
                   const discount = hasOffer ? Math.round((1 - product.offerPrice / product.price) * 100) : 0;
 

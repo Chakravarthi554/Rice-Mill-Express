@@ -5,7 +5,16 @@ const auth = require("../middleware/auth");
 const upload = require("../utils/uploadMiddleware");
 const asyncHandler = require("../middleware/asyncHandler");
 const { customerLimiter } = require("../middleware/rateLimit");
+const rateLimit = require("express-rate-limit");
+const cache = require("../middleware/cacheMiddleware");
 
+const searchLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 100, // Limit each IP to 100 search requests per windowMs
+  message: { message: 'Too many search requests, please try again after a minute' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 const {
   getProducts,
   getProductById,
@@ -25,12 +34,12 @@ const { likeItem, addComment, getComments, trackShare, rateItem, getProductRevie
 
 // ===== PUBLIC ROUTES =====
 // Static routes MUST come BEFORE dynamic /:id routes
-router.get("/filter", filterProducts);
+router.get("/filter", searchLimiter, cache(300), filterProducts);
 router.get("/recipe", getRecipeSuggestion);
 
 // ===== SELLER ROUTES (Static) =====
 router.get("/seller", auth.protect, auth.role("seller"), auth.kycVerified, getSellerProducts);
-router.post("/bulk", auth.protect, auth.role("seller"), auth.kycVerified, bulkUploadProducts);
+router.post("/bulk", auth.protect, auth.requireVerifiedEmail, auth.role("seller"), auth.kycVerified, bulkUploadProducts);
 
 // ===== ADMIN ROUTES (Static) =====
 router.get("/analytics", auth.protect, auth.role("admin"), getProductAnalytics);
@@ -38,13 +47,13 @@ router.get("/admin/pending", auth.protect, auth.role("admin"), getPendingProduct
 router.put("/:id/approve", auth.protect, auth.role("admin"), approveProduct);
 
 // ===== GET BY ID (Dynamic) - Must stay below static routes =====
-router.get("/:id", getProductById);
-router.route('/').get(getProducts);
+router.get("/:id", cache(300), getProductById);
+router.route('/').get(cache(300), getProducts);
 
 // ===== SELLER WRITE ROUTES =====
-router.post("/", auth.protect, auth.role("seller"), auth.kycVerified, upload.any(), createProduct);
-router.put("/:id", auth.protect, auth.role("seller"), auth.kycVerified, upload.any(), updateProduct);
-router.delete("/:id", auth.protect, auth.role("seller"), auth.kycVerified, deleteProduct);
+router.post("/", auth.protect, auth.requireVerifiedEmail, auth.role("seller"), auth.kycVerified, upload.any(), createProduct);
+router.put("/:id", auth.protect, auth.requireVerifiedEmail, auth.role("seller"), auth.kycVerified, upload.any(), updateProduct);
+router.delete("/:id", auth.protect, auth.requireVerifiedEmail, auth.role("seller"), auth.kycVerified, deleteProduct);
 
 // ===== USER SOCIAL ROUTES =====
 router.post("/:id/reviews", auth.protect, (req, res, next) => {

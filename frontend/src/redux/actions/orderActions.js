@@ -36,12 +36,34 @@ export const downloadInvoice = (orderId) => async (dispatch) => {
   try {
     console.log(`🔄 Downloading invoice for order: ${orderId}`);
 
-    // Use responseType 'blob' for binary data (PDF)
-    const { data } = await api.get(`/api/orders/${orderId}/invoice`, {
+    // 1. Enqueue the generation job
+    const { data: initData } = await api.get(`/api/orders/${orderId}/invoice`);
+    
+    let isReady = false;
+    let attempts = 0;
+    const maxAttempts = 30; // 60 seconds timeout
+
+    // 2. Poll for status
+    while (!isReady && attempts < maxAttempts) {
+      const { data: statusData } = await api.get(`/api/orders/${orderId}/invoice/status`);
+      if (statusData.status === 'completed') {
+        isReady = true;
+      } else {
+        attempts++;
+        await new Promise(resolve => setTimeout(resolve, 2000)); // wait 2 seconds
+      }
+    }
+
+    if (!isReady) {
+      throw new Error('Invoice generation timed out. Please try again later.');
+    }
+
+    // 3. Download the actual file
+    const { data: blobData } = await api.get(`/api/orders/${orderId}/invoice/download`, {
       responseType: 'blob'
     });
 
-    const blob = new Blob([data], { type: 'application/pdf' });
+    const blob = new Blob([blobData], { type: 'application/pdf' });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;

@@ -21,6 +21,7 @@ const ProductCard = ({
     price,
     mrp,
     rating = 0,
+    numReviews = 0,
     countInStock = 0,
     discount,
     brand = 'Rice Mill Express',
@@ -28,7 +29,7 @@ const ProductCard = ({
   } = product || {};
 
   const outOfStock = Number(countInStock) <= 0;
-  const displayRating = Number(rating) > 0 ? Number(rating).toFixed(1) : '4.5';
+  const displayRating = Number(rating) > 0 ? Number(rating).toFixed(1) : null;
   const stop = (fn) => (event) => {
     event.stopPropagation();
     fn && fn(product);
@@ -70,7 +71,12 @@ const ProductCard = ({
           </Stack>
           <Typography sx={{ mt: 0.75, color: '#111827', fontSize: 15, fontWeight: 950, lineHeight: 1.22, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{name}</Typography>
           <Stack direction="row" alignItems="center" spacing={1} sx={{ my: 1 }}>
-            <Chip icon={<Star sx={{ fontSize: '14px !important' }} />} label={displayRating} size="small" sx={{ bgcolor: '#E8F5E9', color: '#1B5E20', fontWeight: 950, height: 24 }} />
+            {displayRating && (
+              <Chip icon={<Star sx={{ fontSize: '14px !important' }} />} label={displayRating} size="small" sx={{ bgcolor: '#E8F5E9', color: '#1B5E20', fontWeight: 950, height: 24 }} />
+            )}
+            {numReviews > 0 && (
+              <Typography sx={{ color: '#6B7280', fontSize: 12, fontWeight: 800 }}>{numReviews.toLocaleString()} reviews</Typography>
+            )}
             <Typography sx={{ color: '#6B7280', fontSize: 12, fontWeight: 800 }}>{deliveryEta}</Typography>
           </Stack>
           <Stack direction="row" alignItems="flex-end" spacing={1} sx={{ mt: 'auto' }}>
@@ -97,7 +103,9 @@ const ProductCard = ({
       <Box sx={{ height: 184, position: 'relative' }}>
         {imageNode}
         <Stack direction="row" spacing={0.75} sx={{ position: 'absolute', top: 12, left: 12 }}>
-          <Chip icon={<Star sx={{ fontSize: '14px !important' }} />} label={displayRating} size="small" sx={{ bgcolor: '#2E7D32', color: '#fff', fontWeight: 950, height: 26 }} />
+          {displayRating && (
+            <Chip icon={<Star sx={{ fontSize: '14px !important' }} />} label={displayRating} size="small" sx={{ bgcolor: '#2E7D32', color: '#fff', fontWeight: 950, height: 26 }} />
+          )}
           {!!discount && <Chip label={`${discount}% OFF`} size="small" sx={{ bgcolor: '#FFB300', color: '#111827', fontWeight: 950, height: 26 }} />}
         </Stack>
         <Stack spacing={0.75} sx={{ position: 'absolute', top: 10, right: 10 }}>
@@ -120,6 +128,9 @@ const ProductCard = ({
         <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mt: 1.25 }}>
           <LocalShipping sx={{ fontSize: 17, color: '#2E7D32' }} />
           <Typography sx={{ color: '#2E7D32', fontSize: 12.5, fontWeight: 900 }}>Delivery in {deliveryEta}</Typography>
+          {numReviews > 0 && (
+            <Typography sx={{ color: '#9CA3AF', fontSize: 11, fontWeight: 700 }}>• {numReviews.toLocaleString()} sold</Typography>
+          )}
         </Stack>
         <Stack direction="row" alignItems="flex-end" spacing={1} sx={{ mt: 'auto', mb: 1.5 }}>
           <Typography sx={{ color: '#111827', fontSize: 23, fontWeight: 950, letterSpacing: '-0.03em' }}>₹{price}</Typography>

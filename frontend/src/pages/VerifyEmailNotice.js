@@ -4,12 +4,16 @@ import { MailOutline, Refresh, Logout } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { sendEmailVerification } from 'firebase/auth';
 import { auth } from '../firebase';
+import { refreshFirebaseToken } from '../utils/authUtils';
+import { useNavigate } from 'react-router-dom';
 
 const VerifyEmailNotice = () => {
     const { logout, user } = useAuth();
     const [loading, setLoading] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
+    const navigate = useNavigate();
 
     const handleResendEmail = async () => {
         try {
@@ -30,8 +34,22 @@ const VerifyEmailNotice = () => {
         }
     };
 
-    const handleRefresh = () => {
-        window.location.reload();
+    const handleRefresh = async () => {
+        try {
+            setIsRefreshing(true);
+            setError('');
+            const newToken = await refreshFirebaseToken();
+            if (newToken) {
+                setMessage('Verification successful! Redirecting...');
+                setTimeout(() => navigate('/'), 1500);
+            } else {
+                setError('Could not verify email status yet. Please try again or log out and back in.');
+            }
+        } catch (err) {
+            setError('Error checking verification status.');
+        } finally {
+            setIsRefreshing(false);
+        }
     };
 
     return (
@@ -61,10 +79,11 @@ const VerifyEmailNotice = () => {
                         variant="contained"
                         size="large"
                         onClick={handleRefresh}
-                        startIcon={<Refresh />}
+                        disabled={isRefreshing}
+                        startIcon={!isRefreshing && <Refresh />}
                         fullWidth
                     >
-                        I've Verified (Refresh Page)
+                        {isRefreshing ? <CircularProgress size={24} color="inherit" /> : "I've Verified (Refresh Session)"}
                     </Button>
 
                     <Button

@@ -3,6 +3,105 @@ const Order = require('../models/Order.js');
 const asyncHandler = require('../middleware/asyncHandler.js');
 const User = require('../models/User.js');
 const SettlementService = require('../services/SettlementService');
+const { Incentive, DPIncentiveProgress } = require('../models/Incentive.js');
+const WalletTransaction = require('../models/WalletTransaction.js');
+
+/**
+ * Helper to calculate period boundaries for incentives
+ */
+const getPeriodBoundaries = (period) => {
+    const now = new Date();
+    const start = new Date(now);
+    const end = new Date(now);
+    
+    if (period === 'daily') {
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
+    } else if (period === 'weekly') {
+        const day = start.getDay();
+        const diff = start.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Monday
+        start.setDate(diff);
+        start.setHours(0, 0, 0, 0);
+        end.setDate(start.getDate() + 6);
+        end.setHours(23, 59, 59, 999);
+    } else if (period === 'monthly') {
+        start.setDate(1);
+        start.setHours(0, 0, 0, 0);
+        end.setMonth(start.getMonth() + 1);
+        end.setDate(0);
+        end.setHours(23, 59, 59, 999);
+    }
+    return { start, end };
+};
+
+/**
+ * Helper to evaluate incentives after a successful delivery
+ */
+const evaluateIncentives = async (deliveryPartnerId) => {
+    try {
+        const activeIncentives = await Incentive.find({ isActive: true });
+        if (activeIncentives.length === 0) return;
+        
+        const dp = await DeliveryPartner.findById(deliveryPartnerId).populate('user');
+        if (!dp || !dp.user) return;
+        
+        for (const incentive of activeIncentives) {
+            const { start, end } = getPeriodBoundaries(incentive.period);
+            
+            // Find or create progress tracking record
+            let progress = await DPIncentiveProgress.findOne({
+                deliveryPartner: deliveryPartnerId,
+                incentive: incentive._id,
+                periodStart: start
+            });
+            
+            if (!progress) {
+                progress = new DPIncentiveProgress({
+                    deliveryPartner: deliveryPartnerId,
+                    incentive: incentive._id,
+                    periodStart: start,
+                    periodEnd: end,
+                    currentCount: 0,
+                    isAchieved: false
+                });
+            }
+            
+            // If already achieved, skip
+            if (progress.isAchieved) continue;
+            
+            // Increment count
+            progress.currentCount += 1;
+            
+            // Check achievement
+            if (progress.currentCount >= incentive.target) {
+                progress.isAchieved = true;
+                progress.achievedAt = new Date();
+                
+                // Credit the bonus to user wallet
+                const user = await User.findById(dp.user._id);
+                if (user) {
+                    user.walletBalance = (user.walletBalance || 0) + incentive.bonusAmount;
+                    await user.save();
+                    
+                    await WalletTransaction.create({
+                        user: user._id,
+                        amount: incentive.bonusAmount,
+                        type: 'incentive_bonus',
+                        status: 'completed',
+                        description: `Bonus for completing ${incentive.title}`,
+                        referenceType: 'DeliveryPartner',
+                        referenceId: dp._id
+                    });
+                    
+                    console.log(`✅ Paid incentive ₹${incentive.bonusAmount} to DP ${dp._id} for ${incentive.title}`);
+                }
+            }
+            await progress.save();
+        }
+    } catch (err) {
+        console.error('⚠️ Failed to evaluate incentives:', err.message);
+    }
+};
 
 // @desc    Get all delivery partners for the current seller
 // @route   GET /api/delivery-partners/partners
@@ -729,6 +828,9 @@ const confirmDelivery = asyncHandler(async (req, res) => {
     partnerProfile.totalDeliveries = (partnerProfile.totalDeliveries || 0) + 1;
     await partnerProfile.save();
     console.log(`✅ Updated total deliveries for partner ${partnerProfile._id}`);
+    
+    // Evaluate real-time incentives
+    await evaluateIncentives(partnerProfile._id);
   } catch (statErr) {
     console.error('⚠️ Failed to update partner stats:', statErr.message);
   }
@@ -1092,6 +1194,46 @@ const checkDeliveryPaymentStatus = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc    Get real-time incentives progress
+// @route   GET /api/delivery-partners/incentives
+// @access  Private/DeliveryPartner
+const getIncentives = asyncHandler(async (req, res) => {
+    const DeliveryPartner = require('../models/deliveryPartner');
+    const { Incentive, DPIncentiveProgress } = require('../models/Incentive.js');
+    
+    const partnerProfiles = await DeliveryPartner.find({ user: req.user._id });
+    if (partnerProfiles.length === 0) {
+        return res.json({ success: true, incentives: [] });
+    }
+    
+    const dpId = partnerProfiles[0]._id;
+    const activeIncentives = await Incentive.find({ isActive: true });
+    
+    const responseData = [];
+    
+    for (const incentive of activeIncentives) {
+        const { start } = getPeriodBoundaries(incentive.period);
+        let progress = await DPIncentiveProgress.findOne({
+            deliveryPartner: dpId,
+            incentive: incentive._id,
+            periodStart: start
+        });
+        
+        responseData.push({
+            id: incentive._id,
+            title: incentive.title,
+            target: incentive.target,
+            bonus: incentive.bonusAmount,
+            period: incentive.period,
+            color: incentive.color,
+            current: progress ? progress.currentCount : 0,
+            isAchieved: progress ? progress.isAchieved : false
+        });
+    }
+    
+    res.json({ success: true, incentives: responseData });
+});
+
 module.exports = {
   getDeliveryPartners,
   createDeliveryPartner,
@@ -1111,5 +1253,6 @@ module.exports = {
   reviewReplacement,
   redispatchReplacement,
   generateDeliveryPaymentLink,
-  checkDeliveryPaymentStatus
+  checkDeliveryPaymentStatus,
+  getIncentives
 };

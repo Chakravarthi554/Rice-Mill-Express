@@ -2,7 +2,7 @@ const Notification = require('../models/Notification');
 const User = require('../models/User');
 const OrderStatusHistory = require('../models/OrderStatusHistory');
 const Order = require('../models/Order');
-const sendEmail = require('../utils/sendEmail');
+const { emailQueue } = require('../jobs/queues');
 
 class NotificationService {
     constructor(io) {
@@ -67,7 +67,7 @@ class NotificationService {
             // 4. Send Email to Customer
             if (customer && customer.email) {
                 try {
-                    await sendEmail({
+                    await emailQueue.add({
                         email: customer.email,
                         subject: `Order #${order.orderNumber || order._id.toString().slice(-6)} Update: ${order.orderStatus.toUpperCase()}`,
                         message: `
@@ -93,7 +93,7 @@ class NotificationService {
             // 5. Send Email to Seller
             if (seller && seller.email) {
                 try {
-                    await sendEmail({
+                    await emailQueue.add({
                         email: seller.email,
                         subject: `Order #${order.orderNumber || order._id.toString().slice(-6)} Update: ${order.orderStatus.toUpperCase()}`,
                         message: `
@@ -141,7 +141,7 @@ class NotificationService {
             const customer = await User.findById(order.user);
             if (customer && customer.email) {
                 try {
-                    await sendEmail({
+                    await emailQueue.add({
                         email: customer.email,
                         subject: `Delivery Partner Assigned - Order #${order.orderNumber || order._id.toString().slice(-6)}`,
                         message: `

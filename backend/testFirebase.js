@@ -1,9 +1,12 @@
-const admin = require('firebase-admin');
-const serviceAccount = require('./config/rice-express-7eef4-firebase-adminsdk-fbsvc-01dd764cb9.json');
+const dotenv = require('dotenv');
+dotenv.config();
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
-});
+const { admin, isFirebaseInitialized } = require('./config/firebase');
+
+if (!isFirebaseInitialized) {
+  console.error('❌ Firebase not initialized. Set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY in .env');
+  process.exit(1);
+}
 
 async function test() {
   try {

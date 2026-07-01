@@ -1,19 +1,40 @@
-// frontend/src/pages/ForgotPasswordPage.js (NEW FILE)
-import React, { useState, useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+// frontend/src/pages/ForgotPasswordPage.js
+import React, { useState } from 'react';
 import { Container, Typography, Box, TextField, Button, CircularProgress, Paper, Alert } from '@mui/material';
 import { Link } from 'react-router-dom';
-import { forgotPassword } from '../redux/actions/userActions';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { auth } from '../firebase';
 
 const ForgotPasswordPage = () => {
   const [email, setEmail] = useState('');
-  const dispatch = useDispatch();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+  const [message, setMessage] = useState('');
 
-  const { loading, error, success, message } = useSelector((state) => state.userForgotPassword);
-
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    dispatch(forgotPassword(email));
+    if (!email) return;
+    
+    setLoading(true);
+    setError('');
+    setSuccess(false);
+
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setSuccess(true);
+      setMessage('Password reset link sent! Check your email inbox.');
+    } catch (err) {
+      if (err.code === 'auth/user-not-found') {
+        setError('No account found with this email address.');
+      } else if (err.code === 'auth/invalid-email') {
+        setError('Please enter a valid email address.');
+      } else {
+        setError(err.message || 'Failed to send reset email. Please try again later.');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

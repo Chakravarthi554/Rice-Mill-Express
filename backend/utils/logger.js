@@ -1,18 +1,33 @@
-const logger = {
-    info: (message, meta = '') => {
-        console.log(`[INFO] ${new Date().toISOString()} - ${message}`, meta ? JSON.stringify(meta) : '');
-    },
-    error: (message, error = '') => {
-        console.error(`[ERROR] ${new Date().toISOString()} - ${message}`, error);
-    },
-    warn: (message, meta = '') => {
-        console.warn(`[WARN] ${new Date().toISOString()} - ${message}`, meta ? JSON.stringify(meta) : '');
-    },
-    debug: (message, meta = '') => {
-        if (process.env.NODE_ENV !== 'production') {
-            console.debug(`[DEBUG] ${new Date().toISOString()} - ${message}`, meta ? JSON.stringify(meta) : '');
-        }
-    }
-};
+const winston = require('winston');
+const fs = require('fs');
+const path = require('path');
+
+// Ensure logs directory exists
+const logDir = path.join(__dirname, '../logs');
+if (!fs.existsSync(logDir)) {
+  fs.mkdirSync(logDir);
+}
+
+const logger = winston.createLogger({
+  level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.errors({ stack: true }),
+    winston.format.json()
+  ),
+  transports: [
+    new winston.transports.File({ filename: path.join(logDir, 'error.log'), level: 'error' }),
+    new winston.transports.File({ filename: path.join(logDir, 'combined.log') })
+  ]
+});
+
+if (process.env.NODE_ENV !== 'production') {
+  logger.add(new winston.transports.Console({
+    format: winston.format.combine(
+      winston.format.colorize(),
+      winston.format.simple()
+    )
+  }));
+}
 
 module.exports = logger;

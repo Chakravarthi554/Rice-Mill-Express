@@ -29,8 +29,6 @@ import {
 import { listProductDetails } from "../../redux/actions/productActions";
 import { addToCart } from "../../redux/actions/cartActions";
 import { addToWishlist } from "../../redux/actions/userActions";
-import { listProducts } from "../../redux/actions/productActions";
-import { listMyCart } from "../../redux/actions/cartActions";
 
 // Utils
 import { getImageUrl } from "../../utils/urlHelper";
@@ -64,8 +62,6 @@ const ProductPage = () => {
 
   useEffect(() => {
     dispatch(listProductDetails(id));
-    dispatch(listProducts({ limit: 10 }));
-    dispatch(listMyCart());
   }, [dispatch, id]);
 
   useEffect(() => {
@@ -138,19 +134,14 @@ const ProductPage = () => {
   const displayPrice = hasOffer ? product.offerPrice : product.price;
   const originalPrice = hasOffer ? product.price : null;
   const discountPercentage = hasOffer ? Math.round(((product.price - product.offerPrice) / product.price) * 100) : 0;
-  const productRating = product.rating || 4.5;
-  const productReviews = product.numReviews || 12450;
-  const monthlySales = product.soldCount || 1200;
+  const productRating = product.rating || 0;
+  const productReviews = product.numReviews || 0;
+  const monthlySales = product.soldCount || 0;
   const inStock = product.countInStock > 0;
 
   const relatedProducts = allProducts.filter(p => p._id !== id).slice(0, 6);
 
-  // Mock reviews
-  const mockReviews = [
-    { name: "Priya S.", rating: 5, text: "Excellent quality rice! Very aromatic and long grains. My family loved it.", date: "2 weeks ago" },
-    { name: "Ramesh K.", rating: 4, text: "Good value for money. Fresh stock delivered on time.", date: "1 month ago" },
-    { name: "Anjali M.", rating: 5, text: "Regular customer. Consistent quality every time.", date: "3 weeks ago" },
-  ];
+
 
   return (
     <Box sx={{ bgcolor: '#FFFDF9', minHeight: '100vh', pb: { xs: 12, md: 0 } }}>
@@ -200,7 +191,7 @@ const ProductPage = () => {
               {/* Main Image */}
               <Box sx={{ width: '100%', aspectRatio: '1/1', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#F9FAFB', borderRadius: '12px', overflow: 'hidden' }}>
                 {mainImageUrl ? (
-                  <img src={mainImageUrl} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'contain', mixBlendMode: 'multiply' }} />
+                  <img src={mainImageUrl} alt={product.name} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'contain', mixBlendMode: 'multiply' }} />
                 ) : (
                   <Box sx={{ fontSize: 80, opacity: 0.3 }}>🌾</Box>
                 )}
@@ -228,7 +219,7 @@ const ProductPage = () => {
                       transition: 'all 0.2s', bgcolor: '#F9FAFB'
                     }}
                   >
-                    <img src={getImageUrl(img)} alt={`Thumb ${idx}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={getImageUrl(img)} alt={`Thumb ${idx}`} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   </Box>
                 ))}
               </Stack>
@@ -264,15 +255,21 @@ const ProductPage = () => {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, bgcolor: '#F0FDF4', px: 1, py: 0.25, borderRadius: '6px' }}>
                     <Star sx={{ fontSize: 16, color: '#2E7D32' }} />
-                    <Typography sx={{ fontSize: '0.85rem', fontWeight: 800, color: '#2E7D32' }}>{productRating}</Typography>
+                    <Typography sx={{ fontSize: '0.85rem', fontWeight: 800, color: '#2E7D32' }}>
+                      {productRating > 0 ? productRating.toFixed(1) : 'New'}
+                    </Typography>
                   </Box>
                   <Typography variant="body2" sx={{ fontWeight: 700, color: '#6B7280' }}>
-                    ({productReviews.toLocaleString()} reviews)
+                    {productReviews > 0 ? `(${productReviews.toLocaleString()} reviews)` : 'No reviews yet'}
                   </Typography>
-                  <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: '#D1D5DB' }} />
-                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#6B7280' }}>
-                    {monthlySales.toLocaleString()} sold/month
-                  </Typography>
+                  {monthlySales > 0 && (
+                    <>
+                      <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: '#D1D5DB' }} />
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#6B7280' }}>
+                        {monthlySales.toLocaleString()} sold/month
+                      </Typography>
+                    </>
+                  )}
                 </Box>
 
                 {/* Pricing */}
@@ -330,7 +327,7 @@ const ProductPage = () => {
                 </Box>
 
                 {/* Desktop Buttons */}
-                <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: 2, mb: 3 }}>
+                <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: 2, mb: 2 }}>
                   <Button
                     variant="outlined"
                     onClick={addToCartHandler}
@@ -360,6 +357,14 @@ const ProductPage = () => {
                     Buy Now
                   </Button>
                 </Box>
+                <Button
+                  variant="text"
+                  onClick={addToWishlistHandler}
+                  startIcon={isWishlisted(product._id) ? <Favorite sx={{ color: '#DC2626' }} /> : <FavoriteBorder sx={{ color: '#6B7280' }} />}
+                  sx={{ display: { xs: 'none', md: 'flex' }, textTransform: 'none', color: '#6B7280', fontWeight: 700, mb: 3 }}
+                >
+                  {isWishlisted(product._id) ? 'Saved to Wishlist' : 'Add to Wishlist'}
+                </Button>
 
                 {/* Seller Info */}
                 <Box sx={{ bgcolor: '#F9FAFB', borderRadius: '12px', p: 2, mb: 3 }}>
@@ -437,37 +442,6 @@ const ProductPage = () => {
         {/* ── BOTTOM SECTIONS ── */}
         <Box sx={{ mt: { xs: 4, md: 8 } }}>
           
-          {/* Customer Reviews */}
-          <Box sx={{ mb: 6, bgcolor: '#fff', borderRadius: '20px', p: { xs: 2.5, md: 4 }, border: '1px solid #F3F4F6', boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-              <Typography variant="h5" fontWeight={800} color="#1F2937">Customer Reviews</Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Rating value={productRating} precision={0.5} readOnly sx={{ color: '#F59E0B' }} />
-                <Typography fontWeight={800} color="#1F2937">{productRating}</Typography>
-              </Box>
-            </Box>
-            <Divider sx={{ mb: 3 }} />
-            <Stack spacing={2.5}>
-              {mockReviews.map((review, i) => (
-                <Box key={i} sx={{ pb: 2.5, borderBottom: i < mockReviews.length - 1 ? '1px solid #F3F4F6' : 'none' }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
-                    <Avatar sx={{ width: 36, height: 36, bgcolor: '#2E7D32', fontSize: 14, fontWeight: 700 }}>
-                      {review.name[0]}
-                    </Avatar>
-                    <Box>
-                      <Typography variant="body2" fontWeight={800} color="#1F2937">{review.name}</Typography>
-                      <Typography variant="caption" color="#9CA3AF">{review.date}</Typography>
-                    </Box>
-                    <Rating value={review.rating} size="small" readOnly sx={{ ml: 'auto', color: '#F59E0B' }} />
-                  </Box>
-                  <Typography variant="body2" sx={{ color: '#6B7280', lineHeight: 1.6, ml: 6.5 }}>{review.text}</Typography>
-                </Box>
-              ))}
-            </Stack>
-            <Button fullWidth variant="outlined" sx={{ mt: 2, borderRadius: '12px', py: 1.2, borderColor: '#E5E7EB', color: '#2E7D32', fontWeight: 700, textTransform: 'none' }}>
-              View All Reviews
-            </Button>
-          </Box>
 
           {/* Community Discussion */}
           <Box sx={{ mb: 6, bgcolor: '#fff', borderRadius: '20px', p: { xs: 2.5, md: 4 }, border: '1px solid #F3F4F6', boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
@@ -508,6 +482,9 @@ const ProductPage = () => {
 
       {/* ── MOBILE STICKY BOTTOM PURCHASE BAR ── */}
       <Box sx={{ display: { xs: 'flex', md: 'none' }, position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000, bgcolor: '#fff', p: 1.5, gap: 1.5, borderTop: '1px solid #E5E7EB', alignItems: 'center' }}>
+        <IconButton size="small" onClick={addToWishlistHandler} sx={{ color: isWishlisted(product._id) ? '#DC2626' : '#9CA3AF' }}>
+          {isWishlisted(product._id) ? <Favorite sx={{ fontSize: 22 }} /> : <FavoriteBorder sx={{ fontSize: 22 }} />}
+        </IconButton>
         <Box sx={{ flexShrink: 0 }}>
           <Typography sx={{ fontSize: '1.2rem', fontWeight: 900, color: '#2E7D32' }}>₹{displayPrice}</Typography>
           {originalPrice && (

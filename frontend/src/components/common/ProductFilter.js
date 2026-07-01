@@ -28,7 +28,7 @@ import SortIcon from '@mui/icons-material/Sort';
 import { listProducts, listFilteredProducts } from '../../redux/actions/productActions';
 import { addToCart } from '../../redux/actions/cartActions';
 import { addToWishlist } from '../../redux/actions/userActions';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 // Premium UI Components
 import ProductCard from '../ui/ProductCard';
@@ -94,28 +94,78 @@ const ProductFilter = () => {
     { value: 'popular', label: 'Most Popular' },
   ];
 
-  // Load products on mount
-  useEffect(() => {
-    dispatch(listProducts());
-  }, [dispatch]);
+
 
   // Debounce search input
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchQuery);
-    }, 300);
+    }, 500);
 
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Apply filters when debounced search or filters change
+  const location = useLocation();
+  
+  // Track whether initial load has completed to prevent double-fetch
+  const initialLoadDone = React.useRef(false);
+
+  // Initial product load on mount and parse URL params
   useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const searchParam = params.get('search');
+    const categoryParam = params.get('category');
+    const saleParam = params.get('sale');
+
+    let initialFilters = { ...filters };
+    let hasParams = false;
+
+    if (searchParam) {
+      setSearchQuery(searchParam);
+      setDebouncedSearch(searchParam);
+      hasParams = true;
+    }
+    
+    if (categoryParam) {
+      // Find matching category (case-insensitive)
+      const matchedCat = categories.find(c => c.toLowerCase() === categoryParam.toLowerCase());
+      if (matchedCat) {
+        initialFilters.category = matchedCat;
+        hasParams = true;
+      }
+    }
+    
+    if (saleParam === 'true') {
+      initialFilters.discounts = 'true';
+      hasParams = true;
+    }
+
+    if (hasParams) {
+      setFilters(initialFilters);
+      dispatch(listFilteredProducts({ ...initialFilters, search: searchParam || '' }));
+    } else {
+      dispatch(listProducts());
+    }
+    
+    // Mark initial load as done after a tick so the filter-watcher skips its first run
+    setTimeout(() => { initialLoadDone.current = true; }, 500);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dispatch, location.search]);
+
+  // Apply filters when debounced search or filters change (skip initial mount)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const filtersKey = JSON.stringify(filters);
+  useEffect(() => {
+    // Skip if initial URL-param load hasn't settled yet
+    if (!initialLoadDone.current) return;
+    
     if (debouncedSearch.trim() || hasActiveFilters()) {
       dispatch(listFilteredProducts({ ...filters, search: debouncedSearch }));
     } else {
       dispatch(listProducts());
     }
-  }, [debouncedSearch, filters, dispatch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, filtersKey, dispatch]);
 
   const hasActiveFilters = useCallback(() => {
     return (
@@ -236,6 +286,7 @@ const ProductFilter = () => {
       );
     }
     if (filters.stockAvailability) badges.push({ label: filters.stockAvailability, key: 'stockAvailability' });
+    if (filters.discounts) badges.push({ label: 'On Sale', key: 'discounts' });
     return badges;
   }, [filters]);
 
@@ -349,6 +400,26 @@ const ProductFilter = () => {
             />
           ))}
         </Stack>
+      </Box>
+
+      <Divider sx={{ mb: 2.5 }} />
+
+      {/* Sale Items Toggle */}
+      <Box sx={{ mb: 2.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Typography sx={{ fontWeight: 700, fontSize: '0.78rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Sale Items Only
+        </Typography>
+        <Chip
+          label="On Sale"
+          size="small"
+          onClick={() => handleFilterChange('discounts', filters.discounts ? '' : 'true')}
+          sx={{
+            bgcolor: filters.discounts ? '#FEE2E2' : '#F3F4F6',
+            color: filters.discounts ? '#DC2626' : '#6B7280',
+            fontWeight: 700,
+            '&:hover': { bgcolor: filters.discounts ? '#FCA5A5' : '#E5E7EB' }
+          }}
+        />
       </Box>
 
       {!inDrawer && (

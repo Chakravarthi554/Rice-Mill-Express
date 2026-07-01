@@ -2,7 +2,7 @@ const asyncHandler = require('express-async-handler');
 const Message = require('../models/Message');
 const User = require('../models/User');
 const Conversation = require('../models/Conversation');
-const nodemailer = require('nodemailer');
+const { emailQueue } = require('../jobs/queues');
 const path = require('path');
 const fs = require('fs');
 
@@ -27,13 +27,7 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
 }).single('image');
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+// Transporter removed in favor of background jobs
 
 const sendMessage = asyncHandler(async (req, res) => {
   upload(req, res, async (err) => {
@@ -101,14 +95,13 @@ const sendMessage = asyncHandler(async (req, res) => {
       const receiver = await User.findById(receiverId);
       if (receiver && !receiver.isOnline) {
         try {
-          await transporter.sendMail({
-            from: process.env.EMAIL_USER,
-            to: receiver.email,
+          await emailQueue.add({
+            email: receiver.email,
             subject: 'New Message in Rice Mill App',
-            text: `You have a new message from ${req.user.name}: ${content || 'Image/PDF message'}\n\nReply at: ${process.env.FRONTEND_URL}`,
+            message: `You have a new message from ${req.user.name}: ${content || 'Image/PDF message'}<br><br>Reply at: <a href="${process.env.FRONTEND_URL}">${process.env.FRONTEND_URL}</a>`,
           });
         } catch (mailErr) {
-          console.error('Email sending failed:', mailErr.message);
+          console.error('Email enqueueing failed:', mailErr.message);
         }
       }
 

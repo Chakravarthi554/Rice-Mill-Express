@@ -32,7 +32,9 @@ import {
   withdrawalReducer,
   withdrawalHistoryReducer,
   adminWithdrawalListReducer,
-  adminWithdrawalUpdateReducer
+  adminWithdrawalUpdateReducer,
+  referralCodeReducer,
+  referralsReducer,
 } from './reducers/rewardsReducers';
 
 import {
@@ -208,6 +210,8 @@ const combinedReducer = combineReducers({
   withdrawalHistory: withdrawalHistoryReducer,
   adminWithdrawalList: adminWithdrawalListReducer,
   adminWithdrawalUpdate: adminWithdrawalUpdateReducer,
+  referralCode: referralCodeReducer,
+  referrals: referralsReducer,
 
   userSubscription: userSubscriptionReducer,
   userReportProblem: userReportProblemReducer,

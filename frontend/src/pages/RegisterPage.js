@@ -30,6 +30,7 @@ const RegisterPage = () => {
     e.preventDefault();
     if (formData.password !== formData.confirmPassword) { setMessage('Passwords do not match.'); return; }
     
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) { setMessage('Please enter a valid email address.'); return; }
     const phoneDigits = formData.phone.replace(/\D/g, '');
     if (!/^\d{10}$/.test(phoneDigits)) { setMessage('Please enter a valid 10-digit phone number.'); return; }
 
@@ -238,7 +239,7 @@ const RegisterPage = () => {
               </Grid>
             </Grid>
 
-            {message && <Alert severity={message.includes('failed') ? 'error' : 'success'} sx={{ mt: 3, borderRadius: 3, fontWeight: 600 }}>{message}</Alert>}
+            {message && <Alert severity={message.toLowerCase().includes('success') ? 'success' : 'error'} sx={{ mt: 3, borderRadius: 3, fontWeight: 600 }}>{message}</Alert>}
 
             <Button 
               type="submit" 

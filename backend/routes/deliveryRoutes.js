@@ -16,7 +16,8 @@ const {
   confirmDelivery,
   requestReplacement,
   generateDeliveryPaymentLink,
-  checkDeliveryPaymentStatus
+  checkDeliveryPaymentStatus,
+  getIncentives
 } = require('../controllers/deliveryController.js');
 const router = express.Router();
 const { protect, role } = require('../middleware/auth.js');
@@ -31,6 +32,7 @@ router.route('/partners/:id')
 
 // Partner-specific routes
 router.get('/my-deliveries', protect, role('deliveryPartner'), getAssignedOrders);
+router.get('/incentives', protect, role('deliveryPartner'), getIncentives);
 
 // KYC routes
 router.put('/partners/:id/kyc', protect, role('seller'), upload.fields([

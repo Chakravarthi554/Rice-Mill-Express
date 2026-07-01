@@ -129,8 +129,7 @@ const CheckoutScreen = ({ navigation }) => {
                 const orderData = { shippingAddressId: selectedAddress._id, paymentMethod: 'online', orderItems: cartItems.map(item => ({ product: item.product?._id, qty: item.quantity || item.qty || 1 })), useRewards };
                 const response = await apiService.createOrder(orderData);
                 const order = Array.isArray(response.data.orders) ? response.data.orders[0] : (response.data.order || response.data);
-                const token = await apiService.getAuthToken();
-                const paymentUrl = `${API_URL}/api/payments/razorpay/pay/${order._id}?token=${token}`;
+                const paymentUrl = `${API_URL}/api/payments/razorpay/pay/${order._id}`;
                 Alert.alert('Proceeding to Payment', 'You will be redirected to our secure payment gateway.', [{ text: 'OK', onPress: async () => { await Linking.openURL(paymentUrl); setLoading(false); } }]);
                 return;
             } catch (error) {
@@ -150,8 +149,7 @@ const CheckoutScreen = ({ navigation }) => {
                             const orderData = { shippingAddressId: selectedAddress._id, paymentMethod: 'cod', orderItems: cartItems.map(item => ({ product: item.product?._id, qty: item.quantity || item.qty || 1 })), useRewards };
                             const response = await apiService.createOrder(orderData);
                             const order = Array.isArray(response.data.orders) ? response.data.orders[0] : (response.data.order || response.data);
-                            const token = await apiService.getAuthToken();
-                            await Linking.openURL(`${API_URL}/api/payments/razorpay/pay-advance/${order._id}?token=${token}`);
+                            await Linking.openURL(`${API_URL}/api/payments/razorpay/pay-advance/${order._id}`);
                             setLoading(false);
                         } catch (error) {
                             Alert.alert('Payment Error', error.response?.data?.message || 'Failed to initiate advance payment.');

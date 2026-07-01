@@ -58,7 +58,7 @@ try {
   };
 }
 
-const { protect, role, sellerOrOrderOwner } = authMiddleware;
+const { protect, requireVerifiedEmail, role, sellerOrOrderOwner } = authMiddleware;
 const {
   createOrder,
   getOrderById,
@@ -93,7 +93,7 @@ const validateController = (controller, functionName) => {
 // ✅ FIXED: Create & list orders
 router
   .route("/")
-  .post(protect, validateController(orderController, 'createOrder'))
+  .post(protect, requireVerifiedEmail, validateController(orderController, 'createOrder'))
   .get(protect, role("admin"), validateController(orderController, 'getOrders'));
 
 // Delivery fee preview for checkout
@@ -113,8 +113,10 @@ router.route("/seller/analytics")
 // ✅ FIXED: Webhook (no protect middleware)
 router.post("/webhook/shiprocket", validateController(orderController, 'shiprocketWebhook'));
 
-// ✅ FIXED: Invoice generation
-const { generateInvoice } = require('../controllers/invoiceController');
+// ✅ FIXED: Invoice generation (specific routes first to avoid :id shadowing)
+const { generateInvoice, checkInvoiceStatus, downloadInvoiceFile } = require('../controllers/invoiceController');
+router.get("/:id/invoice/status", protect, checkInvoiceStatus);
+router.get("/:id/invoice/download", protect, downloadInvoiceFile);
 router.get("/:id/invoice", protect, generateInvoice);
 
 // ✅ FIXED: Single order actions
@@ -125,7 +127,7 @@ router
 
 // ✅ FIXED: Specific status updates
 router.put("/:id/status", protect, role("admin", "seller"), sellerOrOrderOwner, validateController(orderController, 'updateOrderStatus'));
-router.put("/:id/cancel", protect, sellerOrOrderOwner, validateController(orderController, 'cancelOrder'));
+router.put("/:id/cancel", protect, requireVerifiedEmail, sellerOrOrderOwner, validateController(orderController, 'cancelOrder'));
 router.put("/:id/assign-partner", protect, role("admin", "seller"), sellerOrOrderOwner, validateController(orderController, 'assignDeliveryPartner'));
 router.put("/:id/pay", protect, role("admin"), validateController(orderController, 'updateOrderToPaid'));
 router.put("/:id/deliver", protect, role("admin", "seller", "deliveryPartner"), sellerOrOrderOwner, validateController(orderController, 'updateOrderToDelivered'));

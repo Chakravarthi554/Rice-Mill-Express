@@ -12,7 +12,6 @@ const DeliveryPartner = require('../models/deliveryPartner');
 const Campaign = require('../models/Campaign');
 const Reward = require('../models/Reward');
 const NotificationService = require('../services/NotificationService');
-const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const Razorpay = require('razorpay');
 const AdminSettings = require('../models/AdminSettings');
@@ -22,6 +21,7 @@ const {
   calculatePincodeDistance,
   calculateOrderWeight
 } = require('../utils/deliveryChargeCalculator');
+const eventBus = require('../utils/eventBus');
 
 let razorpayInstance = null;
 if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
@@ -31,13 +31,7 @@ if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
   });
 }
 
-let transporter = null;
-if (process.env.EMAIL_USER && process.env.EMAIL_PASS && !process.env.EMAIL_USER.includes('your.email')) {
-  transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
-  });
-}
+// Removed unused inline transporter
 
 // Helper function to map bulk order status to regular order status
 const mapBulkStatusToOrderStatus = (bulkStatus) => {
@@ -413,10 +407,11 @@ exports.createOrder = asyncHandler(async (req, res) => {
       }
 
       if (transporter && user.email) {
-        await transporter.sendMail({
-          from: `"RiceMill Express" <${process.env.EMAIL_USER}>`, to: user.email,
-          subject: 'Order Confirmation',
-          text: `Your order(s) placed successfully! Total: ₹${grandTotal.toFixed(2)}`,
+        // Phase 9 & 10: Emit event for background processing instead of blocking
+        eventBus.emit('orderPlaced', {
+          orderId: createdOrders[0]?._id,
+          userEmail: user.email,
+          grandTotal: grandTotal
         });
       }
     } catch (postCommitError) {
@@ -663,6 +658,7 @@ exports.cancelOrder = asyncHandler(async (req, res) => {
 exports.getMyOrders = asyncHandler(async (req, res) => {
   try {
     const orders = await Order.find({ user: req.user._id })
+      .select('orderNumber seller orderItems paymentMethod totalPrice orderStatus paymentStatus createdAt isPaid isDelivered finalPaidAmount')
       .populate('seller', 'name businessDetails.businessName')
       .sort({ createdAt: -1 })
       .lean();
@@ -732,6 +728,7 @@ exports.getOrders = asyncHandler(async (req, res) => {
   try {
     const count = await Order.countDocuments(query);
     const orders = await Order.find(query)
+      .select('orderNumber user seller orderItems paymentMethod totalPrice orderStatus paymentStatus createdAt isPaid isDelivered finalPaidAmount')
       .populate('user', 'name email phone')
       .populate('seller', 'name email businessDetails.businessName')
       .populate('deliveryPartner', 'name')
@@ -789,6 +786,7 @@ exports.getSellerOrders = asyncHandler(async (req, res) => {
     const [count, orders, bulkCount, bulkOrders] = await Promise.all([
       Order.countDocuments(query),
       Order.find(query)
+        .select('orderNumber user orderItems paymentMethod totalPrice orderStatus paymentStatus createdAt isPaid isDelivered finalPaidAmount')
         .populate('user', 'name phone')
         .populate('deliveryPartner', 'name phone')
         .sort(sort)

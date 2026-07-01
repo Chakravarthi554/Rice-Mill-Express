@@ -37,6 +37,7 @@ const SocialInteraction = ({ itemType, itemId, itemUserId, showComments = true }
   const [likes, setLikes] = useState(0);
   const [hasLiked, setHasLiked] = useState(false);
   const [comments, setComments] = useState([]);
+  const [currentItemId, setCurrentItemId] = useState(null);
   const [commentText, setCommentText] = useState('');
   const [showCommentDialog, setShowCommentDialog] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
@@ -47,21 +48,16 @@ const SocialInteraction = ({ itemType, itemId, itemUserId, showComments = true }
   const socialCommentsList = useSelector((state) => state.socialCommentsList);
 
   useEffect(() => {
-    // Load initial social data
+    setComments([]);
+    setCurrentItemId(itemId);
     dispatch(getComments(itemType, itemId));
-
-    // Initialize likes from Redux if previous like action data exists
-    if (socialLike?.data?.likesCount != null) {
-      setLikes(socialLike.data.likesCount);
-      setHasLiked(socialLike.data.userLiked ?? false);
-    }
-  }, [dispatch, itemType, itemId, socialLike?.data?.likesCount]);
+  }, [dispatch, itemType, itemId]);
 
   useEffect(() => {
-    if (socialCommentsList.comments) {
+    if (socialCommentsList.comments && currentItemId === itemId) {
       setComments(socialCommentsList.comments);
     }
-  }, [socialCommentsList]);
+  }, [socialCommentsList, currentItemId, itemId]);
 
   // Socket.io real-time updates
   useEffect(() => {

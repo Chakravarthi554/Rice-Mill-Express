@@ -12,7 +12,7 @@ import {
     Dashboard as DashboardIcon, ShoppingBag, Inventory2, AccountBalanceWallet,
     LocalShipping, BarChart, Settings, Logout, Search,
     TrendingUp, TrendingDown, ArrowForward, PeopleAlt, Chat, Warning, CheckCircle,
-    Download as DownloadIcon
+    Download as DownloadIcon, Person as PersonIcon
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -30,6 +30,7 @@ import Message from '../components/common/Message';
 import CommunityForum from '../components/seller/CommunityForum';
 import RecipeEngagementDashboard from '../components/seller/RecipeEngagementDashboard';
 import NotificationBadge from '../components/common/NotificationBadge';
+import SellerSettings from '../components/seller/SellerSettings';
 
 const NAV_ITEMS = [
     { label: 'Dashboard', icon: <DashboardIcon fontSize="small" />, id: 0 },
@@ -40,7 +41,8 @@ const NAV_ITEMS = [
     { label: 'Analytics', icon: <BarChart fontSize="small" />, id: 5 },
     { label: 'Community Forum', icon: <Chat fontSize="small" />, id: 6 },
     { label: 'Recipes', icon: <PeopleAlt fontSize="small" />, id: 7 },
-    { label: 'Settings', icon: <Settings fontSize="small" />, id: 8 },
+    { label: 'Profile', icon: <PersonIcon fontSize="small" />, id: 8 },
+    { label: 'Settings', icon: <Settings fontSize="small" />, id: 9 },
 ];
 
 // ────────────────────────────────────────────────────────────
@@ -585,6 +587,7 @@ const SellerDashboard = () => {
             case 6: return <CommunityForum />;
             case 7: return <RecipeEngagementDashboard recipes={myRecipes} />;
             case 8: return <SellerProfile />;
+            case 9: return <SellerSettings />;
             default: return null;
         }
     };

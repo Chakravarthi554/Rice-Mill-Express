@@ -69,6 +69,8 @@ productSchema.index({ category: 1, type: 1, quality: 1, price: 1, weight: 1 });
 productSchema.index({ likesCount: -1 });
 productSchema.index({ commentsCount: -1 });
 productSchema.index({ rating: -1 });
+productSchema.index({ seller: 1, approvalStatus: 1 });
+productSchema.index({ category: 1, price: 1 });
 
 // Average rating and aggregates will now be managed by specialized controllers
 // using standalone Rating, Comment, and Like models.

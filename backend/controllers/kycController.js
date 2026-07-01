@@ -7,11 +7,24 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const { emitNewKyc } = require('../utils/socketServer');
-const sendEmail = require('../utils/sendEmail');
+const { emailQueue } = require('../jobs/queues');
 const sendSMS = require('../utils/sendSMS');
 
-// Multer configuration (in-memory storage)
-const storage = multer.memoryStorage();
+const uploadDir = path.join(__dirname, '..', 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Multer configuration (disk storage)
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const userId = req.user ? req.user._id : 'temp';
+    cb(null, `kyc-${Date.now()}-${userId}-${file.fieldname}${ext}`);
+  }
+});
+
 const upload = multer({ storage: storage }).fields([
   { name: 'idProof', maxCount: 1 },
   { name: 'addressProof', maxCount: 1 },
@@ -97,46 +110,17 @@ const submitKycApplication = asyncHandler(async (req, res) => {
     const documents = [];
     const uploadDir = path.join(__dirname, '..', 'uploads');
 
-    // Ensure upload directory exists
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-
     for (const [type, file] of Object.entries(files)) {
       if (file) {
-        const filename = `kyc-${Date.now()}-${req.user._id}-${type}${path.extname(file.originalname)}`;
-        const documentUrl = `/uploads/${filename}`;
-        const uploadPath = path.join(uploadDir, filename);
+        // file is already saved by diskStorage
+        const documentUrl = `/uploads/${file.filename}`;
 
-        try {
-          fs.writeFileSync(uploadPath, file.buffer);
-          console.log(`File saved to: ${uploadPath}`);
-
-          documents.push({
-            documentType: type,
-            documentUrl,
-            originalName: file.originalname,
-            uploadedAt: new Date()
-          });
-        } catch (fileError) {
-          console.error(`Error saving file ${filename}:`, fileError);
-          // Clean up any already saved files
-          documents.forEach((doc) => {
-            const filePath = path.join(uploadDir, path.basename(doc.documentUrl));
-            if (fs.existsSync(filePath)) {
-              try {
-                fs.unlinkSync(filePath);
-              } catch (unlinkError) {
-                console.error('Error cleaning up file:', unlinkError);
-              }
-            }
-          });
-          return res.status(500).json({
-            success: false,
-            message: 'Failed to save uploaded files',
-            error: fileError.message
-          });
-        }
+        documents.push({
+          documentType: type,
+          documentUrl,
+          originalName: file.originalname,
+          uploadedAt: new Date()
+        });
       }
     }
 
@@ -152,23 +136,17 @@ const submitKycApplication = asyncHandler(async (req, res) => {
       submittedAt: new Date()
     };
 
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
     try {
       console.log('Creating KYC application with data:', kycData);
-      const kycApplication = await KycApplication.create([kycData], { session });
+      const kycApplication = await KycApplication.create(kycData);
 
       console.log('Updating user KYC status for:', req.user._id);
       await User.findByIdAndUpdate(
         req.user._id,
-        { kycStatus: 'under_review' },
-        { session }
+        { kycStatus: 'under_review' }
       );
 
-      await session.commitTransaction();
-      console.log('KYC submission transaction committed successfully');
-      session.endSession();
+      console.log('KYC submission committed successfully');
 
       // 🔥 ENHANCED: Create admin notifications for KYC
       const adminUsers = await mongoose.model('User').find({ role: 'admin' }).select('_id');
@@ -180,9 +158,9 @@ const submitKycApplication = asyncHandler(async (req, res) => {
             title: 'New KYC Application',
             message: `New KYC application from ${businessName} (${req.user.name})`,
             priority: 'high',
-            relatedEntity: kycApplication[0]._id,
+            relatedEntity: kycApplication._id,
             entityModel: 'KycApplication',
-            actionUrl: `/admin/dashboard?tab=kyc&application=${kycApplication[0]._id}`,
+            actionUrl: `/admin/dashboard?tab=kyc&application=${kycApplication._id}`,
             actionLabel: 'Review KYC'
           })
         );
@@ -194,7 +172,7 @@ const submitKycApplication = asyncHandler(async (req, res) => {
       if (req.app.get('io')) {
         const io = req.app.get('io');
         io.to('admin_room').emit('NEW_KYC_SUBMITTED', {
-          kycId: kycApplication[0]._id,
+          kycId: kycApplication._id,
           userName: req.user.name,
           businessName: businessName,
           timestamp: new Date()
@@ -204,15 +182,12 @@ const submitKycApplication = asyncHandler(async (req, res) => {
       res.status(201).json({
         success: true,
         message: 'KYC application submitted successfully',
-        kycApplication: kycApplication[0],
+        kycApplication: kycApplication,
         documentUrls: documents.map(d => d.documentUrl)
       });
 
-    } catch (transactionError) {
-      await session.abortTransaction();
-      session.endSession();
-
-      // Clean up uploaded files on transaction error
+    } catch (dbError) {
+      // Clean up uploaded files on DB error
       documents.forEach((doc) => {
         const filePath = path.join(uploadDir, path.basename(doc.documentUrl));
         if (fs.existsSync(filePath)) {
@@ -224,8 +199,8 @@ const submitKycApplication = asyncHandler(async (req, res) => {
         }
       });
 
-      console.error('Transaction error in submitKycApplication:', transactionError);
-      throw transactionError;
+      console.error('Database error in submitKycApplication:', dbError);
+      throw dbError;
     }
 
   } catch (error) {
@@ -279,7 +254,7 @@ const approveKycApplication = asyncHandler(async (req, res) => {
     const msgBody = `<h2>Congratulations!</h2><p>Your KYC application for <b>${kyc.businessName}</b> has been <b>approved</b>.</p><p>You can now log in to the Seller Dashboard and start listing your products.</p><p>Review Notes: ${reviewNotes || 'Welcome aboard!'}</p>`;
     const smsMessage = `Congratulations! Your KYC for ${kyc.businessName} is approved. You can now log in to your seller account.`;
 
-    await sendEmail({ email: updatedUser.email, subject: emailSubject, message: msgBody });
+    await emailQueue.add({ email: updatedUser.email, subject: emailSubject, message: msgBody });
     if (updatedUser.phone) await sendSMS({ phone: updatedUser.phone, message: smsMessage });
   } catch (notifyErr) {
     console.error('⚠️ Notification failed during KYC approval:', notifyErr.message);
@@ -321,7 +296,7 @@ const rejectKycApplication = asyncHandler(async (req, res) => {
     const msgBody = `<h2>KYC Update</h2><p>Your KYC application for <b>${kyc.businessName}</b> has been <b>rejected</b>.</p><p>Reason: ${reviewNotes}</p><p>Please update your documents and try again.</p>`;
     const smsMessage = `Your KYC for ${kyc.businessName} was rejected. Reason: ${reviewNotes}. Please re-submit correctly.`;
 
-    await sendEmail({ email: updatedUser.email, subject: emailSubject, message: msgBody });
+    await emailQueue.add({ email: updatedUser.email, subject: emailSubject, message: msgBody });
     if (updatedUser.phone) await sendSMS({ phone: updatedUser.phone, message: smsMessage });
   } catch (notifyErr) {
     console.error('⚠️ Notification failed during KYC rejection:', notifyErr.message);
@@ -400,7 +375,7 @@ const reviewKycApplication = asyncHandler(async (req, res) => {
       : `Your KYC for ${application.businessName} was rejected. Reason: ${reviewNotes}. Please re-submit correctly.`;
 
     // Send Email
-    await sendEmail({
+    await emailQueue.add({
       email: updatedUser.email,
       subject: emailSubject,
       message: msgBody
