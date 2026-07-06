@@ -1,8 +1,12 @@
 const { pdfQueue } = require('../jobs/queues');
+const { generateInvoicePDF } = require('../utils/pdfGenerator');
 const Order = require('../models/Order');
 const asyncHandler = require('express-async-handler');
 const path = require('path');
 const fs = require('fs');
+
+const isRedisDisabled = process.env.DISABLE_REDIS === 'true';
+
 
 // Helper to decode common HTML entities and normalize UTF-8 strings
 const decodeEntities = (text) => {
@@ -86,10 +90,20 @@ exports.generateInvoice = asyncHandler(async (req, res) => {
         }
 
         // --- BACKGROUND PDF GENERATION ---
+        if (isRedisDisabled) {
+            // Redis unavailable — generate synchronously so it's ready immediately
+            console.log(`[InvoiceController] Redis disabled — generating PDF synchronously for order ${order._id}`);
+            await generateInvoicePDF(order);
+            return res.status(200).json({
+                success: true,
+                status: 'completed',
+                message: 'Invoice generated successfully'
+            });
+        }
+
+        // Redis available — enqueue and return 202 Accepted
         console.log(`[InvoiceController] Enqueuing PDF generation job for order ${order._id}`);
         await pdfQueue.add({ order });
-        
-        // Return 202 Accepted immediately without blocking
         res.status(202).json({ 
              success: true, 
              status: 'processing', 
@@ -103,6 +117,7 @@ exports.generateInvoice = asyncHandler(async (req, res) => {
         }
     }
 });
+
 
 // @desc    Check status of invoice generation
 // @route   GET /api/orders/:id/invoice/status

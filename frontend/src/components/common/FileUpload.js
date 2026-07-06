@@ -28,30 +28,30 @@ const FileUpload = ({ label, onUploadComplete, acceptedTypes = 'image/jpeg,image
   };
 
   return (
-    <Box className="mb-4">
-      <Typography variant="subtitle1" className="mb-2 text-gray-700">{label}</Typography>
+    <Box sx={{ mb: 2 }}>
+      <Typography variant="subtitle1" sx={{ mb: 1, color: 'text.secondary' }}>{label}</Typography>
       <input
         id={`file-upload-${label}`}
         type="file"
         accept={acceptedTypes}
         multiple={multiple}
         onChange={handleFileChange}
-        className="hidden"
+        style={{ display: 'none' }}
       />
       <label htmlFor={`file-upload-${label}`}>
         <Button
           variant="contained"
           component="span"
           startIcon={<CloudUploadIcon />}
-          className="bg-green-600 hover:bg-green-700 text-white"
+          sx={{ bgcolor: 'success.main', color: 'white', '&:hover': { bgcolor: 'success.dark' } }}
         >
           {fileNames.length ? `${fileNames.length} file(s)` : 'Upload File'}
         </Button>
       </label>
       {fileNames.length > 0 && (
-        <Box className="mt-2">
+        <Box sx={{ mt: 1 }}>
           {fileNames.map((n, idx) => (
-            <Typography key={idx} variant="body2" className="text-gray-600">• {n}</Typography>
+            <Typography key={idx} variant="body2" sx={{ color: 'text.secondary' }}>• {n}</Typography>
           ))}
         </Box>
       )}

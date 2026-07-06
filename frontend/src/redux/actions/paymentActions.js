@@ -29,7 +29,10 @@ import {
 export const createRazorpayOrder = (orderData) => async (dispatch, getState) => {
   try {
     dispatch({ type: RAZORPAY_ORDER_CREATE_REQUEST });
-    const { data } = await api.post('/api/payments/razorpay/order', orderData);
+    const idempotencyKey = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substr(2);
+    const { data } = await api.post('/api/v1/payments/razorpay/order', orderData, {
+      headers: { 'Idempotency-Key': idempotencyKey }
+    });
     dispatch({ type: RAZORPAY_ORDER_CREATE_SUCCESS, payload: data });
     return Promise.resolve(data);
   } catch (error) {
@@ -46,7 +49,10 @@ export const createRazorpayOrder = (orderData) => async (dispatch, getState) => 
 export const verifyRazorpayPayment = (paymentData) => async (dispatch, getState) => {
   try {
     dispatch({ type: RAZORPAY_VERIFY_REQUEST });
-    const { data } = await api.post('/api/payments/razorpay/verify', paymentData);
+    const idempotencyKey = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substr(2);
+    const { data } = await api.post('/api/v1/payments/razorpay/verify', paymentData, {
+      headers: { 'Idempotency-Key': idempotencyKey }
+    });
 
     if (data.success) {
       dispatch({ type: RAZORPAY_VERIFY_SUCCESS, payload: data });
@@ -68,7 +74,7 @@ export const verifyRazorpayPayment = (paymentData) => async (dispatch, getState)
 export const getSellerPayments = () => async (dispatch, getState) => {
   try {
     dispatch({ type: SELLER_PAYMENTS_REQUEST });
-    const { data } = await api.get('/api/payments/seller');
+    const { data } = await api.get('/api/v1/payments/seller');
     dispatch({ type: SELLER_PAYMENTS_SUCCESS, payload: data });
   } catch (error) {
     dispatch({ type: SELLER_PAYMENTS_FAIL, payload: handleApiError(error) });
@@ -82,7 +88,7 @@ export const getSellerPayments = () => async (dispatch, getState) => {
 export const recordCodReceived = (orderId, amountReceived, proof = 'Seller confirmed') => async (dispatch, getState) => {
   try {
     dispatch({ type: PAYMENT_RECORD_COD_REQUEST });
-    const { data } = await api.post(`/api/payments/cod-report/${orderId}`, { amountReceived, proof });
+    const { data } = await api.post(`/api/v1/payments/cod-report/${orderId}`, { amountReceived, proof });
 
     dispatch({ type: PAYMENT_RECORD_COD_SUCCESS, payload: data.payment });
     return Promise.resolve(data);
@@ -100,7 +106,7 @@ export const recordCodReceived = (orderId, amountReceived, proof = 'Seller confi
 export const requestPayout = (payoutData) => async (dispatch, getState) => {
   try {
     dispatch({ type: PAYOUT_REQUEST_REQUEST });
-    const { data } = await api.post('/api/payments/request-payout', payoutData);
+    const { data } = await api.post('/api/v1/payments/request-payout', payoutData);
     dispatch({ type: PAYOUT_REQUEST_SUCCESS, payload: data.payout });
     // Refresh seller balance after payout request
     dispatch(getSellerPayments());
@@ -119,7 +125,7 @@ export const requestPayout = (payoutData) => async (dispatch, getState) => {
 export const getPayoutHistory = () => async (dispatch, getState) => {
   try {
     dispatch({ type: SELLER_PAYOUTS_HISTORY_REQUEST });
-    const { data } = await api.get('/api/payments/payout-history');
+    const { data } = await api.get('/api/v1/payments/payout-history');
     dispatch({ type: SELLER_PAYOUTS_HISTORY_SUCCESS, payload: data });
   } catch (error) {
     dispatch({ type: SELLER_PAYOUTS_HISTORY_FAIL, payload: handleApiError(error) });

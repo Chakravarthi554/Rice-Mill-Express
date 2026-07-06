@@ -33,7 +33,7 @@ export const listNotifications = (filters = {}) => async (dispatch) => {
       if (filters[key]) queryParams.append(key, filters[key]);
     });
 
-    const { data } = await api.get(`/api/notifications?${queryParams}`);
+    const { data } = await api.get(`/api/v1/notifications?${queryParams}`);
 
     dispatch({
       type: NOTIFICATION_LIST_SUCCESS,
@@ -54,7 +54,7 @@ export const markNotificationAsRead = (notificationId) => async (dispatch, getSt
 
     const { userLogin: { userInfo } } = getState();
 
-    const { data } = await api.put(`/api/notifications/${notificationId}/read`);
+    const { data } = await api.put(`/api/v1/notifications/${notificationId}/read`);
 
     dispatch({
       type: NOTIFICATION_MARK_READ_SUCCESS,
@@ -77,7 +77,7 @@ export const markAllNotificationsAsRead = () => async (dispatch) => {
   try {
     dispatch({ type: NOTIFICATION_MARK_ALL_READ_REQUEST });
 
-    await api.put('/api/notifications/read-all');
+    await api.put('/api/v1/notifications/read-all');
 
     dispatch({
       type: NOTIFICATION_MARK_ALL_READ_SUCCESS
@@ -95,7 +95,7 @@ export const deleteNotification = (notificationId) => async (dispatch) => {
   try {
     dispatch({ type: NOTIFICATION_DELETE_REQUEST });
 
-    await api.delete(`/api/notifications/${notificationId}`);
+    await api.delete(`/api/v1/notifications/${notificationId}`);
 
     dispatch({
       type: NOTIFICATION_DELETE_SUCCESS,
@@ -114,7 +114,7 @@ export const clearAllNotifications = () => async (dispatch) => {
   try {
     dispatch({ type: NOTIFICATION_CLEAR_ALL_REQUEST });
 
-    await api.delete('/api/notifications');
+    await api.delete('/api/v1/notifications');
 
     dispatch({
       type: NOTIFICATION_CLEAR_ALL_SUCCESS
@@ -132,7 +132,7 @@ export const getNotificationStats = () => async (dispatch) => {
   try {
     dispatch({ type: NOTIFICATION_STATS_REQUEST });
 
-    const { data } = await api.get('/api/notifications/stats');
+    const { data } = await api.get('/api/v1/notifications/stats');
 
     dispatch({
       type: NOTIFICATION_STATS_SUCCESS,

@@ -17,7 +17,7 @@ import {
   DarkTheme as NavigationDarkTheme,
 } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
-import store from './redux/store';
+import store, { persistor } from './redux/store';
 import { setupInterceptors } from './services/api';
 import { loadUserFromStorage, setCredentials, setAuthReady, logout } from './redux/slices/authSlice';
 import { fetchSettings } from './redux/slices/settingsSlice';
@@ -39,7 +39,7 @@ const { LightTheme, DarkTheme } = adaptNavigationTheme({
 });
 
 // Initialize API interceptors with store
-setupInterceptors(store);
+setupInterceptors(store, logout);
 
 // Auth Screens
 import LoginScreen from './screens/auth/LoginScreen';
@@ -413,8 +413,10 @@ function AppNavigator() {
 
           if (storedUserInfo) {
             const user = JSON.parse(storedUserInfo);
-            dispatch(setCredentials({ user, token }));
-            console.log('🔄 Redux state updated with fresh Firebase token');
+            // Don't store the token in Redux — the API interceptor always fetches
+            // a fresh token from auth.currentUser on every request.
+            dispatch(setCredentials({ user, token: null }));
+            console.log('🔄 Redux state updated from fresh Firebase session');
           }
         } else {
           console.log('ℹ️ Firebase auth state: User signed out');
@@ -531,11 +533,15 @@ function MainContent() {
   );
 }
 
+import { PersistGate } from 'redux-persist/integration/react';
+
 export default function App() {
   return (
     <MobileErrorBoundary>
       <Provider store={store}>
-        <MainContent />
+        <PersistGate loading={null} persistor={persistor}>
+          <MainContent />
+        </PersistGate>
       </Provider>
     </MobileErrorBoundary>
   );

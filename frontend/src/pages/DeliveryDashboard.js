@@ -56,8 +56,8 @@ const DeliveryDashboard = () => {
       const config = { headers: { Authorization: `Bearer ${token}` } };
       
       const [deliveriesRes, incentivesRes] = await Promise.all([
-        axios.get('/api/delivery-partners/my-deliveries', config).catch(() => ({ data: { orders: [] } })),
-        axios.get('/api/delivery-partners/incentives', config).catch(() => ({ data: { incentives: [] } }))
+        axios.get('/api/v1/delivery-partners/my-deliveries', config).catch(() => ({ data: { orders: [] } })),
+        axios.get('/api/v1/delivery-partners/incentives', config).catch(() => ({ data: { incentives: [] } }))
       ]);
 
       setOrders(deliveriesRes.data?.orders || []);

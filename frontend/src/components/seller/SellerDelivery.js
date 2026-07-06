@@ -197,7 +197,7 @@ const SellerDelivery = () => {
         partnerId = currentPartner._id;
       } else {
         // Create new partner using direct API call to get ID
-        const response = await fetch('/api/delivery-partners/partners', {
+        const response = await fetch('/api/v1/delivery-partners/partners', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -227,7 +227,7 @@ const SellerDelivery = () => {
         if (kycFiles.panPhoto) formData.append('panPhoto', kycFiles.panPhoto);
         if (kycFiles.driverPhoto) formData.append('driverPhoto', kycFiles.driverPhoto);
 
-        const kycResponse = await fetch(`/api/delivery-partners/partners/${partnerId}/kyc`, {
+        const kycResponse = await fetch(`/api/v1/delivery-partners/partners/${partnerId}/kyc`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${userInfo.token}`

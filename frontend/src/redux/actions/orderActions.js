@@ -37,7 +37,7 @@ export const downloadInvoice = (orderId) => async (dispatch) => {
     console.log(`🔄 Downloading invoice for order: ${orderId}`);
 
     // 1. Enqueue the generation job
-    const { data: initData } = await api.get(`/api/orders/${orderId}/invoice`);
+    const { data: initData } = await api.get(`/api/v1/orders/${orderId}/invoice`);
     
     let isReady = false;
     let attempts = 0;
@@ -45,7 +45,7 @@ export const downloadInvoice = (orderId) => async (dispatch) => {
 
     // 2. Poll for status
     while (!isReady && attempts < maxAttempts) {
-      const { data: statusData } = await api.get(`/api/orders/${orderId}/invoice/status`);
+      const { data: statusData } = await api.get(`/api/v1/orders/${orderId}/invoice/status`);
       if (statusData.status === 'completed') {
         isReady = true;
       } else {
@@ -59,7 +59,7 @@ export const downloadInvoice = (orderId) => async (dispatch) => {
     }
 
     // 3. Download the actual file
-    const { data: blobData } = await api.get(`/api/orders/${orderId}/invoice/download`, {
+    const { data: blobData } = await api.get(`/api/v1/orders/${orderId}/invoice/download`, {
       responseType: 'blob'
     });
 
@@ -89,7 +89,7 @@ export const listMyOrders = () => async (dispatch, getState) => {
 
     console.log('🔄 Fetching my orders...');
 
-    const { data } = await api.get('/api/orders/myorders');
+    const { data } = await api.get('/api/v1/orders/myorders');
 
     console.log(`✅ Found ${data.length} orders`);
 
@@ -134,7 +134,7 @@ export const createOrder = (order) => async (dispatch, getState) => {
       total: order.totalPrice
     });
 
-    const { data } = await api.post('/api/orders', order);
+    const { data } = await api.post('/api/v1/orders', order);
 
     console.log('✅ Order created successfully:', data);
 
@@ -170,7 +170,7 @@ export const getOrderDetails = (id) => async (dispatch, getState) => {
 
     console.log(`🔄 Fetching order details: ${id}`);
 
-    const { data } = await api.get(`/api/orders/${id}`);
+    const { data } = await api.get(`/api/v1/orders/${id}`);
 
     console.log('✅ Order details received:', data._id);
 
@@ -204,7 +204,7 @@ export const listOrders = (filters = {}) => async (dispatch, getState) => {
       if (filters[key]) queryParams.append(key, filters[key]);
     });
 
-    const url = `/api/orders${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const url = `/api/v1/orders${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
     console.log(`🔄 Fetching orders: ${url}`);
 
@@ -242,7 +242,7 @@ export const listSellerOrders = (filters = {}) => async (dispatch, getState) => 
       if (filters[key]) queryParams.append(key, filters[key]);
     });
 
-    const url = `/api/orders/sellerorders${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const url = `/api/v1/orders/sellerorders${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
     console.log(`🔄 Fetching seller orders: ${url}`);
 
@@ -287,7 +287,7 @@ export const cancelOrder = (orderId, cancellationReason) => async (dispatch, get
 
     console.log(`🔄 Cancelling order: ${orderId}`);
 
-    const { data } = await api.put(`/api/orders/${orderId}/cancel`, {
+    const { data } = await api.put(`/api/v1/orders/${orderId}/cancel`, {
       cancellationReason
     });
 
@@ -323,7 +323,7 @@ export const deliverOrder = (orderId) => async (dispatch, getState) => {
 
     console.log(`🔄 Marking order as delivered: ${orderId}`);
 
-    const { data } = await api.put(`/api/orders/${orderId}/deliver`, {});
+    const { data } = await api.put(`/api/v1/orders/${orderId}/deliver`, {});
 
     console.log('✅ Order marked as delivered');
 
@@ -354,7 +354,7 @@ export const updateOrderStatus = (orderId, status, note = '') => async (dispatch
 
     console.log(`🔄 Updating order status: ${orderId} to ${status}`);
 
-    const { data } = await api.put(`/api/orders/${orderId}/status`, {
+    const { data } = await api.put(`/api/v1/orders/${orderId}/status`, {
       status,
       note
     });
@@ -388,7 +388,7 @@ export const payOrder = (orderId, paymentResult) => async (dispatch, getState) =
 
     console.log(`🔄 Processing payment for order: ${orderId}`);
 
-    const { data } = await api.put(`/api/orders/${orderId}/pay`, paymentResult);
+    const { data } = await api.put(`/api/v1/orders/${orderId}/pay`, paymentResult);
 
     console.log('✅ Payment processed successfully');
 

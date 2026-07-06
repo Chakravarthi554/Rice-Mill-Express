@@ -40,8 +40,8 @@ const AdminSupportDashboard = () => {
                 headers: { Authorization: `Bearer ${userInfo.token}` }
             };
             const url = statusFilter
-                ? `/api/support/admin/tickets?status=${statusFilter}`
-                : '/api/support/admin/tickets';
+                ? `/api/v1/support/admin/tickets?status=${statusFilter}`
+                : '/api/v1/support/admin/tickets';
             const { data } = await axios.get(url, config);
             setTickets(data.data || data.tickets || data || []);
         } catch (error) {
@@ -63,7 +63,7 @@ const AdminSupportDashboard = () => {
             const config = {
                 headers: { Authorization: `Bearer ${userInfo.token}` }
             };
-            await axios.put(`/api/support/admin/tickets/${id}`, { status: newStatus }, config);
+            await axios.put(`/api/v1/support/admin/tickets/${id}`, { status: newStatus }, config);
             fetchTickets();
         } catch (error) {
             console.error('Error updating status:', error);

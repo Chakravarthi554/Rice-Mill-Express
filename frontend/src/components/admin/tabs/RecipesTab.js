@@ -54,7 +54,7 @@ const RecipesTab = () => {
         headers: { Authorization: `Bearer ${userInfo.token}` },
         params: { pageNumber: page }
       };
-      const { data } = await axios.get('/api/admin/engagement/recipes', config);
+      const { data } = await axios.get('/api/v1/admin/engagement/recipes', config);
       setLibraryRecipes(data.recipes);
       setLibraryTotal(data.total);
       setLibraryPages(data.pages);

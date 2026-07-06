@@ -1,6 +1,4 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
@@ -63,6 +61,30 @@
 /* ── BASE STYLES ── */
 * {
   box-sizing: border-box;
+}
+
+/* ── ACCESSIBILITY: Focus Indicators ── */
+/* Visible focus rings for keyboard navigation (WCAG 2.4.7) */
+*:focus-visible {
+  outline: 3px solid var(--green-primary);
+  outline-offset: 2px;
+}
+
+/* Remove outline for mouse users only */
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ── ACCESSIBILITY: Reduced Motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 body {

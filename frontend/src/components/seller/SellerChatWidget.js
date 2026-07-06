@@ -175,14 +175,14 @@ const SellerChatWidget = () => {
     const fetchConversation = async () => {
         try {
             const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-            const { data: conversations } = await axios.get('/api/chat/conversations', config);
+            const { data: conversations } = await axios.get('/api/v1/chat/conversations', config);
             const adminConv = conversations.find(c =>
                 c.participants.some(p => p.role === 'admin' && p._id !== userInfo._id)
             );
 
             if (adminConv) {
                 setConversationId(adminConv._id);
-                const { data: msgs } = await axios.get(`/api/chat/messages/${adminConv._id}`, config);
+                const { data: msgs } = await axios.get(`/api/v1/chat/messages/${adminConv._id}`, config);
                 setMessages(msgs.messages);
                 markAsRead(adminConv._id);
 
@@ -197,7 +197,7 @@ const SellerChatWidget = () => {
                 setIsDisabled(adminConv.isDisabled || false);
             } else {
                 // If no conversation yet, try to find an admin to start one
-                const { data: admins } = await axios.get('/api/users/admins', config);
+                const { data: admins } = await axios.get('/api/v1/users/admins', config);
                 if (admins?.[0]) {
                     const admin = admins[0];
                     setAdminOnline(admin.isOnline);
@@ -212,7 +212,7 @@ const SellerChatWidget = () => {
     const markAsRead = async (cid) => {
         try {
             const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-            await axios.put(`/api/chat/read/${cid}`, {}, config);
+            await axios.put(`/api/v1/chat/read/${cid}`, {}, config);
         } catch (e) { console.error(e); }
     };
 
@@ -222,7 +222,7 @@ const SellerChatWidget = () => {
 
         try {
             const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-            await axios.put(`/api/chat/action/${conversationId}`, { action: 'mute' }, config);
+            await axios.put(`/api/v1/chat/action/${conversationId}`, { action: 'mute' }, config);
 
             // Toggle the local state
             setIsMuted(prev => !prev);
@@ -264,7 +264,7 @@ const SellerChatWidget = () => {
                 },
             };
 
-            const { data: uploadResults } = await axios.post('/api/upload/chat/multiple', formData, config);
+            const { data: uploadResults } = await axios.post('/api/v1/upload/chat/multiple', formData, config);
             await sendMessage(null, uploadResults);
         } catch (error) {
             console.error('Upload failed', error);
@@ -285,7 +285,7 @@ const SellerChatWidget = () => {
             try {
                 const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
                 // ✅ FIX BUG #3: Wait for response and update UI immediately
-                const { data: updatedMessage } = await axios.put(`/api/chat/message/${editingMsg._id}`, { content: msgContent }, config);
+                const { data: updatedMessage } = await axios.put(`/api/v1/chat/message/${editingMsg._id}`, { content: msgContent }, config);
 
                 // Update UI immediately (optimistic)
                 setMessages(prev => prev.map(m => m._id === editingMsg._id ? updatedMessage : m));
@@ -305,12 +305,12 @@ const SellerChatWidget = () => {
             const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
             let adminId = messages.find(m => m.sender.role === 'admin' && m.sender._id !== userInfo._id)?.sender._id;
             if (!adminId) {
-                const { data: admins } = await axios.get('/api/users/admins', config);
+                const { data: admins } = await axios.get('/api/v1/users/admins', config);
                 if (admins?.[0]) adminId = admins[0]._id;
             }
 
             if (adminId) {
-                const { data: sentMessage } = await axios.post('/api/chat/send', {
+                const { data: sentMessage } = await axios.post('/api/v1/chat/send', {
                     receiverId: adminId,
                     content: msgContent,
                     attachments,
@@ -354,7 +354,7 @@ const SellerChatWidget = () => {
 
         try {
             const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-            await axios.delete(`/api/chat/message/${selectedMsg._id}?mode=${mode}`, config);
+            await axios.delete(`/api/v1/chat/message/${selectedMsg._id}?mode=${mode}`, config);
             // 'everyone' mode handled via socket chat:message_updated
         } catch (e) {
             console.error(e);
@@ -367,7 +367,7 @@ const SellerChatWidget = () => {
     const handleStar = async () => {
         try {
             const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-            await axios.put(`/api/chat/message/${selectedMsg._id}/star`, {}, config);
+            await axios.put(`/api/v1/chat/message/${selectedMsg._id}/star`, {}, config);
             setMessages(prev => prev.map(m => m._id === selectedMsg._id ? {
                 ...m, isStarredBy: m.isStarredBy.includes(userInfo._id)
                     ? m.isStarredBy.filter(id => id !== userInfo._id)
@@ -386,7 +386,7 @@ const SellerChatWidget = () => {
 
         try {
             const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-            await axios.put(`/api/chat/clear/${conversationId}`, {}, config);
+            await axios.put(`/api/v1/chat/clear/${conversationId}`, {}, config);
         } catch (e) {
             console.error(e);
             setMessages(oldMessages); // Rollback
@@ -432,7 +432,7 @@ const SellerChatWidget = () => {
                                 try {
                                     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
                                     for (const id of selectedMsgs) {
-                                        await axios.delete(`/api/chat/message/${id}?mode=me`, config);
+                                        await axios.delete(`/api/v1/chat/message/${id}?mode=me`, config);
                                     }
                                     setMessages(prev => prev.filter(m => !selectedMsgs.includes(m._id)));
                                     setSelectionMode(false);

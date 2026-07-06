@@ -56,7 +56,7 @@ const AddDeliveryPartnerScreen = ({ navigation }) => {
             setLoading(true);
             
             // Note: api service automatically adds Auth header and bridge bypass headers
-            await api.post('/api/delivery-partners/partners', formData);
+            await api.post('/api/v1/delivery-partners/partners', formData);
 
             Alert.alert('Success', 'Delivery Partner registered successfully! They can now login using their email and password.', [
                 { text: 'OK', onPress: () => navigation.goBack() }

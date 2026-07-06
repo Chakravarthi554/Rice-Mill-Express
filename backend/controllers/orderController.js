@@ -49,17 +49,18 @@ const mapBulkStatusToOrderStatus = (bulkStatus) => {
 };
 
 exports.createOrder = asyncHandler(async (req, res) => {
-  const { orderItems, shippingAddressId, paymentMethod, razorpayPaymentId, razorpayOrderId, razorpaySignature } = req.body;
-
-  if (!orderItems || !Array.isArray(orderItems) || orderItems.length === 0) {
-    res.status(400); throw new Error('No valid order items provided');
-  }
-  if (!shippingAddressId || !mongoose.Types.ObjectId.isValid(shippingAddressId)) {
-    res.status(400); throw new Error('Valid shipping address ID is required');
-  }
-  if (!paymentMethod || !['cod', 'razorpay', 'online'].includes(paymentMethod)) {
-    res.status(400); throw new Error('Invalid payment method');
-  }
+  const {
+    orderItems,
+    shippingAddressId,
+    paymentMethod,
+    razorpayPaymentId,
+    razorpayOrderId,
+    razorpaySignature,
+    itemsPrice,
+    taxPrice,
+    shippingPrice,
+    totalPrice,
+  } = req.body;
 
   // Normalize payment method
   const finalPaymentMethod = paymentMethod === 'online' ? 'razorpay' : paymentMethod;
@@ -468,7 +469,7 @@ exports.getOrderById = asyncHandler(async (req, res) => {
     const order = await Order.findById(req.params.id)
       .populate('user', 'name phone email')
       .populate('seller', 'name businessDetails.businessName phone email')
-      .populate('deliveryPartner', 'name phone');
+      .populate('deliveryPartner', 'name');
 
     if (!order) {
       return res.status(404).json({ message: 'Order not found' });
@@ -490,11 +491,8 @@ exports.getOrderById = asyncHandler(async (req, res) => {
 });
 
 exports.updateOrderStatus = asyncHandler(async (req, res) => {
-  const { status, reason, notes } = req.body;
+  const { status, note } = req.body;
   const orderId = req.params.id;
-
-  if (!mongoose.Types.ObjectId.isValid(orderId)) { res.status(400); throw new Error('Invalid order ID'); }
-  if (!status) { res.status(400); throw new Error('Status is required'); }
 
   const order = await Order.findById(orderId);
   if (!order) { res.status(404); throw new Error('Order not found'); }
@@ -531,7 +529,7 @@ exports.updateOrderStatus = asyncHandler(async (req, res) => {
   order.statusHistory.push({
     status,
     timestamp: new Date(),
-    reason: notes || reason || `Status updated to ${status}`
+    reason: note || `Status updated to ${status}`
   });
 
   if (status === 'delivered') {
@@ -554,7 +552,7 @@ exports.updateOrderStatus = asyncHandler(async (req, res) => {
   }
 
   if (status === 'cancelled') {
-    order.cancelReason = reason || notes || 'Cancelled by seller/admin';
+    order.cancelReason = note || 'Cancelled by seller/admin';
     if (!order.isDelivered) {
       for (const item of order.orderItems) {
         await Product.findByIdAndUpdate(item.product, { $inc: { stock: item.qty } });
@@ -586,7 +584,7 @@ exports.updateOrderStatus = asyncHandler(async (req, res) => {
   // 🔥 Real-time sync & Multi-channel notifications
   const io = req.app.get('io');
   const notificationService = new NotificationService(io);
-  await notificationService.notifyOrderStatusUpdate(updatedOrder, previousStatus, req.user, notes || reason, req);
+  await notificationService.notifyOrderStatusUpdate(updatedOrder, previousStatus, req.user, note, req);
 
   res.json(updatedOrder);
 });
@@ -594,9 +592,6 @@ exports.updateOrderStatus = asyncHandler(async (req, res) => {
 exports.cancelOrder = asyncHandler(async (req, res) => {
   const { cancellationReason } = req.body;
   const orderId = req.params.id;
-
-  if (!cancellationReason) { res.status(400); throw new Error('Cancellation reason is required'); }
-  if (!mongoose.Types.ObjectId.isValid(orderId)) { res.status(400); throw new Error('Invalid order ID'); }
 
   const order = await Order.findById(orderId);
   if (!order) { res.status(404); throw new Error('Order not found'); }

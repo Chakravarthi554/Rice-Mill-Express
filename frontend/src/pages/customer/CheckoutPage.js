@@ -157,7 +157,7 @@ const CheckoutPage = () => {
     const fetchDeliveryCharge = async () => {
       if (!selectedAddress) { setDeliveryCharge(0); return; }
       try {
-        const { data } = await api.post('/api/orders/delivery-fee-preview', {
+        const { data } = await api.post('/api/v1/orders/delivery-fee-preview', {
           shippingAddressId: selectedAddress._id, orderTotal: totalAmount
         });
         setDeliveryCharge(data.deliveryFee || 0);
@@ -202,72 +202,95 @@ const CheckoutPage = () => {
   };
 
   const initiateRazorpay = async () => {
-    setRzpInitiating(true);
-    const rzpOrder = await dispatch(createRazorpayOrder({
-      amount: Math.round(finalTotal * 100), currency: 'INR',
-      receipt: `rcpt_${userInfo._id}_${Date.now()}`.slice(0, 40)
-    }));
-    if (!rzpOrder?.id) throw new Error('Failed to create Razorpay order');
-    const options = {
-      key: rzpOrder.key || process.env.REACT_APP_RAZORPAY_KEY_ID,
-      amount: rzpOrder.amount, currency: rzpOrder.currency,
-      name: 'RiceMill Express', description: 'Order Payment', order_id: rzpOrder.id,
-      handler: async (response) => {
-        const selectedCartItems = cartItems.filter(i => selectedItems.includes(i.product._id));
-        await dispatch(createOrder({
-          orderItems: selectedCartItems.map(i => ({ product: i.product._id, qty: i.quantity })),
-          shippingAddressId: selectedAddress._id, paymentMethod: 'razorpay', useRewards,
-          razorpayPaymentId: response.razorpay_payment_id,
-          razorpayOrderId: response.razorpay_order_id,
-          razorpaySignature: response.razorpay_signature,
-        }));
-      },
-      prefill: { name: userInfo.name, email: userInfo.email, contact: userInfo.phone },
-      theme: { color: colors.primary.main }
-    };
-    const rzp = new window.Razorpay(options);
-    rzp.open();
-    rzp.on('payment.failed', () => { alert('Payment failed. Try again.'); setRzpInitiating(false); });
-    razorpayRef.current = rzp;
+    try {
+      setRzpInitiating(true);
+      if (!window.Razorpay) {
+        await loadScript('https://checkout.razorpay.com/v1/checkout.js');
+      }
+      const rzpOrder = await dispatch(createRazorpayOrder({
+        amount: Math.round(finalTotal * 100), currency: 'INR',
+        receipt: `rcpt_${userInfo._id}_${Date.now()}`.slice(0, 40)
+      }));
+      if (!rzpOrder?.id) throw new Error('Failed to create Razorpay order');
+      const options = {
+        key: rzpOrder.key || process.env.REACT_APP_RAZORPAY_KEY_ID,
+        amount: rzpOrder.amount, currency: rzpOrder.currency,
+        name: 'RiceMill Express', description: 'Order Payment', order_id: rzpOrder.id,
+        handler: async (response) => {
+          const selectedCartItems = cartItems.filter(i => selectedItems.includes(i.product._id));
+          await dispatch(createOrder({
+            orderItems: selectedCartItems.map(i => ({ product: i.product._id, qty: i.quantity })),
+            shippingAddressId: selectedAddress._id, paymentMethod: 'razorpay', useRewards,
+            razorpayPaymentId: response.razorpay_payment_id,
+            razorpayOrderId: response.razorpay_order_id,
+            razorpaySignature: response.razorpay_signature,
+          }));
+        },
+        prefill: { name: userInfo.name, email: userInfo.email, contact: userInfo.phone },
+        theme: { color: colors.primary.main }
+      };
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+      rzp.on('payment.failed', () => { alert('Payment failed. Try again.'); setRzpInitiating(false); });
+      razorpayRef.current = rzp;
+    } catch (error) {
+      console.error(error);
+      alert('Payment initialization failed. Please try again.');
+      setRzpInitiating(false);
+    }
   };
 
   const initiateRazorpayForAdvance = async (advanceAmount) => {
-    setRzpInitiating(true);
-    const rzpOrder = await dispatch(createRazorpayOrder({
-      amount: Math.round(advanceAmount * 100), currency: 'INR',
-      receipt: `adv_${userInfo._id}_${Date.now()}`.slice(0, 40)
-    }));
-    if (!rzpOrder?.id) throw new Error('Failed to create Razorpay advance order');
-    const options = {
-      key: rzpOrder.key || process.env.REACT_APP_RAZORPAY_KEY_ID,
-      amount: rzpOrder.amount, currency: rzpOrder.currency,
-      name: 'RiceMill Express', description: 'COD Advance Payment (20%)', order_id: rzpOrder.id,
-      handler: async (response) => {
-        const selectedCartItems = cartItems.filter(i => selectedItems.includes(i.product._id));
-        await dispatch(createOrder({
-          orderItems: selectedCartItems.map(i => ({ product: i.product._id, qty: i.quantity })),
-          shippingAddressId: selectedAddress._id, paymentMethod: 'cod', useRewards,
-          isAdvancePaid: true, advanceAmountPaid: advanceAmount,
-          razorpayPaymentId: response.razorpay_payment_id,
-          razorpayOrderId: response.razorpay_order_id,
-          razorpaySignature: response.razorpay_signature,
-        }));
-      },
-      prefill: { name: userInfo.name, email: userInfo.email, contact: userInfo.phone },
-      theme: { color: colors.primary.main }
-    };
-    const rzp = new window.Razorpay(options);
-    rzp.open();
-    rzp.on('payment.failed', () => { alert('Advance Payment failed. Try again.'); setRzpInitiating(false); });
-    razorpayRef.current = rzp;
+    try {
+      setRzpInitiating(true);
+      if (!window.Razorpay) {
+        await loadScript('https://checkout.razorpay.com/v1/checkout.js');
+      }
+      const rzpOrder = await dispatch(createRazorpayOrder({
+        amount: Math.round(advanceAmount * 100), currency: 'INR',
+        receipt: `adv_${userInfo._id}_${Date.now()}`.slice(0, 40)
+      }));
+      if (!rzpOrder?.id) throw new Error('Failed to create Razorpay advance order');
+      const options = {
+        key: rzpOrder.key || process.env.REACT_APP_RAZORPAY_KEY_ID,
+        amount: rzpOrder.amount, currency: rzpOrder.currency,
+        name: 'RiceMill Express', description: 'COD Advance Payment (20%)', order_id: rzpOrder.id,
+        handler: async (response) => {
+          const selectedCartItems = cartItems.filter(i => selectedItems.includes(i.product._id));
+          await dispatch(createOrder({
+            orderItems: selectedCartItems.map(i => ({ product: i.product._id, qty: i.quantity })),
+            shippingAddressId: selectedAddress._id, paymentMethod: 'cod', useRewards,
+            isAdvancePaid: true, advanceAmountPaid: advanceAmount,
+            razorpayPaymentId: response.razorpay_payment_id,
+            razorpayOrderId: response.razorpay_order_id,
+            razorpaySignature: response.razorpay_signature,
+          }));
+        },
+        prefill: { name: userInfo.name, email: userInfo.email, contact: userInfo.phone },
+        theme: { color: colors.primary.main }
+      };
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+      rzp.on('payment.failed', () => { alert('Advance Payment failed. Try again.'); setRzpInitiating(false); });
+      razorpayRef.current = rzp;
+    } catch (error) {
+      console.error(error);
+      alert('Advance Payment initialization failed. Please try again.');
+      setRzpInitiating(false);
+    }
   };
 
   const placeOrderHandler = async () => {
-    if (!selectedAddress) return alert('Select a delivery address');
-    if (selectedItems.length === 0) return alert('Please select at least one item to order');
-    if (paymentMethod === 'cod' && !isMinOrderMet) return alert('Minimum ₹1500 for COD');
-    if (paymentMethod === 'cod') { await placeCODOrder(); }
-    else { await initiateRazorpay(); }
+    try {
+      if (!selectedAddress) return alert('Select a delivery address');
+      if (selectedItems.length === 0) return alert('Please select at least one item to order');
+      if (paymentMethod === 'cod' && !isMinOrderMet) return alert('Minimum ₹1500 for COD');
+      if (paymentMethod === 'cod') { await placeCODOrder(); }
+      else { await initiateRazorpay(); }
+    } catch (error) {
+      console.error('Order placement failed:', error);
+      alert('Order placement failed. Please try again.');
+    }
   };
 
   useEffect(() => {

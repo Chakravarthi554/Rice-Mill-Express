@@ -9,6 +9,7 @@
     "dev": "nodemon server.js",
     "test": "mocha --require tests/setup.js --file tests/hooks.js tests/**/*.test.js --timeout 15000 --exit",
     "test:watch": "mocha --require tests/setup.js --file tests/hooks.js tests/**/*.test.js --watch --timeout 15000 --exit",
+    "test:coverage": "nyc --check-coverage --lines 70 npm test",
     "lint": "eslint .",
     "seed:admin": "node seedAdmin.js"
   },
@@ -28,8 +29,8 @@
     "npm": ">=8.0.0"
   },
   "dependencies": {
-    "@sentry/node": "^10.62.0",
-    "@sentry/profiling-node": "^10.62.0",
+    "@sentry/node": "^10.63.0",
+    "@sentry/profiling-node": "^10.63.0",
     "@socket.io/redis-adapter": "^8.3.0",
     "axios": "^1.10.0",
     "bad-words": "^4.0.0",
@@ -37,10 +38,12 @@
     "body-parser": "^2.2.0",
     "buffer": "^6.0.3",
     "bull": "^4.16.5",
+    "bullmq": "^5.79.2",
     "cloudinary": "^2.9.0",
     "compression": "^1.8.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
+    "csurf": "^1.11.0",
     "csv-parser": "^3.2.0",
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
@@ -49,7 +52,7 @@
     "express-mongo-sanitize": "^2.2.0",
     "express-rate-limit": "^8.1.0",
     "express-status-monitor": "^1.3.4",
-    "express-validator": "^7.2.1",
+    "express-validator": "^7.3.2",
     "firebase-admin": "^13.6.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
@@ -69,6 +72,8 @@
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
     "stripe": "^18.4.0",
+    "swagger-jsdoc": "^6.3.0",
+    "swagger-ui-express": "^5.0.1",
     "twilio": "^5.7.3",
     "winston": "^3.18.3",
     "ws": "^8.18.3"
@@ -78,9 +83,14 @@
     "eslint": "^8.57.0",
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-plugin-import": "^2.29.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
     "mocha": "^11.7.1",
     "mongodb-memory-server": "^11.2.0",
     "nodemon": "^3.1.10",
+    "nyc": "^18.0.0",
+    "prettier": "^3.9.4",
+    "sinon": "^22.0.0",
     "supertest": "^7.1.3"
   },
   "repository": {
@@ -90,5 +100,14 @@
   "bugs": {
     "url": "your-issues-url"
   },
-  "homepage": "your-homepage-url"
+  "homepage": "your-homepage-url",
+  "lint-staged": {
+    "*.js": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md}": [
+      "prettier --write"
+    ]
+  }
 }

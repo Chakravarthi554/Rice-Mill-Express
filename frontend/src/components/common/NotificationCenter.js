@@ -69,11 +69,11 @@ const NotificationCenter = () => {
   const fetchNotifications = async () => {
     setLoading(true);
     try {
-      let url = '/api/notifications?limit=50';
+      let url = '/api/v1/notifications?limit=50';
       if (filter === 'unread') {
-        url = '/api/notifications?read=false&limit=50';
+        url = '/api/v1/notifications?read=false&limit=50';
       } else if (filter !== 'all') {
-        url = `/api/notifications?type=${filter}&limit=50`;
+        url = `/api/v1/notifications?type=${filter}&limit=50`;
       }
 
       const { data } = await api.get(url);
@@ -93,7 +93,7 @@ const NotificationCenter = () => {
 
   const markAsRead = async (notificationId) => {
     try {
-      await api.put(`/api/notifications/${notificationId}/read`);
+      await api.put(`/api/v1/notifications/${notificationId}/read`);
       // Update local state
       setNotifications(prev => prev.map(n =>
         n._id === notificationId ? { ...n, read: true } : n
@@ -107,7 +107,7 @@ const NotificationCenter = () => {
 
   const markAllAsRead = async () => {
     try {
-      await api.put('/api/notifications/read-all');
+      await api.put('/api/v1/notifications/read-all');
       // Update local state
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     } catch (error) {
@@ -117,7 +117,7 @@ const NotificationCenter = () => {
 
   const deleteNotification = async (notificationId) => {
     try {
-      await api.delete(`/api/notifications/${notificationId}`);
+      await api.delete(`/api/v1/notifications/${notificationId}`);
       // Remove from local state
       setNotifications(prev => prev.filter(n => n._id !== notificationId));
     } catch (error) {
@@ -127,7 +127,7 @@ const NotificationCenter = () => {
 
   const clearAllNotifications = async () => {
     try {
-      await api.delete('/api/notifications');
+      await api.delete('/api/v1/notifications');
       setNotifications([]);
     } catch (error) {
       console.error('Error clearing all notifications:', error);

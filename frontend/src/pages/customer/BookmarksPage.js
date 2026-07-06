@@ -34,7 +34,7 @@ const BookmarksPage = () => {
     setLoading(true);
     setError('');
     try {
-      const { data } = await axiosInstance.get(`/api/forum/bookmarks?page=${page}&limit=20`, {
+      const { data } = await axiosInstance.get(`/api/v1/forum/bookmarks?page=${page}&limit=20`, {
         headers: { Authorization: `Bearer ${userInfo.token}` }
       });
       setBookmarks(data.posts || []);
@@ -50,7 +50,7 @@ const BookmarksPage = () => {
 
   const handleUnbookmark = async (postId) => {
     try {
-      await axiosInstance.post(`/api/forum/${postId}/bookmark`, {}, {
+      await axiosInstance.post(`/api/v1/forum/${postId}/bookmark`, {}, {
         headers: { Authorization: `Bearer ${userInfo.token}` }
       });
       setBookmarks((prev) => prev.filter((post) => post._id !== postId));

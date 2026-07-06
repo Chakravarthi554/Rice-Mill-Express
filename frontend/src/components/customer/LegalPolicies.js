@@ -22,7 +22,7 @@ const LegalPolicies = () => {
       setLoading(true);
       setError(null);
       try {
-        const response = await api.get(`/api/legal/${selectedPolicyType}`);
+        const response = await api.get(`/api/v1/legal/${selectedPolicyType}`);
         if (response.data && response.data.success) {
           setPolicyData(response.data.data);
         } else {

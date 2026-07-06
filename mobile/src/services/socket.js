@@ -5,21 +5,37 @@ import { API_URL } from '../config/env';
 let socket = null;
 
 export const connectSocket = async () => {
+    // Prevent duplicate connections
+    if (socket && socket.connected) {
+        console.log('✅ Socket already connected:', socket.id);
+        return socket;
+    }
+
+    // Disconnect any stale socket before reconnecting
+    if (socket) {
+        socket.disconnect();
+        socket = null;
+    }
+
     const user = auth.currentUser;
     if (!user) {
-        console.log('No user logged in, cannot connect socket');
+        console.log('⚠️ No Firebase user logged in, skipping socket connection');
         return null;
     }
 
     try {
-        const token = await user.getIdToken();
+        const token = await user.getIdToken(false);
 
+        // Force websocket transport in React Native to avoid HTTP polling timeout/server errors
         socket = io(API_URL, {
             auth: { token },
             transports: ['websocket'],
+            upgrade: false,
             reconnection: true,
             reconnectionAttempts: 5,
-            reconnectionDelay: 1000,
+            reconnectionDelay: 2000,
+            reconnectionDelayMax: 10000,
+            timeout: 10000,
         });
 
         socket.on('connect', () => {
@@ -31,12 +47,13 @@ export const connectSocket = async () => {
         });
 
         socket.on('connect_error', (error) => {
-            console.error('Socket connection error:', error.message);
+            // Suppress repeated errors to keep the console clean
+            console.warn('⚠️ Socket connect failed (real-time updates unavailable):', error.message);
         });
 
         return socket;
     } catch (error) {
-        console.error('Error connecting socket:', error);
+        console.warn('⚠️ Could not initiate socket connection:', error.message);
         return null;
     }
 };

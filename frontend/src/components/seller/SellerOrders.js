@@ -40,9 +40,9 @@ const SellerOrders = () => {
       try {
         const queryParams = showReplacements ? '?hasReplacementRequest=true' : '';
         const [ordersRes, partnersRes, productsRes] = await Promise.all([
-          api.get(`/api/orders/sellerorders${queryParams}`),
-          api.get('/api/users/delivery-partners'),
-          api.get('/api/products/seller'),
+          api.get(`/api/v1/orders/sellerorders${queryParams}`),
+          api.get('/api/v1/users/delivery-partners'),
+          api.get('/api/v1/products/seller'),
         ]);
         setOrders(ordersRes.data.orders || ordersRes.data || []); // Handle both paginated and flat response
         setDeliveryPartners(partnersRes.data || []);
@@ -74,7 +74,7 @@ const SellerOrders = () => {
 
   const handleSaveOrder = async () => {
     try {
-      const response = await api.put(`/api/orders/${selectedOrder._id}`, {
+      const response = await api.put(`/api/v1/orders/${selectedOrder._id}`, {
         orderItems: selectedProducts,
         deliveryPartner: partnerId,
         paymentVerificationStatus: paymentStatus,
@@ -90,9 +90,9 @@ const SellerOrders = () => {
 
   const handleAssignPartner = async () => {
     try {
-      const response = await api.put(`/api/orders/${selectedOrder._id}/assign-partner`, { partnerId });
+      const response = await api.put(`/api/v1/orders/${selectedOrder._id}/assign-partner`, { partnerId });
       console.log('Assign partner response:', response.data);
-      const ordersRes = await api.get('/api/orders/sellerorders');
+      const ordersRes = await api.get('/api/v1/orders/sellerorders');
       setOrders(ordersRes.data || []);
       setError(null);
     } catch (error) {
@@ -105,7 +105,7 @@ const SellerOrders = () => {
     const formData = new FormData();
     formData.append('proof', file);
     try {
-      const response = await api.put(`/api/orders/${selectedOrder._id}/cod-proof`, formData, {
+      const response = await api.put(`/api/v1/orders/${selectedOrder._id}/cod-proof`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setPaymentStatus('verified');
@@ -121,7 +121,7 @@ const SellerOrders = () => {
     if (!window.confirm(`Are you sure you want to ${decision} this replacement request?`)) return;
 
     try {
-      const response = await api.put(`/api/delivery-partners/orders/${selectedOrder._id}/replacement-review`, {
+      const response = await api.put(`/api/v1/delivery-partners/orders/${selectedOrder._id}/replacement-review`, {
         decision,
         notes: `Manual ${decision} by seller`
       });
@@ -144,7 +144,7 @@ const SellerOrders = () => {
     if (!window.confirm('Are you sure you want to re-dispatch this replacement?')) return;
 
     try {
-      const response = await api.post(`/api/delivery-partners/orders/${selectedOrder._id}/redispatch`, {
+      const response = await api.post(`/api/v1/delivery-partners/orders/${selectedOrder._id}/redispatch`, {
         deliveryPartnerId: partnerId
       });
 

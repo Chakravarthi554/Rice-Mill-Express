@@ -22,7 +22,7 @@ export const submitKycApplication = (formData, navigate) => async (dispatch, get
         Authorization: `Bearer ${getState().userLogin.userInfo.token}`,
       },
     };
-    const { data } = await api.post('/api/kyc/submit', formData, config);
+    const { data } = await api.post('/api/v1/kyc/submit', formData, config);
     dispatch({ type: KYC_SUBMIT_SUCCESS, payload: data });
     dispatch(getKycStatus());
     navigate('/seller/kyc');
@@ -42,7 +42,7 @@ export const getKycStatus = () => async (dispatch, getState) => {
         Authorization: `Bearer ${getState().userLogin.userInfo.token}`,
       },
     };
-    const { data } = await api.get('/api/kyc/status', config);
+    const { data } = await api.get('/api/v1/kyc/status', config);
     dispatch({ type: KYC_STATUS_SUCCESS, payload: data });
   } catch (error) {
     dispatch({
@@ -57,7 +57,7 @@ export const getKycApplications = () => async (dispatch, getState) => {
     dispatch({ type: KYC_APPLICATIONS_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await api.get('/api/kyc/applications', config);
+    const { data } = await api.get('/api/v1/kyc/applications', config);
     dispatch({ type: KYC_APPLICATIONS_SUCCESS, payload: data });
   } catch (error) {
     dispatch({
@@ -76,9 +76,9 @@ export const reviewKycApplication = (id, actionData) => async (dispatch, getStat
 
     let endpoint = '';
     if (actionData.status === 'approved') {
-      endpoint = `/api/kyc/approve/${id}`;
+      endpoint = `/api/v1/kyc/approve/${id}`;
     } else if (actionData.status === 'rejected') {
-      endpoint = `/api/kyc/reject/${id}`;
+      endpoint = `/api/v1/kyc/reject/${id}`;
     }
 
     const { data } = await api.put(endpoint, { reviewNotes: actionData.reviewNotes }, config);

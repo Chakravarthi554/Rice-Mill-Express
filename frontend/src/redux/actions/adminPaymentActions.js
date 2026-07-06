@@ -42,7 +42,7 @@ export const getAdminPaymentStats = () => async (dispatch, getState) => {
       },
     };
 
-    const { data } = await api.get('/api/admin/payments/stats', config);
+    const { data } = await api.get('/api/v1/admin/payments/stats', config);
 
     dispatch({
       type: ADMIN_PAYMENT_STATS_SUCCESS,
@@ -73,7 +73,7 @@ export const getAdminTransactions = (filters = {}) => async (dispatch, getState)
       params: filters,
     };
 
-    const { data } = await api.get('/api/admin/payments/transactions', config);
+    const { data } = await api.get('/api/v1/admin/payments/transactions', config);
 
     dispatch({
       type: ADMIN_TRANSACTIONS_SUCCESS,
@@ -104,7 +104,7 @@ export const getPayoutsList = (filters = {}) => async (dispatch, getState) => {
       params: filters,
     };
 
-    const { data } = await api.get('/api/admin/payments/payouts', config);
+    const { data } = await api.get('/api/v1/admin/payments/payouts', config);
 
     dispatch({
       type: ADMIN_PAYOUTS_LIST_SUCCESS,
@@ -134,7 +134,7 @@ export const processRefund = (paymentId, refundData) => async (dispatch, getStat
       },
     };
 
-    const { data } = await api.post(`/api/admin/payments/refund/${paymentId}`, refundData, config);
+    const { data } = await api.post(`/api/v1/admin/payments/refund/${paymentId}`, refundData, config);
 
     dispatch({
       type: ADMIN_REFUND_SUCCESS,
@@ -169,7 +169,7 @@ export const releasePayout = (payoutId, payoutData) => async (dispatch, getState
       },
     };
 
-    const { data } = await api.post(`/api/admin/payments/payout/${payoutId}/release`, payoutData, config);
+    const { data } = await api.post(`/api/v1/admin/payments/payout/${payoutId}/release`, payoutData, config);
 
     dispatch({
       type: ADMIN_PAYOUT_RELEASE_SUCCESS,
@@ -204,7 +204,7 @@ export const flagPayment = (paymentId, flagData) => async (dispatch, getState) =
       },
     };
 
-    const { data } = await api.post(`/api/admin/payments/flag/${paymentId}`, flagData, config);
+    const { data } = await api.post(`/api/v1/admin/payments/flag/${paymentId}`, flagData, config);
 
     dispatch({
       type: ADMIN_PAYMENT_FLAG_SUCCESS,
@@ -240,7 +240,7 @@ export const exportPaymentReport = (exportParams) => async (dispatch, getState) 
       params: exportParams,
     };
 
-    const response = await api.get('/api/admin/payments/export', config);
+    const response = await api.get('/api/v1/admin/payments/export', config);
 
     // Create download link
     const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -285,7 +285,7 @@ export const getAdminCODSettlements = (filters = {}) => async (dispatch, getStat
       params: filters,
     };
 
-    const { data } = await api.get('/api/admin/payments/cod-settlements', config);
+    const { data } = await api.get('/api/v1/admin/payments/cod-settlements', config);
 
     dispatch({
       type: ADMIN_COD_SETTLEMENTS_SUCCESS,
@@ -315,7 +315,7 @@ export const settleCOD = (orderId) => async (dispatch, getState) => {
       },
     };
 
-    const { data } = await api.post(`/api/admin/payments/settle-cod/${orderId}`, {}, config);
+    const { data } = await api.post(`/api/v1/admin/payments/settle-cod/${orderId}`, {}, config);
 
     dispatch({
       type: ADMIN_SETTLE_COD_SUCCESS,

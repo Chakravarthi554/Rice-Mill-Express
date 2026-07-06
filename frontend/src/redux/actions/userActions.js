@@ -102,7 +102,7 @@ export const loginUser = (email, password) => async (dispatch) => {
 
     // ✅ FIX: Use axiosInstance (has explicit baseURL=http://localhost:5000)
     //    instead of bare axios which only works via CRA proxy — a fragile dev-only mechanism.
-    const { data: loginData } = await axiosInstance.post('/api/auth/login', { email, password }, {
+    const { data: loginData } = await axiosInstance.post('/api/v1/auth/login', { email, password }, {
       headers: { 'Content-Type': 'application/json' },
       withCredentials: true,
       timeout: 30000
@@ -113,7 +113,7 @@ export const loginUser = (email, password) => async (dispatch) => {
     }
 
     console.log('✅ Login successful, fetching full profile...');
-    const { data: profileData } = await axiosInstance.get('/api/users/profile', {
+    const { data: profileData } = await axiosInstance.get('/api/v1/users/profile', {
       headers: { Authorization: `Bearer ${loginData.accessToken}` },
       timeout: 30000
     });
@@ -198,7 +198,7 @@ export const getUserDetails = (id = 'profile') => async (dispatch, getState) => 
       timeout: 30000
     };
 
-    const url = id === 'profile' ? '/api/users/profile' : `/api/users/${id}`;
+    const url = id === 'profile' ? '/api/v1/users/profile' : `/api/v1/users/${id}`;
     const { data } = await axiosInstance.get(url, config);
 
     dispatch({ type: USER_DETAILS_SUCCESS, payload: data });
@@ -229,7 +229,7 @@ export const changeUserPassword = (currentPassword, newPassword) => async (dispa
     const config = {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${userInfo.token}` },
     };
-    const { data } = await axiosInstance.put('/api/users/change-password', { currentPassword, newPassword }, config);
+    const { data } = await axiosInstance.put('/api/v1/users/change-password', { currentPassword, newPassword }, config);
     dispatch({ type: USER_CHANGE_PASSWORD_SUCCESS, payload: data });
   } catch (error) {
     dispatch({
@@ -244,7 +244,7 @@ export const listUsers = () => async (dispatch, getState) => {
     dispatch({ type: USER_LIST_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await axiosInstance.get('/api/users', config);
+    const { data } = await axiosInstance.get('/api/v1/users', config);
     dispatch({ type: USER_LIST_SUCCESS, payload: data });
   } catch (error) {
     dispatch({
@@ -259,7 +259,7 @@ export const deleteUser = (id) => async (dispatch, getState) => {
     dispatch({ type: USER_DELETE_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    await axiosInstance.delete(`/api/users/${id}`, config);
+    await axiosInstance.delete(`/api/v1/users/${id}`, config);
     dispatch({ type: USER_DELETE_SUCCESS });
   } catch (error) {
     dispatch({
@@ -276,7 +276,7 @@ export const updateUser = (user) => async (dispatch, getState) => {
     const config = {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${userInfo.token}` },
     };
-    const { data } = await axiosInstance.put(`/api/users/${user._id}`, user, config);
+    const { data } = await axiosInstance.put(`/api/v1/users/${user._id}`, user, config);
     dispatch({ type: USER_UPDATE_SUCCESS });
     dispatch({ type: USER_DETAILS_SUCCESS, payload: data });
   } catch (error) {
@@ -325,7 +325,7 @@ export const updateUserProfile = (userData) => async (dispatch, getState) => {
     };
 
     console.log('🔄 Sending profile update request...');
-    const { data } = await axiosInstance.put('/api/users/profile', formData, config);
+    const { data } = await axiosInstance.put('/api/v1/users/profile', formData, config);
     console.log('✅ Profile update response:', data);
 
     if (data.success) {
@@ -373,7 +373,7 @@ export const getWishlistAction = () => async (dispatch, getState) => { // Rename
         Authorization: `Bearer ${userInfo.token}`,
       },
     };
-    const { data } = await axiosInstance.get('/api/users/wishlist', config);
+    const { data } = await axiosInstance.get('/api/v1/users/wishlist', config);
     dispatch({ type: USER_WISHLIST_SUCCESS, payload: data }); // FIXED: Dispatch SUCCESS with full populated data
   } catch (error) {
     console.error('Get Wishlist Error:', error);
@@ -391,7 +391,7 @@ export const addToWishlist = (productId) => async (dispatch, getState) => {
       },
     };
     // FIXED: Send productId in body
-    const { data } = await axiosInstance.post('/api/users/wishlist', { productId }, config);
+    const { data } = await axiosInstance.post('/api/v1/users/wishlist', { productId }, config);
     dispatch({ type: USER_WISHLIST_SUCCESS, payload: data }); // FIXED: Dispatch SUCCESS with full updated wishlist from backend
   } catch (error) {
     console.error('Wishlist Error:', error.response?.data || error.message);
@@ -408,7 +408,7 @@ export const removeFromWishlist = (productId) => async (dispatch, getState) => {
         Authorization: `Bearer ${userInfo.token}`,
       },
     };
-    const { data } = await axiosInstance.delete(`/api/users/wishlist/${productId}`, config); // FIXED: Await response (backend returns updated wishlist)
+    const { data } = await axiosInstance.delete(`/api/v1/users/wishlist/${productId}`, config); // FIXED: Await response (backend returns updated wishlist)
     dispatch({ type: USER_WISHLIST_SUCCESS, payload: data }); // FIXED: Dispatch SUCCESS with full updated wishlist from backend
   } catch (error) {
     console.error('Remove Wishlist Error:', error);
@@ -427,7 +427,7 @@ export const getWishlist = () => async (dispatch, getState) => {
       },
     };
 
-    const { data } = await axiosInstance.get('/api/users/wishlist', config);
+    const { data } = await axiosInstance.get('/api/v1/users/wishlist', config);
     dispatch({ type: USER_WISHLIST_REQUEST, payload: data });
   } catch (error) {
     console.error('Get Wishlist Error:', error);
@@ -442,7 +442,7 @@ export const createDeliveryPartner = (partnerData) => async (dispatch, getState)
     const config = {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${userInfo.token}` },
     };
-    const { data } = await axiosInstance.post('/api/delivery/partners', partnerData, config);
+    const { data } = await axiosInstance.post('/api/v1/delivery/partners', partnerData, config);
     dispatch({ type: CREATE_DELIVERY_PARTNER_SUCCESS, payload: data });
   } catch (error) {
     dispatch({
@@ -456,7 +456,7 @@ export const listDeliveryPartners = () => async (dispatch, getState) => {
     dispatch({ type: LIST_DELIVERY_PARTNERS_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await axiosInstance.get('/api/delivery/partners', config);
+    const { data } = await axiosInstance.get('/api/v1/delivery/partners', config);
     dispatch({ type: LIST_DELIVERY_PARTNERS_SUCCESS, payload: data });
   } catch (error) {
     dispatch({
@@ -472,7 +472,7 @@ export const updateDeliveryPartner = (partnerId, partnerData) => async (dispatch
     const config = {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${userInfo.token}` },
     };
-    const { data } = await axiosInstance.put(`/api/delivery/partners/${partnerId}`, partnerData, config);
+    const { data } = await axiosInstance.put(`/api/v1/delivery/partners/${partnerId}`, partnerData, config);
     dispatch({ type: UPDATE_DELIVERY_PARTNER_SUCCESS, payload: data });
   } catch (error) {
     dispatch({
@@ -486,7 +486,7 @@ export const deleteDeliveryPartner = (partnerId) => async (dispatch, getState) =
     dispatch({ type: DELETE_DELIVERY_PARTNER_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    await axiosInstance.delete(`/api/delivery/partners/${partnerId}`, config);
+    await axiosInstance.delete(`/api/v1/delivery/partners/${partnerId}`, config);
     dispatch({ type: DELETE_DELIVERY_PARTNER_SUCCESS });
   } catch (error) {
     dispatch({
@@ -506,7 +506,7 @@ export const updateSellerProfile = (formData) => async (dispatch, getState) => {
         Authorization: `Bearer ${userInfo.token}`
       },
     };
-    const { data } = await axiosInstance.put('/api/seller/profile', formData, config);
+    const { data } = await axiosInstance.put('/api/v1/seller/profile', formData, config);
     dispatch({ type: USER_UPDATE_PROFILE_SUCCESS, payload: data.user });
 
     // Update USER_LOGIN_SUCCESS if the updated data is returned
@@ -527,7 +527,7 @@ export const forgotPassword = (email) => async (dispatch) => {
   try {
     dispatch({ type: USER_FORGOT_PASSWORD_REQUEST });
     const config = { headers: { 'Content-Type': 'application/json' } };
-    const { data } = await axiosInstance.post('/api/users/forgotpassword', { email }, config);
+    const { data } = await axiosInstance.post('/api/v1/users/forgotpassword', { email }, config);
     dispatch({ type: USER_FORGOT_PASSWORD_SUCCESS, payload: data.message });
   } catch (error) {
     dispatch({
@@ -541,7 +541,7 @@ export const resetPassword = (token, password) => async (dispatch) => {
   try {
     dispatch({ type: USER_RESET_PASSWORD_REQUEST });
     const config = { headers: { 'Content-Type': 'application/json' } };
-    const { data } = await axiosInstance.put(`/api/users/resetpassword/${token}`, { password }, config);
+    const { data } = await axiosInstance.put(`/api/v1/users/resetpassword/${token}`, { password }, config);
     dispatch({ type: USER_RESET_PASSWORD_SUCCESS, payload: data.message });
   } catch (error) {
     dispatch({
@@ -554,7 +554,7 @@ export const deleteAccount = (password) => async (dispatch, getState) => {
   try {
     dispatch({ type: USER_DELETE_ACCOUNT_REQUEST });
     const { userLogin: { userInfo } } = getState();
-    await axiosInstance.delete('/api/users/me', {
+    await axiosInstance.delete('/api/v1/users/me', {
       data: { password },
       headers: { Authorization: `Bearer ${userInfo.token}` }
     });
@@ -582,7 +582,7 @@ export const resetPreferences = () => async (dispatch, getState) => {
       },
     };
 
-    const { data } = await axiosInstance.post('/api/users/reset-preferences', {}, config);
+    const { data } = await axiosInstance.post('/api/v1/users/reset-preferences', {}, config);
 
     const updatedUserInfo = { ...userInfo, ...data.user };
     dispatch({ type: USER_LOGIN_SUCCESS, payload: updatedUserInfo });
@@ -602,7 +602,7 @@ export const linkAccount = (provider) => async (dispatch, getState) => {
     dispatch({ type: USER_LINK_ACCOUNT_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await axiosInstance.post('/api/users/linked-accounts', { provider }, config);
+    const { data } = await axiosInstance.post('/api/v1/users/linked-accounts', { provider }, config);
     dispatch({ type: USER_LINK_ACCOUNT_SUCCESS, payload: data });
     dispatch(getUserDetails('profile'));
   } catch (error) {
@@ -615,7 +615,7 @@ export const unlinkAccount = (provider) => async (dispatch, getState) => {
     dispatch({ type: USER_UNLINK_ACCOUNT_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await axiosInstance.delete('/api/users/linked-accounts', { ...config, data: { provider } });
+    const { data } = await axiosInstance.delete('/api/v1/users/linked-accounts', { ...config, data: { provider } });
     dispatch({ type: USER_UNLINK_ACCOUNT_SUCCESS, payload: data });
     dispatch(getUserDetails('profile'));
   } catch (error) {
@@ -628,7 +628,7 @@ export const addPaymentMethod = (method) => async (dispatch, getState) => {
     dispatch({ type: USER_ADD_PAYMENT_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await axiosInstance.post('/api/users/payment-methods', method, config);
+    const { data } = await axiosInstance.post('/api/v1/users/payment-methods', method, config);
     dispatch({ type: USER_ADD_PAYMENT_SUCCESS, payload: data });
     dispatch(getUserDetails('profile'));
   } catch (error) {
@@ -641,7 +641,7 @@ export const deletePaymentMethod = (id) => async (dispatch, getState) => {
     dispatch({ type: USER_DELETE_PAYMENT_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    await axiosInstance.delete(`/api/users/payment-methods/${id}`, config);
+    await axiosInstance.delete(`/api/v1/users/payment-methods/${id}`, config);
     dispatch({ type: USER_DELETE_PAYMENT_SUCCESS });
     dispatch(getUserDetails('profile'));
   } catch (error) {
@@ -654,7 +654,7 @@ export const getRewards = () => async (dispatch, getState) => {
     dispatch({ type: USER_GET_REWARDS_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await axiosInstance.get('/api/users/rewards', config);
+    const { data } = await axiosInstance.get('/api/v1/users/rewards', config);
     dispatch({ type: USER_GET_REWARDS_SUCCESS, payload: data });
   } catch (error) {
     dispatch({ type: USER_GET_REWARDS_FAIL, payload: error.response?.data?.message || error.message });
@@ -666,7 +666,7 @@ export const subscribe = () => async (dispatch, getState) => {
     dispatch({ type: USER_SUBSCRIBE_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await axiosInstance.post('/api/users/subscribe', {}, config);
+    const { data } = await axiosInstance.post('/api/v1/users/subscribe', {}, config);
     dispatch({ type: USER_SUBSCRIBE_SUCCESS, payload: data });
     dispatch(getUserDetails('profile'));
   } catch (error) {
@@ -679,7 +679,7 @@ export const unsubscribe = () => async (dispatch, getState) => {
     dispatch({ type: USER_UNSUBSCRIBE_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await axiosInstance.post('/api/users/unsubscribe', {}, config);
+    const { data } = await axiosInstance.post('/api/v1/users/unsubscribe', {}, config);
     dispatch({ type: USER_UNSUBSCRIBE_SUCCESS, payload: data });
     dispatch(getUserDetails('profile'));
   } catch (error) {
@@ -692,7 +692,7 @@ export const reportProblem = (report) => async (dispatch, getState) => {
     dispatch({ type: USER_REPORT_PROBLEM_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await axiosInstance.post('/api/users/report-problem', report, config);
+    const { data } = await axiosInstance.post('/api/v1/users/report-problem', report, config);
     dispatch({ type: USER_REPORT_PROBLEM_SUCCESS, payload: data });
   } catch (error) {
     dispatch({ type: USER_REPORT_PROBLEM_FAIL, payload: error.response?.data?.message || error.message });
@@ -704,7 +704,7 @@ export const exportUserData = () => async (dispatch, getState) => {
     dispatch({ type: USER_EXPORT_DATA_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await axiosInstance.get('/api/users/export-data', config);
+    const { data } = await axiosInstance.get('/api/v1/users/export-data', config);
     dispatch({ type: USER_EXPORT_DATA_SUCCESS, payload: data });
   } catch (error) {
     dispatch({ type: USER_EXPORT_DATA_FAIL, payload: error.response?.data?.message || error.message });
@@ -718,7 +718,7 @@ export const getSubscription = () => async (dispatch, getState) => {
       userLogin: { userInfo },
     } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await axiosInstance.get('/api/users/subscription', config);
+    const { data } = await axiosInstance.get('/api/v1/users/subscription', config);
     dispatch({ type: USER_GET_SUBSCRIPTION_SUCCESS, payload: data });
   } catch (error) {
     dispatch({
@@ -732,7 +732,7 @@ export const getReferrals = () => async (dispatch, getState) => {
   try {
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await axiosInstance.get('/api/users/referrals', config);
+    const { data } = await axiosInstance.get('/api/v1/users/referrals', config);
     // Dispatch success or update user info if needed
     // For now we just return data or dispatch a generic success? 
     // Maybe better to update a specific reducer. Let's assume we update details.
@@ -748,7 +748,7 @@ export const getPrivacySettings = () => async (dispatch, getState) => {
   try {
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await axiosInstance.get('/api/users/privacy', config);
+    const { data } = await axiosInstance.get('/api/v1/users/privacy', config);
     return data;
   } catch (error) {
     console.error(error);
@@ -759,7 +759,7 @@ export const updatePrivacySettings = (settings) => async (dispatch, getState) =>
   try {
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await axiosInstance.put('/api/users/privacy', settings, config);
+    const { data } = await axiosInstance.put('/api/v1/users/privacy', settings, config);
 
     // ✅ Update Redux state and localStorage
     const newUserInfo = { ...userInfo, ...data };
@@ -786,7 +786,7 @@ export const bookmarkPost = (postId) => async (dispatch, getState) => {
         Authorization: `Bearer ${userInfo.token}`,
       },
     };
-    await axiosInstance.post('/api/users/bookmarks', { postId }, config);
+    await axiosInstance.post('/api/v1/users/bookmarks', { postId }, config);
     // You could dispatch a success action here if needed
   } catch (error) {
     console.error('Bookmark error:', error.response?.data || error.message);
@@ -802,7 +802,7 @@ export const unbookmarkPost = (postId) => async (dispatch, getState) => {
         Authorization: `Bearer ${userInfo.token}`,
       },
     };
-    await axiosInstance.delete(`/api/users/bookmarks/${postId}`, config);
+    await axiosInstance.delete(`/api/v1/users/bookmarks/${postId}`, config);
     // You could dispatch a success action here if needed
   } catch (error) {
     console.error('Unbookmark error:', error.response?.data || error.message);
@@ -818,7 +818,7 @@ export const getBookmarks = () => async (dispatch, getState) => {
         Authorization: `Bearer ${userInfo.token}`,
       },
     };
-    const { data } = await axiosInstance.get('/api/users/bookmarks', config);
+    const { data } = await axiosInstance.get('/api/v1/users/bookmarks', config);
     return data.bookmarks || [];
   } catch (error) {
     console.error('Get bookmarks error:', error.response?.data || error.message);

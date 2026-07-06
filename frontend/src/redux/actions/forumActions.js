@@ -122,7 +122,7 @@ export const createForumPost = (postData) => async (dispatch, getState) => {
     const config = getAuthConfig(userInfo);
 
     const { data } = await safeApiCall(
-      () => axiosInstance.post('/api/forum', postData, config),
+      () => axiosInstance.post('/api/v1/forum', postData, config),
       'Create forum post failed'
     );
 
@@ -160,7 +160,7 @@ export const getForumPosts = (page = 1, limit = 50, category = '', search = '', 
     console.log('🔄 Fetching forum posts with params:', params);
 
     const { data } = await safeApiCall(
-      () => axiosInstance.get('/api/forum', { params, ...config }),
+      () => axiosInstance.get('/api/v1/forum', { params, ...config }),
       'Fetch forum posts failed'
     );
 
@@ -211,7 +211,7 @@ export const getPendingPosts = (page = 1, limit = 10) => async (dispatch, getSta
 
     console.log('🔄 Fetching pending posts...');
     const { data } = await safeApiCall(
-      () => axiosInstance.get('/api/forum/admin/pending', {
+      () => axiosInstance.get('/api/v1/forum/admin/pending', {
         params: { page, limit },
         ...config,
       }),
@@ -263,7 +263,7 @@ export const getPostById = (id) => async (dispatch, getState) => {
     const config = userInfo?.token ? getAuthConfig(userInfo) : {};
 
     const { data } = await safeApiCall(
-      () => axiosInstance.get(`/api/forum/${id}`, config),
+      () => axiosInstance.get(`/api/v1/forum/${id}`, config),
       'Fetch post by ID failed'
     );
 
@@ -294,7 +294,7 @@ export const likePost = (postId) => async (dispatch, getState) => {
     const config = getAuthConfig(userInfo);
 
     const { data } = await safeApiCall(
-      () => axiosInstance.post(`/api/forum/${postId}/like`, {}, config),
+      () => axiosInstance.post(`/api/v1/forum/${postId}/like`, {}, config),
       'Like post failed'
     );
 
@@ -327,7 +327,7 @@ export const addComment = (postId, content) => async (dispatch, getState) => {
     console.log(`Adding comment to post ${postId}:`, content);
 
     const { data } = await safeApiCall(
-      () => axiosInstance.post(`/api/forum/${postId}/reply`, { content }, config),
+      () => axiosInstance.post(`/api/v1/forum/${postId}/reply`, { content }, config),
       'Add comment failed'
     );
 
@@ -361,7 +361,7 @@ export const approvePost = (postId, status) => async (dispatch, getState) => {
     const config = getAuthConfig(userInfo);
 
     const { data } = await safeApiCall(
-      () => axiosInstance.put(`/api/forum/admin/${postId}/approve`, { status }, config),
+      () => axiosInstance.put(`/api/v1/forum/admin/${postId}/approve`, { status }, config),
       'Approve post failed'
     );
 
@@ -392,7 +392,7 @@ export const reportPost = (postId, reportData) => async (dispatch, getState) => 
     const config = getAuthConfig(userInfo);
 
     const { data } = await safeApiCall(
-      () => axiosInstance.post(`/api/forum/${postId}/report`, reportData, config),
+      () => axiosInstance.post(`/api/v1/forum/${postId}/report`, reportData, config),
       'Report post failed'
     );
 
@@ -423,7 +423,7 @@ export const deleteForumPost = (id) => async (dispatch, getState) => {
     const config = getAuthConfig(userInfo);
 
     await safeApiCall(
-      () => axiosInstance.delete(`/api/forum/${id}`, config),
+      () => axiosInstance.delete(`/api/v1/forum/${id}`, config),
       'Delete post failed'
     );
 
@@ -454,7 +454,7 @@ export const pinPost = (id) => async (dispatch, getState) => {
     const config = getAuthConfig(userInfo);
 
     const { data } = await safeApiCall(
-      () => axiosInstance.put(`/api/forum/admin/${id}/pin`, {}, config),
+      () => axiosInstance.put(`/api/v1/forum/admin/${id}/pin`, {}, config),
       'Pin post failed'
     );
 
@@ -486,7 +486,7 @@ export const moderateForumComment = (postId, commentId, action) => async (dispat
 
     const { data } = await safeApiCall(
       () => axiosInstance.post(
-        `/api/forum/admin/${postId}/comments/${commentId}/moderate`,
+        `/api/v1/forum/admin/${postId}/comments/${commentId}/moderate`,
         { action },
         config
       ),
@@ -521,7 +521,7 @@ export const reportForumComment = (postId, commentId, reason = '') => async (dis
 
     const { data } = await safeApiCall(
       () => axiosInstance.post(
-        `/api/forum/${postId}/comments/${commentId}/report`,
+        `/api/v1/forum/${postId}/comments/${commentId}/report`,
         { reason },
         config
       ),
@@ -560,7 +560,7 @@ export const getFlaggedForumComments = (page = 1, limit = 20) => async (dispatch
     const config = getAuthConfig(userInfo);
 
     const { data } = await safeApiCall(
-      () => axiosInstance.get('/api/forum/admin/moderation/flagged-comments', {
+      () => axiosInstance.get('/api/v1/forum/admin/moderation/flagged-comments', {
         params: { page, limit },
         ...config,
       }),
@@ -598,7 +598,7 @@ export const getForumPostsLive = (page = 1, limit = 50, category = '', search = 
     if (search) params.search = search;
 
     const { data } = await safeApiCall(
-      () => axiosInstance.get('/api/forum', { params, ...config }),
+      () => axiosInstance.get('/api/v1/forum', { params, ...config }),
       'Fetch live forum posts failed'
     );
 
@@ -631,7 +631,7 @@ export const getReports = (filters = {}) => async (dispatch, getState) => {
     const params = new URLSearchParams(filters).toString();
 
     const { data } = await safeApiCall(
-      () => axiosInstance.get(`/api/forum/admin/reports?${params}`, config),
+      () => axiosInstance.get(`/api/v1/forum/admin/reports?${params}`, config),
       'Fetch reports failed'
     );
 
@@ -662,7 +662,7 @@ export const toggleBookmark = (postId) => async (dispatch, getState) => {
     const config = getAuthConfig(userInfo);
 
     const { data } = await safeApiCall(
-      () => axiosInstance.post(`/api/forum/${postId}/bookmark`, {}, config),
+      () => axiosInstance.post(`/api/v1/forum/${postId}/bookmark`, {}, config),
       'Bookmark action failed'
     );
 
@@ -693,7 +693,7 @@ export const getUserBookmarks = (page = 1, limit = 20) => async (dispatch, getSt
     const config = getAuthConfig(userInfo);
 
     const { data } = await safeApiCall(
-      () => axiosInstance.get(`/api/forum/bookmarks?page=${page}&limit=${limit}`, config),
+      () => axiosInstance.get(`/api/v1/forum/bookmarks?page=${page}&limit=${limit}`, config),
       'Fetch bookmarks failed'
     );
 
@@ -717,7 +717,7 @@ export const getUserBookmarks = (page = 1, limit = 20) => async (dispatch, getSt
 export const sharePost = (postId) => async (dispatch) => {
   try {
     dispatch({ type: FORUM_POST_SHARE_REQUEST });
-    const { data } = await axiosInstance.post(`/api/forum/${postId}/share`);
+    const { data } = await axiosInstance.post(`/api/v1/forum/${postId}/share`);
     dispatch({ type: FORUM_POST_SHARE_SUCCESS, payload: data });
     return Promise.resolve(data);
   } catch (error) {

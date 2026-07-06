@@ -35,7 +35,7 @@ export const getAdminConversations = (filters = {}) => async (dispatch, getState
       if (filters[key]) params.append(key, filters[key]);
     });
 
-    const { data } = await api.get(`/api/admin/messages/conversations?${params}`, config);
+    const { data } = await api.get(`/api/v1/admin/messages/conversations?${params}`, config);
     
     dispatch({
       type: ADMIN_MESSAGES_CONVERSATIONS_SUCCESS,
@@ -62,7 +62,7 @@ export const getConversationWithUser = (userId) => async (dispatch, getState) =>
       },
     };
 
-    const { data } = await api.get(`/api/admin/messages/conversations/${userId}`, config);
+    const { data } = await api.get(`/api/v1/admin/messages/conversations/${userId}`, config);
     
     dispatch({
       type: ADMIN_MESSAGES_CONVERSATION_SUCCESS,
@@ -90,7 +90,7 @@ export const adminSendMessage = (messageData) => async (dispatch, getState) => {
       },
     };
 
-    const { data } = await api.post('/api/admin/messages/send', messageData, config);
+    const { data } = await api.post('/api/v1/admin/messages/send', messageData, config);
     
     dispatch({
       type: ADMIN_MESSAGES_SEND_SUCCESS,
@@ -126,7 +126,7 @@ export const markConversationResolved = (userId, resolutionData) => async (dispa
       },
     };
 
-    const { data } = await api.put(`/api/admin/messages/conversations/${userId}/resolve`, resolutionData, config);
+    const { data } = await api.put(`/api/v1/admin/messages/conversations/${userId}/resolve`, resolutionData, config);
     
     dispatch({
       type: ADMIN_MESSAGES_RESOLVE_SUCCESS,
@@ -159,7 +159,7 @@ export const getMessageStats = () => async (dispatch, getState) => {
       },
     };
 
-    const { data } = await api.get('/api/admin/messages/stats', config);
+    const { data } = await api.get('/api/v1/admin/messages/stats', config);
     
     dispatch({
       type: ADMIN_MESSAGES_STATS_SUCCESS,

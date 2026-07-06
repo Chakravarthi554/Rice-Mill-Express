@@ -1,1 +1,70 @@
-浩潰瑲删慥瑣‬⁻獵卥慴整素映潲⁭爧慥瑣㬧椊灭牯⁴⁻潂ⱸ吠灹杯慲桰ⱹ倠灡牥‬潆浲潃瑮潲ⱬ匠汥捥ⱴ䴠湥䥵整Ɑ䐠癩摩牥‬睓瑩档‬瑓捡⁫⁽牦浯✠浀極洯瑡牥慩❬਻浩潰瑲笠甠敳牔湡汳瑡潩⁮⁽牦浯✠敲捡⵴ㅩ游硥❴਻浩潰瑲笠甠敳桔浥⁥⁽牦浯✠⸮ⸯ⼮潣瑮硥⽴桔浥䍥湯整瑸㬧ਊ潣獮⁴敓汬牥敓瑴湩獧㴠⠠ 㸽笠 †挠湯瑳笠琠‬ㅩ游素㴠甠敳牔湡汳瑡潩⡮㬩 †挠湯瑳笠琠敨敭‬敳呴敨敭潍敤素㴠甠敳桔浥⡥㬩ਊ††潣獮⁴獛瑥楴杮ⱳ猠瑥敓瑴湩獧⁝‽獵卥慴整⠨ 㸽笠 †††琠祲笠 †††††挠湯瑳猠癡摥㴠氠捯污瑓牯条⹥敧䥴整⡭猧汥敬彲敳瑴湩獧⤧਻††††††敲畴湲猠癡摥㼠䨠体⹎慰獲⡥慳敶⥤㨠笠氠湡畧条㩥✠湥Ⱗ琠敨敭›猧獹整❭‬潮楴楦慣楴湯㩳琠畲⁥㭽 †††素挠瑡档笠爠瑥牵⁮⁻慬杮慵敧›攧❮‬桴浥㩥✠祳瑳浥Ⱗ渠瑯晩捩瑡潩獮›牴敵素※੽††⥽਻ †挠湯瑳猠癡卥瑥楴杮⁳‽渨睥敓瑴湩獧 㸽笠 †††猠瑥敓瑴湩獧渨睥敓瑴湩獧㬩 †††氠捯污瑓牯条⹥敳䥴整⡭猧汥敬彲敳瑴湩獧Ⱗ䨠体⹎瑳楲杮晩⡹敮卷瑥楴杮⥳㬩 †††椠⁦渨睥敓瑴湩獧琮敨敭 敳呴敨敭潍敤渨睥敓瑴湩獧琮敨敭㬩 †††椠⁦渨睥敓瑴湩獧氮湡畧条⥥椠㠱⹮档湡敧慌杮慵敧渨睥敓瑴湩獧氮湡畧条⥥਻††㭽ਊ††敲畴湲⠠ †††㰠慐数⁲汥癥瑡潩㵮ほ⁽硳笽⁻㩰㐠‬潢摲牥慒楤獵›ⰳ戠牯敤㩲✠瀱⁸潳楬⁤䔣䔵䔷❂‬慭坸摩桴›〶‰絽ਾ††††††吼灹杯慲桰⁹慶楲湡㵴൜栊尵映湯坴楥桧㵴㡻〰⁽扭笽紳倾慬晴牯⁭敓瑴湩獧⼼祔潰牧灡票ਾ †††††㰠潂⁸扭笽紳ਾ††††††††吼灹杯慲桰⁹潦瑮敗杩瑨笽〷細洠㵢ㅻ㹽慌杮慵敧⼼祔潰牧灡票ਾ††††††††䘼牯䍭湯牴汯映汵坬摩桴猠穩㵥獜慭汬㹜 †††††††††㰠敓敬瑣瘠污敵笽敳瑴湩獧氮湡畧条絥漠䍮慨杮㵥敻㴠‾慳敶敓瑴湩獧笨⸠⸮敳瑴湩獧‬慬杮慵敧›⹥慴杲瑥瘮污敵素紩ਾ††††††††††††䴼湥䥵整⁭慶畬㵥敜屮䔾杮楬桳⼼敍畮瑉浥ਾ††††††††††††䴼湥䥵整⁭慶畬㵥桜屩릤ꓠ芤ꓠ肥⠠楈摮⥩⼼敍畮瑉浥ਾ††††††††††††䴼湥䥵整⁭慶畬㵥瑜屡꒮껠뾮껠趯⠠慔業⥬⼼敍畮瑉浥ਾ††††††††††††䴼湥䥵整⁭慶畬㵥瑜履꒰뇠늰뇠鞰뇠₁吨汥杵⥵⼼敍畮瑉浥ਾ††††††††††⼼敓敬瑣ਾ††††††††⼼潆浲潃瑮潲㹬 †††††㰠䈯硯ਾ †††††㰠楄楶敤⁲硳笽⁻祭›″絽⼠ਾ †††††㰠潂⁸扭笽紳ਾ††††††††吼灹杯慲桰⁹潦瑮敗杩瑨笽〷細洠㵢ㅻ㹽桔浥⁥牐晥牥湥散㱳启灹杯慲桰㹹 †††††††㰠潆浲潃瑮潲⁬畦汬楗瑤⁨楳敺尽浳污屬ਾ††††††††††匼汥捥⁴慶畬㵥獻瑥楴杮⹳桴浥絥漠䍮慨杮㵥敻㴠‾慳敶敓瑴湩獧笨⸠⸮敳瑴湩獧‬桴浥㩥攠琮牡敧⹴慶畬⁥⥽㹽 †††††††††††㰠敍畮瑉浥瘠污敵尽楬桧屴䰾杩瑨䴠摯㱥䴯湥䥵整㹭 †††††††††††㰠敍畮瑉浥瘠污敵尽慤歲㹜慄歲䴠摯㱥䴯湥䥵整㹭 †††††††††††㰠敍畮瑉浥瘠污敵尽祳瑳浥㹜祓瑳浥䐠晥畡瑬⼼敍畮瑉浥ਾ††††††††††⼼敓敬瑣ਾ††††††††⼼潆浲潃瑮潲㹬 †††††㰠䈯硯ਾ †††††㰠楄楶敤⁲硳笽⁻祭›″絽⼠ਾ †††††㰠潂㹸 †††††††㰠瑓捡⁫楤敲瑣潩㵮牜睯⁜番瑳晩䍹湯整瑮尽灳捡ⵥ敢睴敥屮愠楬湧瑉浥㵳捜湥整屲ਾ††††††††††䈼硯ਾ††††††††††††吼灹杯慲桰⁹潦瑮敗杩瑨笽〷細倾獵⁨潎楴楦慣楴湯㱳启灹杯慲桰㹹 †††††††††††㰠祔潰牧灡票瘠牡慩瑮尽慣瑰潩屮挠汯牯尽整瑸献捥湯慤祲㹜敒散癩⁥污牥獴映牯渠睥漠摲牥㱳启灹杯慲桰㹹 †††††††††㰠䈯硯ਾ††††††††††匼楷捴⁨档捥敫㵤獻瑥楴杮⹳潮楴楦慣楴湯絳漠䍮慨杮㵥敻㴠‾慳敶敓瑴湩獧笨⸠⸮敳瑴湩獧‬潮楴楦慣楴湯㩳攠琮牡敧⹴档捥敫⁤⥽⁽潣潬㵲灜楲慭祲⁜㸯 †††††††㰠匯慴正ਾ††††††⼼潂㹸 †††㰠倯灡牥ਾ††㬩紊਻攊灸牯⁴敤慦汵⁴敓汬牥敓瑴湩獧਻਍
+import React, { useState } from 'react';
+import { Box, Typography, Paper, FormControl, Select, MenuItem, Divider, Switch, Stack } from '@mui/material';
+import { useTranslation } from 'react-i18next';
+import { useTheme } from '../../context/ThemeContext';
+
+const SellerSettings = () => {
+  const { t, i18n } = useTranslation();
+  const { theme, setThemeMode } = useTheme();
+
+  const [settings, setSettings] = useState(() => {
+    try {
+      const saved = localStorage.getItem('seller_settings');
+      return saved ? JSON.parse(saved) : { language: 'en', theme: 'system', notifications: true };
+    } catch {
+      return { language: 'en', theme: 'system', notifications: true };
+    }
+  });
+
+  const saveSettings = (newSettings) => {
+    setSettings(newSettings);
+    localStorage.setItem('seller_settings', JSON.stringify(newSettings));
+    if (newSettings.theme) setThemeMode(newSettings.theme);
+    if (newSettings.language) i18n.changeLanguage(newSettings.language);
+  };
+
+  return (
+    <Paper elevation={0} sx={{ p: 4, borderRadius: 3, border: '1px solid #E5E7EB', maxWidth: 600 }}>
+      <Typography variant="h5" fontWeight={800} mb={4}>Platform Settings</Typography>
+
+      <Box mb={4}>
+        <Typography fontWeight={700} mb={1}>Language</Typography>
+        <FormControl fullWidth size="small">
+          <Select value={settings.language} onChange={(e) => saveSettings({ ...settings, language: e.target.value })}>
+            <MenuItem value="en">English</MenuItem>
+            <MenuItem value="hi">हिन्दी (Hindi)</MenuItem>
+            <MenuItem value="ta">தமிழ் (Tamil)</MenuItem>
+            <MenuItem value="te">తెలుగు (Telugu)</MenuItem>
+          </Select>
+        </FormControl>
+      </Box>
+
+      <Divider sx={{ my: 3 }} />
+
+      <Box mb={4}>
+        <Typography fontWeight={700} mb={1}>Theme Preferences</Typography>
+        <FormControl fullWidth size="small">
+          <Select value={settings.theme} onChange={(e) => saveSettings({ ...settings, theme: e.target.value })}>
+            <MenuItem value="light">Light Mode</MenuItem>
+            <MenuItem value="dark">Dark Mode</MenuItem>
+            <MenuItem value="system">System Default</MenuItem>
+          </Select>
+        </FormControl>
+      </Box>
+
+      <Divider sx={{ my: 3 }} />
+
+      <Box>
+        <Stack direction="row" justifyContent="space-between" alignItems="center">
+          <Box>
+            <Typography fontWeight={700}>Push Notifications</Typography>
+            <Typography variant="caption" color="text.secondary">Receive alerts for new orders</Typography>
+          </Box>
+          <Switch checked={settings.notifications} onChange={(e) => saveSettings({ ...settings, notifications: e.target.checked })} color="primary" />
+        </Stack>
+      </Box>
+    </Paper>
+  );
+};
+
+export default SellerSettings;

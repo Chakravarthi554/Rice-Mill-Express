@@ -13,7 +13,8 @@ import { API_URL } from '../../config/env';
 export default function CartScreen({ navigation }) {
     const dispatch = useDispatch();
     const cart = useSelector((state) => state.cart);
-    const { cartItems = [], loading, error } = cart || {};
+    const { loading, error } = cart || {};
+    const cartItems = Array.isArray(cart?.cartItems) ? cart.cartItems : [];
     const { t } = useTranslation();
 
     useEffect(() => { dispatch(getCart()); }, [dispatch]);

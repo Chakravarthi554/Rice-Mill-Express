@@ -74,7 +74,7 @@ const SupportChatScreen = ({ route, navigation }) => {
             // Alternatively, I can create a dedicated support-reply endpoint or fetch conversation details first.
 
             // Let's fetch conversation details to get the admin ID
-            const convRes = await api.get('/api/chat/conversations');
+            const convRes = await api.get('/api/v1/chat/conversations');
             const conv = convRes.data.find(c => c._id === conversationId);
             const adminParticipant = conv?.participants.find(p => p._id !== user._id);
 
@@ -82,7 +82,7 @@ const SupportChatScreen = ({ route, navigation }) => {
                 throw new Error('Support agent not found in conversation');
             }
 
-            await api.post('/api/chat/send', {
+            await api.post('/api/v1/chat/send', {
                 receiverId: adminParticipant._id,
                 content,
                 type: 'text'

@@ -10,12 +10,6 @@ jobs:
   test:
     runs-on: ubuntu-latest
     
-    env:
-      JWT_SECRET: "test_jwt_secret_which_needs_to_be_long_enough_for_security"
-      REFRESH_TOKEN_SECRET: "test_refresh_secret"
-      MONGO_URI: "mongodb://127.0.0.1:27017/dummy" # Mocked out by mongodb-memory-server
-      NODE_ENV: "test"
-
     defaults:
       run:
         working-directory: ./backend
@@ -23,10 +17,16 @@ jobs:
     strategy:
       matrix:
         node-version: [18.x, 20.x]
+        mongodb-version: ['6.0']
 
     steps:
     - uses: actions/checkout@v4
     
+    - name: Start MongoDB
+      uses: supercharge/mongodb-github-action@1.10.0
+      with:
+        mongodb-version: ${{ matrix.mongodb-version }}
+        
     - name: Use Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v4
       with:
@@ -34,8 +34,13 @@ jobs:
         cache: 'npm'
         cache-dependency-path: './backend/package-lock.json'
         
-    - name: Install dependencies
-      run: npm ci || npm install --legacy-peer-deps
-      
-    - name: Run tests
-      run: npm test
+    - run: npm ci --legacy-peer-deps
+    - run: npm audit --production --audit-level=high || true
+    - run: npm run test:coverage
+      env:
+        MONGO_URI: mongodb://localhost:27017/ricemill-test
+        JWT_SECRET: test-secret-key-12345
+        REFRESH_TOKEN_SECRET: test-refresh-secret-12345
+        FIREBASE_PROJECT_ID: test-project
+        CLOUDINARY_CLOUD_NAME: test-cloud
+        NODE_ENV: test

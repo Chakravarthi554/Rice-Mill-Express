@@ -23,7 +23,7 @@ const Bookmarks = () => {
                     Authorization: `Bearer ${userInfo.token}`
                 }
             };
-            const { data } = await axios.get('/api/users/bookmarks', config);
+            const { data } = await axios.get('/api/v1/users/bookmarks', config);
             setBookmarks(data.posts || []);
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to fetch bookmarks');
@@ -45,7 +45,7 @@ const Bookmarks = () => {
                     Authorization: `Bearer ${userInfo.token}`
                 }
             };
-            await axios.delete(`/api/users/bookmarks/${postId}`, config);
+            await axios.delete(`/api/v1/users/bookmarks/${postId}`, config);
             setBookmarks(prev => prev.filter(post => post._id !== postId));
         } catch (err) {
             alert('Failed to remove bookmark');

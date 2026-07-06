@@ -118,7 +118,7 @@ const NotificationBadge = () => {
       fetchingRef.current = true;
       lastFetchedTokenRef.current = userInfo.token;
 
-      const { data } = await api.get('/api/notifications?limit=10');
+      const { data } = await api.get('/api/v1/notifications?limit=10');
 
       if (data.success) {
         setNotifications(data.notifications || []);
@@ -146,7 +146,7 @@ const NotificationBadge = () => {
     try {
       if (!userInfo) return;
 
-      await api.put('/api/notifications/read-all');
+      await api.put('/api/v1/notifications/read-all');
       // Update local state to reflect all read
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     } catch (error) {
@@ -158,7 +158,7 @@ const NotificationBadge = () => {
     // Mark single notification as read if not already read
     if (!notification.read) {
       try {
-        await api.put(`/api/notifications/${notification._id}/read`);
+        await api.put(`/api/v1/notifications/${notification._id}/read`);
         setNotifications(prev => prev.map(n =>
           n._id === notification._id ? { ...n, read: true } : n
         ));

@@ -37,7 +37,7 @@ const DeliveryPartnerDashboard = () => {
     useEffect(() => {
         const fetchAssignedOrders = async () => {
             try {
-                const response = await fetch('/api/delivery-partners/my-deliveries', {
+                const response = await fetch('/api/v1/delivery-partners/my-deliveries', {
                     headers: {
                         'Authorization': `Bearer ${userInfo.token}`
                     }

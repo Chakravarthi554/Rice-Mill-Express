@@ -32,7 +32,7 @@ const DeliveryKYCApproval = () => {
                     Authorization: `Bearer ${userInfo.token}`
                 }
             };
-            const { data } = await axios.get('/api/delivery-partners/admin/kyc/pending', config);
+            const { data } = await axios.get('/api/v1/delivery-partners/admin/kyc/pending', config);
             setPendingPartners(data);
             setLoading(false);
         } catch (err) {
@@ -49,7 +49,7 @@ const DeliveryKYCApproval = () => {
                     Authorization: `Bearer ${userInfo.token}`
                 }
             };
-            await axios.put(`/api/delivery-partners/admin/kyc/${partnerId}`,
+            await axios.put(`/api/v1/delivery-partners/admin/kyc/${partnerId}`,
                 { status: 'approved' },
                 config
             );
@@ -72,7 +72,7 @@ const DeliveryKYCApproval = () => {
                     Authorization: `Bearer ${userInfo.token}`
                 }
             };
-            await axios.put(`/api/delivery-partners/admin/kyc/${partnerId}`,
+            await axios.put(`/api/v1/delivery-partners/admin/kyc/${partnerId}`,
                 { status: 'rejected', rejectionReason },
                 config
             );

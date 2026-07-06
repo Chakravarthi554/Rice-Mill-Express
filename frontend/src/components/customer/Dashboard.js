@@ -117,7 +117,7 @@ const Dashboard = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const liveOrFallback = products.length > 0 ? products : fallbackProducts;
+  const liveOrFallback = products;
 
   const visibleProducts = useMemo(() => {
     if (!activeCategory) return liveOrFallback;

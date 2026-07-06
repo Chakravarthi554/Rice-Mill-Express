@@ -1,4 +1,6 @@
 import { configureStore, combineReducers } from '@reduxjs/toolkit';
+import { persistStore, persistReducer, FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER } from 'redux-persist';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import authReducer from './slices/authSlice';
 import settingsReducer from './slices/settingsSlice';
 import { productListReducer, productDetailsReducer, productCreateReviewReducer } from './reducers/productReducers';
@@ -45,6 +47,25 @@ import {
 } from './reducers/walletReducers';
 import { wishlistReducer } from './reducers/wishlistReducers';
 import { addressListReducer } from './reducers/addressReducers';
+
+// ─── Redux-Persist Configuration ────────────────────────────────────────────
+// Whitelist only the slices that should survive app restarts.
+// Transient UI state (loading spinners, form drafts) is intentionally excluded.
+const persistConfig = {
+  key: 'root',
+  storage: AsyncStorage,
+  version: 1,
+  whitelist: [
+    'auth',           // Keep user logged in across restarts
+    'cart',           // Preserve cart contents offline
+    'settings',       // Theme, language, notification prefs
+    'productList',    // Cache product catalogue for offline browsing
+    'addressList',    // Cached delivery addresses
+    'wishlist',       // Wishlist survives offline
+    'rewards',        // Loyalty point balance
+  ],
+  // Blacklist everything else — they re-fetch on mount anyway
+};
 
 const combinedReducer = combineReducers({
   auth: authReducer,
@@ -93,16 +114,23 @@ const rootReducer = (state, action) => {
   return combinedReducer(state, action);
 };
 
+const persistedReducer = persistReducer(persistConfig, rootReducer);
+
 const store = configureStore({
-  reducer: rootReducer,
+  reducer: persistedReducer,
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
-        // Ignore Firebase auth objects in actions
-        ignoredActions: ['auth/login/fulfilled', 'auth/loadFromStorage/fulfilled'],
+        // Ignore redux-persist actions AND Firebase auth objects
+        ignoredActions: [
+          FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER,
+          'auth/login/fulfilled',
+          'auth/loadFromStorage/fulfilled',
+        ],
         ignoredPaths: ['auth.user'],
       },
     }),
 });
 
+export const persistor = persistStore(store);
 export default store;

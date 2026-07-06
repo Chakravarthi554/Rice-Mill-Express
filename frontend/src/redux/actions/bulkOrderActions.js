@@ -22,7 +22,7 @@ export const createBulkOrder = (orderData) => async (dispatch) => {
   try {
     dispatch({ type: BULK_ORDER_CREATE_REQUEST });
     console.log('Creating bulk order →', orderData);
-    const { data } = await api.post('/api/bulk-orders', orderData);
+    const { data } = await api.post('/api/v1/bulk-orders', orderData);
     dispatch({
       type: BULK_ORDER_CREATE_SUCCESS,
       payload: data.order || data.bulkOrder,
@@ -42,7 +42,7 @@ export const getBulkOrders = (status = '') => async (dispatch) => {
   try {
     dispatch({ type: BULK_ORDER_LIST_REQUEST });
     const config = status ? { params: { status } } : {};
-    const { data } = await api.get('/api/bulk-orders', config);
+    const { data } = await api.get('/api/v1/bulk-orders', config);
     dispatch({
       type: BULK_ORDER_LIST_SUCCESS,
       payload: data.bulkOrders || [],
@@ -65,7 +65,7 @@ export const getBulkOrders = (status = '') => async (dispatch) => {
 export const getBulkOrderDetails = (orderId) => async (dispatch) => {
   try {
     dispatch({ type: BULK_ORDER_DETAILS_REQUEST });
-    const { data } = await api.get(`/api/bulk-orders/${orderId}`);
+    const { data } = await api.get(`/api/v1/bulk-orders/${orderId}`);
     dispatch({
       type: BULK_ORDER_DETAILS_SUCCESS,
       payload: data.bulkOrder,
@@ -84,7 +84,7 @@ export const getBulkOrderDetails = (orderId) => async (dispatch) => {
 export const updateBulkOrder = (orderId, updateData) => async (dispatch) => {
   try {
     dispatch({ type: BULK_ORDER_UPDATE_REQUEST });
-    const { data } = await api.put(`/api/bulk-orders/${orderId}`, updateData);
+    const { data } = await api.put(`/api/v1/bulk-orders/${orderId}`, updateData);
     dispatch({
       type: BULK_ORDER_UPDATE_SUCCESS,
       payload: data.bulkOrder,
@@ -104,7 +104,7 @@ export const updateBulkOrder = (orderId, updateData) => async (dispatch) => {
 export const cancelBulkOrder = (orderId, cancellationReason) => async (dispatch) => {
   try {
     dispatch({ type: BULK_ORDER_CANCEL_REQUEST });
-    const { data } = await api.put(`/api/bulk-orders/${orderId}/cancel`, {
+    const { data } = await api.put(`/api/v1/bulk-orders/${orderId}/cancel`, {
       cancellationReason,
     });
     dispatch({

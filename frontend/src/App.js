@@ -40,53 +40,50 @@ const DeliveryKYCApproval = lazy(() => import('./components/admin/DeliveryKYCApp
 const OrderSuccessPage = lazy(() => import('./pages/customer/OrderSuccessPage'));
 const VerifyEmailNotice = lazy(() => import('./pages/VerifyEmailNotice'));
 const ProductsPage = lazy(() => import('./pages/customer/ProductsPage'));
-
-
-
 // --- Replacement Components ---
-import ReplacementManagement from './components/admin/ReplacementManagement';
+const ReplacementManagement = lazy(() => import('./components/admin/ReplacementManagement'));
 
-import AccountManagement from './components/customer/AccountManagement';
-import LogoutPage from './components/customer/LogoutPage';
-import DeleteAccountPage from './components/customer/DeleteAccountPage';
+const AccountManagement = lazy(() => import('./components/customer/AccountManagement'));
+const LogoutPage = lazy(() => import('./components/customer/LogoutPage'));
+const DeleteAccountPage = lazy(() => import('./components/customer/DeleteAccountPage'));
 
 // --- Community ---
-import RecipeDetail from './components/common/RecipeDetail';
-import RecipeList from './components/common/RecipeList';
-import ForumList from './components/common/ForumList';
-import ForumPostDetail from './components/common/ForumPostDetail';
-import CreatePostForm from './components/common/CreatePostForm';
-import ForumComments from './components/common/ForumComments';
-import BookmarksPage from './pages/customer/BookmarksPage';
+const RecipeDetail = lazy(() => import('./components/common/RecipeDetail'));
+const RecipeList = lazy(() => import('./components/common/RecipeList'));
+const ForumList = lazy(() => import('./components/common/ForumList'));
+const ForumPostDetail = lazy(() => import('./components/common/ForumPostDetail'));
+const CreatePostForm = lazy(() => import('./components/common/CreatePostForm'));
+const ForumComments = lazy(() => import('./components/common/ForumComments'));
+const BookmarksPage = lazy(() => import('./pages/customer/BookmarksPage'));
 
 // --- Settings Components ---
-import Settings from './components/customer/Settings';
-import Profile from './components/customer/Profile';
-import AddressManager from './components/customer/AddressManager';
-import SecuritySettings from './components/customer/SecuritySettings';
-import PreferencesSettings from './components/customer/PreferencesSettings';
+const Settings = lazy(() => import('./components/customer/Settings'));
+const Profile = lazy(() => import('./components/customer/Profile'));
+const AddressManager = lazy(() => import('./components/customer/AddressManager'));
+const SecuritySettings = lazy(() => import('./components/customer/SecuritySettings'));
+const PreferencesSettings = lazy(() => import('./components/customer/PreferencesSettings'));
 
-
-// REAL Components (NOT placeholders)
-import LanguageSettings from './components/customer/LanguageSettings';
-import ThemeMode from './components/customer/ThemeMode';
-import AccessibilitySettings from './components/customer/AccessibilitySettings';
-import OrderHistory from './components/customer/MyOrders';
-import RefundsReturns from './components/customer/RefundsReturns';
-import DownloadInvoices from './components/customer/DownloadInvoices';
-import RewardsWallet from './components/customer/RewardsWallet';
-import Recommendations from './components/customer/Recommendations';
-import PrivacySettings from './components/customer/PrivacySettings';
-import HelpCenter from './components/customer/HelpCenter';
-import LegalPolicies from './components/customer/LegalPolicies';
-import ContactForm from './components/customer/ContactForm';
-import NotificationSettings from './components/customer/NotificationSettings';
-import Reviews from './components/customer/Reviews';
-import About from './components/customer/About';
-import Bookmarks from './components/customer/Bookmarks';
+// REAL Components
+const LanguageSettings = lazy(() => import('./components/customer/LanguageSettings'));
+const ThemeMode = lazy(() => import('./components/customer/ThemeMode'));
+const AccessibilitySettings = lazy(() => import('./components/customer/AccessibilitySettings'));
+const OrderHistory = lazy(() => import('./components/customer/MyOrders'));
+const RefundsReturns = lazy(() => import('./components/customer/RefundsReturns'));
+const DownloadInvoices = lazy(() => import('./components/customer/DownloadInvoices'));
+const RewardsWallet = lazy(() => import('./components/customer/RewardsWallet'));
+const Recommendations = lazy(() => import('./components/customer/Recommendations'));
+const PrivacySettings = lazy(() => import('./components/customer/PrivacySettings'));
+const HelpCenter = lazy(() => import('./components/customer/HelpCenter'));
+const LegalPolicies = lazy(() => import('./components/customer/LegalPolicies'));
+const ContactForm = lazy(() => import('./components/customer/ContactForm'));
+const NotificationSettings = lazy(() => import('./components/customer/NotificationSettings'));
+const Reviews = lazy(() => import('./components/customer/Reviews'));
+const About = lazy(() => import('./components/customer/About'));
+const Bookmarks = lazy(() => import('./components/customer/Bookmarks'));
 
 // Placeholder for future
-import SettingsPlaceholder from './components/customer/SettingsPlaceholder';
+const SettingsPlaceholder = lazy(() => import('./components/customer/SettingsPlaceholder'));
+
 
 // ============================================================
 // THEME CONFIGURATION
@@ -207,10 +204,12 @@ function App() {
       <CustomThemeProvider>
         <I18nProvider>
           <SocketInitializer />
-          <Suspense fallback={<div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</div>}>
+          <main id="main-content" role="main">
+          <Suspense fallback={<div role="status" aria-label="Loading page" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</div>}>
           <Routes>
 
             {/* --- AUTH --- */}
+            <Route path="/logout" element={<LogoutPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/forgotpassword" element={<ForgotPasswordPage />} />
@@ -353,6 +352,7 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           </Suspense>
+          </main>
           <EnvBadge />
         </I18nProvider>
       </CustomThemeProvider>

@@ -57,7 +57,7 @@ export const listProducts = (keyword = '', pageNumber = '') => async (dispatch) 
 
     console.log('🔄 Fetching products...');
 
-    const { data } = await api.get(`/api/products?keyword=${keyword}&pageNumber=${pageNumber}`);
+    const { data } = await api.get(`/api/v1/products?keyword=${keyword}&pageNumber=${pageNumber}`);
 
     console.log(`✅ Products received: ${data.products?.length || 0}`);
 
@@ -106,7 +106,7 @@ export const listFilteredProducts = (filters = {}) => async (dispatch) => {
       }
     });
 
-    const { data } = await api.get(`/api/products/filter?${queryParams.toString()}`);
+    const { data } = await api.get(`/api/v1/products/filter?${queryParams.toString()}`);
 
     dispatch({
       type: PRODUCT_LIST_SUCCESS,
@@ -135,7 +135,7 @@ export const listProductDetails = (id) => async (dispatch) => {
 
     console.log(`🔄 Fetching product details: ${id}`);
 
-    const { data } = await api.get(`/api/products/${id}`);
+    const { data } = await api.get(`/api/v1/products/${id}`);
 
     console.log('✅ Product details received:', data.product?._id);
 
@@ -174,7 +174,7 @@ export const deleteProduct = (id) => async (dispatch, getState) => {
       headers: { Authorization: `Bearer ${userInfo?.token || ''}` },
     };
 
-    await api.delete(`/api/products/${id}`);
+    await api.delete(`/api/v1/products/${id}`);
 
     dispatch({ type: PRODUCT_DELETE_SUCCESS, payload: id });
   } catch (error) {
@@ -203,7 +203,7 @@ export const createProduct = (product) => async (dispatch, getState) => {
       },
     };
 
-    const { data } = await api.post(`/api/products`, product, {
+    const { data } = await api.post(`/api/v1/products`, product, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
 
@@ -234,7 +234,7 @@ export const updateProduct = (productId, productData) => async (dispatch, getSta
       },
     };
 
-    const { data } = await api.put(`/api/products/${productId}`, productData, {
+    const { data } = await api.put(`/api/v1/products/${productId}`, productData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
 
@@ -265,7 +265,7 @@ export const createProductReview = (productId, review) => async (dispatch, getSt
       },
     };
 
-    await api.post(`/api/social/products/${productId}/rate`, review);
+    await api.post(`/api/v1/social/products/${productId}/rate`, review);
 
     dispatch({ type: PRODUCT_CREATE_REVIEW_SUCCESS });
   } catch (error) {
@@ -295,7 +295,7 @@ export const listSellerProducts = () => async (dispatch, getState) => {
       headers: { Authorization: `Bearer ${userInfo.token || ''}` },
     };
 
-    const { data } = await api.get('/api/products/seller');
+    const { data } = await api.get('/api/v1/products/seller');
 
     dispatch({ type: PRODUCT_SELLER_LIST_SUCCESS, payload: data });
   } catch (error) {
@@ -324,7 +324,7 @@ export const bulkUploadProducts = (fileUrl) => async (dispatch, getState) => {
       },
     };
 
-    const { data } = await api.post('/api/products/bulk', { fileUrl });
+    const { data } = await api.post('/api/v1/products/bulk', { fileUrl });
 
     dispatch({ type: PRODUCT_BULK_UPLOAD_SUCCESS, payload: data });
   } catch (error) {
@@ -350,7 +350,7 @@ export const getProductAnalytics = () => async (dispatch, getState) => {
       headers: { Authorization: `Bearer ${userInfo?.token || ''}` },
     };
 
-    const { data } = await api.get('/api/products/analytics');
+    const { data } = await api.get('/api/v1/products/analytics');
 
     dispatch({ type: PRODUCT_ANALYTICS_SUCCESS, payload: data });
   } catch (error) {
@@ -377,7 +377,7 @@ export const listSellerAnalytics = (timeframe = '30d') => async (dispatch, getSt
       params: { timeframe },
     };
 
-    const { data } = await api.get('/api/seller/analytics', config);
+    const { data } = await api.get('/api/v1/seller/analytics', config);
 
     dispatch({ type: SELLER_ANALYTICS_SUCCESS, payload: data });
   } catch (error) {
@@ -399,7 +399,7 @@ export const postForumMessage = (message) => async (dispatch, getState) => {
       userLogin: { userInfo },
     } = getState();
 
-    const { data } = await api.post('/api/forum/post', message);
+    const { data } = await api.post('/api/v1/forum/post', message);
 
     dispatch({ type: FORUM_POST_SUCCESS, payload: data });
   } catch (error) {
@@ -418,7 +418,7 @@ export const listForumMessages = () => async (dispatch, getState) => {
       userLogin: { userInfo },
     } = getState();
 
-    const { data } = await api.get('/api/forum/messages');
+    const { data } = await api.get('/api/v1/forum/messages');
 
     dispatch({ type: FORUM_MESSAGES_SUCCESS, payload: data });
   } catch (error) {
@@ -441,7 +441,7 @@ export const listPendingProducts = () => async (dispatch, getState) => {
       userLogin: { userInfo },
     } = getState();
 
-    const { data } = await api.get('/api/products/admin/pending', {
+    const { data } = await api.get('/api/v1/products/admin/pending', {
       headers: { Authorization: `Bearer ${userInfo?.token || ''}` },
     });
 
@@ -462,7 +462,7 @@ export const approveProduct = (id, status, reason = '') => async (dispatch, getS
       userLogin: { userInfo },
     } = getState();
 
-    const { data } = await api.put(`/api/products/${id}/approve`, { status, reason }, {
+    const { data } = await api.put(`/api/v1/products/${id}/approve`, { status, reason }, {
       headers: { Authorization: `Bearer ${userInfo?.token || ''}` },
     });
 

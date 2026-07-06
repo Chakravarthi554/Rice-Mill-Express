@@ -75,7 +75,7 @@ const AdminReportsPanel = () => {
         setLoading(true);
         try {
             const queryParams = new URLSearchParams(filters).toString();
-            const response = await fetch(`/api/forum/admin/reports?${queryParams}`, {
+            const response = await fetch(`/api/v1/forum/admin/reports?${queryParams}`, {
                 headers: {
                     'Authorization': `Bearer ${userInfo.token}`
                 }
@@ -91,7 +91,7 @@ const AdminReportsPanel = () => {
 
     const fetchStats = async () => {
         try {
-            const response = await fetch('/api/forum/admin/reports/stats', {
+            const response = await fetch('/api/v1/forum/admin/reports/stats', {
                 headers: {
                     'Authorization': `Bearer ${userInfo.token}`
                 }
@@ -105,7 +105,7 @@ const AdminReportsPanel = () => {
 
     const handleViewReport = async (reportId) => {
         try {
-            const response = await fetch(`/api/forum/admin/reports/${reportId}`, {
+            const response = await fetch(`/api/v1/forum/admin/reports/${reportId}`, {
                 headers: {
                     'Authorization': `Bearer ${userInfo.token}`
                 }
@@ -122,7 +122,7 @@ const AdminReportsPanel = () => {
 
         setSubmitting(true);
         try {
-            const response = await fetch(`/api/forum/admin/reports/${selectedReport.report._id}/action`, {
+            const response = await fetch(`/api/v1/forum/admin/reports/${selectedReport.report._id}/action`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

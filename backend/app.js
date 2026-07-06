@@ -9,15 +9,20 @@ const helmet = require("helmet");
 const compression = require("compression");
 const mongoSanitize = require("express-mongo-sanitize");
 const cookieParser = require("cookie-parser");
+const csrf = require("csurf");
 const statusMonitor = require("express-status-monitor");
+const morgan = require("morgan");
 const fs = require("fs");
+const logger = require("./utils/logger");
 
 const Sentry = require("@sentry/node");
 const { nodeProfilingIntegration } = require("@sentry/profiling-node");
 
 if (process.env.SENTRY_DSN) {
+  const { version } = require('./package.json');
   Sentry.init({
     dsn: process.env.SENTRY_DSN,
+    release: `ricemill-backend@${version}`,
     integrations: [nodeProfilingIntegration()],
     tracesSampleRate: 1.0,
     profilesSampleRate: 1.0,
@@ -70,7 +75,9 @@ if (process.env.STATUS_USER && process.env.STATUS_PASS) {
     users: { [process.env.STATUS_USER]: process.env.STATUS_PASS },
     challenge: true,
   }));
-  app.use(statusMonitor());
+  app.use(statusMonitor({
+    socketPath: '/status-socket.io' // Prevent hijacking the global /socket.io endpoint
+  }));
 } else {
   console.warn("⚠️ WARNING: STATUS_USER or STATUS_PASS not set. The /status monitoring route has been disabled for security.");
 }
@@ -79,6 +86,37 @@ if (process.env.STATUS_USER && process.env.STATUS_PASS) {
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+// CSRF Protection
+// Only apply to routes that are not webhooks or file uploads if needed, 
+// but for now we apply globally and frontend will fetch the token.
+const csrfProtection = csrf({ cookie: true });
+const conditionalCsrf = (req, res, next) => {
+  const excludedPaths = [
+    '/api/v1/auth/firebase-login', 
+    '/api/v1/auth/login', 
+    '/api/v1/auth/register', 
+    '/api/v1/auth/refresh-token',
+    '/api/v1/orders',
+    '/api/v1/payments'
+  ];
+  
+  const shouldExclude = excludedPaths.some(path => req.originalUrl.includes(path));
+  console.log(`🛡️ CSRF Check for ${req.method} ${req.originalUrl} | Bypass? ${shouldExclude}`);
+  
+  if (shouldExclude) {
+    return next();
+  }
+  return csrfProtection(req, res, next);
+};
+
+app.use('/api/v1/auth', conditionalCsrf);
+app.use('/api/v1/orders', conditionalCsrf);
+app.use('/api/v1/payments', conditionalCsrf);
+
+app.get('/api/v1/csrf-token', csrfProtection, (req, res) => {
+  res.json({ csrfToken: req.csrfToken() });
+});
 
 // Data sanitization against NoSQL query injection
 // NOTE: express-mongo-sanitize's default middleware reassigns req.query,
@@ -225,12 +263,22 @@ app.use(
 
 app.use(compression());
 
-// Request logging middleware
-app.use((req, res, next) => {
-  const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-  console.log(`➡️ [${new Date().toISOString()}] ${req.method} ${req.originalUrl} - From: ${clientIp}`);
-  next();
-});
+// Structured request logging via Morgan → Winston
+const morganStream = {
+  write: (message) => logger.info(message.trim()),
+};
+app.use(morgan(':method :url :status :res[content-length] - :response-time ms', { stream: morganStream }));
+
+// Standardized Response Envelope
+const responseEnvelope = require('./middleware/responseEnvelope');
+app.use(responseEnvelope);
+
+// Pagination Guardrails (caps limit at 50, defaults page=1, limit=20)
+const { paginationGuardrails } = require('./middleware/pagination');
+app.use(paginationGuardrails);
+
+// ================== SWAGGER ==================
+require('./swagger')(app);
 
 // ================== ROUTES ==================
 console.log("🔄 Loading API routes...");
@@ -238,37 +286,37 @@ console.log("🔄 Loading API routes...");
 // ✅ FIXED: Load all routes with proper error handling
 const loadRoutes = () => {
   const routes = [
-    { path: "/api/auth", name: "Auth", file: "./routes/auth" },
-    { path: "/api/admin", name: "Admin", file: "./routes/admin" },
-    { path: "/api/kyc", name: "KYC", file: "./routes/kyc" },
-    { path: "/api/orders", name: "Orders", file: "./routes/orders" },
-    { path: "/api/users", name: "Users", file: "./routes/userRoutes" },
-    { path: "/api/upload", name: "Upload", file: "./routes/uploadRoutes" },
-    { path: "/api/products", name: "Products", file: "./routes/products" },
-    { path: "/api/delivery-partners", name: "Delivery", file: "./routes/deliveryRoutes" },
-    { path: "/api/payments", name: "Payments", file: "./routes/paymentRoutes" },
-    { path: "/api/addresses", name: "Addresses", file: "./routes/addressRoutes" },
-    { path: "/api/cart", name: "Cart", file: "./routes/cartRoutes" },
-    { path: "/api/seller", name: "Seller", file: "./routes/sellerRoutes" },
-    { path: "/api/messages", name: "Messages", file: "./routes/messageRoutes" },
-    { path: "/api/chat", name: "Chat", file: "./routes/chatRoutes" },
-    { path: "/api/admin/chat", name: "Admin Chat", file: "./routes/adminChatRoutes" },
-    { path: "/api/recipes", name: "Recipes", file: "./routes/recipeRoutes" },
-    { path: "/api/legal", name: "Legal", file: "./routes/legalRoutes" },
-    { path: "/api/rewards", name: "Rewards", file: "./routes/rewardsRoutes" },
-    { path: "/api/forum", name: "Forum", file: "./routes/forumRoutes" },
-    { path: "/api/social", name: "Social", file: "./routes/socialRoutes" },
-    { path: "/api/admin/settings", name: "Admin Settings", file: "./routes/adminSettings" },
-    { path: "/api/settings", name: "Public Settings", file: "./routes/publicSettings" },
-    { path: "/api/admin/messages", name: "Admin Messages", file: "./routes/adminMessageRoutes" },
-    { path: "/api/admin/moderation", name: "Admin Moderation", file: "./routes/moderationRoutes" },
-    { path: "/api/bulk-orders", name: "Bulk Orders", file: "./routes/bulkOrder" },
-    { path: "/api/notifications", name: "Notifications", file: "./routes/notificationRoutes" },
-    { path: "/api/delivery", name: "Delivery Confirmation", file: "./routes/deliveryConfirmationRoutes" },
-    { path: "/api/replacements", name: "Replacements", file: "./routes/replacementRoutes" },
-    { path: "/api/dp", name: "Delivery Partner System", file: "./routes/deliveryPartnerNewRoutes" },
-    { path: "/api/campaigns", name: "Campaigns", file: "./routes/campaignRoutes" },
-    { path: "/api/support", name: "Support", file: "./routes/supportRoutes" },
+    { path: "/api/v1/auth", name: "Auth", file: "./routes/auth" },
+    { path: "/api/v1/admin", name: "Admin", file: "./routes/admin" },
+    { path: "/api/v1/kyc", name: "KYC", file: "./routes/kyc" },
+    { path: "/api/v1/orders", name: "Orders", file: "./routes/orders" },
+    { path: "/api/v1/users", name: "Users", file: "./routes/userRoutes" },
+    { path: "/api/v1/upload", name: "Upload", file: "./routes/uploadRoutes" },
+    { path: "/api/v1/products", name: "Products", file: "./routes/products" },
+    { path: "/api/v1/delivery-partners", name: "Delivery", file: "./routes/deliveryRoutes" },
+    { path: "/api/v1/payments", name: "Payments", file: "./routes/paymentRoutes" },
+    { path: "/api/v1/addresses", name: "Addresses", file: "./routes/addressRoutes" },
+    { path: "/api/v1/cart", name: "Cart", file: "./routes/cartRoutes" },
+    { path: "/api/v1/seller", name: "Seller", file: "./routes/sellerRoutes" },
+    { path: "/api/v1/messages", name: "Messages", file: "./routes/messageRoutes" },
+    { path: "/api/v1/chat", name: "Chat", file: "./routes/chatRoutes" },
+    { path: "/api/v1/admin/chat", name: "Admin Chat", file: "./routes/adminChatRoutes" },
+    { path: "/api/v1/recipes", name: "Recipes", file: "./routes/recipeRoutes" },
+    { path: "/api/v1/legal", name: "Legal", file: "./routes/legalRoutes" },
+    { path: "/api/v1/rewards", name: "Rewards", file: "./routes/rewardsRoutes" },
+    { path: "/api/v1/forum", name: "Forum", file: "./routes/forumRoutes" },
+    { path: "/api/v1/social", name: "Social", file: "./routes/socialRoutes" },
+    { path: "/api/v1/admin/settings", name: "Admin Settings", file: "./routes/adminSettings" },
+    { path: "/api/v1/settings", name: "Public Settings", file: "./routes/publicSettings" },
+    { path: "/api/v1/admin/messages", name: "Admin Messages", file: "./routes/adminMessageRoutes" },
+    { path: "/api/v1/admin/moderation", name: "Admin Moderation", file: "./routes/moderationRoutes" },
+    { path: "/api/v1/bulk-orders", name: "Bulk Orders", file: "./routes/bulkOrder" },
+    { path: "/api/v1/notifications", name: "Notifications", file: "./routes/notificationRoutes" },
+    { path: "/api/v1/delivery", name: "Delivery Confirmation", file: "./routes/deliveryConfirmationRoutes" },
+    { path: "/api/v1/replacements", name: "Replacements", file: "./routes/replacementRoutes" },
+    { path: "/api/v1/dp", name: "Delivery Partner System", file: "./routes/deliveryPartnerNewRoutes" },
+    { path: "/api/v1/campaigns", name: "Campaigns", file: "./routes/campaignRoutes" },
+    { path: "/api/v1/support", name: "Support", file: "./routes/supportRoutes" },
   ];
 
   routes.forEach(route => {
@@ -295,12 +343,12 @@ try {
   const adminPaymentRoutesPath = path.join(__dirname, './routes/adminPaymentRoutes.js');
   if (fs.existsSync(adminPaymentRoutesPath)) {
     const adminPaymentRoutes = require('./routes/adminPaymentRoutes');
-    app.use('/api/admin/payments', adminPaymentRoutes);
-    console.log('✅ Admin Payments routes loaded at /api/admin/payments');
+    app.use('/api/v1/admin/payments', adminPaymentRoutes);
+    console.log('✅ Admin Payments routes loaded at /api/v1/admin/payments');
   } else {
     console.log('⚠️ Admin Payments routes file not found, creating placeholder...');
     // Create a simple placeholder route
-    app.use('/api/admin/payments', (req, res) => {
+    app.use('/api/v1/admin/payments', (req, res) => {
       res.status(501).json({
         message: 'Admin Payments API is not implemented yet',
         timestamp: new Date().toISOString()
@@ -350,7 +398,7 @@ app.use("/customer", express.static(customerImagesDir, {
 }));
 
 // Health check endpoint
-app.get("/api/health", (req, res) => {
+app.get("/api/v1/health", (req, res) => {
   res.json({
     status: "OK",
     timestamp: new Date().toISOString(),
@@ -361,32 +409,32 @@ app.get("/api/health", (req, res) => {
       socket: app.get("io") ? "active" : "inactive"
     },
     routes: {
-      bulkOrders: "/api/bulk-orders",
-      products: "/api/products",
-      orders: "/api/orders",
-      auth: "/api/auth",
-      adminPayments: "/api/admin/payments"
+      bulkOrders: "/api/v1/bulk-orders",
+      products: "/api/v1/products",
+      orders: "/api/v1/orders",
+      auth: "/api/v1/auth",
+      adminPayments: "/api/v1/admin/payments"
     }
   });
 });
 
 // Test bulk order endpoint
-app.get("/api/bulk-orders/test", (req, res) => {
+app.get("/api/v1/bulk-orders/test", (req, res) => {
   res.json({
     message: "Bulk Orders API is working!",
     timestamp: new Date().toISOString(),
     endpoints: {
-      create: "POST /api/bulk-orders",
-      list: "GET /api/bulk-orders",
-      getById: "GET /api/bulk-orders/:id",
-      update: "PUT /api/bulk-orders/:id",
-      cancel: "PUT /api/bulk-orders/:id/cancel"
+      create: "POST /api/v1/bulk-orders",
+      list: "GET /api/v1/bulk-orders",
+      getById: "GET /api/v1/bulk-orders/:id",
+      update: "PUT /api/v1/bulk-orders/:id",
+      cancel: "PUT /api/v1/bulk-orders/:id/cancel"
     }
   });
 });
 
 // Bulk orders health check
-app.get("/api/bulk-orders/health", (req, res) => {
+app.get("/api/v1/bulk-orders/health", (req, res) => {
   res.json({
     message: "Bulk Orders Health Check - OK",
     timestamp: new Date().toISOString(),
@@ -395,7 +443,7 @@ app.get("/api/bulk-orders/health", (req, res) => {
 });
 
 // Admin payments health check
-app.get("/api/admin/payments/health", (req, res) => {
+app.get("/api/v1/admin/payments/health", (req, res) => {
   res.json({
     message: "Admin Payments API - Placeholder",
     timestamp: new Date().toISOString(),

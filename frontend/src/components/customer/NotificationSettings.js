@@ -50,7 +50,7 @@ const NotificationSettings = () => {
 
   const sendTest = async (type) => {
     try {
-      await axios.post('/api/users/test-notification', { type }, {
+      await axios.post('/api/v1/users/test-notification', { type }, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       setMessage(`Test ${type} sent!`);

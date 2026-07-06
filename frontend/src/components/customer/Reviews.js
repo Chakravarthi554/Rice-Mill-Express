@@ -20,7 +20,7 @@ const Reviews = () => {
         const config = {
           headers: { Authorization: `Bearer ${userInfo.token}` }
         };
-        const { data } = await axios.get('/api/users/reviews', config);
+        const { data } = await axios.get('/api/v1/users/reviews', config);
         setReviews(data);
       } catch (err) {
         setError(err.response?.data?.message || 'Failed to fetch reviews');

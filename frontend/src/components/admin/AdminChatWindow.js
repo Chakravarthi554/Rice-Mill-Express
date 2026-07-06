@@ -143,7 +143,7 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
     }
     try {
       const config = { headers: { Authorization: `Bearer ${currentUser.token}` } };
-      const { data } = await axios.get(`/api/chat/messages/${conversation._id}`, config);
+      const { data } = await axios.get(`/api/v1/chat/messages/${conversation._id}`, config);
       setMessages(data.messages);
       scrollToBottom();
       markAsRead();
@@ -154,7 +154,7 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
     if (!conversation._id) return;
     try {
       const config = { headers: { Authorization: `Bearer ${currentUser.token}` } };
-      await axios.put(`/api/chat/read/${conversation._id}`, {}, config);
+      await axios.put(`/api/v1/chat/read/${conversation._id}`, {}, config);
     } catch (e) { console.error(e); }
   };
 
@@ -172,7 +172,7 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
     setLoadingProfile(true);
     try {
       const config = { headers: { Authorization: `Bearer ${currentUser.token}` } };
-      const { data } = await axios.get(`/api/users/${otherUser._id}`, config);
+      const { data } = await axios.get(`/api/v1/users/${otherUser._id}`, config);
       console.log('Fetched full seller profile:', data);
       setFullSellerProfile(data);
     } catch (e) {
@@ -212,7 +212,7 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
           Authorization: `Bearer ${currentUser.token}`,
         },
       };
-      const { data: uploadResults } = await axios.post('/api/upload/chat/multiple', formData, config);
+      const { data: uploadResults } = await axios.post('/api/v1/upload/chat/multiple', formData, config);
       await handleSend(null, uploadResults);
     } catch (e) {
       console.error(e);
@@ -236,7 +236,7 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
     if (editingMsg) {
       try {
         const config = { headers: { Authorization: `Bearer ${currentUser.token}` } };
-        await axios.put(`/api/chat/message/${editingMsg._id}`, { content: msgContent }, config);
+        await axios.put(`/api/v1/chat/message/${editingMsg._id}`, { content: msgContent }, config);
         setEditingMsg(null);
         setMessage('');
         return;
@@ -247,7 +247,7 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
       setSending(true);
       const config = { headers: { Authorization: `Bearer ${currentUser.token}` } };
       // ✅ FIX: Get response from API to add message immediately
-      const { data: sentMessage } = await axios.post('/api/chat/send', {
+      const { data: sentMessage } = await axios.post('/api/v1/chat/send', {
         receiverId: otherUser._id,
         content: msgContent,
         attachments,
@@ -288,7 +288,7 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
 
     try {
       const config = { headers: { Authorization: `Bearer ${currentUser.token}` } };
-      await axios.delete(`/api/chat/message/${selectedMsg._id}?mode=${mode}`, config);
+      await axios.delete(`/api/v1/chat/message/${selectedMsg._id}?mode=${mode}`, config);
     } catch (e) {
       console.error(e);
       alert('Delete failed');
@@ -299,7 +299,7 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
   const handleStar = async () => {
     try {
       const config = { headers: { Authorization: `Bearer ${currentUser.token}` } };
-      await axios.put(`/api/chat/message/${selectedMsg._id}/star`, {}, config);
+      await axios.put(`/api/v1/chat/message/${selectedMsg._id}/star`, {}, config);
       setMessages(prev => prev.map(m => m._id === selectedMsg._id ? {
         ...m, isStarredBy: m.isStarredBy.includes(currentUser._id)
           ? m.isStarredBy.filter(id => id !== currentUser._id)
@@ -322,7 +322,7 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
 
     try {
       const config = { headers: { Authorization: `Bearer ${currentUser.token}` } };
-      await axios.put(`/api/chat/clear/${conversation._id}`, {}, config);
+      await axios.put(`/api/v1/chat/clear/${conversation._id}`, {}, config);
     } catch (e) {
       console.error(e);
       setMessages(oldMessages);
@@ -362,7 +362,7 @@ const AdminChatWindow = ({ conversation, currentUser, onClose }) => {
               try {
                 const config = { headers: { Authorization: `Bearer ${currentUser.token}` } };
                 for (const id of selectedMsgs) {
-                  await axios.delete(`/api/chat/message/${id}?mode=me`, config);
+                  await axios.delete(`/api/v1/chat/message/${id}?mode=me`, config);
                 }
                 setMessages(prev => prev.filter(m => !selectedMsgs.includes(m._id)));
                 setSelectionMode(false);

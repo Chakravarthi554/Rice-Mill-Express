@@ -9,6 +9,8 @@ const axiosInstance = axios.create({
   baseURL: BASE_URL,
   timeout: 30000,
   withCredentials: true,
+  xsrfCookieName: '_csrf',
+  xsrfHeaderName: 'X-CSRF-Token',
 });
 
 // === ENHANCED TOKEN HANDLING ===
@@ -56,6 +58,20 @@ axiosInstance.interceptors.response.use(
     if (process.env.NODE_ENV === 'development') {
       console.log(`✅ Axios Success: ${response.config.method?.toUpperCase()} ${response.config.url}`);
     }
+
+    // ✅ AUTO-UNWRAP RESPONSE ENVELOPE
+    // Backend wraps all responses in { success, data, message }.
+    // Unwrap so callers get the actual payload directly.
+    if (
+      response.data &&
+      typeof response.data === 'object' &&
+      'success' in response.data &&
+      'data' in response.data &&
+      response.data.success === true
+    ) {
+      response.data = response.data.data;
+    }
+
     return response;
   },
   async (error) => {

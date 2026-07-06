@@ -33,7 +33,7 @@ export const getAdminSettings = () => async (dispatch, getState) => {
       },
     };
 
-    const { data } = await api.get('/api/admin/settings', config);
+    const { data } = await api.get('/api/v1/admin/settings', config);
 
     dispatch({
       type: ADMIN_SETTINGS_SUCCESS,
@@ -62,7 +62,7 @@ export const updateAdminSettings = (settingsData) => async (dispatch, getState) 
       },
     };
 
-    const { data } = await api.put('/api/admin/settings', settingsData, config);
+    const { data } = await api.put('/api/v1/admin/settings', settingsData, config);
 
     dispatch({
       type: ADMIN_SETTINGS_UPDATE_SUCCESS,
@@ -93,7 +93,7 @@ export const sendBulkNotification = (notificationData) => async (dispatch, getSt
       },
     };
 
-    const { data } = await api.post('/api/admin/settings/push-notification', notificationData, config);
+    const { data } = await api.post('/api/v1/admin/settings/push-notification', notificationData, config);
 
     dispatch({
       type: ADMIN_NOTIFICATION_SEND_SUCCESS,
@@ -126,7 +126,7 @@ export const getAvailableRecipes = () => async (dispatch, getState) => {
       },
     };
 
-    const { data } = await api.get('/api/admin/settings/recipes', config);
+    const { data } = await api.get('/api/v1/admin/settings/recipes', config);
 
     dispatch({
       type: ADMIN_RECIPES_LIST_SUCCESS,
@@ -153,7 +153,7 @@ export const resetAdminSettings = () => async (dispatch, getState) => {
       },
     };
 
-    const { data } = await api.post('/api/admin/settings/reset', {}, config);
+    const { data } = await api.post('/api/v1/admin/settings/reset', {}, config);
 
     dispatch({
       type: ADMIN_SETTINGS_RESET_SUCCESS,
@@ -175,7 +175,7 @@ export const getPublicSettings = () => async (dispatch) => {
   try {
     dispatch({ type: PUBLIC_SETTINGS_REQUEST });
 
-    const { data } = await api.get('/api/admin/settings/public'); // Correcting path to match common pattern or my previous backend update
+    const { data } = await api.get('/api/v1/admin/settings/public'); // Correcting path to match common pattern or my previous backend update
 
     dispatch({
       type: PUBLIC_SETTINGS_SUCCESS,

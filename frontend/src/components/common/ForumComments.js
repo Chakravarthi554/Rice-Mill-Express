@@ -88,11 +88,11 @@ const ForumComments = ({ postId, post, onCommentUpdate }) => {
       setLoading(true);
       let data = [];
       try {
-        const res = await axios.get(`/api/forum/${postId}`);
+        const res = await axios.get(`/api/v1/forum/${postId}`);
         data = res.data.comments || [];
       } catch {
         try {
-          const res = await axios.get(`/api/forum/${postId}/comments`);
+          const res = await axios.get(`/api/v1/forum/${postId}/comments`);
           data = res.data;
         } catch {
           data = post?.comments || [];

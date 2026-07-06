@@ -175,7 +175,7 @@ const Settings = () => {
                 <Box sx={{ p: 1.5, pt: 1, borderTop: '1px solid #F3F4F6', mt: 1 }}>
                     <ListItemButton
                         sx={{ borderRadius: 3, background: '#FEF2F2', '&:hover': { background: '#FEE2E2' } }}
-                        onClick={() => navigate('/logout')}
+                        onClick={() => navigate('/settings/logout')}
                     >
                         <ListItemIcon sx={{ minWidth: 42 }}>
                             <Box sx={{ width: 34, height: 34, borderRadius: 2.5, bgcolor: '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

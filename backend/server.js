@@ -8,17 +8,27 @@ const app = require("./app");
 const connectDB = require("./config/db");
 const setupSocketServer = require("./utils/socketServer");
 const { connectRedis } = require("./utils/redis");
+const logger = require("./utils/logger");
 
 // 🔍 Environment Variable Checks
-console.log("🔍 Checking environment variables...");
-console.log("JWT_SECRET exists:", !!process.env.JWT_SECRET);
-console.log("REFRESH_TOKEN_SECRET exists:", !!process.env.REFRESH_TOKEN_SECRET);
+logger.info("🔍 Validating core environment variables...");
 
-// ❌ Abort startup if secrets are missing
-if (!process.env.JWT_SECRET || !process.env.REFRESH_TOKEN_SECRET) {
-  console.error("❌ CRITICAL: JWT secrets are not properly configured in environment variables");
+const requiredEnvVars = [
+  'JWT_SECRET', 
+  'REFRESH_TOKEN_SECRET', 
+  'MONGO_URI', 
+  'FIREBASE_PROJECT_ID', 
+  'CLOUDINARY_CLOUD_NAME'
+];
+
+const missingVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
+
+if (missingVars.length > 0) {
+  logger.error(`❌ CRITICAL: Missing required environment variables: ${missingVars.join(', ')}`);
+  logger.error('👉 Please refer to .env.example to configure these properly.');
   process.exit(1);
 }
+logger.info("✅ All core environment variables are configured.");
 
 const server = http.createServer(app);
 
@@ -79,7 +89,7 @@ process.on("unhandledRejection", (err) => {
 (async () => {
   try {
     await connectDB();
-    console.log("✅ MongoDB Connected");
+    logger.info("✅ MongoDB Connected");
 
     // Initialize Redis
     await connectRedis();

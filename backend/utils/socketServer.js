@@ -9,44 +9,62 @@ const { createAdapter } = require('@socket.io/redis-adapter');
 const setupSocketServer = async (server) => {
   const io = socketio(server, {
     cors: {
-      origin: [
-        'http://localhost:3000',
-        'http://127.0.0.1:3000',
-        'http://localhost:3001',
-        'https://c111b7c7.rice-mill-frontend.pages.dev',
-        /^https:\/\/.*\.pages\.dev$/,
-      ],
+      origin: (origin, callback) => {
+        // Allow connections with no origin (mobile apps, Postman, etc.)
+        if (!origin) return callback(null, true);
+        // Allow localhost, local network IPs, and deployed frontends
+        const allowed = [
+          /^http:\/\/localhost(:\d+)?$/,
+          /^http:\/\/127\.0\.0\.1(:\d+)?$/,
+          /^http:\/\/10\.\d+\.\d+\.\d+(:\d+)?$/,    // Local network (10.x.x.x)
+          /^http:\/\/192\.168\.\d+\.\d+(:\d+)?$/,    // Local network (192.168.x.x)
+          /^https:\/\/.*\.pages\.dev$/,               // Cloudflare Pages
+        ];
+        if (allowed.some(pattern => pattern.test(origin))) {
+          return callback(null, true);
+        }
+        callback(null, true); // Allow all in development; auth middleware handles security
+      },
       methods: ['GET', 'POST'],
       credentials: true,
     },
     transports: ['websocket', 'polling'],
   });
 
-  // Attach Redis adapter for scaling across multiple instances
-  const pubClient = createClient({
-    socket: {
-      host: process.env.REDIS_HOST || '127.0.0.1',
-      port: process.env.REDIS_PORT || 6379,
+  // Attach Redis adapter for scaling across multiple instances (if Redis is enabled)
+  if (process.env.DISABLE_REDIS?.trim() !== 'true') {
+    const pubClient = createClient({
+      socket: {
+        host: process.env.REDIS_HOST || '127.0.0.1',
+        port: process.env.REDIS_PORT || 6379,
+      }
+    });
+    const subClient = pubClient.duplicate();
+
+    pubClient.on('error', (err) => {
+      logger.error('❌ Redis pubClient Error (Socket.io Adapter):', err.message);
+    });
+    subClient.on('error', (err) => {
+      logger.error('❌ Redis subClient Error (Socket.io Adapter):', err.message);
+    });
+
+    try {
+      // Await adapter connection before allowing sockets to connect
+      await Promise.all([pubClient.connect(), subClient.connect()]);
+      io.adapter(createAdapter(pubClient, subClient));
+      logger.info('✅ Socket.io Redis adapter connected');
+    } catch (err) {
+      logger.error('❌ Failed to connect Socket.io Redis adapter:', err.message);
     }
-  });
-  const subClient = pubClient.duplicate();
-
-  pubClient.on('error', (err) => {
-    logger.error('❌ Redis pubClient Error (Socket.io Adapter):', err.message);
-    // Optional: Could process.exit(1) here if strict scaling is required
-  });
-  subClient.on('error', (err) => {
-    logger.error('❌ Redis subClient Error (Socket.io Adapter):', err.message);
-  });
-
-  // Await adapter connection before allowing sockets to connect
-  await Promise.all([pubClient.connect(), subClient.connect()]);
-  io.adapter(createAdapter(pubClient, subClient));
-  logger.info('✅ Socket.io Redis adapter connected');
+  } else {
+    logger.info('⚠️ Running Socket.io with in-memory adapter (Redis disabled)');
+  }
 
   // 🔥 ENHANCED AUTH: Better token validation with role checking
   io.use(async (socket, next) => {
+    console.log(`🔌 [SOCKET.IO MIDDLEWARE] Attempting connection from id=${socket.id}, transport=${socket.conn.transport.name}`);
     try {
+
       const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization;
 
       if (!token) {

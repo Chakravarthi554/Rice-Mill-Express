@@ -19,7 +19,7 @@ export const addToCart = (productId, qty) => async (dispatch, getState) => {
         Authorization: `Bearer ${userInfo.token}`,
       },
     };
-    const { data } = await api.post('/api/cart', { product: productId, qty });
+    const { data } = await api.post('/api/v1/cart', { product: productId, qty });
     // data = array of { product: { _id, name, price, ... }, qty }
     dispatch({ type: CART_REPLACE_ITEMS, payload: data });
     localStorage.setItem('cartItems', JSON.stringify(data));
@@ -38,8 +38,8 @@ export const removeFromCart = (productId) => async (dispatch, getState) => {
     const config = {
       headers: { Authorization: `Bearer ${userInfo.token}` },
     };
-    await api.delete(`/api/cart/${productId}`);
-    const { data } = await api.get('/api/cart'); // Refresh cart
+    await api.delete(`/api/v1/cart/${productId}`);
+    const { data } = await api.get('/api/v1/cart'); // Refresh cart
     dispatch({ type: CART_REPLACE_ITEMS, payload: data });
     localStorage.setItem('cartItems', JSON.stringify(data));
   } catch (error) {
@@ -55,7 +55,7 @@ export const listMyCart = () => async (dispatch, getState) => {
     const config = {
       headers: { Authorization: `Bearer ${userInfo.token}` },
     };
-    const { data } = await api.get('/api/cart');
+    const { data } = await api.get('/api/v1/cart');
     dispatch({ type: CART_REPLACE_ITEMS, payload: data });
     localStorage.setItem('cartItems', JSON.stringify(data));
   } catch (error) {
@@ -71,7 +71,7 @@ export const clearCart = () => async (dispatch, getState) => {
     const config = {
       headers: { Authorization: `Bearer ${userInfo.token}` },
     };
-    await api.delete('/api/cart');
+    await api.delete('/api/v1/cart');
     dispatch({ type: CART_CLEAR_ITEMS });
     localStorage.removeItem('cartItems');
   } catch (error) {

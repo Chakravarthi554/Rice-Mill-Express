@@ -15,7 +15,7 @@ const SettingsBanner = () => {
         // Fetch public settings
         const fetchSettings = async () => {
             try {
-                const { data } = await api.get('/api/settings/public');
+                const { data } = await api.get('/api/v1/settings/public');
                 setSettings(data);
 
                 // Show festival banner if enabled

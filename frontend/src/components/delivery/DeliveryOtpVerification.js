@@ -137,14 +137,14 @@ const DeliveryOtpVerification = ({ order, onSuccess, onCancel }) => {
                 formData.append('file', photoProof);
                 formData.append('folder', 'delivery_proofs');
 
-                const uploadRes = await axios.post('/api/upload', formData, {
+                const uploadRes = await axios.post('/api/v1/upload', formData, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
                 photoUrl = uploadRes.data.url;
             }
 
             // Submit delivery confirmation
-            const response = await axios.post('/api/delivery/confirm', {
+            const response = await axios.post('/api/v1/delivery/confirm', {
                 orderId: order._id,
                 idToken,
                 photoProofUrl: photoUrl,

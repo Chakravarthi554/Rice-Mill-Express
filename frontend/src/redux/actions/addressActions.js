@@ -31,7 +31,7 @@ export const listAddresses = () => async (dispatch, getState) => {
       },
     };
 
-    const { data } = await api.get('/api/addresses');
+    const { data } = await api.get('/api/v1/addresses');
 
     dispatch({
       type: ADDRESS_LIST_SUCCESS,
@@ -63,7 +63,7 @@ export const addAddress = (address) => async (dispatch, getState) => {
       },
     };
 
-    const { data } = await api.post('/api/addresses', address);
+    const { data } = await api.post('/api/v1/addresses', address);
 
     dispatch({
       type: ADDRESS_ADD_SUCCESS,
@@ -95,7 +95,7 @@ export const updateAddress = (id, address) => async (dispatch, getState) => {
       },
     };
 
-    const { data } = await api.put(`/api/addresses/${id}`, address);
+    const { data } = await api.put(`/api/v1/addresses/${id}`, address);
 
     dispatch({
       type: ADDRESS_UPDATE_SUCCESS,
@@ -126,7 +126,7 @@ export const deleteAddress = (id) => async (dispatch, getState) => {
       },
     };
 
-    await api.delete(`/api/addresses/${id}`);
+    await api.delete(`/api/v1/addresses/${id}`);
 
     dispatch({ type: ADDRESS_DELETE_SUCCESS, payload: id });
   } catch (error) {
@@ -154,7 +154,7 @@ export const setDefaultAddress = (id) => async (dispatch, getState) => {
       },
     };
 
-    const { data } = await api.put(`/api/addresses/${id}/default`, {});
+    const { data } = await api.put(`/api/v1/addresses/${id}/default`, {});
 
     dispatch({
       type: ADDRESS_SET_DEFAULT_SUCCESS,

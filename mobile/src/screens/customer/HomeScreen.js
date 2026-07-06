@@ -18,6 +18,7 @@ import { API_URL } from '../../config/env';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const CATEGORIES = [
+    { id: '', name: 'All\nProducts', emoji: '🌾', bg: '#F0FDF4', color: '#16A34A' },
     { id: 'basmati', name: 'Basmati\nRice', emoji: '🍚', bg: '#FFF7ED', color: '#EA580C' },
     { id: 'sona', name: 'Sona\nMasoori', emoji: '🌾', bg: '#F0FDF4', color: '#16A34A' },
     { id: 'kolam', name: 'Kolam\nRice', emoji: '🥣', bg: '#EFF6FF', color: '#3B82F6' },
@@ -81,7 +82,8 @@ export default function HomeScreen({ navigation }) {
     const wishlist = useSelector(state => state.wishlist);
     const { wishlistItems = [] } = wishlist || {};
     const cart = useSelector(state => state.cart);
-    const cartCount = (cart?.cartItems || []).reduce((s, i) => s + (i.qty || 1), 0);
+    const cartItemsArray = Array.isArray(cart?.cartItems) ? cart.cartItems : [];
+    const cartCount = cartItemsArray.reduce((s, i) => s + (i.qty || 1), 0);
 
     useEffect(() => { fetchEverything(); dispatch(getWishlist()); dispatch(getCart()); }, [dispatch]);
 
@@ -100,15 +102,34 @@ export default function HomeScreen({ navigation }) {
     const fetchEverything = async () => {
         try {
             setLoading(true);
-            const response = await apiService.getProducts();
-            setProducts(response.data.products || []);
-            const addrRes = await apiService.getAddresses();
-            if (addrRes.data && addrRes.data.length > 0) {
-                setUserAddress(addrRes.data[0]);
+            const response = await apiService.getProducts({ pageSize: 100 });
+            // Handle both response shapes: { products: [...] } or direct array
+            const data = response.data;
+            if (Array.isArray(data)) {
+                setProducts(data);
+            } else if (data?.products) {
+                setProducts(data.products);
+            } else {
+                setProducts([]);
             }
         } catch (e) {
-            console.error('Error fetching data:', e);
-        } finally { setLoading(false); setRefreshing(false); }
+            console.error('Error fetching products:', e?.message || e);
+        }
+
+        // Fetch address separately — don't let it block product display
+        try {
+            const addrRes = await apiService.getAddresses();
+            const addresses = Array.isArray(addrRes.data) ? addrRes.data : addrRes.data?.addresses || [];
+            if (addresses.length > 0) {
+                setUserAddress(addresses[0]);
+            }
+        } catch (e) {
+            // Address fetch may fail if user is not yet authenticated — that's OK
+            console.log('Address fetch skipped (not critical):', e?.message || e);
+        }
+
+        setLoading(false);
+        setRefreshing(false);
     };
 
     const onRefresh = () => { setRefreshing(true); fetchEverything(); };
@@ -122,16 +143,11 @@ export default function HomeScreen({ navigation }) {
     const handleAddToCart = (productId) => dispatch(addToCart(productId, 1));
     const handleNavigation = (id) => navigation.navigate('ProductDetail', { productId: id });
 
-    const sortedProducts = [...products].sort((a, b) => {
-        if (!activeCategory) return 0;
-        const isACat = a.category?.toLowerCase() === activeCategory.toLowerCase() || a.name?.toLowerCase().includes(activeCategory.toLowerCase());
-        const isBCat = b.category?.toLowerCase() === activeCategory.toLowerCase() || b.name?.toLowerCase().includes(activeCategory.toLowerCase());
-        if (isACat && !isBCat) return -1;
-        if (!isACat && isBCat) return 1;
-        return 0;
-    });
+    const filteredByCategory = activeCategory 
+        ? products.filter(p => p.category?.toLowerCase() === activeCategory.toLowerCase() || p.name?.toLowerCase().includes(activeCategory.toLowerCase()))
+        : products;
 
-    const filteredProducts = sortedProducts.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    const filteredProducts = filteredByCategory.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
     const getImageUri = (item) => {
         const img = item.images?.[0];
@@ -288,7 +304,13 @@ export default function HomeScreen({ navigation }) {
                                         </View>
                                         <Text style={styles.bannerTitle}>{banner.title}</Text>
                                         <Text style={styles.bannerSubtitle}>{banner.subtitle}</Text>
-                                        <TouchableOpacity style={styles.bannerCta}>
+                                        <TouchableOpacity 
+                                            style={styles.bannerCta} 
+                                            onPress={() => {
+                                                if (banner.id === 1) navigation.navigate('BulkOrders');
+                                                else { setActiveCategory(''); setSearchQuery(''); }
+                                            }}
+                                        >
                                             <Text style={styles.bannerCtaText}>{banner.cta} →</Text>
                                         </TouchableOpacity>
                                     </View>
@@ -313,7 +335,13 @@ export default function HomeScreen({ navigation }) {
                                 <TouchableOpacity
                                     key={cat.id}
                                     style={styles.catItem}
-                                    onPress={() => setActiveCategory(activeCategory === cat.id ? '' : cat.id)}
+                                    onPress={() => {
+                                        if (cat.id === 'bulk') {
+                                            navigation.navigate('BulkOrders');
+                                        } else {
+                                            setActiveCategory(activeCategory === cat.id ? '' : cat.id);
+                                        }
+                                    }}
                                 >
                                     <View style={[
                                         styles.catCircle,

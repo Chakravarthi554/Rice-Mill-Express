@@ -16,6 +16,8 @@ const api = axios.create({
   withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
   timeout: 30000,
+  xsrfCookieName: '_csrf',
+  xsrfHeaderName: 'X-CSRF-Token',
 });
 
 let isRefreshing = false;
@@ -56,6 +58,21 @@ api.interceptors.response.use(
     if (process.env.NODE_ENV === 'development') {
       console.log(`✅ API ${response.config.method?.toUpperCase()} ${response.config.url}:`, response.status);
     }
+
+    // ✅ AUTO-UNWRAP RESPONSE ENVELOPE
+    // Backend wraps all responses in { success, data, message }.
+    // Unwrap so that callers doing `const { data } = await api.get(...)` 
+    // get the actual payload in `data` instead of the envelope.
+    if (
+      response.data &&
+      typeof response.data === 'object' &&
+      'success' in response.data &&
+      'data' in response.data &&
+      response.data.success === true
+    ) {
+      response.data = response.data.data;
+    }
+
     return response;
   },
   async (error) => {

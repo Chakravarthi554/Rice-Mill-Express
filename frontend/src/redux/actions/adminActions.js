@@ -51,7 +51,7 @@ export const listUsers = () => async (dispatch, getState) => {
     };
 
     console.log('🔄 Fetching users...');
-    const { data } = await api.get('/api/admin/users', config);
+    const { data } = await api.get('/api/v1/admin/users', config);
     console.log('✅ Users received:', data?.length || 0);
 
     dispatch({
@@ -78,7 +78,7 @@ export const deleteUser = (id) => async (dispatch, getState) => {
     dispatch({ type: USER_DELETE_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    await api.delete(`/api/users/${id}`, config);
+    await api.delete(`/api/v1/users/${id}`, config);
     dispatch({ type: USER_DELETE_SUCCESS });
     dispatch(listUsers());
     return { success: true };
@@ -94,7 +94,7 @@ export const updateUser = (user) => async (dispatch, getState) => {
     dispatch({ type: USER_UPDATE_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await api.put(`/api/users/${user._id}`, user, config);
+    const { data } = await api.put(`/api/v1/users/${user._id}`, user, config);
     dispatch({ type: USER_UPDATE_SUCCESS });
     dispatch(listUsers());
     return { success: true, data };
@@ -118,7 +118,7 @@ export const listOrders = () => async (dispatch, getState) => {
     };
 
     console.log('🔄 Fetching orders...');
-    const { data } = await api.get('/api/admin/orders', config);
+    const { data } = await api.get('/api/v1/admin/orders', config);
     console.log('✅ Orders received:', data?.length || 0);
 
     dispatch({
@@ -145,7 +145,7 @@ export const getOrderDetails = (id) => async (dispatch, getState) => {
     dispatch({ type: ORDER_DETAILS_REQUEST });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await api.get(`/api/orders/${id}`, config);
+    const { data } = await api.get(`/api/v1/orders/${id}`, config);
     dispatch({ type: ORDER_DETAILS_SUCCESS, payload: data });
     return { success: true, data };
   } catch (error) {
@@ -159,7 +159,7 @@ export const getOrdersList = () => async (dispatch) => {
   try {
     dispatch({ type: ORDER_LIST_REQUEST });
 
-    const response = await api.get('/api/admin/orders');
+    const response = await api.get('/api/v1/admin/orders');
 
     dispatch({
       type: ORDER_LIST_SUCCESS,
@@ -182,7 +182,7 @@ export const getKycApplications = () => async (dispatch) => {
   try {
     dispatch({ type: KYC_APPLICATIONS_REQUEST });
 
-    const response = await api.get('/api/kyc/applications');
+    const response = await api.get('/api/v1/kyc/applications');
 
     dispatch({
       type: KYC_APPLICATIONS_SUCCESS,
@@ -205,7 +205,7 @@ export const getUsersList = () => async (dispatch) => {
   try {
     dispatch({ type: USER_LIST_REQUEST });
 
-    const response = await api.get('/api/admin/users');
+    const response = await api.get('/api/v1/admin/users');
 
     dispatch({
       type: USER_LIST_SUCCESS,
@@ -236,7 +236,7 @@ export const listKycApplications = () => async (dispatch, getState) => {
       },
     };
 
-    const { data } = await api.get('/api/kyc/applications', config);
+    const { data } = await api.get('/api/v1/kyc/applications', config);
     dispatch({ type: KYC_APPLICATIONS_SUCCESS, payload: data });
 
     return { success: true, data };
@@ -262,7 +262,7 @@ export const approveKycApplication = (kycId, reviewNotes) => async (dispatch, ge
       },
     };
 
-    const { data } = await api.put(`/api/kyc/approve/${kycId}`, { reviewNotes }, config);
+    const { data } = await api.put(`/api/v1/kyc/approve/${kycId}`, { reviewNotes }, config);
     dispatch({ type: APPROVE_KYC_SUCCESS, payload: data });
     dispatch(listKycApplications());
 
@@ -289,7 +289,7 @@ export const rejectKycApplication = (kycId, reviewNotes) => async (dispatch, get
       },
     };
 
-    const { data } = await api.put(`/api/kyc/reject/${kycId}`, { reviewNotes }, config);
+    const { data } = await api.put(`/api/v1/kyc/reject/${kycId}`, { reviewNotes }, config);
     dispatch({ type: REJECT_KYC_SUCCESS, payload: data });
     dispatch(listKycApplications());
 
@@ -317,7 +317,7 @@ export const getSearchLogs = () => async (dispatch, getState) => {
       },
     };
 
-    const { data } = await api.get('/api/admin/search-logs', config);
+    const { data } = await api.get('/api/v1/admin/search-logs', config);
     dispatch({ type: SEARCH_LOGS_SUCCESS, payload: data });
 
     return { success: true, data };
@@ -343,7 +343,7 @@ export const updateSellerLocation = (locationData) => async (dispatch, getState)
       },
     };
 
-    const { data } = await api.put('/api/admin/seller-location', locationData, config);
+    const { data } = await api.put('/api/v1/admin/seller-location', locationData, config);
     dispatch({ type: SELLER_LOCATION_UPDATE_SUCCESS, payload: data });
 
     return { success: true, data };
@@ -365,7 +365,7 @@ export const getDashboardStats = () => async (dispatch) => {
 
     console.log('🔄 Fetching comprehensive dashboard stats...');
 
-    const response = await api.get('/api/admin/stats');
+    const response = await api.get('/api/v1/admin/stats');
 
     console.log('✅ Dashboard stats received:', response.data);
 
@@ -396,7 +396,7 @@ export const getRealTimeActivities = () => async (dispatch) => {
 
     console.log('🔄 Fetching real-time activities...');
 
-    const response = await api.get('/api/admin/activities');
+    const response = await api.get('/api/v1/admin/activities');
 
     console.log('✅ Real-time activities received:', response.data);
 
@@ -436,7 +436,7 @@ export const getCommentsForModeration = (type = '', page = 1, limit = 20) => asy
     if (type) params.type = type;
 
     console.log('🔄 Fetching comments for moderation...');
-    const { data } = await api.get('/api/admin/comments/moderation', {
+    const { data } = await api.get('/api/v1/admin/comments/moderation', {
       params,
       ...config
     });
@@ -471,7 +471,7 @@ export const fetchAdminStats = () => async (dispatch, getState) => {
     dispatch({ type: 'ADMIN_STATS_REQUEST' });
     const { userLogin: { userInfo } } = getState();
     const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-    const { data } = await api.get('/api/admin/stats', config);
+    const { data } = await api.get('/api/v1/admin/stats', config);
     dispatch({ type: 'ADMIN_STATS_SUCCESS', payload: data });
 
     return { success: true, data };
@@ -489,7 +489,7 @@ export const getPlatformOverview = () => async (dispatch) => {
 
     console.log('🔄 Fetching platform overview...');
 
-    const response = await api.get('/api/admin/platform-overview');
+    const response = await api.get('/api/v1/admin/platform-overview');
 
     console.log('✅ Platform overview received:', response.data);
 
@@ -519,7 +519,7 @@ export const getRecipeAnalytics = (timeframe = 'month') => async (dispatch) => {
 
     console.log('🔄 Fetching recipe analytics...');
 
-    const response = await api.get(`/api/admin/recipe-analytics?timeframe=${timeframe}`);
+    const response = await api.get(`/api/v1/admin/recipe-analytics?timeframe=${timeframe}`);
 
     console.log('✅ Recipe analytics received:', response.data);
 
@@ -547,7 +547,7 @@ export const exportAnalyticsData = (type = 'sales', timeframe = 'month') => asyn
   try {
     console.log(`🔄 Exporting ${type} analytics data for ${timeframe}...`);
 
-    const response = await api.get(`/api/admin/analytics/export?type=${type}&timeframe=${timeframe}`, {
+    const response = await api.get(`/api/v1/admin/analytics/export?type=${type}&timeframe=${timeframe}`, {
       responseType: 'blob'
     });
 
@@ -605,7 +605,7 @@ export const getAnalyticsData = (timeframe = 'week') => async (dispatch) => {
 
     console.log('🔄 Fetching analytics data...');
 
-    const response = await api.get(`/api/admin/analytics?timeframe=${timeframe}`);
+    const response = await api.get(`/api/v1/admin/analytics?timeframe=${timeframe}`);
 
     console.log('✅ Analytics data received:', response.data);
 
@@ -632,7 +632,7 @@ export const getAnalyticsData = (timeframe = 'week') => async (dispatch) => {
 // ✅ FIXED: Test admin API connection
 export const testAdminAPI = () => async () => {
   try {
-    const response = await api.get('/api/admin/health');
+    const response = await api.get('/api/v1/admin/health');
     return { success: true, data: response.data };
   } catch (error) {
     console.error('❌ Admin API test failed:', error);

@@ -184,39 +184,11 @@ const OverviewPanel = ({ orders, products, onTabChange }) => {
                                 </TableHead>
                                 <TableBody>
                                     {recent.length === 0 ? (
-                                        // Mock fallback rows if order list is empty
-                                        <>
-                                            <TableRow hover>
-                                                <TableCell sx={{ fontWeight: 700, color: '#1565C0' }}>#RM240301-001</TableCell>
-                                                <TableCell>Rahul Sharma</TableCell>
-                                                <TableCell>3 items</TableCell>
-                                                <TableCell sx={{ fontWeight: 700 }}>₹3,700</TableCell>
-                                                <TableCell>{statusChip('placed')}</TableCell>
-                                                <TableCell>
-                                                    <Button size="small" variant="text" sx={{ color: '#1565C0', fontWeight: 700, textTransform: 'none', p: 0 }}>Accept</Button>
-                                                </TableCell>
-                                            </TableRow>
-                                            <TableRow hover>
-                                                <TableCell sx={{ fontWeight: 700, color: '#1565C0' }}>#RM240301-002</TableCell>
-                                                <TableCell>Priya Patel</TableCell>
-                                                <TableCell>2 items</TableCell>
-                                                <TableCell sx={{ fontWeight: 700 }}>₹2,450</TableCell>
-                                                <TableCell>{statusChip('processing')}</TableCell>
-                                                <TableCell>
-                                                    <Button size="small" variant="text" sx={{ color: '#1565C0', fontWeight: 700, textTransform: 'none', p: 0 }}>Assign DP</Button>
-                                                </TableCell>
-                                            </TableRow>
-                                            <TableRow hover>
-                                                <TableCell sx={{ fontWeight: 700, color: '#1565C0' }}>#RM240301-003</TableCell>
-                                                <TableCell>Kumar Traders</TableCell>
-                                                <TableCell>5 items</TableCell>
-                                                <TableCell sx={{ fontWeight: 700 }}>₹8,200</TableCell>
-                                                <TableCell>{statusChip('packed')}</TableCell>
-                                                <TableCell>
-                                                    <Button size="small" variant="text" sx={{ color: '#1565C0', fontWeight: 700, textTransform: 'none', p: 0 }}>Track</Button>
-                                                </TableCell>
-                                            </TableRow>
-                                        </>
+                                        <TableRow>
+                                            <TableCell colSpan={6} align="center" sx={{ py: 3, color: '#6B7280' }}>
+                                                No recent orders found.
+                                            </TableCell>
+                                        </TableRow>
                                     ) : recent.map(order => (
                                         <TableRow key={order._id} hover>
                                             <TableCell sx={{ fontWeight: 700, fontSize: '0.8rem', color: '#1565C0' }}>#{order._id?.slice(-6).toUpperCase()}</TableCell>

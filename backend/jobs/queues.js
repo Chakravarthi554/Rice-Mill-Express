@@ -7,9 +7,17 @@ const redisOptions = {
   }
 };
 
-const emailQueue = new Queue('email-sending', redisOptions);
-const pdfQueue = new Queue('pdf-generation', redisOptions);
-const fcmQueue = new Queue('fcm-push', redisOptions);
+const isRedisDisabled = process.env.DISABLE_REDIS === 'true';
+
+const createMockQueue = (name) => ({
+  add: async (data) => console.log(`[Mock Queue] Job added to ${name} (Redis disabled)`),
+  process: () => console.log(`[Mock Queue] Processor registered for ${name}`),
+  on: () => {},
+});
+
+const emailQueue = isRedisDisabled ? createMockQueue('email-sending') : new Queue('email-sending', redisOptions);
+const pdfQueue = isRedisDisabled ? createMockQueue('pdf-generation') : new Queue('pdf-generation', redisOptions);
+const fcmQueue = isRedisDisabled ? createMockQueue('fcm-push') : new Queue('fcm-push', redisOptions);
 
 // Error handling to prevent unhandled promise rejections on Redis connection issues
 const handleQueueError = (queue, name) => {
@@ -18,9 +26,11 @@ const handleQueueError = (queue, name) => {
   });
 };
 
-handleQueueError(emailQueue, 'Email Queue');
-handleQueueError(pdfQueue, 'PDF Queue');
-handleQueueError(fcmQueue, 'FCM Queue');
+if (!isRedisDisabled) {
+  handleQueueError(emailQueue, 'Email Queue');
+  handleQueueError(pdfQueue, 'PDF Queue');
+  handleQueueError(fcmQueue, 'FCM Queue');
+}
 
 module.exports = {
   emailQueue,

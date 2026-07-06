@@ -22,7 +22,7 @@ const RatingSystem = ({ type = 'recipes', itemId, currentUserRating, onRate }) =
 
     const fetchRatingDistribution = React.useCallback(async () => {
         try {
-            const response = await fetch(`/api/social/${type}/${itemId}/rating-distribution`);
+            const response = await fetch(`/api/v1/social/${type}/${itemId}/rating-distribution`);
             const data = await response.json();
             setDistribution(data);
         } catch (error) {

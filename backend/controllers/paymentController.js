@@ -8,6 +8,14 @@ const Notification = require('../models/Notification');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
 
+// --- Idempotency Storage ---
+const idempotencySchema = new mongoose.Schema({
+    key: { type: String, required: true, unique: true },
+    response: { type: Object, required: true },
+    createdAt: { type: Date, default: Date.now, index: { expireAfterSeconds: 86400 } } // 24 hours TTL
+});
+const IdempotencyKey = mongoose.models.IdempotencyKey || mongoose.model('IdempotencyKey', idempotencySchema);
+// --- End Idempotency Storage ---
 // --- Razorpay Instance Setup ---
 let razorpayInstance = null;
 const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID;
@@ -34,12 +42,24 @@ const createRazorpayOrder = asyncHandler(async (req, res) => {
     if (!razorpayInstance) {
         return res.status(503).json({ message: 'Online payments are currently unavailable.' });
     }
-    const { amount, currency = 'INR', receipt } = req.body;
 
-    if (!amount || amount <= 0 || !receipt) {
-        res.status(400);
-        throw new Error('Missing or invalid amount or receipt ID');
+    // --- Idempotency Check ---
+    const idempotencyKey = req.headers['idempotency-key'] || req.body.idempotencyKey;
+    if (idempotencyKey) {
+        try {
+            const existingRequest = await IdempotencyKey.findOne({ key: idempotencyKey });
+            if (existingRequest) {
+                console.log(`[Idempotency] Returning cached response for key: ${idempotencyKey}`);
+                return res.status(200).json(existingRequest.response);
+            }
+        } catch (error) {
+            console.error('Idempotency check error:', error);
+            // Fall through and process if DB errors to not block legitimate payments
+        }
     }
+    // --- End Idempotency Check ---
+
+    const { amount, currency = 'INR', receipt } = req.body;
 
     const finalReceipt = receipt.length > 40 ? receipt.slice(0, 40) : receipt;
 
@@ -55,12 +75,27 @@ const createRazorpayOrder = asyncHandler(async (req, res) => {
         }
         console.log("Razorpay Order Created (API):", order);
 
-        res.json({
+        const responsePayload = {
             id: order.id,
             amount: order.amount,
             currency: order.currency,
             receipt: order.receipt
-        });
+        };
+
+        // --- Store Idempotency Response ---
+        if (idempotencyKey) {
+            try {
+                await IdempotencyKey.create({
+                    key: idempotencyKey,
+                    response: responsePayload
+                });
+            } catch (error) {
+                console.error('Failed to store idempotency key:', error);
+            }
+        }
+        // --- End Store ---
+
+        res.json(responsePayload);
     } catch (error) {
         console.error('Razorpay order creation error (API Route):', error);
         const errorMessage = error.error?.description || error.message || 'Failed to create Razorpay order';
@@ -75,17 +110,23 @@ const createRazorpayOrder = asyncHandler(async (req, res) => {
  * @access  Private (Customer/System)
  */
 const verifyRazorpayPayment = asyncHandler(async (req, res) => {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+    // --- Idempotency Check ---
+    const idempotencyKey = req.headers['idempotency-key'] || req.body.idempotencyKey;
+    if (idempotencyKey) {
+        try {
+            const existingRequest = await IdempotencyKey.findOne({ key: idempotencyKey });
+            if (existingRequest) {
+                console.log(`[Idempotency] Returning cached response for verify key: ${idempotencyKey}`);
+                return res.status(200).json(existingRequest.response);
+            }
+        } catch (error) {
+            console.error('Idempotency check error:', error);
+            // Fall through
+        }
+    }
+    // --- End Idempotency Check ---
 
-    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-        res.status(400);
-        throw new Error('Missing required payment verification fields');
-    }
-    if (!RAZORPAY_KEY_SECRET) {
-        console.error("Razorpay secret key is missing for verification.");
-        res.status(500);
-        throw new Error("Payment verification configuration error.");
-    }
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
 
     const body = razorpay_order_id + '|' + razorpay_payment_id;
     const expectedSignature = crypto.createHmac('sha256', RAZORPAY_KEY_SECRET).update(body.toString()).digest('hex');
@@ -164,13 +205,28 @@ const verifyRazorpayPayment = asyncHandler(async (req, res) => {
                     }
                 }
 
-                res.json({
+                const responsePayload = {
                     success: true,
                     message: "Payment verified successfully",
                     payment_id: razorpay_payment_id,
                     status: paymentDetails.status,
                     orderCount: orders.length
-                });
+                };
+
+                // --- Store Idempotency Response ---
+                if (idempotencyKey) {
+                    try {
+                        await IdempotencyKey.create({
+                            key: idempotencyKey,
+                            response: responsePayload
+                        });
+                    } catch (error) {
+                        console.error('Failed to store idempotency key:', error);
+                    }
+                }
+                // --- End Store ---
+
+                res.json(responsePayload);
             } else {
                 console.warn(`(Verify Route) Payment ${razorpay_payment_id} status is ${paymentDetails.status}.`);
                 res.status(400).json({
@@ -442,11 +498,6 @@ const recordCodPayment = asyncHandler(async (req, res) => {
 const requestPayout = asyncHandler(async (req, res) => {
     const { amount } = req.body;
     const sellerId = req.user._id;
-
-    if (!amount || amount <= 0) {
-        res.status(400);
-        throw new Error('Invalid amount');
-    }
 
     const session = await mongoose.startSession();
     session.startTransaction();

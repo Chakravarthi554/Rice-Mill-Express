@@ -10,8 +10,11 @@ import GlobalErrorBoundary from './components/common/GlobalErrorBoundary';
 import App from './App';
 import './i18n';
 import { io } from 'socket.io-client';
-import * as Sentry from "@sentry/react";
+// Polyfills
+import { Buffer } from 'buffer';
+import process from 'process';
 
+import * as Sentry from "@sentry/react";
 if (process.env.REACT_APP_SENTRY_DSN) {
   Sentry.init({
     dsn: process.env.REACT_APP_SENTRY_DSN,
@@ -24,10 +27,6 @@ if (process.env.REACT_APP_SENTRY_DSN) {
     replaysOnErrorSampleRate: 1.0,
   });
 }
-
-// Polyfills
-import { Buffer } from 'buffer';
-import process from 'process';
 
 globalThis.Buffer = Buffer;
 globalThis.process = process;
@@ -53,3 +52,28 @@ root.render(
     </ThemeProvider>
   </React.StrictMode>
 );
+
+// Register service worker for PWA support (ONLY in production)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    if (process.env.NODE_ENV === 'production') {
+      navigator.serviceWorker.register('/service-worker.js').then(
+        (registration) => {
+          console.log('ServiceWorker registration successful with scope: ', registration.scope);
+        },
+        (err) => {
+          console.log('ServiceWorker registration failed: ', err);
+        }
+      );
+    } else {
+      // Force unregister all service workers in development to prevent infinite HMR reload loops
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (let registration of registrations) {
+          registration.unregister().then(
+            () => console.log('ServiceWorker unregistered successfully in development mode.')
+          );
+        }
+      });
+    }
+  });
+}

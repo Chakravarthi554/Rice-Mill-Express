@@ -71,7 +71,7 @@ const MessagesTab = () => {
     try {
       setLoading(true);
       const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-      const { data } = await axios.get('/api/chat/conversations', config);
+      const { data } = await axios.get('/api/v1/chat/conversations', config);
       setConversations(Array.isArray(data) ? data : data.conversations || []);
     } catch (error) {
       console.error('Error fetching conversations:', error);
@@ -84,7 +84,7 @@ const MessagesTab = () => {
     try {
       setLoadingUsers(true);
       const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-      const { data } = await axios.get('/api/users', config);
+      const { data } = await axios.get('/api/v1/users', config);
       // Filter out admins and delivery partners if we only want to chat with sellers/customers
       setUsers(data.filter(u => u._id !== userInfo._id));
     } catch (e) {
@@ -186,7 +186,7 @@ const MessagesTab = () => {
     if (menuConversation) {
       try {
         const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-        await axios.put(`/api/chat/action/${menuConversation._id}`, {
+        await axios.put(`/api/v1/chat/action/${menuConversation._id}`, {
           action: 'disable'
         }, config);
         fetchConversations();
@@ -336,7 +336,7 @@ const MessagesTab = () => {
         <MenuItem onClick={async () => {
           try {
             const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-            await axios.put(`/api/chat/action/${menuConversation._id}`, { action: 'pin' }, config);
+            await axios.put(`/api/v1/chat/action/${menuConversation._id}`, { action: 'pin' }, config);
             fetchConversations();
           } catch (e) { console.error(e); }
           handleMenuClose();
@@ -347,7 +347,7 @@ const MessagesTab = () => {
         <MenuItem onClick={async () => {
           try {
             const config = { headers: { Authorization: `Bearer ${userInfo.token}` } };
-            await axios.put(`/api/chat/action/${menuConversation._id}`, { action: 'mute' }, config);
+            await axios.put(`/api/v1/chat/action/${menuConversation._id}`, { action: 'mute' }, config);
             fetchConversations();
           } catch (e) { console.error(e); }
           handleMenuClose();

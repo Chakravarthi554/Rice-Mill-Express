@@ -18,13 +18,13 @@ export const login = createAsyncThunk(
 
                 // 2. Get user profile from backend
                 response = await api.post(
-                    '/api/auth/firebase-login',
+                    '/api/v1/auth/firebase-login',
                     { idToken: token }
                 );
             } catch (firebaseError) {
                 console.log('Firebase login failed, falling back to legacy backend login', firebaseError.message);
                 // Fallback to legacy backend login (e.g. for delivery partners not in Firebase)
-                response = await api.post('/api/auth/login', { email, password });
+                response = await api.post('/api/v1/auth/login', { email, password });
                 token = response.data.accessToken;
             }
 
@@ -33,9 +33,14 @@ export const login = createAsyncThunk(
                 return response.data; // Return raw response without storing
             }
 
-            // 3. Store token and user info
-            await AsyncStorage.setItem('userToken', token);
+            // 3. Store user info ONLY (not the token)
+            // Firebase ID tokens expire in 1 hour — always get a fresh one from auth.currentUser.
+            // Storing the token causes 401 flood on restart if the cached token is expired.
             await AsyncStorage.setItem('userInfo', JSON.stringify(response.data));
+            // For non-Firebase legacy users (delivery partners), store their backend token
+            if (!auth.currentUser) {
+                await AsyncStorage.setItem('userToken', token);
+            }
 
             return { user: response.data, token: token };
         } catch (error) {
@@ -56,7 +61,7 @@ export const register = createAsyncThunk(
             // 2. Create user profile in backend
             // Note: api service already has Authorization header interceptor
             const response = await api.post(
-                '/api/auth/register',
+                '/api/v1/auth/register',
                 { name, email, password, phone, role, referralCode, deviceId }
             );
 
@@ -79,11 +84,13 @@ export const loadUserFromStorage = createAsyncThunk(
     'auth/loadFromStorage',
     async (_, { rejectWithValue }) => {
         try {
-            const token = await AsyncStorage.getItem('userToken');
             const userInfo = await AsyncStorage.getItem('userInfo');
 
-            if (token && userInfo) {
-                return { user: JSON.parse(userInfo), token };
+            if (userInfo) {
+                // For Firebase users, don't use the stored token — get a fresh one from auth.currentUser
+                // For legacy users (delivery partners), fall back to stored token
+                const legacyToken = await AsyncStorage.getItem('userToken');
+                return { user: JSON.parse(userInfo), token: legacyToken || null };
             }
             return rejectWithValue('No stored credentials');
         } catch (error) {

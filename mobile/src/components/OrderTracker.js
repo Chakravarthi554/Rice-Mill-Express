@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { ProgressBar, Colors } from 'react-native-paper';
 import { MaterialIcons } from '@expo/vector-icons';
-import OrderTrackingSocket from '../utils/socket';
+import { connectSocket, subscribeToOrderUpdates, joinRoom, leaveRoom } from '../services/socket';
 
 const statusSteps = [
   { label: 'Placed', value: 'placed', icon: 'shopping-cart' },
@@ -20,19 +20,23 @@ const OrderTracker = ({ order, userId }) => {
   useEffect(() => {
     updateActiveStep(currentOrder.orderStatus);
 
-    const orderSocket = new OrderTrackingSocket(userId);
-    orderSocket.connect();
-    setSocket(orderSocket);
+    const setupSocket = async () => {
+      // Use the global socket.io service instead of the raw WebSocket implementation
+      await connectSocket();
+      subscribeToOrderUpdates((updatedOrder) => {
+        if (updatedOrder._id === order._id) {
+          setCurrentOrder(updatedOrder);
+          updateActiveStep(updatedOrder.orderStatus);
+        }
+      });
+      joinRoom(`order_${order._id}`);
+    };
 
-    orderSocket.on('message', (message) => {
-      if (message.type === 'ORDER_UPDATE' && message.data._id === order._id) {
-        setCurrentOrder(message.data);
-        updateActiveStep(message.data.orderStatus);
-      }
-    });
+    setupSocket();
 
     return () => {
-      orderSocket.disconnect();
+      leaveRoom(`order_${order._id}`);
+      // Don't disconnect globally as other screens might need it
     };
   }, []);
 

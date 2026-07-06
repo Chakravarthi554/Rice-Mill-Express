@@ -60,7 +60,7 @@ const CommentSystem = ({ itemId, type = 'recipes' }) => {
         setLoading(true);
         try {
             const response = await fetch(
-                `/api/social/${type}/${itemId}/comments/sorted?sortBy=${sort}&page=${pageNum}&limit=20`,
+                `/api/v1/social/${type}/${itemId}/comments/sorted?sortBy=${sort}&page=${pageNum}&limit=20`,
                 {
                     headers: userInfo?.token ? { Authorization: `Bearer ${userInfo.token}` } : {}
                 }
@@ -84,7 +84,7 @@ const CommentSystem = ({ itemId, type = 'recipes' }) => {
     // Fetch replies for a comment
     const fetchReplies = async (commentId) => {
         try {
-            const response = await fetch(`/api/social/${type}/${itemId}/comments/${commentId}/replies`);
+            const response = await fetch(`/api/v1/social/${type}/${itemId}/comments/${commentId}/replies`);
             const data = await response.json();
             setReplies(prev => ({ ...prev, [commentId]: data.replies || [] }));
         } catch (error) {
@@ -184,7 +184,7 @@ const CommentSystem = ({ itemId, type = 'recipes' }) => {
         setCommentText('');
 
         try {
-            const response = await fetch(`/api/social/${type}/${itemId}/comment`, {
+            const response = await fetch(`/api/v1/social/${type}/${itemId}/comment`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -210,7 +210,7 @@ const CommentSystem = ({ itemId, type = 'recipes' }) => {
         if (!editText.trim()) return;
 
         try {
-            const response = await fetch(`/api/social/${type}/${itemId}/comments/${commentId}`, {
+            const response = await fetch(`/api/v1/social/${type}/${itemId}/comments/${commentId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -259,7 +259,7 @@ const CommentSystem = ({ itemId, type = 'recipes' }) => {
         });
 
         try {
-            await fetch(`/api/social/${type}/${itemId}/comments/${commentId}`, {
+            await fetch(`/api/v1/social/${type}/${itemId}/comments/${commentId}`, {
                 method: 'DELETE',
                 headers: { Authorization: `Bearer ${userInfo.token}` }
             });
@@ -296,7 +296,7 @@ const CommentSystem = ({ itemId, type = 'recipes' }) => {
         });
 
         try {
-            const response = await fetch(`/api/social/${type}/${itemId}/comments/${commentId}/like`, {
+            const response = await fetch(`/api/v1/social/${type}/${itemId}/comments/${commentId}/like`, {
                 method: 'POST',
                 headers: { Authorization: `Bearer ${userInfo.token}` }
             });
@@ -338,7 +338,7 @@ const CommentSystem = ({ itemId, type = 'recipes' }) => {
         }));
 
         try {
-            const response = await fetch(`/api/social/${type}/${itemId}/comments/${parentCommentId}/reply`, {
+            const response = await fetch(`/api/v1/social/${type}/${itemId}/comments/${parentCommentId}/reply`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

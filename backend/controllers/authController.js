@@ -260,11 +260,6 @@ const loginUser = asyncHandler(async (req, res) => {
 const loginWithPhone = asyncHandler(async (req, res) => {
   const { idToken, phone } = req.body;
 
-  if (!idToken) {
-    res.status(400);
-    throw new Error('Firebase ID Token is required');
-  }
-
   try {
     // 1. Verify Firebase ID Token
     const decodedToken = await admin.auth().verifyIdToken(idToken);
@@ -334,11 +329,6 @@ const loginWithPhone = asyncHandler(async (req, res) => {
 // @access  Public
 const firebaseLogin = asyncHandler(async (req, res) => {
   const { idToken, referralCode } = req.body;
-
-  if (!idToken) {
-    res.status(400);
-    throw new Error('Firebase ID Token is required');
-  }
 
   try {
     // 1. Verify Firebase ID Token
@@ -521,11 +511,6 @@ const firebaseLogin = asyncHandler(async (req, res) => {
 // @access  Public
 const loginWithGoogle = asyncHandler(async (req, res) => {
   const { idToken } = req.body;
-
-  if (!idToken) {
-    res.status(400);
-    throw new Error('Firebase ID Token is required');
-  }
 
   try {
     // 1. Verify Token

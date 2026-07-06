@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { paymentLimiter } = require('../middleware/rateLimiter');
 
 // Import middlewares with error handling
 let authMiddleware;
@@ -23,6 +24,16 @@ try {
 const { protect, authorize, requireVerifiedEmail } = authMiddleware;
 
 // ✅ FIXED: Health check for admin payments API
+/**
+ * @swagger
+ * /api/payments/health:
+ *   get:
+ *     summary: Health check for Payments API
+ *     tags: [Payments]
+ *     responses:
+ *       200:
+ *         description: Payments API is healthy
+ */
 router.get('/health', (req, res) => {
   res.json({
     message: 'Admin Payments API is working!',
@@ -32,11 +43,70 @@ router.get('/health', (req, res) => {
 });
 
 const paymentController = require('../controllers/paymentController');
+const { validateResult } = require('../middleware/validators/validate');
+const paymentValidator = require('../middleware/validators/paymentValidator');
 
 // 🌐 PUBLIC ROUTES (MUST be before protect middleweare)
+/**
+ * @swagger
+ * /api/payments/razorpay/pay/{orderId}:
+ *   get:
+ *     summary: Render Razorpay checkout page for an order
+ *     tags: [Payments]
+ *     parameters:
+ *       - in: path
+ *         name: orderId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Order ID to pay for
+ *     responses:
+ *       200:
+ *         description: Checkout page rendered
+ */
 router.get('/razorpay/pay/:orderId', paymentController.renderRazorpayCheckout);
+
+/**
+ * @swagger
+ * /api/payments/razorpay/verify-link:
+ *   get:
+ *     summary: Verify Razorpay payment link
+ *     tags: [Payments]
+ *     responses:
+ *       200:
+ *         description: Verification result
+ */
 router.get('/razorpay/verify-link', paymentController.verifyRazorpayLink);
+
+/**
+ * @swagger
+ * /api/payments/razorpay/pay-advance/{orderId}:
+ *   get:
+ *     summary: Render Razorpay advance checkout for an order
+ *     tags: [Payments]
+ *     parameters:
+ *       - in: path
+ *         name: orderId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Order ID for advance payment
+ *     responses:
+ *       200:
+ *         description: Advance checkout page rendered
+ */
 router.get('/razorpay/pay-advance/:orderId', paymentController.renderRazorpayAdvanceCheckout);
+
+/**
+ * @swagger
+ * /api/payments/razorpay/verify-advance-link:
+ *   get:
+ *     summary: Verify Razorpay advance payment link
+ *     tags: [Payments]
+ *     responses:
+ *       200:
+ *         description: Verification result
+ */
 router.get('/razorpay/verify-advance-link', paymentController.verifyRazorpayAdvanceLink);
 
 // All routes require authentication
@@ -55,13 +125,158 @@ router.post('/add-card', requireVerifiedEmail, validateController(userController
 router.delete('/cards/:id', requireVerifiedEmail, validateController(userController, 'deletePaymentMethod'));
 
 // ✅ FIXED: Razorpay routes for customers (Secure)
-router.post('/razorpay/order', requireVerifiedEmail, paymentController.createRazorpayOrder);
-router.post('/razorpay/verify', requireVerifiedEmail, paymentController.verifyRazorpayPayment);
+/**
+ * @swagger
+ * /api/payments/razorpay/order:
+ *   post:
+ *     summary: Create a Razorpay order to initiate payment
+ *     tags: [Payments]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - amount
+ *               - orderId
+ *             properties:
+ *               amount:
+ *                 type: number
+ *                 description: Payment amount in INR
+ *                 example: 1500
+ *               orderId:
+ *                 type: string
+ *                 description: The order ID to create payment for
+ *                 example: "60d5ec49f1b2c72b7c8e4a3f"
+ *               currency:
+ *                 type: string
+ *                 default: INR
+ *     responses:
+ *       200:
+ *         description: Razorpay order created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 razorpayOrder:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     amount:
+ *                       type: number
+ *                     currency:
+ *                       type: string
+ *       400:
+ *         description: Invalid request
+ *       401:
+ *         description: Unauthorized
+ */
+router.post('/razorpay/order', paymentLimiter, requireVerifiedEmail, paymentValidator.createRazorpayOrderValidator, validateResult, paymentController.createRazorpayOrder);
+
+/**
+ * @swagger
+ * /api/payments/razorpay/verify:
+ *   post:
+ *     summary: Verify a Razorpay payment after checkout
+ *     tags: [Payments]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - razorpay_order_id
+ *               - razorpay_payment_id
+ *               - razorpay_signature
+ *             properties:
+ *               razorpay_order_id:
+ *                 type: string
+ *                 description: Razorpay order ID returned from checkout
+ *               razorpay_payment_id:
+ *                 type: string
+ *                 description: Razorpay payment ID from successful payment
+ *               razorpay_signature:
+ *                 type: string
+ *                 description: HMAC signature for verification
+ *     responses:
+ *       200:
+ *         description: Payment verified successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 payment:
+ *                   type: object
+ *       400:
+ *         description: Payment verification failed
+ *       401:
+ *         description: Unauthorized
+ */
+router.post('/razorpay/verify', paymentLimiter, requireVerifiedEmail, paymentValidator.verifyRazorpayPaymentValidator, validateResult, paymentController.verifyRazorpayPayment);
 
 // ✅ NEW: Seller payment routes
+/**
+ * @swagger
+ * /api/payments/seller:
+ *   get:
+ *     summary: Get payment history for the authenticated seller
+ *     tags: [Payments]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of seller payments
+ */
 router.get('/seller', authorize('seller'), paymentController.getSellerPayments);
-router.post('/cod-report/:orderId', requireVerifiedEmail, authorize('seller'), paymentController.recordCodPayment);
-router.post('/request-payout', requireVerifiedEmail, authorize('seller'), paymentController.requestPayout);
+
+/**
+ * @swagger
+ * /api/payments/cod-report/{orderId}:
+ *   post:
+ *     summary: Record a COD payment for an order (seller only)
+ *     tags: [Payments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orderId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: COD payment recorded
+ */
+router.post('/cod-report/:orderId', requireVerifiedEmail, authorize('seller'), paymentValidator.recordCodPaymentValidator, validateResult, paymentController.recordCodPayment);
+
+/**
+ * @swagger
+ * /api/payments/request-payout:
+ *   post:
+ *     summary: Request a payout (seller only)
+ *     tags: [Payments]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Payout request submitted
+ */
+router.post('/request-payout', requireVerifiedEmail, authorize('seller'), paymentValidator.requestPayoutValidator, validateResult, paymentController.requestPayout);
 
 // Admin Routes (Apply admin check to all subsequent routes or individually)
 router.use(authorize('admin'));

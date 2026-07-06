@@ -132,7 +132,7 @@ const DeliveryPhotoConfirmation = ({ order, onSuccess, onCancel }) => {
             setSubmitting(true);
             const userInfo = JSON.parse(localStorage.getItem('userInfo'));
 
-            const response = await axios.post('/api/delivery/confirm', {
+            const response = await axios.post('/api/v1/delivery/confirm', {
                 orderId: order._id,
                 photoProofUrl: photoUrl,
                 codAmount: order.paymentMethod === 'cod' ? codAmount : null,

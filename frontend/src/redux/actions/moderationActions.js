@@ -41,7 +41,7 @@ export const getPendingContent = (filters = {}) => async (dispatch, getState) =>
       if (filters[key]) params.append(key, filters[key]);
     });
 
-    const { data } = await api.get(`/api/admin/moderation/pending?${params}`, config);
+    const { data } = await api.get(`/api/v1/admin/moderation/pending?${params}`, config);
     
     dispatch({
       type: MODERATION_PENDING_SUCCESS,
@@ -73,7 +73,7 @@ export const getFlaggedContent = (filters = {}) => async (dispatch, getState) =>
       if (filters[key]) params.append(key, filters[key]);
     });
 
-    const { data } = await api.get(`/api/admin/moderation/flagged?${params}`, config);
+    const { data } = await api.get(`/api/v1/admin/moderation/flagged?${params}`, config);
     
     dispatch({
       type: MODERATION_FLAGGED_SUCCESS,
@@ -102,7 +102,7 @@ export const approveContent = (contentType, contentId, moderationData) => async 
     };
 
     const { data } = await api.put(
-      `/api/admin/moderation/approve/${contentType}/${contentId}`,
+      `/api/v1/admin/moderation/approve/${contentType}/${contentId}`,
       moderationData,
       config
     );
@@ -137,7 +137,7 @@ export const rejectContent = (contentType, contentId, moderationData) => async (
     };
 
     const { data } = await api.put(
-      `/api/admin/moderation/reject/${contentType}/${contentId}`,
+      `/api/v1/admin/moderation/reject/${contentType}/${contentId}`,
       moderationData,
       config
     );
@@ -172,7 +172,7 @@ export const deleteContent = (contentType, contentId, moderationData) => async (
     };
 
     const { data } = await api.delete(
-      `/api/admin/moderation/delete/${contentType}/${contentId}`,
+      `/api/v1/admin/moderation/delete/${contentType}/${contentId}`,
       { data: moderationData, ...config }
     );
     
@@ -205,7 +205,7 @@ export const pinForumPost = (postId) => async (dispatch, getState) => {
     };
 
     const { data } = await api.put(
-      `/api/admin/moderation/pin/forum/${postId}`,
+      `/api/v1/admin/moderation/pin/forum/${postId}`,
       {},
       config
     );
@@ -238,7 +238,7 @@ export const getModerationStats = () => async (dispatch, getState) => {
       },
     };
 
-    const { data } = await api.get('/api/admin/moderation/stats', config);
+    const { data } = await api.get('/api/v1/admin/moderation/stats', config);
     
     dispatch({
       type: MODERATION_STATS_SUCCESS,

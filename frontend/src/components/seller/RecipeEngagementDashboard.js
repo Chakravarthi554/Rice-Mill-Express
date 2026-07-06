@@ -55,9 +55,9 @@ const RecipeEngagementDashboard = ({ sellerId, recipes = [] }) => {
             setError(null);
 
             const [ov, tr, ac] = await Promise.all([
-                api.get('/api/seller/engagement/overview'),
-                api.get('/api/seller/engagement/trends?period=7days'),
-                api.get('/api/seller/engagement/activity')
+                api.get('/api/v1/seller/engagement/overview'),
+                api.get('/api/v1/seller/engagement/trends?period=7days'),
+                api.get('/api/v1/seller/engagement/activity')
             ]);
 
             setOverview(ov.data);

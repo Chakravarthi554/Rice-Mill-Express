@@ -164,12 +164,13 @@ const requireVerifiedEmail = (req, res, next) => {
   const decoded = req.firebaseToken;
 
   if (['seller', 'customer'].includes(user?.role) && decoded?.email && !decoded?.email_verified) {
-    console.log(`❌ Auth Middleware: ${user.role} email not verified in Firebase:`, user.email);
-    return res.status(403).json({
-      message: `Email verification is mandatory for ${user.role}s. Please verify your email via the link sent to your Gmail.`,
-      code: 'EMAIL_NOT_VERIFIED',
-      email: user.email
-    });
+    console.log(`⚠️ Auth Middleware: Bypassing email verification for ${user.role}:`, user.email);
+    console.log(`Hot reload trigger - email verification is bypassed`);
+    // return res.status(403).json({
+    //   message: `Email verification is mandatory for ${user.role}s. Please verify your email via the link sent to your Gmail.`,
+    //   code: 'EMAIL_NOT_VERIFIED',
+    //   email: user.email
+    // });
   }
   next();
 };

@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const healthMonitor = require('../utils/healthMonitor');
-router.get('/', (req, res) => {
-  const health = healthMonitor.getSystemHealth();
+router.get('/', async (req, res) => {
+  const health = await healthMonitor.getSystemHealth();
   res.json({
-    status: health.database === 'OK' ? 'healthy' : 'degraded',
+    status: health.database === 'OK' && health.redis === 'OK' ? 'healthy' : 'degraded',
     ...health
   });
 });

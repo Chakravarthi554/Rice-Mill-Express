@@ -14,7 +14,9 @@ export const cartReducer = (state = { cartItems: [], loading: false }, action) =
         case CART_FETCH_REQUEST:
             return { ...state, loading: true };
         case CART_FETCH_SUCCESS:
-            return { loading: false, cartItems: action.payload };
+            // Defensive check: if payload is the API envelope object, extract the array. Otherwise fallback to []
+            const safePayload = Array.isArray(action.payload) ? action.payload : (action.payload?.data && Array.isArray(action.payload.data) ? action.payload.data : []);
+            return { loading: false, cartItems: safePayload };
         case CART_FETCH_FAIL:
             return { ...state, loading: false, error: action.payload };
         case CART_ADD_ITEM:

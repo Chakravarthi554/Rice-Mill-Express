@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import {
     View, Text, ScrollView, StyleSheet, ActivityIndicator,
-    Alert, TouchableOpacity, Linking, Image, SafeAreaView, StatusBar,
+    Alert, TouchableOpacity, Linking, Image, SafeAreaView, StatusBar, Share,
 } from 'react-native';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system';
@@ -51,6 +51,22 @@ const OrderDetailScreen = ({ route, navigation }) => {
     const [loading, setLoading] = useState(true);
     const [downloading, setDownloading] = useState(false);
 
+    // Share handler — share a clean link to the order
+    const handleShare = async () => {
+        try {
+            if (!order) return;
+            const orderNum = order._id.slice(-10).toUpperCase();
+            // Deep link for app users; web fallback for others
+            const link = `ricemillapp://orders/${order._id}`;
+            await Share.share({
+                message: `Check my order #${orderNum} on Rice Mill App:\n${link}`,
+                title: `Order #${orderNum}`,
+            });
+        } catch (e) {
+            Alert.alert('Error', 'Unable to share order details.');
+        }
+    };
+
     useEffect(() => { fetchOrderDetails(); }, []);
 
     const fetchOrderDetails = async () => {
@@ -70,61 +86,63 @@ const OrderDetailScreen = ({ route, navigation }) => {
     const handleDownloadInvoice = async () => {
         try {
             setDownloading(true);
-            const auth = await apiService.getAuthToken();
-            const headers = { Authorization: `Bearer ${auth}` };
 
-            // 1. Enqueue the generation job
-            const enqueueRes = await fetch(`${API_URL}/api/orders/${id}/invoice`, { headers });
-            if (enqueueRes.status !== 202 && enqueueRes.status !== 200) {
-                throw new Error('Failed to start invoice generation');
-            }
+            // 1. Request invoice generation (uses correct /api/v1 base URL with auth)
+            const enqueueRes = await apiService.generateInvoice(id);
+            const initialStatus = enqueueRes?.data?.status;
 
-            // 2. Poll for completion
-            let isReady = false;
-            let attempts = 0;
-            const maxAttempts = 30; // 60 seconds timeout
-            while (!isReady && attempts < maxAttempts) {
-                const statusRes = await fetch(`${API_URL}/api/orders/${id}/invoice/status`, { headers });
-                const statusData = await statusRes.json();
-                if (statusData.status === 'completed') {
-                    isReady = true;
-                } else {
-                    attempts++;
-                    await new Promise(resolve => setTimeout(resolve, 2000));
+            // 2. If not already completed, poll until PDF is ready (max 60s)
+            if (initialStatus !== 'completed') {
+                let isReady = false;
+                let attempts = 0;
+                const maxAttempts = 30;
+                while (!isReady && attempts < maxAttempts) {
+                    const statusRes = await apiService.checkInvoiceStatus(id);
+                    if (statusRes?.data?.status === 'completed') {
+                        isReady = true;
+                    } else {
+                        attempts++;
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                    }
+                }
+                if (!isReady) {
+                    throw new Error('Invoice generation timed out. Please try again.');
                 }
             }
 
-            if (!isReady) {
-                throw new Error('Invoice generation timed out. Please try again later.');
+            // 3. Download the PDF using FileSystem with auth header
+            const token = await apiService.getAuthToken();
+            const fileUri = FileSystem.documentDirectory + `invoice_${id.slice(-8).toUpperCase()}.pdf`;
+            const downloadRes = await FileSystem.downloadAsync(
+                `${API_URL}/api/v1/orders/${id}/invoice/download`,
+                fileUri,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            if (downloadRes.status !== 200) {
+                throw new Error('Failed to download the invoice PDF.');
             }
 
-            // 3. Download the actual PDF file
-            const downloadUrl = `${API_URL}/api/orders/${id}/invoice/download`;
-            const fileUri = FileSystem.documentDirectory + `invoice_${id.slice(-8).toUpperCase()}.pdf`;
-            
-            const downloadRes = await FileSystem.downloadAsync(
-                downloadUrl,
-                fileUri,
-                { headers }
-            );
-            
-            if (downloadRes.status !== 200) {
-                throw new Error('Failed to download invoice');
-            }
-            
+            // 4. Open the native share / open-with sheet
             if (await Sharing.isAvailableAsync()) {
-                await Sharing.shareAsync(downloadRes.uri);
+                await Sharing.shareAsync(downloadRes.uri, {
+                    mimeType: 'application/pdf',
+                    dialogTitle: `Invoice for Order #${id.slice(-10).toUpperCase()}`,
+                    UTI: 'com.adobe.pdf',
+                });
             } else {
-                Alert.alert('Success', 'Invoice downloaded successfully to your device.');
+                Alert.alert('Downloaded', 'Invoice saved to your device.');
             }
         } catch (error) {
-            Alert.alert('Error', error.message || 'Could not download invoice. Please try again later.');
+            console.error('Invoice download error:', error);
+            Alert.alert('Error', error.message || 'Could not download invoice. Please try again.');
         } finally {
             setDownloading(false);
         }
     };
 
     const handleRefundRequest = () => navigation.navigate('Refunds', { orderId: id });
+
     const handleTrackOrder = () => Alert.alert('Live Tracking', 'Live map tracking is coming soon!');
 
     const formatDate = (ds) => {
@@ -158,7 +176,7 @@ const OrderDetailScreen = ({ route, navigation }) => {
                     <Feather name="arrow-left" size={20} color="#111827" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Order Details</Text>
-                <TouchableOpacity style={styles.shareBtn}>
+                <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
                     <Feather name="share-2" size={18} color="#6B7280" />
                 </TouchableOpacity>
             </View>

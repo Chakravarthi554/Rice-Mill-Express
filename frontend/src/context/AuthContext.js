@@ -123,7 +123,7 @@ export const AuthProvider = ({ children }) => {
         return null;
       }
 
-      const response = await api.post('/api/auth/refresh-token', { refreshToken: refreshTokenValue });
+      const response = await api.post('/api/v1/auth/refresh-token', { refreshToken: refreshTokenValue });
 
       const { accessToken, refreshToken: newRefreshToken, user: userData } = response.data;
       console.log('✅ AuthContext: Token refresh successful');
@@ -172,7 +172,7 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('🔄 AuthContext: Background syncing profile for UID:', firebaseUser.uid);
       const idToken = await firebaseUser.getIdToken(true);
-      const response = await api.post('/api/auth/firebase-login', { idToken }, { signal });
+      const response = await api.post('/api/v1/auth/firebase-login', { idToken }, { signal });
       console.log('📦 AuthContext: Background sync successful');
 
       const userData = {
@@ -301,7 +301,7 @@ export const AuthProvider = ({ children }) => {
             console.log('🔄 AuthContext: Fetching profile for UID:', firebaseUser.uid);
             const idToken = await firebaseUser.getIdToken(true);
 
-            const response = await api.post('/api/auth/firebase-login', { idToken }, { signal: abortController.signal });
+            const response = await api.post('/api/v1/auth/firebase-login', { idToken }, { signal: abortController.signal });
             console.log('📦 AuthContext: Sync successful');
 
             const userData = {
@@ -539,15 +539,15 @@ export const AuthProvider = ({ children }) => {
       };
 
       // 2. Sync with MongoDB
-      const { data } = await api.post('/api/auth/register', registrationData);
+      const { data } = await api.post('/api/v1/auth/register', registrationData);
 
-      if (data.success) {
+      if (data) {
         const idToken = await firebaseUser.getIdToken();
         localStorage.setItem('token', idToken);
         localStorage.setItem('refreshToken', firebaseUser.refreshToken);
 
         // Fetch full profile (bridging MongoDB roles)
-        const { data: profileData } = await api.get('/api/users/profile', {
+        const { data: profileData } = await api.get('/api/v1/users/profile', {
           headers: { Authorization: `Bearer ${idToken}` },
         });
 

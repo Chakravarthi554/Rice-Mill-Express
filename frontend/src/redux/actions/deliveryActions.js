@@ -23,7 +23,7 @@ import {
 export const listDeliveryPartners = () => async (dispatch, getState) => {
   try {
     dispatch({ type: DELIVERY_PARTNER_LIST_REQUEST });
-    const { data } = await api.get('/api/delivery-partners/partners');
+    const { data } = await api.get('/api/v1/delivery-partners/partners');
 
     console.log('✅ Delivery partners fetched:', {
       count: data.length,
@@ -43,7 +43,7 @@ export const listDeliveryPartners = () => async (dispatch, getState) => {
 export const createDeliveryPartner = (partnerData) => async (dispatch, getState) => {
   try {
     dispatch({ type: DELIVERY_PARTNER_CREATE_REQUEST });
-    const { data } = await api.post('/api/delivery-partners/partners', partnerData);
+    const { data } = await api.post('/api/v1/delivery-partners/partners', partnerData);
     dispatch({ type: DELIVERY_PARTNER_CREATE_SUCCESS, payload: data });
   } catch (error) {
     dispatch({
@@ -56,7 +56,7 @@ export const createDeliveryPartner = (partnerData) => async (dispatch, getState)
 export const updateDeliveryPartner = (id, partnerData) => async (dispatch, getState) => {
   try {
     dispatch({ type: DELIVERY_PARTNER_UPDATE_REQUEST });
-    const { data } = await api.put(`/api/delivery-partners/partners/${id}`, partnerData);
+    const { data } = await api.put(`/api/v1/delivery-partners/partners/${id}`, partnerData);
     dispatch({ type: DELIVERY_PARTNER_UPDATE_SUCCESS, payload: data });
   } catch (error) {
     dispatch({
@@ -69,7 +69,7 @@ export const updateDeliveryPartner = (id, partnerData) => async (dispatch, getSt
 export const deleteDeliveryPartner = (id) => async (dispatch, getState) => {
   try {
     dispatch({ type: DELIVERY_PARTNER_DELETE_REQUEST });
-    await api.delete(`/api/delivery-partners/partners/${id}`);
+    await api.delete(`/api/v1/delivery-partners/partners/${id}`);
     dispatch({ type: DELIVERY_PARTNER_DELETE_SUCCESS, payload: id });
   } catch (error) {
     dispatch({
@@ -84,11 +84,11 @@ export const assignDeliveryPartner = (orderId, deliveryData) => async (dispatch,
     console.log('🚀 Redux Action: Assigning delivery partner', {
       orderId,
       deliveryData,
-      endpoint: `/api/delivery-partners/orders/${orderId}`
+      endpoint: `/api/v1/delivery-partners/orders/${orderId}`
     });
 
     dispatch({ type: DELIVERY_ASSIGN_REQUEST });
-    const { data } = await api.put(`/api/orders/${orderId}/assign-partner`, deliveryData);
+    const { data } = await api.put(`/api/v1/orders/${orderId}/assign-partner`, deliveryData);
     console.log('✅ Partner assigned successfully:', data);
 
     dispatch({ type: DELIVERY_ASSIGN_SUCCESS, payload: data });
@@ -125,7 +125,7 @@ export const assignDeliveryPartner = (orderId, deliveryData) => async (dispatch,
 export const listOrdersForDelivery = () => async (dispatch, getState) => {
   try {
     dispatch({ type: ORDER_LIST_FOR_DELIVERY_REQUEST });
-    const { data } = await api.get('/api/delivery-partners/orders/ready-for-delivery');
+    const { data } = await api.get('/api/v1/delivery-partners/orders/ready-for-delivery');
     dispatch({ type: ORDER_LIST_FOR_DELIVERY_SUCCESS, payload: data });
   } catch (error) {
     dispatch({

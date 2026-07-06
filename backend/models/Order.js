@@ -547,4 +547,8 @@ orderSchema.pre('save', function (next) {
 orderSchema.set('toJSON', { virtuals: true });
 orderSchema.set('toObject', { virtuals: true });
 
+// Compound Indexes for query performance
+orderSchema.index({ user: 1, orderStatus: 1 });
+orderSchema.index({ seller: 1, orderStatus: 1 });
+
 module.exports = mongoose.model('Order', orderSchema);
