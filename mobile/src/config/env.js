@@ -18,7 +18,7 @@ const ENV_MAP = {
     DEBUG: true,
   },
   production: {
-    API_URL: 'http://13.62.55.108:5001',
+    API_URL: 'http://13.62.55.108',
     ENVIRONMENT: 'production',
     DEBUG: false,
   },

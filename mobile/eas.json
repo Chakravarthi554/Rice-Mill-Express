@@ -12,7 +12,7 @@
       "distribution": "internal",
       "env": {
         "APP_ENV": "production",
-        "EXPO_PUBLIC_API_URL": "http://13.62.55.108:5001",
+        "EXPO_PUBLIC_API_URL": "http://13.62.55.108",
         "EXPO_PUBLIC_ENVIRONMENT": "production"
       }
     },
