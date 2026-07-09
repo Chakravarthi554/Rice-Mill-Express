@@ -9,7 +9,20 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "APP_ENV": "production",
+        "EXPO_PUBLIC_API_URL": "http://13.62.55.108:5001",
+        "EXPO_PUBLIC_ENVIRONMENT": "production"
+      }
+    },
+    "preview-local": {
+      "extends": "preview",
+      "env": {
+        "APP_ENV": "development",
+        "EXPO_PUBLIC_API_URL": "http://10.55.30.143:5001",
+        "EXPO_PUBLIC_ENVIRONMENT": "development"
+      }
     },
     "production": {
       "autoIncrement": true

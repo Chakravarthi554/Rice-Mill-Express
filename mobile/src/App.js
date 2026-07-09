@@ -23,15 +23,9 @@ import { loadUserFromStorage, setCredentials, setAuthReady, logout } from './red
 import { fetchSettings } from './redux/slices/settingsSlice';
 import { auth } from './config/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import * as Sentry from '@sentry/react-native';
 import MobileErrorBoundary from './components/MobileErrorBoundary';
 
-if (process.env.EXPO_PUBLIC_SENTRY_DSN) {
-  Sentry.init({
-    dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
-    tracesSampleRate: 1.0,
-  });
-}
+// Sentry integration removed
 
 const { LightTheme, DarkTheme } = adaptNavigationTheme({
   reactNavigationLight: NavigationDefaultTheme,

@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import * as Sentry from '@sentry/react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Updates from 'expo-updates';
 
@@ -20,10 +19,8 @@ class MobileErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    // Report to Sentry
-    Sentry.captureException(error, {
-      contexts: { react: { componentStack: errorInfo?.componentStack } },
-    });
+    // Report to error tracking service if needed
+    console.error("ErrorBoundary caught an error:", error, errorInfo);
   }
 
   handleRestart = async () => {

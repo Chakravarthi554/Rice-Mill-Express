@@ -47,6 +47,12 @@ const waitForFirebaseUser = (timeoutMs = 3000) => {
 // Add auth token to every request
 api.interceptors.request.use(
     async (config) => {
+        console.log(`\n--- [API DEBUG] ---`);
+        console.log(`Current API URL : ${API_URL}`);
+        console.log(`Axios baseURL   : ${config.baseURL}`);
+        console.log(`Request Method  : ${config.method?.toUpperCase()}`);
+        console.log(`Request URL     : ${config.url}`);
+        console.log(`-------------------\n`);
         try {
             // Always try to get a fresh token from Firebase first.
             // wait up to 3s for Firebase auth to restore the session on startup.

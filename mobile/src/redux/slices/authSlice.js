@@ -160,10 +160,24 @@ const authSlice = createSlice({
                 state.error = action.payload;
             })
             // Logout
+            .addCase(logout.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
             .addCase(logout.fulfilled, (state) => {
                 state.user = null;
                 state.token = null;
+                state.loading = false;
+                state.error = null;
                 state.isAuthenticated = false;
+                state.isAuthReady = true;
+            })
+            .addCase(logout.rejected, (state) => {
+                state.loading = false;
+                state.user = null;
+                state.token = null;
+                state.isAuthenticated = false;
+                state.isAuthReady = true;
             })
             // Load from storage
             .addCase(loadUserFromStorage.pending, (state) => {

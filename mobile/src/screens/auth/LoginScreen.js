@@ -8,6 +8,7 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { login } from '../../redux/slices/authSlice';
+import { clearError } from '../../redux/slices/authSlice';
 
 export default function LoginScreen({ navigation }) {
     const [email, setEmail] = useState('');
@@ -20,6 +21,7 @@ export default function LoginScreen({ navigation }) {
     const { loading, error } = useSelector((state) => state.auth);
 
     const handleLogin = async () => {
+        dispatch(clearError());
         if (!email || !password) { Alert.alert('Missing Fields', 'Please fill in all fields'); return; }
         try {
             const result = await dispatch(login({ email, password })).unwrap();
@@ -131,7 +133,7 @@ export default function LoginScreen({ navigation }) {
                         </View>
 
                         {/* Google Login */}
-                        <TouchableOpacity style={styles.googleBtn}>
+                        <TouchableOpacity style={styles.googleBtn} onPress={() => Alert.alert('Coming Soon', 'Google Sign-In is not yet configured for this app. Please use email and password to sign in.')}>
                             <Text style={styles.googleIcon}>🇬</Text>
                             <Text style={styles.googleBtnText}>Continue with Google</Text>
                         </TouchableOpacity>

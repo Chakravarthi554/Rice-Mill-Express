@@ -108,8 +108,19 @@ const combinedReducer = combineReducers({
 const rootReducer = (state, action) => {
   // On logout or cache clear, reset ALL user-scoped state to prevent data leaking between accounts
   if (action.type === 'auth/logout/fulfilled' || action.type === 'CLEAR_CACHE_STATE') {
-    // Reset everything — let each reducer start fresh with initial state
-    state = undefined;
+    // Reset everything — but preserve isAuthReady so the app doesn't get
+    // stuck on the loading spinner (the onAuthStateChanged listener may
+    // have already fired and won't fire again to set it back to true).
+    state = {
+      auth: {
+        user: null,
+        token: null,
+        loading: false,
+        error: null,
+        isAuthenticated: false,
+        isAuthReady: true,
+      },
+    };
   }
   return combinedReducer(state, action);
 };
