@@ -174,11 +174,10 @@ const filterProducts = asyncHandler(async (req, res) => {
     // Execute query
     const products = await Product.find(query)
       .select('name brand category price offerPrice images rating numReviews countInStock availableStock weight unit approvalStatus type quality discounts')
-      .populate('seller', 'name businessName phone rating')
+      .populate('seller', 'name businessName phone address')
       .sort(sort)
       .skip(skip)
-      .limit(Number(limit))
-      .lean();
+      .limit(Number(limit));
 
     const total = await Product.countDocuments(query);
 
