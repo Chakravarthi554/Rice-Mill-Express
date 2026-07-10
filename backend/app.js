@@ -59,6 +59,25 @@ const app = express();
 
 app.set("trust proxy", 1);
 
+// 🌐 Global URL Rewriter for all images
+app.use((req, res, next) => {
+  const originalSend = res.send;
+  const baseUrl = process.env.NODE_ENV === 'production' 
+    ? 'http://13.62.55.108:5001' 
+    : `http://localhost:${process.env.PORT || 5001}`;
+
+  res.send = function(body) {
+    if (typeof body === 'string' && (res.get('Content-Type') || '').includes('application/json')) {
+      // Replace "/uploads/..." and "/images/..." with full URLs anywhere in the JSON payload
+      body = body.replace(/"\/uploads\//g, `"${baseUrl}/uploads/`)
+                 .replace(/"\/images\//g, `"${baseUrl}/images/`)
+                 .replace(/\\"\//g, `\\"${baseUrl}/`); // For escaped JSON inside strings if any
+    }
+    return originalSend.call(this, body);
+  };
+  next();
+});
+
 // Socket.io initialization has been moved to the async startup block (see bottom of file)
 
 // Attach io and broadcast functions to each request
