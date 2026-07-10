@@ -16,17 +16,25 @@ logger.info("🔍 Validating core environment variables...");
 const requiredEnvVars = [
   'JWT_SECRET', 
   'REFRESH_TOKEN_SECRET', 
-  'MONGO_URI', 
-  'FIREBASE_PROJECT_ID', 
+  'MONGO_URI'
+];
+
+const optionalEnvVars = [
+  'FIREBASE_PROJECT_ID',
   'CLOUDINARY_CLOUD_NAME'
 ];
 
-const missingVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
+const missingRequired = requiredEnvVars.filter(envVar => !process.env[envVar]);
+const missingOptional = optionalEnvVars.filter(envVar => !process.env[envVar]);
 
-if (missingVars.length > 0) {
-  logger.error(`❌ CRITICAL: Missing required environment variables: ${missingVars.join(', ')}`);
+if (missingRequired.length > 0) {
+  logger.error(`❌ CRITICAL: Missing required environment variables: ${missingRequired.join(', ')}`);
   logger.error('👉 Please refer to .env.example to configure these properly.');
   process.exit(1);
+}
+
+if (missingOptional.length > 0) {
+  logger.warn(`⚠️ Optional environment variables not set: ${missingOptional.join(', ')}. Some features may be disabled.`);
 }
 logger.info("✅ All core environment variables are configured.");
 
