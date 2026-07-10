@@ -16,14 +16,25 @@ const fs = require("fs");
 const logger = require("./utils/logger");
 
 const Sentry = require("@sentry/node");
-const { nodeProfilingIntegration } = require("@sentry/profiling-node");
+let nodeProfilingIntegration = null;
+try {
+  const sentryProfiling = require("@sentry/profiling-node");
+  nodeProfilingIntegration = sentryProfiling.nodeProfilingIntegration;
+} catch (error) {
+  console.log("⚠️ Sentry profiling module not loaded (native bindings may be missing):", error.message);
+}
 
 if (process.env.SENTRY_DSN) {
   const { version } = require('./package.json');
+  const integrations = [];
+  if (nodeProfilingIntegration) {
+    integrations.push(nodeProfilingIntegration());
+  }
+  
   Sentry.init({
     dsn: process.env.SENTRY_DSN,
     release: `ricemill-backend@${version}`,
-    integrations: [nodeProfilingIntegration()],
+    integrations: integrations,
     tracesSampleRate: 1.0,
     profilesSampleRate: 1.0,
   });
