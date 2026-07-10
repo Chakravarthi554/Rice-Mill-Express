@@ -37,16 +37,14 @@ const setupSocketServer = async (server) => {
       socket: {
         host: process.env.REDIS_HOST || '127.0.0.1',
         port: process.env.REDIS_PORT || 6379,
+        connectTimeout: 5000,
+        reconnectStrategy: false, // Don't retry if initial connection fails
       }
     });
     const subClient = pubClient.duplicate();
 
-    pubClient.on('error', (err) => {
-      logger.error('❌ Redis pubClient Error (Socket.io Adapter):', err.message);
-    });
-    subClient.on('error', (err) => {
-      logger.error('❌ Redis subClient Error (Socket.io Adapter):', err.message);
-    });
+    pubClient.on('error', () => {}); // Suppress error spam during connection attempt
+    subClient.on('error', () => {});
 
     try {
       // Await adapter connection before allowing sockets to connect
@@ -54,7 +52,10 @@ const setupSocketServer = async (server) => {
       io.adapter(createAdapter(pubClient, subClient));
       logger.info('✅ Socket.io Redis adapter connected');
     } catch (err) {
-      logger.error('❌ Failed to connect Socket.io Redis adapter:', err.message);
+      logger.warn('⚠️ Redis not available, falling back to in-memory Socket.io adapter. This is fine for single-server deployments.');
+      // Disconnect clients to stop error spam
+      try { await pubClient.disconnect(); } catch(e) {}
+      try { await subClient.disconnect(); } catch(e) {}
     }
   } else {
     logger.info('⚠️ Running Socket.io with in-memory adapter (Redis disabled)');
