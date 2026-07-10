@@ -40,6 +40,26 @@ const recipeSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
+const formatImages = (ret) => {
+  const baseUrl = process.env.NODE_ENV === 'production' ? 'http://13.62.55.108:5001' : 'http://localhost:5001';
+  if (ret.images && Array.isArray(ret.images)) {
+    ret.images = ret.images.map(img => (img && img.startsWith('/')) ? `${baseUrl}${img}` : img);
+  }
+  if (ret.image && ret.image.startsWith('/')) {
+    ret.image = `${baseUrl}${ret.image}`;
+  }
+  return ret;
+};
+
+recipeSchema.set('toJSON', { 
+  virtuals: true,
+  transform: (doc, ret) => formatImages(ret)
+});
+recipeSchema.set('toObject', { 
+  virtuals: true,
+  transform: (doc, ret) => formatImages(ret)
+});
+
 // Index for searching approved recipes quickly
 recipeSchema.index({ status: 1, createdAt: -1 });
 recipeSchema.index({ riceType: 1, status: 1 });
