@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Box, Paper, Typography, Grid, Button, List, ListItem, ListItemText,
   Divider, Dialog, DialogTitle, DialogContent, DialogActions, TextField,
-  Alert, CircularProgress, IconButton, Avatar, Chip, Switch
+  Alert, CircularProgress, IconButton, Avatar, Chip, Switch, Stack
 } from '@mui/material';
 import {
   AccountBalanceWallet, Share, ContentCopy, Add, ExitToApp,
@@ -11,7 +11,7 @@ import {
   Language, NotificationsActive, Lock
 } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
-import { getRewards, getRewardTransactions, getWalletData, requestWithdrawal, getWithdrawalHistory, getReferralCode, getReferrals } from '../../redux/actions/rewardsActions';
+import { getRewards, getRewardTransactions, getWalletData, requestWithdrawal, getWithdrawalHistory, getReferralCode, getReferrals, rechargeWallet } from '../../redux/actions/rewardsActions';
 import { getPublicSettings } from '../../redux/actions/adminSettingsActions';
 import { WITHDRAW_RESET } from '../../redux/constants/rewardsConstants';
 import { useNavigate } from 'react-router-dom';
@@ -27,6 +27,9 @@ const RewardsWallet = () => {
   const [withdrawalAmount, setWithdrawalAmount] = useState('');
   const [bankDetails, setBankDetails] = useState({ bankName: '', accountNumber: '', ifscCode: '', accountHolderName: '' });
 
+  const [openRecharge, setOpenRecharge] = useState(false);
+  const [rechargeAmount, setRechargeAmount] = useState('');
+
   const { userInfo } = useSelector(s => s.userLogin || {});
   const { rewards } = useSelector(state => state.rewards || {});
   const { transactions } = useSelector(state => state.rewardTransactions || {});
@@ -38,6 +41,45 @@ const RewardsWallet = () => {
 
   const referralSettings = publicSettings?.referralSettings || {};
   const minWithdrawal = referralSettings.minWithdrawalAmount || 300;
+
+  const copyReferralCode = () => {
+    const code = referralCodeObj?.code || rewards?.referralCode || userInfo?.referralCode;
+    if (code) {
+      navigator.clipboard.writeText(code);
+      alert('Referral code copied to clipboard!');
+    } else {
+      alert('No referral code available to copy.');
+    }
+  };
+
+  const getShareText = () => {
+    const code = referralCodeObj?.code || rewards?.referralCode || userInfo?.referralCode || '';
+    return `Hey! Join Rice Mill Express using my referral code: ${code} and get ₹50 welcome bonus! Download the app today.`;
+  };
+
+  const shareViaWhatsApp = () => {
+    const text = getShareText();
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+  };
+
+  const shareViaTelegram = () => {
+    const text = getShareText();
+    window.open(`https://t.me/share/url?url=${encodeURIComponent(window.location.origin)}&text=${encodeURIComponent(text)}`, '_blank');
+  };
+
+  const shareGeneral = async () => {
+    const text = getShareText();
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Rice Mill Express Referral', text, url: window.location.origin });
+      } catch (e) {
+        console.log('Share canceled or failed', e);
+      }
+    } else {
+      navigator.clipboard.writeText(text);
+      alert('Referral text copied to clipboard!');
+    }
+  };
   const campaignEnabled = referralSettings.referralCampaignEnabled !== false;
 
   useEffect(() => {
@@ -53,10 +95,6 @@ const RewardsWallet = () => {
     }
   }, [withdrawSuccess, dispatch]);
 
-  const copyReferralCode = () => {
-    const code = referralCodeObj?.code || rewards?.referralCode;
-    if (code) { navigator.clipboard.writeText(code); alert('Copied!'); }
-  };
   const navigate = useNavigate();
 
   const menuItems = [
@@ -129,7 +167,7 @@ const RewardsWallet = () => {
                 <Typography variant="h4" fontWeight={800} sx={{ mt: 0.5, mb: 2 }}>₹{walletData?.balance != null ? walletData.balance.toFixed(2) : '0.00'}</Typography>
                 <Grid container spacing={1.5}>
                   <Grid item xs={6}>
-                    <Button fullWidth variant="contained" sx={{ bgcolor: 'rgba(255,255,255,0.2)', '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' }, color: '#fff', fontWeight: 700, borderRadius: 1.5 }}>
+                    <Button onClick={() => setOpenRecharge(true)} fullWidth variant="contained" sx={{ bgcolor: 'rgba(255,255,255,0.2)', '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' }, color: '#fff', fontWeight: 700, borderRadius: 1.5 }}>
                       Add Money
                     </Button>
                   </Grid>
@@ -198,9 +236,9 @@ const RewardsWallet = () => {
 
               <Typography variant="body2" fontWeight={700} gutterBottom>Share via</Typography>
               <Box sx={{ display: 'flex', gap: 1.5, p: 2, border: '1px solid #F3F4F6', borderRadius: 2, justifyContent: 'center', mb: 3 }}>
-                <WhatsAppIcon />
-                <TelegramIcon />
-                <ShareIconCustom />
+                <IconButton onClick={shareViaWhatsApp} sx={{ p: 0 }}><WhatsAppIcon /></IconButton>
+                <IconButton onClick={shareViaTelegram} sx={{ p: 0 }}><TelegramIcon /></IconButton>
+                <IconButton onClick={shareGeneral} sx={{ p: 0 }}><ShareIconCustom /></IconButton>
               </Box>
 
               <Typography variant="body2" fontWeight={700} gutterBottom>Your Earnings</Typography>
@@ -240,6 +278,57 @@ const RewardsWallet = () => {
           <Button onClick={() => setOpenWithdraw(false)}>Cancel</Button>
           <Button onClick={() => dispatch(requestWithdrawal({ amount: Number(withdrawalAmount), bankDetails }))} variant="contained" color="secondary" disabled={withdrawLoading || !withdrawalAmount || Number(withdrawalAmount) < 300}>
             {withdrawLoading ? <CircularProgress size={24} /> : 'Submit Request'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Recharge Dialog */}
+      <Dialog open={openRecharge} onClose={() => setOpenRecharge(false)} fullWidth maxWidth="xs">
+        <DialogTitle sx={{ fontWeight: 800 }}>Add Money to Wallet</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Enter the amount you wish to add to your Rice Mill Wallet.
+          </Typography>
+          <TextField
+            fullWidth
+            label="Amount (₹)"
+            type="number"
+            value={rechargeAmount}
+            onChange={(e) => setRechargeAmount(e.target.value)}
+            sx={{ mb: 2, mt: 1 }}
+            placeholder="e.g. 500"
+          />
+          <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
+            {[100, 500, 1000, 2000].map(amt => (
+              <Button
+                key={amt}
+                variant="outlined"
+                size="small"
+                onClick={() => setRechargeAmount(amt.toString())}
+                sx={{ borderColor: '#16A34A', color: '#16A34A', '&:hover': { bgcolor: '#F0FDF4', borderColor: '#16A34A' } }}
+              >
+                +₹{amt}
+              </Button>
+            ))}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button onClick={() => setOpenRecharge(false)} sx={{ color: 'text.secondary', fontWeight: 700 }}>Cancel</Button>
+          <Button
+            onClick={() => {
+              if (rechargeAmount && Number(rechargeAmount) > 0) {
+                dispatch(rechargeWallet(Number(rechargeAmount)));
+                setOpenRecharge(false);
+                setRechargeAmount('');
+                alert(`₹${rechargeAmount} added to wallet successfully!`);
+              }
+            }}
+            variant="contained"
+            color="success"
+            disabled={!rechargeAmount || Number(rechargeAmount) <= 0}
+            sx={{ borderRadius: 2, fontWeight: 700 }}
+          >
+            Add Money
           </Button>
         </DialogActions>
       </Dialog>

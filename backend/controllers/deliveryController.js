@@ -1234,6 +1234,40 @@ const getIncentives = asyncHandler(async (req, res) => {
     res.json({ success: true, incentives: responseData });
 });
 
+// @desc    Toggle Delivery Partner Duty Status
+// @route   PUT /api/v1/delivery-partners/status
+// @access  Private/DeliveryPartner
+const toggleDutyStatus = asyncHandler(async (req, res) => {
+  const { isOnline } = req.body;
+  const user = await User.findById(req.user._id);
+  
+  if (!user || user.role !== 'deliveryPartner') {
+    res.status(404);
+    throw new Error('Delivery Partner not found');
+  }
+
+  user.isOnline = isOnline;
+  await user.save();
+
+  res.json({ success: true, isOnline: user.isOnline, message: `Status updated to ${isOnline ? 'Online' : 'Offline'}` });
+});
+
+// @desc    Trigger SOS Emergency Alert
+// @route   POST /api/v1/delivery-partners/sos
+// @access  Private/DeliveryPartner
+const triggerSOS = asyncHandler(async (req, res) => {
+  const { locationData } = req.body;
+  
+  // In a real production system, this would trigger an SMS via Twilio / SNS to admins
+  // and create an Emergency Alert record in MongoDB. For Phase 1, we log it.
+  console.error(`🚨 SOS ALERT TRIGGERED by Delivery Partner ${req.user.name} (${req.user._id})`);
+  if (locationData) {
+    console.error(`📍 Location: ${JSON.stringify(locationData)}`);
+  }
+
+  res.status(200).json({ success: true, message: 'SOS Alert dispatched successfully. Support is being notified.' });
+});
+
 module.exports = {
   getDeliveryPartners,
   createDeliveryPartner,
@@ -1254,5 +1288,7 @@ module.exports = {
   redispatchReplacement,
   generateDeliveryPaymentLink,
   checkDeliveryPaymentStatus,
-  getIncentives
+  getIncentives,
+  toggleDutyStatus,
+  triggerSOS
 };

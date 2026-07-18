@@ -28,6 +28,7 @@ const {
   filterProducts,
   getPendingProducts,
   approveProduct,
+  rejectProduct,
 } = require("../controllers/productController");
 
 const { likeItem, addComment, getComments, trackShare, rateItem, getProductReviews } = require('../controllers/socialController');
@@ -45,15 +46,7 @@ router.post("/bulk", auth.protect, auth.requireVerifiedEmail, auth.role("seller"
 router.get("/analytics", auth.protect, auth.role("admin"), getProductAnalytics);
 router.get("/admin/pending", auth.protect, auth.role("admin"), getPendingProducts);
 router.put("/:id/approve", auth.protect, auth.role("admin"), approveProduct);
-
-// ===== GET BY ID (Dynamic) - Must stay below static routes =====
-router.get("/:id", cache(300), getProductById);
-router.route('/').get(cache(300), getProducts);
-
-// ===== SELLER WRITE ROUTES =====
-router.post("/", auth.protect, auth.requireVerifiedEmail, auth.role("seller"), auth.kycVerified, upload.any(), createProduct);
-router.put("/:id", auth.protect, auth.requireVerifiedEmail, auth.role("seller"), auth.kycVerified, upload.any(), updateProduct);
-router.delete("/:id", auth.protect, auth.requireVerifiedEmail, auth.role("seller"), auth.kycVerified, deleteProduct);
+router.put("/:id/reject", auth.protect, auth.role("admin"), rejectProduct);
 
 // ===== USER SOCIAL ROUTES =====
 router.post("/:id/reviews", auth.protect, (req, res, next) => {
@@ -85,5 +78,14 @@ router.post('/:id/share', auth.protect, (req, res, next) => {
   req.params.type = 'products';
   next();
 }, trackShare);
+
+// ===== CUSTOMER READ ROUTES =====
+router.get("/:id", cache(300), getProductById);
+router.route('/').get(cache(300), getProducts);
+
+// ===== SELLER WRITE ROUTES =====
+router.post("/", auth.protect, auth.requireVerifiedEmail, auth.role("seller"), auth.kycVerified, upload.any(), createProduct);
+router.put("/:id", auth.protect, auth.requireVerifiedEmail, auth.role("seller"), auth.kycVerified, upload.any(), updateProduct);
+router.delete("/:id", auth.protect, auth.requireVerifiedEmail, auth.role("seller"), auth.kycVerified, deleteProduct);
 
 module.exports = router;

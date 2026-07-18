@@ -131,13 +131,13 @@ const MyOrders = () => {
                                                     border: '1px solid #F3F4F6',
                                                 }}>
                                                     <Box component="img"
-                                                        src={getImageUrl(item.product.images?.[0])}
-                                                        alt={item.product.name}
+                                                        src={getImageUrl(item.image || item.product?.images?.[0] || item.product?.image)}
+                                                        alt={item.product?.name || item.name}
                                                         sx={{ width: 60, height: 60, borderRadius: 2, objectFit: 'cover', flexShrink: 0 }}
                                                     />
                                                     <Box sx={{ flex: 1, minWidth: 0 }}>
                                                         <Box sx={{ fontSize: 13, fontWeight: 700, color: '#111827', mb: 0.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                            {item.product.name}
+                                                            {item.product?.name || item.name}
                                                         </Box>
                                                         <Box sx={{ fontSize: 12, color: '#9CA3AF', mb: 0.5 }}>
                                                             Qty: {item.qty} × <Price amount={item.price} />

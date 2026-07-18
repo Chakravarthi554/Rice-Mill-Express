@@ -51,6 +51,8 @@ const productSchema = mongoose.Schema(
     // Admin Approval Flow
     approvalStatus: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
     approvalRejectionReason: { type: String },
+    status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+    rejectionReason: { type: String },
   },
   {
     timestamps: true,

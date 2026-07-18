@@ -246,6 +246,13 @@ const setupSocketServer = async (server) => {
       }
     });
 
+    socket.on('leave', (room) => {
+      if (room) {
+        socket.leave(room);
+        logger.info(`✅ Socket ${socket.id} left room: ${room}`);
+      }
+    });
+
     socket.on('joinNotifications', (userId) => {
       if (userId && userId === socket.userId) {
         socket.join(`notifications_${userId}`);

@@ -50,6 +50,10 @@ if (mongoose.models.BulkOrder) {
       type: Number,
       default: 1, // e.g., 50kg per bag → conversionRate = 50
       min: [0.01, 'Conversion rate must be positive']
+    },
+    isPrePackaged: {
+      type: Boolean,
+      default: false // false = loose/unbranded rice (0% GST), true = pre-packaged & labelled (5% GST)
     }
   }, { _id: false });
 
@@ -179,7 +183,7 @@ if (mongoose.models.BulkOrder) {
     taxAmount: { type: Number, default: 0 },
     shippingCharges: { type: Number, default: 0 },
     finalAmount: { type: Number, default: 0 },
-    commissionRate: { type: Number, default: 0.15, min: 0, max: 1 },
+    commissionRate: { type: Number, default: 0, min: 0, max: 1 }, // 0% for free pilot — change to 0.15 when monetizing
     commissionAmount: { type: Number, default: 0 },
     sellerEarnings: { type: Number, default: 0 },
 
@@ -288,7 +292,13 @@ if (mongoose.models.BulkOrder) {
 
     this.subtotal = subtotal;
     const afterDiscount = subtotal * (1 - this.discount / 100);
-    this.taxAmount = afterDiscount * 0.18; // 18% GST
+
+    // ✅ FIXED: Correct rice GST rates (HSN 1006)
+    // Loose/unbranded rice = 0% GST
+    // Pre-packaged & labelled rice = 5% GST (CGST 2.5% + SGST 2.5% or IGST 5%)
+    const hasPrePackagedItems = this.items.some(item => item.isPrePackaged === true);
+    const riceGstRate = hasPrePackagedItems ? 0.05 : 0; // 5% or 0%
+    this.taxAmount = afterDiscount * riceGstRate;
     this.shippingCharges = Math.ceil(this.totalWeight / 100) * 50; // ₹50 per 100kg
 
     this.finalAmount = afterDiscount + this.taxAmount + this.shippingCharges;

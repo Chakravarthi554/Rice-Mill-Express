@@ -29,6 +29,11 @@ const userSchema = mongoose.Schema(
       default: 'not_required',
     },
     isVerified: { type: Boolean, default: false },
+    isOnline: { type: Boolean, default: false }, // Duty status for Delivery Partners
+    sellerType: { 
+      type: String, 
+      enum: ['Rice Shop', 'Rice Mill', 'Farmer Producer Organization (FPO)', 'Wholesaler', 'Distributor', 'Farmer Cooperative', 'Other'] 
+    },
     otp: { type: String, select: false },
     otpExpires: { type: Date, select: false },
     profileImage: { type: String, default: '/uploads/default_avatar.jpg' },

@@ -33,7 +33,7 @@ const DeliveryKYCApproval = () => {
                 }
             };
             const { data } = await axios.get('/api/v1/delivery-partners/admin/kyc/pending', config);
-            setPendingPartners(data);
+            setPendingPartners(data.data || data);
             setLoading(false);
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to fetch pending KYC');

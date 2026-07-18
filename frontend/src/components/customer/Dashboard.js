@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import {
@@ -24,7 +24,6 @@ import {
   Storefront,
   TrendingUp,
   WorkspacePremium,
-
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 
@@ -103,10 +102,18 @@ const Dashboard = () => {
   const dispatch = useDispatch();
   const [activeCategory, setActiveCategory] = useState('');
   const [timeLeft, setTimeLeft] = useState(7942);
+  const productsSectionRef = useRef(null);
 
   const { loading: productLoading, error: productError, products = [] } = useSelector((state) => state.productList || {});
-  const { wishlistItems = [] } = useSelector((state) => state.wishlist || {});
+  const { wishlistItems = [] } = useSelector((state) => state.userWishlist || {});
   const { user: profile } = useSelector((state) => state.userDetails || {});
+
+  const handleCategoryClick = (categoryId) => {
+    setActiveCategory(categoryId);
+    setTimeout(() => {
+      productsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  };
 
   useEffect(() => {
     dispatch(listProducts('', ''));
@@ -167,120 +174,117 @@ const Dashboard = () => {
 
   return (
     <Box sx={{ bgcolor: '#F6F8F3', minHeight: '100vh', pb: 6 }}>
-      <Paper
-        elevation={0}
-        sx={{
-          position: 'sticky', top: 72, zIndex: 20, borderRadius: 0,
-          borderBottom: '1px solid rgba(46, 125, 50, 0.10)',
-          bgcolor: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(18px)',
-        }}
-      >
-        <Container maxWidth="xl" sx={{ py: 1.5 }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between">
-            <Stack direction="row" alignItems="center" spacing={1.25}>
-              <Box sx={{ width: 36, height: 36, borderRadius: 2.5, display: 'grid', placeItems: 'center', bgcolor: '#E8F5E9', color: colors.primary.main }}>
-                <PinDrop fontSize="small" />
-              </Box>
-              <Box>
-                <Typography sx={{ fontSize: 11, color: '#6B7280', fontWeight: 800 }}>Delivering to</Typography>
-                <Typography sx={{ fontSize: 14, color: '#111827', fontWeight: 900 }}>{profile?.address?.city || profile?.city || 'Delivering to you'}</Typography>
-              </Box>
-            </Stack>
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Chip icon={<LocalShipping />} label="12-30 min delivery" sx={{ bgcolor: '#FFF7ED', color: '#9A3412', fontWeight: 900 }} />
-              <IconButton onClick={() => navigate('/notifications')} sx={{ bgcolor: '#F3F7EF' }}><Notifications /></IconButton>
-            </Stack>
+        {/* ── ZEPTO-STYLE HORIZONTAL CATEGORIES SUB-NAV ── */}
+        <Box sx={{ borderBottom: '1px solid #E5E7EB', bgcolor: '#fff', mb: 3, mt: -4, mx: -6, px: 6 }}>
+          <Stack direction="row" spacing={4} sx={{ overflowX: 'auto', py: 1.5 }}>
+            {categories.map((cat) => {
+              const active = activeCategory === cat.id;
+              return (
+                <Box
+                  key={cat.name}
+                  onClick={() => handleCategoryClick(cat.id)}
+                  sx={{
+                    display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer', pb: 1,
+                    borderBottom: '3px solid', borderColor: active ? '#3C006F' : 'transparent',
+                    opacity: active ? 1 : 0.7, '&:hover': { opacity: 1 }
+                  }}
+                >
+                  <Typography sx={{ fontSize: '1.25rem' }}>{cat.icon}</Typography>
+                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 800, color: active ? '#3C006F' : '#374151', whiteSpace: 'nowrap' }}>
+                    {cat.name}
+                  </Typography>
+                </Box>
+              );
+            })}
           </Stack>
-        </Container>
-      </Paper>
+        </Box>
 
-      <Container maxWidth="xl" sx={{ pt: 4 }}>
-        <Grid container spacing={3} sx={{ mb: 4 }}>
-          <Grid item md={8.4}>
+      <Container maxWidth="xl" sx={{ pt: 1 }}>
+        {/* ── ZEPTO-STYLE HERO BANNERS ── */}
+        <Grid container spacing={3} sx={{ mb: 5 }}>
+          <Grid item xs={12} md={6}>
             <MotionPaper
-              initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}
+              whileHover={{ scale: 1.01 }}
               elevation={0}
               sx={{
-                minHeight: 360, p: { md: 5 }, borderRadius: 6, overflow: 'hidden', position: 'relative', color: '#fff',
-                background: 'radial-gradient(circle at 80% 20%, rgba(255, 193, 7, 0.35), transparent 24%), linear-gradient(135deg, #0F3D1E 0%, #1B5E20 44%, #2E7D32 100%)',
-                boxShadow: '0 28px 70px rgba(27, 94, 32, 0.28)',
+                p: 4, borderRadius: 5, overflow: 'hidden', height: 210,
+                background: 'linear-gradient(135deg, #F3E8FF 0%, #E9D5FF 100%)',
+                border: '1px solid #E9D5FF', display: 'flex', flexDirection: 'column', justifyContent: 'center'
               }}
             >
-              <Box sx={{ position: 'absolute', right: 34, bottom: 18, fontSize: 156, opacity: 0.22 }}>🌾</Box>
-              <Chip label="Premium rice marketplace" sx={{ bgcolor: 'rgba(255,255,255,0.16)', color: '#fff', fontWeight: 900, mb: 2, border: '1px solid rgba(255,255,255,0.22)' }} />
-              <Typography sx={{ maxWidth: 650, fontSize: { md: 56 }, lineHeight: 0.98, letterSpacing: '-0.06em', fontWeight: 950, mb: 2 }}>
-                Fresh mill-direct rice, delivered like quick commerce.
+              <Typography sx={{ fontSize: '0.85rem', fontWeight: 900, color: '#6B21A8', letterSpacing: '0.08em', mb: 1, textTransform: 'uppercase' }}>
+                ALL NEW RICEMILL EXPERIENCE
               </Typography>
-              <Typography sx={{ maxWidth: 560, fontSize: 18, color: 'rgba(255,255,255,0.82)', mb: 3 }}>
-                Shop verified sellers, compare wholesale packs, unlock wallet rewards, and reorder your household staples in minutes.
+              <Typography sx={{ fontSize: '1.8rem', fontWeight: 900, color: '#3C006F', mb: 1 }}>
+                ₹0 Delivery Fees
               </Typography>
-              <Stack direction="row" spacing={1.5}>
-                <Button variant="contained" size="large" onClick={() => navigate('/products')} sx={{ bgcolor: '#FBBF24', color: '#1F2937', borderRadius: 999, px: 4, fontWeight: 950, textTransform: 'none', '&:hover': { bgcolor: '#F59E0B' } }}>
-                  Shop best sellers
-                </Button>
-                <Button variant="outlined" size="large" onClick={() => navigate('/recipes')} sx={{ borderColor: 'rgba(255,255,255,0.45)', color: '#fff', borderRadius: 999, px: 3.5, fontWeight: 900, textTransform: 'none' }}>
-                  Explore recipes
-                </Button>
-              </Stack>
-              <Stack direction="row" spacing={3} sx={{ mt: 4 }}>
-                {[
-                  ['2k+', 'families served'], ['100%', 'verified sellers'], ['COD', 'wallet ready'],
-                ].map(([value, label]) => (
-                  <Box key={label}><Typography sx={{ fontSize: 24, fontWeight: 950 }}>{value}</Typography><Typography sx={{ color: 'rgba(255,255,255,0.72)', fontWeight: 700 }}>{label}</Typography></Box>
-                ))}
-              </Stack>
+              <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: '#6B21A8' }}>
+                Everyday Low Prices • No handling fee
+              </Typography>
             </MotionPaper>
           </Grid>
-          <Grid item md={3.6}>
-            <Stack spacing={2} sx={{ height: '100%' }}>
-              <Paper elevation={0} sx={{ p: 3, borderRadius: 5, bgcolor: '#fff', boxShadow: shadows.md, border: '1px solid #EEF2E8' }}>
-                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-                  <Chip icon={<LocalOffer />} label="Flash sale" sx={{ bgcolor: '#FEF3C7', color: '#92400E', fontWeight: 900 }} />
-                  <Typography sx={{ fontFamily: 'monospace', fontWeight: 950, color: '#DC2626' }}>{formatTime(timeLeft)}</Typography>
-                </Stack>
-                <Typography variant="h5" sx={{ fontWeight: 950, letterSpacing: '-0.03em' }}>Save up to 25% on bulk bags</Typography>
-                <Typography sx={{ color: '#6B7280', my: 1.25 }}>Limited-time seller funded discounts on 10kg, 25kg and 50kg packs.</Typography>
-                <Button fullWidth onClick={() => navigate('/products?sale=true')} variant="contained" sx={{ mt: 1, bgcolor: '#E65100', borderRadius: 999, fontWeight: 950, textTransform: 'none' }}>View deals</Button>
-              </Paper>
-              <Grid container spacing={2}>
-                {[
-                  [ShieldOutlined, 'Quality checked', '#EFF6FF'],
-                  [WorkspacePremium, 'Premium grades', '#F5F3FF'],
-                  [Storefront, 'Seller direct', '#ECFDF5'],
-                  [TrendingUp, 'Wholesale rates', '#FFF7ED'],
-                ].map(([Icon, label, bg]) => (
-                  <Grid item xs={6} key={label}>
-                    <Paper elevation={0} sx={{ p: 2, minHeight: 106, borderRadius: 4, bgcolor: bg, border: '1px solid rgba(17,24,39,0.05)' }}>
-                      <Icon sx={{ color: colors.primary.main, mb: 1 }} />
-                      <Typography sx={{ fontWeight: 900, color: '#111827', lineHeight: 1.15 }}>{label}</Typography>
-                    </Paper>
-                  </Grid>
-                ))}
-              </Grid>
-            </Stack>
+          <Grid item xs={12} md={6}>
+            <MotionPaper
+              whileHover={{ scale: 1.01 }}
+              elevation={0}
+              sx={{
+                p: 4, borderRadius: 5, overflow: 'hidden', height: 210,
+                background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)',
+                border: '1px solid #A7F3D0', display: 'flex', flexDirection: 'column', justifyContent: 'center'
+              }}
+            >
+              <Typography sx={{ fontSize: '0.85rem', fontWeight: 900, color: '#065F46', letterSpacing: '0.08em', mb: 1, textTransform: 'uppercase' }}>
+                SUPER SAVER ZONE
+              </Typography>
+              <Typography sx={{ fontSize: '1.8rem', fontWeight: 900, color: '#065F46', mb: 1.5 }}>
+                Up to 25% Off Grains
+              </Typography>
+              <Button
+                variant="contained"
+                onClick={() => navigate('/products?sale=true')}
+                sx={{
+                  bgcolor: '#065F46', color: '#fff', fontWeight: 900, borderRadius: 2,
+                  px: 3, py: 1, width: 'fit-content', textTransform: 'none',
+                  '&:hover': { bgcolor: '#047857' }
+                }}
+              >
+                Order now &gt;
+              </Button>
+            </MotionPaper>
           </Grid>
         </Grid>
 
-        <SectionTitle eyebrow="Shop by need" title="Rice categories" action="Browse all" onAction={() => navigate('/products')} />
-        <Grid container spacing={2.25} sx={{ mb: 5 }}>
+        {/* ── ROUNDED CATEGORY CARDS GRID ── */}
+        <SectionTitle eyebrow="Shop by category" title="Explore categories" action="Browse all" onAction={() => navigate('/products')} />
+        <Grid container spacing={3} sx={{ mb: 6 }}>
           {categories.map((category) => (
-            <Grid item md={2} key={category.name}>
+            <Grid item xs={6} sm={4} md={2} key={category.name}>
               <MotionPaper
-                whileHover={{ y: -8 }}
+                whileHover={{ y: -6 }}
                 elevation={0}
-                onClick={() => setActiveCategory(category.id)}
-                sx={{ p: 2.25, borderRadius: 5, cursor: 'pointer', bgcolor: category.tint, border: activeCategory === category.id ? `2px solid ${colors.primary.main}` : '1px solid rgba(17,24,39,0.06)', minHeight: 150 }}
+                onClick={() => handleCategoryClick(category.id)}
+                sx={{
+                  p: 2, borderRadius: 4, cursor: 'pointer', textAlign: 'center',
+                  bgcolor: '#fff', border: activeCategory === category.id ? '2.5px solid #3C006F' : '1px solid #E5E7EB',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.02)', display: 'flex', flexDirection: 'column', alignItems: 'center'
+                }}
               >
-                <Typography sx={{ fontSize: 38, mb: 1 }}>{category.icon}</Typography>
-                <Typography sx={{ fontWeight: 950, color: '#111827' }}>{category.name}</Typography>
-                <Typography sx={{ color: '#6B7280', fontSize: 13, fontWeight: 700 }}>{category.subtitle}</Typography>
+                <Box sx={{
+                  width: 72, height: 72, borderRadius: '50%', bgcolor: category.tint || '#F3F4F6',
+                  display: 'grid', placeItems: 'center', fontSize: 32, mb: 1.5
+                }}>
+                  {category.icon}
+                </Box>
+                <Typography sx={{ fontWeight: 850, fontSize: '0.88rem', color: '#1F2937', mb: 0.5 }}>{category.name}</Typography>
+                <Typography sx={{ color: '#9CA3AF', fontSize: '0.72rem', fontWeight: 600 }}>{category.subtitle}</Typography>
               </MotionPaper>
             </Grid>
           ))}
         </Grid>
 
-        {productLoading ? (
-          <Grid container spacing={2.25}>{[...Array(10)].map((_, i) => <Grid item md={2.4} key={i}><LoadingSkeleton type="product" /></Grid>)}</Grid>
+        <Box ref={productsSectionRef}>
+          {productLoading ? (
+            <Grid container spacing={2.25}>{[...Array(10)].map((_, i) => <Grid item md={2.4} key={i}><LoadingSkeleton type="product" /></Grid>)}</Grid>
         ) : productError ? (
           <EmptyState icon="⚠️" title="Something went wrong" description={productError} action={{ label: 'Try Again', onClick: () => dispatch(listProducts('', '')) }} />
         ) : (
@@ -332,6 +336,7 @@ const Dashboard = () => {
             </Grid>
           </>
         )}
+        </Box>
       </Container>
     </Box>
   );

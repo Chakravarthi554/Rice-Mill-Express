@@ -57,7 +57,7 @@ const ProductPage = () => {
   const { products: allProducts = [] } = productList;
 
   const { userInfo } = useSelector((state) => state.userLogin || {});
-  const { wishlistItems = [] } = useSelector(state => state.wishlist || {});
+  const { wishlistItems = [] } = useSelector(state => state.userWishlist || {});
   const { cartItems = [] } = useSelector(state => state.cart || {});
 
   useEffect(() => {

@@ -237,20 +237,20 @@ const SellerProducts = () => {
                   <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
                     <Chip label={statusColors.label} size="small" sx={{ bgcolor: statusColors.bg, color: statusColors.text, fontWeight: 700, fontSize: '0.7rem' }} />
                     <Chip 
-                      label={product.approvalStatus === 'approved' ? 'Approved' : product.approvalStatus === 'rejected' ? 'Rejected' : 'Pending Approval'} 
+                      label={(product.status || product.approvalStatus || 'approved') === 'approved' ? 'Approved' : (product.status || product.approvalStatus || 'approved') === 'rejected' ? 'Rejected' : 'Pending Approval'} 
                       size="small" 
-                      title={product.approvalStatus === 'rejected' ? `Reason: ${product.approvalRejectionReason || 'No reason provided'}` : ''}
+                      title={(product.status || product.approvalStatus || 'approved') === 'rejected' ? `Reason: ${product.rejectionReason || product.approvalRejectionReason || 'No reason provided'}` : ''}
                       sx={{ 
-                        bgcolor: product.approvalStatus === 'approved' ? '#DCFCE7' : product.approvalStatus === 'rejected' ? '#FEE2E2' : '#FEF3C7', 
-                        color: product.approvalStatus === 'approved' ? '#166534' : product.approvalStatus === 'rejected' ? '#B91C1C' : '#D97706', 
+                        bgcolor: (product.status || product.approvalStatus || 'approved') === 'approved' ? '#DCFCE7' : (product.status || product.approvalStatus || 'approved') === 'rejected' ? '#FEE2E2' : '#FEF3C7', 
+                        color: (product.status || product.approvalStatus || 'approved') === 'approved' ? '#166534' : (product.status || product.approvalStatus || 'approved') === 'rejected' ? '#B91C1C' : '#D97706', 
                         fontWeight: 700, 
                         fontSize: '0.7rem' 
                       }} 
                     />
                   </Box>
-                  {product.approvalStatus === 'rejected' && (
+                  {(product.status || product.approvalStatus || 'approved') === 'rejected' && (
                     <Typography variant="caption" color="error" sx={{ display: 'block', mt: -1, mb: 1, fontWeight: 600 }}>
-                      Reason: {product.approvalRejectionReason || 'No reason provided'}
+                      Reason: {product.rejectionReason || product.approvalRejectionReason || 'No reason provided'}
                     </Typography>
                   )}
 

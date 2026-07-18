@@ -159,10 +159,11 @@ const likeItem = asyncHandler(async (req, res) => {
 // @access  Private
 const addComment = asyncHandler(async (req, res) => {
   const { type, id } = req.params;
-  const { text, parentCommentId } = req.body;
+  const { text, content, parentCommentId } = req.body;
   const userId = req.user._id;
+  const commentText = text || content;
 
-  if (!text || text.trim() === '') {
+  if (!commentText || commentText.trim() === '') {
     res.status(400);
     throw new Error('Comment text is required');
   }
@@ -182,7 +183,7 @@ const addComment = asyncHandler(async (req, res) => {
     targetId: id,
     targetType,
     userId,
-    content: text.trim(),
+    content: commentText.trim(),
     parentCommentId: parentCommentId || null,
     approved: true
   });
@@ -1228,6 +1229,104 @@ const getProductReviews =
     });
   });
 
+// Helper to recalculate rating stats after review changes
+const recalculateProductRating = async (targetId, targetType) => {
+  let Model;
+  if (targetType === 'Product') Model = Product;
+  else if (targetType === 'Recipe') Model = Recipe;
+  else return;
+
+  const stats = await Rating.aggregate([
+    { $match: { targetId: new mongoose.Types.ObjectId(targetId), approved: true } },
+    {
+      $group: {
+        _id: '$rating',
+        count: { $sum: 1 }
+      }
+    }
+  ]);
+
+  const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  let totalCount = 0;
+  let totalSum = 0;
+
+  stats.forEach(stat => {
+    distribution[stat._id] = stat.count;
+    totalCount += stat.count;
+    totalSum += stat._id * stat.count;
+  });
+
+  const averageRating = totalCount > 0 ? totalSum / totalCount : 0;
+
+  const updateData = {
+    numReviews: totalCount,
+    ratingDistribution: distribution
+  };
+
+  if (targetType === 'Recipe') {
+    updateData.averageRating = averageRating;
+  } else {
+    updateData.rating = averageRating;
+  }
+
+  await Model.findByIdAndUpdate(targetId, { $set: updateData }, { new: true });
+};
+
+// @desc    Update a review/rating
+// @route   PUT /api/v1/reviews/:reviewId
+// @access  Private
+const updateReview = asyncHandler(async (req, res) => {
+  const { rating, comment } = req.body;
+  const reviewId = req.params.reviewId;
+  const userId = req.user._id;
+
+  const reviewDoc = await Rating.findById(reviewId);
+  if (!reviewDoc) {
+    res.status(404);
+    throw new Error('Review not found');
+  }
+
+  if (reviewDoc.userId.toString() !== userId.toString() && req.user.role !== 'admin') {
+    res.status(403);
+    throw new Error('Not authorized to update this review');
+  }
+
+  if (rating) reviewDoc.rating = Number(rating);
+  if (comment !== undefined) reviewDoc.comment = comment;
+  await reviewDoc.save();
+
+  // Recalculate target rating stats
+  await recalculateProductRating(reviewDoc.targetId, reviewDoc.targetType);
+
+  res.json({ success: true, message: 'Review updated successfully', review: reviewDoc });
+});
+
+// @desc    Delete a review/rating
+// @route   DELETE /api/v1/reviews/:reviewId
+// @access  Private
+const deleteReview = asyncHandler(async (req, res) => {
+  const reviewId = req.params.reviewId;
+  const userId = req.user._id;
+
+  const reviewDoc = await Rating.findById(reviewId);
+  if (!reviewDoc) {
+    res.status(404);
+    throw new Error('Review not found');
+  }
+
+  if (reviewDoc.userId.toString() !== userId.toString() && req.user.role !== 'admin') {
+    res.status(403);
+    throw new Error('Not authorized to delete this review');
+  }
+
+  await Rating.findByIdAndDelete(reviewId);
+
+  // Recalculate target rating stats
+  await recalculateProductRating(reviewDoc.targetId, reviewDoc.targetType);
+
+  res.json({ success: true, message: 'Review deleted successfully' });
+});
+
 module.exports = {
   likeItem,
   addComment,
@@ -1249,5 +1348,7 @@ module.exports = {
   replyToComment,
   rateItem,
   getProductReviews,
-  syncEngagementCounts
+  syncEngagementCounts,
+  updateReview,
+  deleteReview
 };

@@ -691,6 +691,45 @@ const remitCash = asyncHandler(async (req, res) => {
     });
 });
 
+// @desc    Reject assigned order
+// @route   POST /api/dp/reject/:orderId
+// @access  Private/DeliveryPartner
+const rejectOrder = asyncHandler(async (req, res) => {
+    const { orderId } = req.params;
+
+    const partnerProfiles = await DeliveryPartner.find({ user: req.user._id });
+    const profileIds = partnerProfiles.map(p => p._id.toString());
+
+    if (profileIds.length === 0) {
+        res.status(404);
+        throw new Error('Delivery partner profile not found');
+    }
+
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+        res.status(404);
+        throw new Error('Order not found');
+    }
+
+    if (!order.deliveryPartner || !profileIds.includes(order.deliveryPartner.toString())) {
+        res.status(403);
+        throw new Error('Access denied: Order is not assigned to you');
+    }
+
+    // Clear assignment so it can be reassigned
+    order.deliveryPartner = null;
+    order.deliveryPartnerStatus = 'pending';
+    const note = `[REJECTED - ${new Date().toLocaleString()}] Delivery Partner ${req.user.name} rejected the order.`;
+    order.notes = order.notes ? `${order.notes}\n${note}` : note;
+    await order.save();
+
+    res.json({
+        success: true,
+        message: 'Order rejected successfully'
+    });
+});
+
 module.exports = {
     getDashboard,
     getMyOrders,
@@ -701,4 +740,5 @@ module.exports = {
     uploadDeliveryPhotoAndComplete,
     requestReplacement,
     remitCash,
+    rejectOrder,
 };

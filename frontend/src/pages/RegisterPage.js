@@ -12,7 +12,7 @@ const RegisterPage = () => {
   const { register, loading, message, setMessage } = useAuth();
   
   const [formData, setFormData] = useState({
-    name: '', email: '', phone: '', password: '', confirmPassword: '', role: 'customer', referralCode: ''
+    name: '', email: '', phone: '', password: '', confirmPassword: '', role: 'customer', referralCode: '', sellerType: ''
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -33,6 +33,7 @@ const RegisterPage = () => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) { setMessage('Please enter a valid email address.'); return; }
     const phoneDigits = formData.phone.replace(/\D/g, '');
     if (!/^\d{10}$/.test(phoneDigits)) { setMessage('Please enter a valid 10-digit phone number.'); return; }
+    if (formData.role === 'seller' && !formData.sellerType) { setMessage('Please select a Business Type.'); return; }
 
     const result = await register({ ...formData, phone: phoneDigits });
     if (!result.success) setMessage(result.message || 'Registration failed.');
@@ -225,8 +226,31 @@ const RegisterPage = () => {
                   <MenuItem value="seller">Seller / Partner</MenuItem>
                 </TextField>
               </Grid>
+
+              {formData.role === 'seller' && (
+                <Grid item xs={12} sm={6}>
+                  <TextField 
+                    fullWidth 
+                    select 
+                    required 
+                    name="sellerType" 
+                    label="Business Type" 
+                    value={formData.sellerType} 
+                    onChange={handleChange} 
+                    sx={inputSx}
+                  >
+                    <MenuItem value="Rice Shop">Rice Shop</MenuItem>
+                    <MenuItem value="Rice Mill">Rice Mill</MenuItem>
+                    <MenuItem value="Farmer Producer Organization (FPO)">Farmer Producer Organization (FPO)</MenuItem>
+                    <MenuItem value="Wholesaler">Wholesaler</MenuItem>
+                    <MenuItem value="Distributor">Distributor</MenuItem>
+                    <MenuItem value="Farmer Cooperative">Farmer Cooperative</MenuItem>
+                    <MenuItem value="Other">Other</MenuItem>
+                  </TextField>
+                </Grid>
+              )}
               
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12} sm={formData.role === 'seller' ? 12 : 6}>
                 <TextField 
                   fullWidth 
                   name="referralCode" 

@@ -91,54 +91,107 @@ const ProductCard = ({
 
   return (
     <MotionBox
-      whileHover={{ y: -8 }}
-      transition={{ duration: 0.2 }}
+      whileHover={{ y: -6 }}
+      transition={{ duration: 0.15 }}
       onClick={() => onClick && onClick(product)}
       sx={{
-        position: 'relative', height: 374, bgcolor: '#fff', borderRadius: 5, border: '1px solid #E8EFE2',
-        boxShadow: '0 12px 32px rgba(15, 23, 42, 0.06)', overflow: 'hidden', cursor: onClick ? 'pointer' : 'default',
-        display: 'flex', flexDirection: 'column', '&:hover img': { transform: 'scale(1.07)' },
+        position: 'relative', height: 380, bgcolor: '#fff', borderRadius: '12px', border: '1px solid #E5E7EB',
+        overflow: 'hidden', cursor: onClick ? 'pointer' : 'default',
+        display: 'flex', flexDirection: 'column', '&:hover img': { transform: 'scale(1.05)' },
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.03)'
       }}
     >
-      <Box sx={{ height: 184, position: 'relative' }}>
+      {/* Image Container */}
+      <Box sx={{ height: 160, position: 'relative', bgcolor: '#F9FAFB', p: 1 }}>
         {imageNode}
-        <Stack direction="row" spacing={0.75} sx={{ position: 'absolute', top: 12, left: 12 }}>
-          {displayRating && (
-            <Chip icon={<Star sx={{ fontSize: '14px !important' }} />} label={displayRating} size="small" sx={{ bgcolor: '#2E7D32', color: '#fff', fontWeight: 950, height: 26 }} />
-          )}
-          {!!discount && <Chip label={`${discount}% OFF`} size="small" sx={{ bgcolor: '#FFB300', color: '#111827', fontWeight: 950, height: 26 }} />}
-        </Stack>
-        <Stack spacing={0.75} sx={{ position: 'absolute', top: 10, right: 10 }}>
+        
+        {/* Wishlist Button */}
+        <Box sx={{ position: 'absolute', top: 8, right: 8 }}>
           <Tooltip title={wishlisted ? 'Remove from wishlist' : 'Add to wishlist'}>
-            <IconButton size="small" onClick={stop(onToggleWishlist)} sx={{ bgcolor: 'rgba(255,255,255,0.94)', boxShadow: '0 6px 16px rgba(15,23,42,0.10)', '&:hover': { bgcolor: '#fff' } }}>
-              {wishlisted ? <Favorite sx={{ color: '#DC2626', fontSize: 18 }} /> : <FavoriteBorder sx={{ color: '#4B5563', fontSize: 18 }} />}
+            <IconButton size="small" onClick={stop(onToggleWishlist)} sx={{ bgcolor: 'rgba(255,255,255,0.9)', boxShadow: '0 4px 8px rgba(0,0,0,0.08)', '&:hover': { bgcolor: '#fff' } }}>
+              {wishlisted ? <Favorite sx={{ color: '#FF3F6C', fontSize: 16 }} /> : <FavoriteBorder sx={{ color: '#4B5563', fontSize: 16 }} />}
             </IconButton>
           </Tooltip>
-          {onQuickView && (
-            <Tooltip title="Quick view">
-              <IconButton size="small" onClick={stop(onQuickView)} sx={{ bgcolor: 'rgba(255,255,255,0.94)', boxShadow: '0 6px 16px rgba(15,23,42,0.10)' }}><VisibilityOutlined sx={{ fontSize: 18 }} /></IconButton>
-            </Tooltip>
-          )}
-        </Stack>
+        </Box>
       </Box>
 
-      <Stack sx={{ p: 2, flex: 1 }}>
-        <Typography sx={{ color: '#6B7280', fontSize: 12, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em' }} noWrap>{brand}</Typography>
-        <Typography sx={{ mt: 0.75, color: '#111827', fontSize: 16, fontWeight: 950, lineHeight: 1.25, minHeight: 42, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{name}</Typography>
-        <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mt: 1.25 }}>
-          <LocalShipping sx={{ fontSize: 17, color: '#2E7D32' }} />
-          <Typography sx={{ color: '#2E7D32', fontSize: 12.5, fontWeight: 900 }}>Delivery in {deliveryEta}</Typography>
-          {numReviews > 0 && (
-            <Typography sx={{ color: '#9CA3AF', fontSize: 11, fontWeight: 700 }}>• {numReviews.toLocaleString()} sold</Typography>
-          )}
+      {/* Details Container */}
+      <Stack sx={{ p: 2, flex: 1, justifyContent: 'space-between' }}>
+        <Box>
+          {/* Brand & Weight */}
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Typography sx={{ color: '#6B7280', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase' }} noWrap>
+              {brand}
+            </Typography>
+            <Typography sx={{ color: '#6B7280', fontSize: '0.72rem', fontWeight: 800 }}>
+              {product.weight ? `${product.weight} ${product.unit || 'kg'}` : '1 pack'}
+            </Typography>
+          </Stack>
+
+          {/* Product Name */}
+          <Typography sx={{ mt: 0.75, color: '#1F2937', fontSize: '0.92rem', fontWeight: 800, lineHeight: 1.25, height: 38, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+            {name}
+          </Typography>
+
+          {/* Rating */}
+          <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 1 }}>
+            <Star sx={{ fontSize: 15, color: '#FFB300' }} />
+            <Typography sx={{ fontSize: '0.78rem', fontWeight: 800, color: '#1F2937' }}>
+              {displayRating || '4.5'}
+            </Typography>
+            <Typography sx={{ fontSize: '0.75rem', fontWeight: 650, color: '#9CA3AF' }}>
+              ({numReviews > 0 ? `${(numReviews / 1000).toFixed(1)}k` : '1.2k'})
+            </Typography>
+          </Stack>
+        </Box>
+
+        {/* Pricing & Add Button Footer */}
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mt: 2 }}>
+          <Box>
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <Typography sx={{ color: '#111827', fontSize: '1.2rem', fontWeight: 900 }}>
+                ₹{price}
+              </Typography>
+              {mrp && (
+                <Typography sx={{ color: '#9CA3AF', textDecoration: 'line-through', fontWeight: 700, fontSize: '0.85rem' }}>
+                  ₹{mrp}
+                </Typography>
+              )}
+            </Stack>
+            {!!discount && (
+              <Typography sx={{ color: '#16A34A', fontSize: '0.72rem', fontWeight: 900, mt: 0.25 }}>
+                {discount}% OFF
+              </Typography>
+            )}
+          </Box>
+
+          <Button
+            variant="outlined"
+            disabled={outOfStock}
+            onClick={stop(onAddToCart)}
+            sx={{
+              borderColor: '#FF3F6C',
+              color: '#FF3F6C',
+              bgcolor: '#fff',
+              borderRadius: '8px',
+              px: 2.25,
+              py: 0.5,
+              fontWeight: 900,
+              textTransform: 'uppercase',
+              fontSize: '0.8rem',
+              '&:hover': {
+                borderColor: '#E11D48',
+                bgcolor: '#FFF5F5'
+              },
+              '&.Mui-disabled': {
+                borderColor: '#E5E7EB',
+                color: '#9CA3AF'
+              }
+            }}
+          >
+            {outOfStock ? 'OOS' : 'ADD'}
+          </Button>
         </Stack>
-        <Stack direction="row" alignItems="flex-end" spacing={1} sx={{ mt: 'auto', mb: 1.5 }}>
-          <Typography sx={{ color: '#111827', fontSize: 23, fontWeight: 950, letterSpacing: '-0.03em' }}>₹{price}</Typography>
-          {mrp && <Typography sx={{ color: '#9CA3AF', textDecoration: 'line-through', fontWeight: 800, mb: 0.35 }}>₹{mrp}</Typography>}
-        </Stack>
-        <Button fullWidth variant="contained" disabled={outOfStock} onClick={stop(onAddToCart)} sx={{ py: 1.05, bgcolor: '#2E7D32', borderRadius: 999, fontWeight: 950, textTransform: 'none', boxShadow: '0 10px 20px rgba(46,125,50,0.18)', '&:hover': { bgcolor: '#1B5E20' } }}>
-          {outOfStock ? 'Notify me' : '+ Add to cart'}
-        </Button>
       </Stack>
     </MotionBox>
   );

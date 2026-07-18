@@ -334,6 +334,7 @@ const loadRoutes = () => {
     { path: "/api/v1/recipes", name: "Recipes", file: "./routes/recipeRoutes" },
     { path: "/api/v1/legal", name: "Legal", file: "./routes/legalRoutes" },
     { path: "/api/v1/rewards", name: "Rewards", file: "./routes/rewardsRoutes" },
+    { path: "/api/v1/reviews", name: "Reviews", file: "./routes/reviewRoutes" },
     { path: "/api/v1/forum", name: "Forum", file: "./routes/forumRoutes" },
     { path: "/api/v1/social", name: "Social", file: "./routes/socialRoutes" },
     { path: "/api/v1/admin/settings", name: "Admin Settings", file: "./routes/adminSettings" },

@@ -48,12 +48,26 @@ const ProductFilter = () => {
 
   const { products = [], loading: productLoading, error: productError } =
     useSelector((state) => state.productList || {});
-  const { wishlistItems = [] } = useSelector(state => state.wishlist || {});
+  const { wishlistItems = [] } = useSelector(state => state.userWishlist || {});
 
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [openDrawer, setOpenDrawer] = useState(false);
   const [sortBy, setSortBy] = useState('newest');
+
+  const [allBrands, setAllBrands] = useState([]);
+  const [priceRangeLocal, setPriceRangeLocal] = useState([0, 5000]);
+
+  useEffect(() => {
+    if (products && products.length > 0 && allBrands.length === 0) {
+      const uniqueBrands = [...new Set(products.map(p => p.brand).filter(Boolean))];
+      setAllBrands(uniqueBrands.sort());
+    }
+  }, [products, allBrands]);
+
+  useEffect(() => {
+    setPriceRangeLocal(filters.priceRange);
+  }, [filters.priceRange]);
 
   const [filters, setFilters] = useState({
     category: '',
@@ -345,16 +359,17 @@ const ProductFilter = () => {
           Price Range
         </Typography>
         <Slider
-          value={filters.priceRange}
-          onChange={(e, newValue) => handleFilterChange('priceRange', newValue)}
+          value={priceRangeLocal}
+          onChange={(e, newValue) => setPriceRangeLocal(newValue)}
+          onChangeCommitted={(e, newValue) => handleFilterChange('priceRange', newValue)}
           valueLabelDisplay="auto"
           min={0}
           max={5000}
           sx={{ color: '#2E7D32', mx: 0.5 }}
         />
         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-          <Typography variant="caption" fontWeight={700} color="#4B5563">₹{filters.priceRange[0]}</Typography>
-          <Typography variant="caption" fontWeight={700} color="#4B5563">₹{filters.priceRange[1]}</Typography>
+          <Typography variant="caption" fontWeight={700} color="#4B5563">₹{priceRangeLocal[0]}</Typography>
+          <Typography variant="caption" fontWeight={700} color="#4B5563">₹{priceRangeLocal[1]}</Typography>
         </Box>
       </Box>
 
@@ -368,7 +383,7 @@ const ProductFilter = () => {
         <Autocomplete
           multiple
           size="small"
-          options={brands}
+          options={allBrands}
           value={filters.brand}
           onChange={(e, newValue) => handleFilterChange('brand', newValue)}
           renderInput={(params) => (

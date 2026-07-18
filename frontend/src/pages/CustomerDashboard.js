@@ -63,59 +63,83 @@ const CustomerDashboard = () => {
     <>
       <Box sx={{ minHeight: '100vh', bgcolor: '#F9FAFB' }}>
         {/* ── ZEPTO-STYLE TOP SEARCH BAR ── */}
-        <Box sx={{ bgcolor: '#fff', borderBottom: '1px solid #F3F4F6', position: 'sticky', top: 0, zIndex: 100 }}>
+        <Box sx={{ bgcolor: '#fff', borderBottom: '1px solid #F3F4F6', position: 'sticky', top: 0, zIndex: 100, py: 0.5 }}>
           <Container maxWidth={false} sx={{ px: { xs: 2, md: 6 } }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 1.5 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4, py: 1 }}>
+              
+              {/* Logo and Location */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
                 <Typography
                   onClick={() => navigate('/customer/dashboard')}
-                  sx={{ fontSize: '1.4rem', fontWeight: 900, color: '#2E7D32', cursor: 'pointer', letterSpacing: '-0.03em' }}
+                  sx={{ fontSize: '2rem', fontWeight: 900, color: '#3C006F', cursor: 'pointer', fontFamily: "'Outfit', 'Inter', sans-serif", letterSpacing: '-0.05em' }}
                 >
-                  RiceMill
+                  ricemill
                 </Typography>
-                <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: '#6B7280', bgcolor: '#F3F4F6', px: 1, py: 0.25, borderRadius: '4px' }}>
-                  {userInfo?.address?.city || userInfo?.city || 'Delivering to you'}
-                </Typography>
+                
+                <Box sx={{ display: 'flex', flexDirection: 'column', cursor: 'pointer' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Typography sx={{ fontSize: '0.85rem', fontWeight: 800, color: '#1F2937' }}>
+                      Select Location
+                    </Typography>
+                    <Typography sx={{ fontSize: '0.75rem', color: '#3C006F' }}>▼</Typography>
+                  </Box>
+                  <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#6B7280' }}>
+                    {userInfo?.address?.city || userInfo?.city || 'Delivering to you'}
+                  </Typography>
+                </Box>
               </Box>
-              <Box sx={{ flex: 1, maxWidth: 640, mx: 'auto' }}>
+
+              {/* Search Bar */}
+              <Box sx={{ flex: 1, maxWidth: 750 }}>
                 <form onSubmit={handleSearchSubmit}>
                   <Box sx={{
                     display: 'flex', alignItems: 'center', bgcolor: '#F3F4F6',
-                    borderRadius: '24px', px: 2, height: 44,
-                    border: '2px solid transparent',
+                    borderRadius: '8px', px: 2, height: 46,
+                    border: '1px solid #E5E7EB',
                     transition: 'all 0.2s',
-                    '&:focus-within': { borderColor: '#2E7D32', bgcolor: '#fff' }
+                    '&:focus-within': { borderColor: '#3C006F', bgcolor: '#fff', boxShadow: '0 4px 12px rgba(60, 0, 111, 0.08)' }
                   }}>
-                    <Search sx={{ color: '#9CA3AF', mr: 1.5, fontSize: 20 }} />
+                    <Search sx={{ color: '#6B7280', mr: 1.5, fontSize: 22 }} />
                     <InputBase
                       fullWidth
-                      placeholder="Search products, brands, categories..."
+                      placeholder="Search for 'Sona Masuri', 'Premium Basmati', 'Brown Rice'..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      sx={{ fontSize: '0.9rem', fontWeight: 500, color: '#1F2937' }}
+                      sx={{ fontSize: '0.95rem', fontWeight: 500, color: '#1F2937' }}
                     />
                   </Box>
                 </form>
               </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <IconButton onClick={() => navigate('/wishlist')} sx={{ color: '#4B5563' }}>
-                  <Favorite sx={{ fontSize: 22 }} />
-                </IconButton>
-                <IconButton onClick={() => navigate('/cart')} sx={{ color: '#4B5563' }}>
-                  <Badge badgeContent={cartItems.length || 0} color="error" sx={{ '& .MuiBadge-badge': { bgcolor: '#2E7D32', fontWeight: 700 } }}>
-                    <ShoppingCart sx={{ fontSize: 22 }} />
+
+              {/* Cart & Profile Controls */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 3.5 }}>
+                <Box onClick={() => navigate('/settings/profile')} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', gap: 0.25 }}>
+                  <Avatar
+                    sx={{ width: 24, height: 24, bgcolor: '#3C006F', fontSize: 11, fontWeight: 700 }}
+                  >
+                    {userInfo?.name?.[0] || 'U'}
+                  </Avatar>
+                  <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#4B5563' }}>Login</Typography>
+                </Box>
+
+                <Box onClick={() => navigate('/wishlist')} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', gap: 0.25 }}>
+                  <Favorite sx={{ fontSize: 24, color: '#4B5563' }} />
+                  <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#4B5563' }}>Wishlist</Typography>
+                </Box>
+
+                <Box onClick={() => navigate('/notifications')} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', gap: 0.25 }}>
+                  <Notifications sx={{ fontSize: 24, color: '#4B5563' }} />
+                  <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#4B5563' }}>Alerts</Typography>
+                </Box>
+
+                <Box onClick={() => navigate('/cart')} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', gap: 0.25 }}>
+                  <Badge badgeContent={cartItems.length || 0} color="error" sx={{ '& .MuiBadge-badge': { bgcolor: '#FF3F6C', fontWeight: 700 } }}>
+                    <ShoppingCart sx={{ fontSize: 24, color: '#4B5563' }} />
                   </Badge>
-                </IconButton>
-                <IconButton onClick={() => navigate('/notifications')} sx={{ color: '#4B5563' }}>
-                  <Notifications sx={{ fontSize: 22 }} />
-                </IconButton>
-                <Avatar
-                  onClick={() => navigate('/settings/profile')}
-                  sx={{ width: 34, height: 34, ml: 0.5, bgcolor: '#2E7D32', cursor: 'pointer', fontSize: 14, fontWeight: 700 }}
-                >
-                  {userInfo?.name?.[0] || 'U'}
-                </Avatar>
+                  <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#4B5563' }}>Cart</Typography>
+                </Box>
               </Box>
+
             </Box>
           </Container>
         </Box>

@@ -1,0 +1,49 @@
+{
+  "id": "519f0e42-22dc-4f8e-94bf-499470b1f99e",
+  "status": "ERRORED",
+  "platform": "ANDROID",
+  "error": {
+    "errorCode": "EAS_BUILD_UNKNOWN_GRADLE_ERROR",
+    "message": "Gradle build failed with unknown error. See logs for the \"Run gradlew\" phase for more information."
+  },
+  "artifacts": {},
+  "fingerprint": {
+    "id": "019f3471-1e8e-740a-9fcc-de9723dc278f",
+    "hash": "87920bffd5995b620394e08e0660be663ab46a28"
+  },
+  "initiatingActor": {
+    "id": "b120cc6c-2709-425d-a808-d7788a48ea38",
+    "displayName": "chakravarthi_9398"
+  },
+  "logFiles": [
+    "https://storage.googleapis.com/eas-workflows-production/logs/767b6310-f521-4865-8355-a409b3ec9c96/519f0e42-22dc-4f8e-94bf-499470b1f99e/2026-07-06T17%3A12%3A27Z-5b70eb8f-220c-4f6b-8403-8ad5b91be42c.txt?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=www-production%40exponentjs.iam.gserviceaccount.com%2F20260706%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20260706T185221Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=4f041d8acc2692dce2a001fa6b204b629c5818bb012790bcd4c00b6d3dc558e3fc5e280350d8c1107944c2151b6317d8840b49f2fd3f7b5420b0bb471b4c3f5dd541bbf07a82381ce67b5f9d520635723f8c3bdc271baf48560b4763a5564fbe18073b424f08a1f4dc5076b44ec69561abd816860a7711c577cd18774011d3aec2a60e9e71b2769a89ab71e84c073eb92ac1bb1a5fec30f8535c650c7915246f4565be390d4a0bca2b18b07b8c8f45a899fd70b41f8cc11da700ae6c068404da3111a6100a5bdea080c8c78c967cc2670f90e8b1836fde856c5e2a8f78c3d98de621b25bb327634b4a9ff83bbaf24e03694ef9845c32b4e75ee34da4833533c5"
+  ],
+  "project": {
+    "id": "767b6310-f521-4865-8355-a409b3ec9c96",
+    "name": "rice-mill-mobile",
+    "slug": "rice-mill-mobile",
+    "ownerAccount": {
+      "id": "41fd04c4-f8eb-43f0-b277-64d71d06d826",
+      "name": "chakravarthi_9398"
+    }
+  },
+  "distribution": "INTERNAL",
+  "buildProfile": "preview",
+  "sdkVersion": "52.0.0",
+  "appVersion": "1.0.0",
+  "appBuildVersion": "1",
+  "runtimeVersion": "1.0.0",
+  "gitCommitHash": "88e9b2ac6b5dcc9ef8cd32c786ffa76ebfc485ce",
+  "gitCommitMessage": "Downgrade chai to v4 for Node 18 support",
+  "priority": "NORMAL_PLUS",
+  "createdAt": "2026-07-06T16:02:44.886Z",
+  "updatedAt": "2026-07-06T17:18:12.116Z",
+  "completedAt": "2026-07-06T17:18:11.663Z",
+  "expirationDate": "2026-07-20T16:02:44.931Z",
+  "isForIosSimulator": false,
+  "metrics": {
+    "buildWaitTime": 2423,
+    "buildQueueTime": 4184795,
+    "buildDuration": 339559
+  }
+}

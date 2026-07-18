@@ -62,6 +62,15 @@ export const AuthProvider = ({ children }) => {
           : theme;
       root.setAttribute('data-theme', actualTheme);
       document.body.className = actualTheme === 'dark' ? 'dark-theme' : 'light-theme';
+
+      // Toggle dark-mode / light-mode classes on documentElement for theme.css variables
+      if (actualTheme === 'dark') {
+        root.classList.add('dark-mode');
+        root.classList.remove('light-mode');
+      } else {
+        root.classList.add('light-mode');
+        root.classList.remove('dark-mode');
+      }
     };
     applyTheme();
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');

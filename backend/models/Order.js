@@ -119,7 +119,7 @@ const orderSchema = new mongoose.Schema({
   },
   commissionRate: {
     type: Number,
-    default: 0.15,
+    default: 0, // 0% for free pilot — change to 0.15 when monetizing
     min: 0,
     max: 1
   },
@@ -526,7 +526,7 @@ orderSchema.pre('save', function (next) {
   // Calculate commission and earnings if not set (Legacy logic - maintained for compatibility)
   if (this.isModified('totalPrice') || this.isNew) {
     if (!this.productAmount) this.productAmount = this.totalPrice;
-    if (!this.commissionAmount) this.commissionAmount = this.totalPrice * (this.commissionRate || 0.15);
+    if (!this.commissionAmount) this.commissionAmount = this.totalPrice * (this.commissionRate || 0); // 0% for free pilot
     if (!this.sellerAmount) this.sellerAmount = this.totalPrice - this.commissionAmount;
 
     // ✅ Ensure deliveryPartnerAmount is calculated if missing

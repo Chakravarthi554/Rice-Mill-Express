@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "381785078247",
+    "project_id": "rice-express-7eef4",
+    "storage_bucket": "rice-express-7eef4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:381785078247:android:f64ea5607c2f99081a6542",
+        "android_client_info": {
+          "package_name": "com.ricemill.express"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "381785078247-7t1vtj2nigju8qe1lju42jk4v8s5stiq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ricemill.express",
+            "certificate_hash": "5803fd37886dea0ebef9fce4620dc464f988c08c"
+          }
+        },
+        {
+          "client_id": "381785078247-kqln1mulv78qq1te9ipvtgcr7rkd5sd0.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDjlasknf4fFwU18uHqmRQtAJWUb2_UwKU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "381785078247-kqln1mulv78qq1te9ipvtgcr7rkd5sd0.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

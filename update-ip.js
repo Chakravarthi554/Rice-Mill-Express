@@ -41,30 +41,33 @@ if (fs.existsSync(envPath)) {
 }
 
 // Update mobile env.js if it exists
-const mobileEnvPath = path.join(__dirname, 'mobile', 'src', 'config', 'env.js');
-if (fs.existsSync(mobileEnvPath)) {
-  let mobileContent = fs.readFileSync(mobileEnvPath, 'utf8');
-  mobileContent = mobileContent.replace(/export const API_URL = .*/g, `export const API_URL = '${newURL}';`);
-  fs.writeFileSync(mobileEnvPath, mobileContent, 'utf8');
-  console.log('✅ mobile/src/config/env.js updated!');
-}
+['mobile', 'mobile-seller', 'mobile-customer', 'mobile-delivery'].forEach(mobileDir => {
+  const mobileEnvPath = path.join(__dirname, mobileDir, 'src', 'config', 'env.js');
+  if (fs.existsSync(mobileEnvPath)) {
+    let mobileContent = fs.readFileSync(mobileEnvPath, 'utf8');
+    // Replace the specific IP hardcode directly so it updates the correct devApiUrl
+    mobileContent = mobileContent.replace(/http:\/\/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:5001/g, newURL);
+    fs.writeFileSync(mobileEnvPath, mobileContent, 'utf8');
+    console.log(`✅ ${mobileDir}/src/config/env.js updated!`);
+  }
 
-// Update mobile/.env.development if it exists
-const mobileEnvDevPath = path.join(__dirname, 'mobile', '.env.development');
-if (fs.existsSync(mobileEnvDevPath)) {
-  let devContent = fs.readFileSync(mobileEnvDevPath, 'utf8');
-  devContent = devContent.replace(/EXPO_PUBLIC_API_URL=.*/g, `EXPO_PUBLIC_API_URL=${newURL}`);
-  fs.writeFileSync(mobileEnvDevPath, devContent, 'utf8');
-  console.log('✅ mobile/.env.development updated!');
-}
+  // Update mobile/.env.development if it exists
+  const mobileEnvDevPath = path.join(__dirname, mobileDir, '.env.development');
+  if (fs.existsSync(mobileEnvDevPath)) {
+    let devContent = fs.readFileSync(mobileEnvDevPath, 'utf8');
+    devContent = devContent.replace(/EXPO_PUBLIC_API_URL=.*/g, `EXPO_PUBLIC_API_URL=${newURL}`);
+    fs.writeFileSync(mobileEnvDevPath, devContent, 'utf8');
+    console.log(`✅ ${mobileDir}/.env.development updated!`);
+  }
 
-// Update mobile/.env if it exists
-const mobileDotEnvPath = path.join(__dirname, 'mobile', '.env');
-if (fs.existsSync(mobileDotEnvPath)) {
-  let envContent = fs.readFileSync(mobileDotEnvPath, 'utf8');
-  envContent = envContent.replace(/EXPO_PUBLIC_API_URL=.*/g, `EXPO_PUBLIC_API_URL=${newURL}`);
-  fs.writeFileSync(mobileDotEnvPath, envContent, 'utf8');
-  console.log('✅ mobile/.env updated!');
-}
+  // Update mobile/.env if it exists
+  const mobileDotEnvPath = path.join(__dirname, mobileDir, '.env');
+  if (fs.existsSync(mobileDotEnvPath)) {
+    let envContent = fs.readFileSync(mobileDotEnvPath, 'utf8');
+    envContent = envContent.replace(/EXPO_PUBLIC_API_URL=.*/g, `EXPO_PUBLIC_API_URL=${newURL}`);
+    fs.writeFileSync(mobileDotEnvPath, envContent, 'utf8');
+    console.log(`✅ ${mobileDir}/.env updated!`);
+  }
+});
 
 console.log('\n✅ Done! Now restart:\n  - Backend:  cd backend && npm start\n  - Frontend: cd frontend && npm start\n');

@@ -307,3 +307,12 @@ export const updateWithdrawalStatus = (id, updateData) => async (dispatch, getSt
         });
     }
 };
+
+export const rechargeWallet = (amount) => async (dispatch, getState) => {
+    try {
+        await api.post('/api/v1/rewards/recharge', { amount });
+        dispatch(getWalletData());
+    } catch (error) {
+        console.error('Wallet recharge error:', error);
+    }
+};

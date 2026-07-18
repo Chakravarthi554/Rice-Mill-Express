@@ -9,7 +9,8 @@ const {
     requestWithdrawal,
     getWithdrawalHistory,
     adminGetWithdrawals,
-    adminUpdateWithdrawal
+    adminUpdateWithdrawal,
+    rechargeWallet
 } = require('../controllers/rewardsController');
 
 const { protect, admin, requireVerifiedEmail } = require('../middleware/auth');
@@ -22,6 +23,7 @@ router.get('/sync', protect, syncRewards);
 // Wallet & Withdrawal Routes
 router.get('/wallet', protect, getWalletData);
 router.post('/withdraw', protect, requireVerifiedEmail, requestWithdrawal);
+router.post('/recharge', protect, rechargeWallet);
 router.get('/withdrawals', protect, getWithdrawalHistory);
 
 // Admin Routes

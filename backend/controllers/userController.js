@@ -785,7 +785,7 @@ const addToWishlist = asyncHandler(async (req, res) => {
     req.user._id,
     { $addToSet: { wishlist: productId } },
     { new: true }
-  ).select('wishlist');
+  ).populate('wishlist').select('wishlist');
   if (!user) throw new Error('User not found');
   res.json(user.wishlist);
 });

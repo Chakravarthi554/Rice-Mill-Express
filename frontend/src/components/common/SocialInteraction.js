@@ -59,9 +59,13 @@ const SocialInteraction = ({ itemType, itemId, itemUserId, showComments = true }
     }
   }, [socialCommentsList, currentItemId, itemId]);
 
-  // Socket.io real-time updates
+  // Socket.io real-time updates and room joining
   useEffect(() => {
-    if (!socket || !itemId) return;
+    if (!socket || !itemId || !itemType) return;
+
+    const roomName = `${itemType.slice(0, -1)}_${itemId}`;
+    socket.emit('join', roomName);
+    console.log(`🔌 Joined social room: ${roomName}`);
 
     const handler = (data) => {
       if (data.itemId === itemId && data.itemType?.toLowerCase() === itemType.toLowerCase()) {
@@ -84,6 +88,8 @@ const SocialInteraction = ({ itemType, itemId, itemUserId, showComments = true }
 
     return () => {
       socket.off('SOCIAL_UPDATE', handler);
+      socket.emit('leave', roomName);
+      console.log(`🔌 Left social room: ${roomName}`);
     };
   }, [itemType, itemId, dispatch]);
 

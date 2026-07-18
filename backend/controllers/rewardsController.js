@@ -539,6 +539,41 @@ const adminUpdateWithdrawal = asyncHandler(async (req, res) => {
     });
 });
 
+// ✅ Recharge wallet (mock payment success)
+const rechargeWallet = asyncHandler(async (req, res) => {
+    const { amount } = req.body;
+    if (!amount || amount <= 0) {
+        res.status(400);
+        throw new Error('Please enter a valid amount');
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+        res.status(404);
+        throw new Error('User not found');
+    }
+
+    // Update user balance
+    user.walletBalance = (user.walletBalance || 0) + Number(amount);
+    await user.save();
+
+    // Create wallet transaction record
+    await WalletTransaction.create({
+        user: user._id,
+        amount: Number(amount),
+        type: 'deposit',
+        status: 'completed',
+        description: `Wallet recharge (Online Payment)`,
+        balanceAfter: user.walletBalance
+    });
+
+    res.json({
+        success: true,
+        message: `₹${amount} added successfully to your wallet`,
+        balance: user.walletBalance
+    });
+});
+
 module.exports = {
     getUserRewards,
     redeemRewards,
@@ -549,5 +584,6 @@ module.exports = {
     requestWithdrawal,
     getWithdrawalHistory,
     adminGetWithdrawals,
-    adminUpdateWithdrawal
+    adminUpdateWithdrawal,
+    rechargeWallet
 };

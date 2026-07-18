@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Box, Container, Typography, Card, CardContent, CardMedia, Button, IconButton, Grid, Chip } from '@mui/material';
-import { Delete as DeleteIcon, ShoppingCart, Favorite, ArrowForward } from '@mui/icons-material';
+import { Delete as DeleteIcon, ShoppingCart, Favorite, ArrowForward, ArrowBack } from '@mui/icons-material';
 import { getWishlistAction, removeFromWishlist } from '../../redux/actions/userActions';
 import { addToCart } from '../../redux/actions/cartActions';
 import { listProducts } from '../../redux/actions/productActions';
@@ -45,6 +45,11 @@ const WishlistPage = () => {
     return (
       <Box sx={{ bgcolor: '#FFF5F5', minHeight: '100vh' }}>
         <Container maxWidth="md" sx={{ py: 8 }}>
+          <Box sx={{ mb: 2 }}>
+            <Button startIcon={<ArrowBack />} onClick={() => navigate(-1)} sx={{ color: '#111827', textTransform: 'none', fontWeight: 700 }}>
+              Back
+            </Button>
+          </Box>
           <EmptyState
             icon="❤️"
             title="Your wishlist is empty"
@@ -60,6 +65,9 @@ const WishlistPage = () => {
     <Box sx={{ bgcolor: '#FFF5F5', minHeight: '100vh', pb: 8 }}>
       <Container maxWidth="xl" sx={{ pt: 4 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+          <IconButton onClick={() => navigate(-1)} sx={{ color: '#111827', mr: 1 }}>
+            <ArrowBack />
+          </IconButton>
           <Favorite sx={{ color: '#EF4444', fontSize: 28 }} />
           <Typography variant="h4" sx={{ fontWeight: 800, color: '#111827' }}>
             My Wishlist

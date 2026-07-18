@@ -30,6 +30,7 @@ const {
     uploadDeliveryPhotoAndComplete,
     requestReplacement,
     remitCash,
+    rejectOrder,
 } = require('../controllers/deliveryPartnerController.js');
 
 const {
@@ -73,6 +74,7 @@ router.post(
     upload.single('replacementPhoto'),
     requestReplacement
 );
+router.post('/reject-order/:orderId', protect, role('deliveryPartner'), rejectOrder);
 router.post('/remit-cash', protect, role('deliveryPartner'), remitCash);
 
 // History & Profile

@@ -133,7 +133,8 @@ function CustomerTabs() {
           if (route.name === 'Home') iconName = 'home';
           else if (route.name === 'Cart') iconName = 'shopping-bag';
           else if (route.name === 'WishlistTab') iconName = 'heart';
-          else if (route.name === 'Orders') iconName = 'package';
+          else if (route.name === 'Recipes') iconName = 'book-open';
+          else if (route.name === 'Forum') iconName = 'message-square';
           else if (route.name === 'Profile') iconName = 'user';
           return <FeatherIcons name={iconName} size={focused ? 22 : 20} color={color} />;
         },
@@ -162,7 +163,8 @@ function CustomerTabs() {
       <Tab.Screen name="Home" component={CustomerHomeScreen} options={{ title: 'Home' }} />
       <Tab.Screen name="Cart" component={CartScreen} options={{ title: 'Cart' }} />
       <Tab.Screen name="WishlistTab" component={WishlistScreen} options={{ title: 'Wishlist' }} />
-      <Tab.Screen name="Orders" component={OrdersScreen} options={{ title: 'Orders' }} />
+      <Tab.Screen name="Recipes" component={RecipesScreen} options={{ title: t('recipes') }} />
+      <Tab.Screen name="Forum" component={ForumScreen} options={{ title: t('forum') }} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
     </Tab.Navigator>
   );
@@ -203,6 +205,11 @@ function CustomerStack() {
         name="Wishlist"
         component={WishlistScreen}
         options={{ title: t('myWishlist') }}
+      />
+      <Stack.Screen
+        name="Orders"
+        component={OrdersScreen}
+        options={{ title: t('orders') || 'Orders' }}
       />
       <Stack.Screen
         name="Notifications"

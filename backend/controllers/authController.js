@@ -50,7 +50,7 @@ const checkJWTSecrets = () => {
 const registerUser = asyncHandler(async (req, res) => {
   checkJWTSecrets();
 
-  const { name, email, password, phone, role, firebaseUid, referralCode } = req.body;
+  const { name, email, password, phone, role, firebaseUid, referralCode, sellerType } = req.body;
 
   // ✅ FIX: Sanitise phone to exactly 10 digits for MongoDB validation
   let sanitisedPhone = phone || '';
@@ -132,6 +132,7 @@ const registerUser = asyncHandler(async (req, res) => {
     role: role || 'customer',
     firebaseUid,
     referredBy: referrerId,
+    sellerType: role === 'seller' ? sellerType : undefined,
     kycStatus: role === 'seller' ? 'not_submitted' : 'not_required',
   });
 

@@ -19,11 +19,11 @@ const getProducts = asyncHandler(async (req, res) => {
       }
       : {};
 
-    const query = { ...keyword, approvalStatus: 'approved' };
+    const query = { ...keyword, approvalStatus: { $ne: 'rejected', $ne: 'pending' }, status: { $ne: 'rejected', $ne: 'pending' } };
 
     const count = await Product.countDocuments(query);
     const products = await Product.find(query)
-      .select('name brand category price offerPrice images rating numReviews countInStock availableStock weight unit approvalStatus type quality')
+      .select('name brand category price offerPrice images rating numReviews countInStock availableStock weight unit approvalStatus status rejectionReason approvalRejectionReason type quality')
       .populate('seller', 'name businessName')
       .limit(pageSize)
       .skip(pageSize * (page - 1))
@@ -84,8 +84,16 @@ const filterProducts = asyncHandler(async (req, res) => {
     }
 
     // Filter by category
-    if (category && category !== 'all') {
-      query.category = category;
+    if (category && category.toLowerCase() !== 'all') {
+      let categoryTerm = category;
+      if (category.toLowerCase().includes('basmati')) categoryTerm = 'Basmati';
+      else if (category.toLowerCase().includes('sona')) categoryTerm = 'Sona';
+      else if (category.toLowerCase().includes('organic')) categoryTerm = 'Organic';
+      else if (category.toLowerCase().includes('brown')) categoryTerm = 'Brown';
+      else if (category.toLowerCase().includes('wholesale')) categoryTerm = 'Wholesale';
+      else if (category.toLowerCase().includes('kolam')) categoryTerm = 'Kolam';
+
+      query.category = { $regex: categoryTerm, $options: 'i' };
     }
 
     // Filter by brand
@@ -109,11 +117,21 @@ const filterProducts = asyncHandler(async (req, res) => {
       query.weight = weight;
     }
 
-    // Price range
-    query.price = {
-      $gte: Number(priceMin),
-      $lte: Number(priceMax)
-    };
+    // Price range - filter based on effective selling price (offerPrice if active, otherwise price)
+    query.$or = [
+      {
+        $and: [
+          { offerPrice: { $gt: 0 } },
+          { offerPrice: { $gte: Number(priceMin), $lte: Number(priceMax) } }
+        ]
+      },
+      {
+        $and: [
+          { $or: [{ offerPrice: { $exists: false } }, { offerPrice: 0 }, { offerPrice: null }] },
+          { price: { $gte: Number(priceMin), $lte: Number(priceMax) } }
+        ]
+      }
+    ];
 
     // Diet preference (array)
     if (dietPreference) {
@@ -165,7 +183,8 @@ const filterProducts = asyncHandler(async (req, res) => {
     }
     
     // Only show approved products
-    query.approvalStatus = 'approved';
+    query.approvalStatus = { $ne: 'rejected', $ne: 'pending' };
+    query.status = { $ne: 'rejected', $ne: 'pending' };
 
     // Calculate pagination
     const skip = (page - 1) * limit;
@@ -173,7 +192,7 @@ const filterProducts = asyncHandler(async (req, res) => {
 
     // Execute query
     const products = await Product.find(query)
-      .select('name brand category price offerPrice images rating numReviews countInStock availableStock weight unit approvalStatus type quality discounts')
+      .select('name brand category price offerPrice images rating numReviews countInStock availableStock weight unit approvalStatus status rejectionReason approvalRejectionReason type quality discounts')
       .populate('seller', 'name businessName phone address')
       .sort(sort)
       .skip(skip)
@@ -332,7 +351,8 @@ const createProduct = asyncHandler(async (req, res) => {
       dietPreference: Array.isArray(dietPreference) ? dietPreference : (dietPreference ? [dietPreference] : []),
       cookingPurpose: Array.isArray(cookingPurpose) ? cookingPurpose : (cookingPurpose ? [cookingPurpose] : []),
       minBulkQuantity: Number(minBulkQuantity),
-      approvalStatus: 'pending'
+      approvalStatus: 'pending',
+      status: 'pending'
     });
 
     const createdProduct = await product.save();
@@ -526,7 +546,7 @@ const getSellerProducts = asyncHandler(async (req, res) => {
     const skip = (page - 1) * limit;
 
     const products = await Product.find({ seller: req.user._id })
-      .select('name brand category price offerPrice images rating numReviews countInStock availableStock weight unit approvalStatus type quality')
+      .select('name brand category price offerPrice images rating numReviews countInStock availableStock weight unit approvalStatus status rejectionReason approvalRejectionReason type quality')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -588,23 +608,16 @@ const getPendingProducts = asyncHandler(async (req, res) => {
 
 const approveProduct = asyncHandler(async (req, res) => {
   try {
-    const { status, reason } = req.body;
     const product = await Product.findById(req.params.id).populate('seller', 'name email');
 
     if (!product) {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
 
-    if (!['approved', 'rejected'].includes(status)) {
-      return res.status(400).json({ success: false, message: 'Invalid status' });
-    }
-
-    product.approvalStatus = status;
-    if (status === 'rejected') {
-      product.approvalRejectionReason = reason || 'No reason provided';
-    } else {
-      product.approvalRejectionReason = undefined;
-    }
+    product.approvalStatus = 'approved';
+    product.status = 'approved';
+    product.approvalRejectionReason = undefined;
+    product.rejectionReason = undefined;
 
     await product.save();
 
@@ -616,19 +629,18 @@ const approveProduct = asyncHandler(async (req, res) => {
       if (seller && seller.email) {
         await emailQueue.add({
           email: seller.email,
-          subject: `Product ${status === 'approved' ? 'Approved' : 'Rejected'}`,
+          subject: `Product Approved`,
           message: `
             <h2>Product Approval Status Update</h2>
-            <p>Your product <b>${product.name}</b> has been <b>${status}</b> by the admin.</p>
-            ${status === 'rejected' ? `<p>Reason: ${product.approvalRejectionReason}</p>` : ''}
+            <p>Your product <b>${product.name}</b> has been <b>approved</b> by the admin.</p>
           `
         });
       }
 
       await Notification.create({
         user: seller._id,
-        type: `PRODUCT_${status.toUpperCase()}`,
-        message: `Your product "${product.name}" has been ${status}.${status === 'rejected' ? ' Reason: ' + product.approvalRejectionReason : ''}`,
+        type: `PRODUCT_APPROVED`,
+        message: `Your product "${product.name}" has been approved.`,
         relatedEntity: product._id,
         entityModel: 'Product'
       });
@@ -638,11 +650,70 @@ const approveProduct = asyncHandler(async (req, res) => {
 
     res.json({
       success: true,
-      message: `Product ${status} successfully`,
+      message: `Product approved successfully`,
       product
     });
   } catch (error) {
     console.error('❌ Approve product error:', error);
+    res.status(500).json({ success: false, message: 'Error updating product status' });
+  }
+});
+
+const rejectProduct = asyncHandler(async (req, res) => {
+  try {
+    const { reason } = req.body;
+    if (!reason || reason.trim() === '') {
+      return res.status(400).json({ success: false, message: 'Rejection reason is required' });
+    }
+
+    const product = await Product.findById(req.params.id).populate('seller', 'name email');
+
+    if (!product) {
+      return res.status(404).json({ success: false, message: 'Product not found' });
+    }
+
+    product.approvalStatus = 'rejected';
+    product.status = 'rejected';
+    product.approvalRejectionReason = reason;
+    product.rejectionReason = reason;
+
+    await product.save();
+
+    // Notify seller
+    try {
+      const { emailQueue } = require('../jobs/queues');
+      const seller = product.seller;
+      
+      if (seller && seller.email) {
+        await emailQueue.add({
+          email: seller.email,
+          subject: `Product Rejected`,
+          message: `
+            <h2>Product Approval Status Update</h2>
+            <p>Your product <b>${product.name}</b> has been <b>rejected</b> by the admin.</p>
+            <p>Reason: ${reason}</p>
+          `
+        });
+      }
+
+      await Notification.create({
+        user: seller._id,
+        type: `PRODUCT_REJECTED`,
+        message: `Your product "${product.name}" has been rejected. Reason: ${reason}`,
+        relatedEntity: product._id,
+        entityModel: 'Product'
+      });
+    } catch (notifErr) {
+      console.error('Failed to notify seller about product rejection:', notifErr.message);
+    }
+
+    res.json({
+      success: true,
+      message: `Product rejected successfully`,
+      product
+    });
+  } catch (error) {
+    console.error('❌ Reject product error:', error);
     res.status(500).json({ success: false, message: 'Error updating product status' });
   }
 });
@@ -660,4 +731,5 @@ module.exports = {
   getRecipeSuggestion,
   getPendingProducts,
   approveProduct,
+  rejectProduct
 };
