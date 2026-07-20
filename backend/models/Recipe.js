@@ -41,7 +41,7 @@ const recipeSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const formatImages = (ret) => {
-  const baseUrl = process.env.NODE_ENV === 'production' ? 'http://13.62.55.108:5001' : 'http://localhost:5001';
+  const baseUrl = process.env.NODE_ENV === 'production' ? 'http://13.63.246.61:5001' : 'http://localhost:5001';
   if (ret.images && Array.isArray(ret.images)) {
     ret.images = ret.images.map(img => (img && img.startsWith('/')) ? `${baseUrl}${img}` : img);
   }

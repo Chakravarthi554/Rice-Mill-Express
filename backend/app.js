@@ -63,7 +63,7 @@ app.set("trust proxy", 1);
 app.use((req, res, next) => {
   const originalSend = res.send;
   const baseUrl = process.env.NODE_ENV === 'production' 
-    ? 'http://13.62.55.108:5001' 
+    ? 'http://13.63.246.61:5001' 
     : `http://localhost:${process.env.PORT || 5001}`;
 
   res.send = function(body) {
@@ -210,7 +210,7 @@ const allowedOrigins = [
   "http://127.0.0.1:3000",
   "http://localhost:3001",
   "http://rice-mill-frontend-chakravarthi.s3-website.eu-north-1.amazonaws.com",
-  "http://13.62.55.108:5001",
+  "http://13.63.246.61:5001",
   "https://c111b7c7.rice-mill-frontend.pages.dev",
   process.env.FRONTEND_URL,
   ...localIPs.map(ip => `http://${ip}:${PORT}`),
