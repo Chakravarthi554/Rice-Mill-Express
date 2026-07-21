@@ -51,6 +51,8 @@ const SellerProductsScreen = ({ navigation }) => {
         }
       ]
     );
+  };
+
   const handleToggleStock = async (product, newValue) => {
     try {
       // Opt-in UI update instantly

@@ -9,7 +9,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:381785078247:android:f64ea5607c2f99081a6542",
         "android_client_info": {
-          "package_name": "com.ricemill.express"
+          "package_name": "com.ricemill.delivery"
         }
       },
       "oauth_client": [
@@ -17,7 +17,7 @@
           "client_id": "381785078247-7t1vtj2nigju8qe1lju42jk4v8s5stiq.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.ricemill.express",
+            "package_name": "com.ricemill.delivery",
             "certificate_hash": "5803fd37886dea0ebef9fce4620dc464f988c08c"
           }
         },

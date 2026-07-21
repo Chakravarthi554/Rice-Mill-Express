@@ -7,10 +7,10 @@ const HelpCenterScreen = () => {
     const [searchQuery, setSearchQuery] = useState('');
 
     const faqs = [
-        { q: 'How do I track my order?', a: 'You can track your order in the "Orders" section of your profile.' },
-        { q: 'What is the return policy?', a: 'We offer a 7-day return policy for damaged or incorrect items.' },
-        { q: 'How do I earn reward points?', a: 'You earn 1 point for every ₹100 spent. Points can be redeemed at checkout.' },
-        { q: 'How can I contact a seller?', a: 'Seller details are available on the product page and order details.' },
+        { q: 'How do I withdraw my earnings?', a: 'You can request a withdrawal from the Business & Payments section. Minimum withdrawal is ₹500.' },
+        { q: 'How do I add a new delivery partner?', a: 'Go to the Delivery Partners tab and tap the + button to create a login for your driver.' },
+        { q: 'When is a payout processed?', a: 'Withdrawal requests are typically processed within 2-3 business days directly to your registered bank account.' },
+        { q: 'How do I update an order status?', a: 'Navigate to the Orders tab, select the order, and you can update its status or assign it to a delivery partner.' },
     ];
 
     return (

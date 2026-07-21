@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Dimensions } from 'react-native';
 import { Card } from 'react-native-paper';
 import { MaterialIcons } from '@expo/vector-icons';
+import { apiService } from '../services/api';
 
 const { width } = Dimensions.get('window');
 
@@ -17,18 +18,30 @@ const SellerAnalyticsScreen = () => {
   const fetchAnalytics = async () => {
     try {
       setLoading(true);
-      // Simulate API call for analytics
-      setTimeout(() => {
-        setStats({
-          totalSales: 154000,
-          ordersCompleted: 420,
-          activeProducts: 15
-        });
-        setLoading(false);
-        setRefreshing(false);
-      }, 1000);
+      
+      const [ordersRes, productsRes] = await Promise.all([
+        apiService.getSellerOrders(),
+        apiService.getSellerProducts()
+      ]);
+
+      const allOrders = ordersRes.data?.orders || ordersRes.data || [];
+      const allProducts = productsRes.data?.products || productsRes.data || [];
+
+      const completedOrders = allOrders.filter(o => o.orderStatus === 'delivered');
+      const totalSalesAmt = completedOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+      const activeProds = allProducts.filter(p => p.isActive !== false).length;
+
+      setStats({
+        totalSales: totalSalesAmt,
+        ordersCompleted: completedOrders.length,
+        activeProducts: activeProds
+      });
+
     } catch (error) {
       console.error('Error fetching analytics:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
   };
 

@@ -405,52 +405,10 @@ function MainContent() {
 import { PersistGate } from 'redux-persist/integration/react';
 
 export default function App() {
-  const [backendError, setBackendError] = useState(false);
-  const [checking, setChecking] = useState(true);
 
-  useEffect(() => {
-    const checkBackend = async () => {
-      try {
-        const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://13.62.55.108:5001';
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        const res = await fetch(`${apiUrl}/api/v1/health`, { signal: controller.signal });
-        clearTimeout(timeoutId);
 
-        if (res.ok) {
-          console.log('✅ Backend connectivity confirmed');
-        } else {
-          setBackendError(true);
-        }
-      } catch (e) {
-        console.error('Backend connection failed:', e);
-        setBackendError(true);
-      } finally {
-        setChecking(false);
-      }
-    };
-    checkBackend();
-  }, []);
+  // Backend checks now run silently in the background
 
-  if (checking) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-        <Text style={{ marginTop: 10, color: '#666' }}>Connecting to server...</Text>
-      </View>
-    );
-  }
-
-  if (backendError) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fee2e2', padding: 20 }}>
-        <MaterialIcons name="cloud-off" size={64} color="#991b1b" />
-        <Text style={{ fontSize: 18, color: '#991b1b', fontWeight: 'bold', textAlign: 'center', marginTop: 20 }}>
-          Cannot connect to server. Please check your connection.
-        </Text>
-      </View>
-    );
-  }
 
   return (
     <MobileErrorBoundary>

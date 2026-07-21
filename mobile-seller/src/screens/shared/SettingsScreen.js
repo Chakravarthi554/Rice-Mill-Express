@@ -20,12 +20,12 @@ const SETTING_GROUPS = [
         ]
     },
     {
-        title: 'Orders & Rewards',
+        title: 'Business & Payments',
         items: [
-            { title: 'Order History', sub: 'Past and pending orders', icon: 'package', iconBg: '#F0FDF4', iconColor: '#16A34A', nav: 'Orders' },
-            { title: 'Rewards & Points', sub: 'Earn and redeem points', icon: 'star', iconBg: '#FEFCE8', iconColor: '#CA8A04', nav: 'Rewards' },
-            { title: 'Refer & Earn', sub: 'Invite friends for rewards', icon: 'gift', iconBg: '#FFF7ED', iconColor: '#F97316', nav: 'Referral' },
-            { title: 'My Reviews', sub: 'Reviews you have written', icon: 'edit-3', iconBg: '#F0F9FF', iconColor: '#0284C7', nav: 'MyReviews' },
+            { title: 'Order Management', sub: 'Past and pending orders', icon: 'package', iconBg: '#F0FDF4', iconColor: '#16A34A', nav: 'SellerOrders' },
+            { title: 'Products', sub: 'Manage your listings', icon: 'grid', iconBg: '#FEFCE8', iconColor: '#CA8A04', nav: 'SellerProducts' },
+            { title: 'Payments & Withdrawals', sub: 'Track your earnings', icon: 'dollar-sign', iconBg: '#FFF7ED', iconColor: '#F97316', nav: 'SellerPayments' },
+            { title: 'Analytics', sub: 'View your sales stats', icon: 'pie-chart', iconBg: '#F0F9FF', iconColor: '#0284C7', nav: 'SellerAnalytics' },
         ]
     },
     {

@@ -37,7 +37,6 @@ setupInterceptors(store, logout);
 
 // Auth Screens
 import LoginScreen from './screens/auth/LoginScreen';
-import RegisterScreen from './screens/auth/RegisterScreen';
 import ForgotPasswordScreen from './screens/auth/ForgotPasswordScreen';
 import TwoFactorVerifyScreen from './screens/auth/TwoFactorVerifyScreen';
 
@@ -46,6 +45,7 @@ import TwoFactorVerifyScreen from './screens/auth/TwoFactorVerifyScreen';
 
 // Delivery Partner Screens
 import DeliveryPartnerDashboard from './screens/DeliveryPartnerDashboard';
+import OnboardingScreen from './screens/OnboardingScreen';
 import DeliveryConfirmationScreen from './screens/DeliveryConfirmationScreen';
 import OrderDetailsScreen from './screens/delivery/OrderDetailsScreen';
 import DeliveryHistoryScreen from './screens/delivery/DeliveryHistoryScreen';
@@ -70,7 +70,6 @@ function AuthStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Login" component={LoginScreen} />
-      <Stack.Screen name="Register" component={RegisterScreen} />
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
       <Stack.Screen name="TwoFactorVerify" component={TwoFactorVerifyScreen} />
     </Stack.Navigator>
@@ -106,9 +105,14 @@ function DeliveryTabs() {
 }
 
 // Delivery Partner Stack Navigator
-function DeliveryStack() {
+function DeliveryStack({ initialRoute }) {
   return (
-    <Stack.Navigator>
+    <Stack.Navigator initialRouteName={initialRoute}>
+      <Stack.Screen 
+        name="Onboarding" 
+        component={OnboardingScreen} 
+        options={{ headerShown: false }} 
+      />
       <Stack.Screen
         name="DeliveryTabs"
         component={DeliveryTabs}
@@ -142,10 +146,15 @@ function DeliveryStack() {
 function AppNavigator() {
   const { user, isAuthenticated, loading, isAuthReady } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
+  const [hasSeenOnboarding, setHasSeenOnboarding] = useState(null);
 
   useEffect(() => {
     // 1. Load user from AsyncStorage ONCE at startup
     dispatch(loadUserFromStorage());
+
+    AsyncStorage.getItem('hasSeenOnboarding').then(val => {
+      setHasSeenOnboarding(val === 'true');
+    });
 
     // 2. Listen to Firebase auth state changes
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -195,7 +204,7 @@ function AppNavigator() {
     }
   }, [isAuthReady, isAuthenticated, dispatch]);
 
-  if (loading || !isAuthReady) {
+  if (loading || !isAuthReady || hasSeenOnboarding === null) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4CAF50" />
@@ -208,7 +217,7 @@ function AppNavigator() {
     return <AuthStack />;
   }
 
-  return <DeliveryStack />;
+  return <DeliveryStack initialRoute={hasSeenOnboarding ? 'DeliveryTabs' : 'Onboarding'} />;
 }
 
 function MainContent() {
@@ -266,52 +275,6 @@ function MainContent() {
 import { PersistGate } from 'redux-persist/integration/react';
 
 export default function App() {
-  const [backendError, setBackendError] = useState(false);
-  const [checking, setChecking] = useState(true);
-
-  useEffect(() => {
-    const checkBackend = async () => {
-      try {
-        const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://13.62.55.108:5001';
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        const res = await fetch(`${apiUrl}/api/v1/health`, { signal: controller.signal });
-        clearTimeout(timeoutId);
-        
-        if (res.ok) {
-          console.log('✅ Backend connectivity confirmed');
-        } else {
-          setBackendError(true);
-        }
-      } catch (e) {
-        console.error('Backend connection failed:', e);
-        setBackendError(true);
-      } finally {
-        setChecking(false);
-      }
-    };
-    checkBackend();
-  }, []);
-
-  if (checking) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-        <Text style={{ marginTop: 10, color: '#666' }}>Connecting to server...</Text>
-      </View>
-    );
-  }
-
-  if (backendError) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fee2e2', padding: 20 }}>
-        <MaterialIcons name="cloud-off" size={64} color="#991b1b" />
-        <Text style={{ fontSize: 18, color: '#991b1b', fontWeight: 'bold', textAlign: 'center', marginTop: 20 }}>
-          Cannot connect to server. Please check your connection.
-        </Text>
-      </View>
-    );
-  }
 
   return (
     <MobileErrorBoundary>

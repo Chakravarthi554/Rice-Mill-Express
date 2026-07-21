@@ -158,11 +158,7 @@ export default function LoginScreen({ navigation }) {
                         </TouchableOpacity>
                     </View>
 
-                    {/* ── REGISTER LINK ── */}
-                    <TouchableOpacity style={styles.registerRow} onPress={() => navigation.navigate('Register')}>
-                        <Text style={styles.registerPrompt}>Don't have an account? </Text>
-                        <Text style={styles.registerLink}>Create Account</Text>
-                    </TouchableOpacity>
+                    {/* ── REGISTER LINK REMOVED ── */}
 
                     {/* Trust Badges */}
                     <View style={styles.trustRow}>

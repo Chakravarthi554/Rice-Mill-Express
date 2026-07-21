@@ -710,7 +710,7 @@ const renderRazorpayCheckout = asyncHandler(async (req, res) => {
             notes: {
                 order_id: order._id.toString()
             },
-            callback_url: `http://10.151.178.143:5001/api/payments/razorpay/verify-link?orderId=${order._id}`,
+            callback_url: `${req.protocol}://${req.get('host')}/api/payments/razorpay/verify-link?orderId=${order._id}`,
             callback_method: "get"
         });
 
@@ -745,7 +745,7 @@ const renderRazorpayAdvanceCheckout = asyncHandler(async (req, res) => {
     }
 
     if (order.isAdvancePaid || order.isPaid) {
-        return res.send('<h1>Advance is already paid!</h1><script>setTimeout(() => { window.location.href="ricemill://payment-success"; }, 2000);</script>');
+        return res.send('<h1>Advance is already paid!</h1><script>setTimeout(() => { window.location.href="ricemill://payment-success"; window.location.href="ricemillapp://payment-success"; }, 2000);</script>');
     }
 
     const advanceAmount = Math.round(order.totalPrice * 0.2);
@@ -780,7 +780,7 @@ const renderRazorpayAdvanceCheckout = asyncHandler(async (req, res) => {
                 order_id: order._id.toString(),
                 is_advance: 'true'
             },
-            callback_url: `http://10.151.178.143:5001/api/payments/razorpay/verify-advance-link?orderId=${order._id}`,
+            callback_url: `${req.protocol}://${req.get('host')}/api/payments/razorpay/verify-advance-link?orderId=${order._id}`,
             callback_method: "get"
         });
 
@@ -855,10 +855,13 @@ const verifyRazorpayLink = asyncHandler(async (req, res) => {
                             const orderId = "${orderId}";
                             setTimeout(() => {
                                 window.location.href = "ricemill://payment-success?orderId=" + orderId;
-                                // Fallback for Expo Go
                                 setTimeout(() => {
-                                    window.location.href = "exp://10.151.178.143:8081/--/payment-success?orderId=" + orderId;
-                                }, 1000);
+                                    window.location.href = "ricemillapp://payment-success?orderId=" + orderId;
+                                    // Fallback for Expo Go
+                                    setTimeout(() => {
+                                        window.location.href = "exp://10.151.178.143:8081/--/payment-success?orderId=" + orderId;
+                                    }, 1000);
+                                }, 500);
                             }, 1000);
                         </script>
                     </body>
@@ -921,14 +924,16 @@ const verifyRazorpayAdvanceLink = asyncHandler(async (req, res) => {
                             <p>Updating your order status...</p>
                             <p>Redirecting you back to the app...</p>
                             <script>
-                                // Try multiple schemes
                                 const orderId = "${orderId}";
                                 setTimeout(() => {
                                     window.location.href = "ricemill://payment-success?orderId=" + orderId;
-                                    // Fallback for Expo Go
                                     setTimeout(() => {
-                                        window.location.href = "exp://10.151.178.143:8081/--/payment-success?orderId=" + orderId;
-                                    }, 1000);
+                                        window.location.href = "ricemillapp://payment-success?orderId=" + orderId;
+                                        // Fallback for Expo Go
+                                        setTimeout(() => {
+                                            window.location.href = "exp://10.151.178.143:8081/--/payment-success?orderId=" + orderId;
+                                        }, 1000);
+                                    }, 500);
                                 }, 1000);
                                 </script>
                             </body>

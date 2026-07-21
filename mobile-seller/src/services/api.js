@@ -221,7 +221,13 @@ export const apiService = {
     // ============ Seller ============
     getSellerOrders: () => api.get('/api/v1/orders/sellerorders'),
     getSellerProducts: () => api.get('/api/v1/seller/products'),
-    createProduct: (productData) => api.post('/api/v1/products', productData),
+    createProduct: (productData) => {
+        const isFormData = productData instanceof FormData;
+        return api.post('/api/v1/products', productData, isFormData ? {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: 60000,
+        } : {});
+    },
     updateProduct: (id, productData) => api.put(`/api/v1/products/${id}`, productData),
     deleteProduct: (id) => api.delete(`/api/v1/products/${id}`),
     assignDeliveryPartner: (orderId, partnerId) =>

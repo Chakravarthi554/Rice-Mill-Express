@@ -55,9 +55,14 @@ export const register = createAsyncThunk(
     'auth/register',
     async ({ name, email, password, phone, role, referralCode, deviceId }, { rejectWithValue }) => {
         try {
-            // 1. Create user in Firebase
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            const idToken = await userCredential.user.getIdToken();
+            let idToken = null;
+            try {
+                // 1. Try to create user in Firebase
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                idToken = await userCredential.user.getIdToken();
+            } catch (firebaseError) {
+                console.log('Firebase registration failed, falling back to backend registration', firebaseError.message);
+            }
 
             // 2. Create user profile in backend
             // Note: api service already has Authorization header interceptor

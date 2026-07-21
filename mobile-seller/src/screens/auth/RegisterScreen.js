@@ -197,7 +197,7 @@ export default function RegisterScreen({ navigation }) {
                                 <Picker
                                     selectedValue={formData.sellerType}
                                     style={{ flex: 1, color: COLORS.text, marginLeft: 4 }}
-                                    onValueChange={(itemValue) => handleChange('sellerType', itemValue)}
+                                    onValueChange={(itemValue) => updateFormData('sellerType', itemValue)}
                                 >
                                     <Picker.Item label="Select Business Type" value="" color={COLORS.textMuted} />
                                     <Picker.Item label="Rice Shop" value="Rice Shop" />

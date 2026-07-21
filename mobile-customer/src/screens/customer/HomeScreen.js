@@ -205,7 +205,7 @@ export default function HomeScreen({ navigation }) {
         return img.startsWith('http') ? img : `${API_URL}${img}`;
     };
 
-    const renderProductCard = (item, compact = false) => {
+    const ProductCard = React.memo(({ item, compact }) => {
         const imageUri = getImageUri(item);
         const hasOffer = typeof item.offerPrice === 'number' && item.offerPrice > 0 && item.offerPrice < item.price;
         const displayPrice = hasOffer ? item.offerPrice : item.price;
@@ -215,7 +215,6 @@ export default function HomeScreen({ navigation }) {
 
         return (
             <TouchableOpacity
-                key={item._id}
                 style={compact ? styles.compactCard : styles.productCard}
                 onPress={() => handleNavigation(item._id)}
                 activeOpacity={0.92}
@@ -263,7 +262,7 @@ export default function HomeScreen({ navigation }) {
                 </View>
             </TouchableOpacity>
         );
-    };
+    });
 
     return (
         <SafeAreaView style={styles.container}>
@@ -428,7 +427,7 @@ export default function HomeScreen({ navigation }) {
                                 </View>
                             </View>
                             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 14 }}>
-                                {filteredProducts.slice(0, 6).map(item => renderProductCard(item, true))}
+                                {filteredProducts.slice(0, 6).map(item => <ProductCard key={item._id} item={item} compact={true} />)}
                             </ScrollView>
                         </View>
                     )}
@@ -457,9 +456,9 @@ export default function HomeScreen({ navigation }) {
                                 </View>
                             </View>
                             <View style={styles.grid}>
-                                {filteredProducts.map(item => (
+                                {filteredProducts.slice(0, 20).map(item => (
                                     <View key={item._id} style={styles.gridItem}>
-                                        {renderProductCard(item, false)}
+                                        <ProductCard item={item} compact={false} />
                                     </View>
                                 ))}
                             </View>

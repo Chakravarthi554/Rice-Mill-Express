@@ -136,7 +136,7 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
                 </View>
 
                 {/* Duty Toggle Massive Card */}
-                <View style={[styles.dutyCard, { backgroundColor: isOnline ? '#1E3A8A' : '#374151' }]}>
+                <View style={[styles.dutyCard, { backgroundColor: isOnline ? '#2563EB' : '#4B5563', shadowColor: isOnline ? '#2563EB' : '#000' }]}>
                     <View style={styles.dutyLeft}>
                         <View style={[styles.dutyDot, { backgroundColor: isOnline ? '#34D399' : '#9CA3AF' }]} />
                         <Text style={styles.dutyText}>{isOnline ? 'YOU ARE ONLINE' : 'YOU ARE OFFLINE'}</Text>
@@ -248,7 +248,7 @@ const DeliveryPartnerDashboard = ({ navigation }) => {
                         <Text style={styles.statValue}>{stats.todayOrders || 0}</Text>
                         <Text style={styles.statLabel}>Today's Trips</Text>
                     </View>
-                    <View style={styles.statBox}>
+                    <View style={[styles.statBox, { backgroundColor: '#10B981', shadowColor: '#10B981' }]}>
                         <Text style={styles.statValue}>₹{stats.floatingCash || 0}</Text>
                         <Text style={styles.statLabel}>Cash to Deposit</Text>
                     </View>
@@ -264,17 +264,17 @@ const styles = StyleSheet.create({
     headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, marginTop: 10 },
     greeting: { fontSize: 28, fontWeight: 'bold', color: '#FFF' },
     date: { fontSize: 16, color: '#9CA3AF', marginTop: 4 },
-    sosButton: { backgroundColor: '#DC2626', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 25 },
+    sosButton: { backgroundColor: '#EF4444', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 25, elevation: 8, shadowColor: '#EF4444', shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.5, shadowRadius: 6 },
     sosText: { color: '#FFF', fontWeight: 'bold', marginLeft: 8, fontSize: 16 },
-    dutyCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderRadius: 16 },
+    dutyCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderRadius: 24, elevation: 12, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.5, shadowRadius: 10 },
     dutyLeft: { flexDirection: 'row', alignItems: 'center' },
     dutyDot: { width: 14, height: 14, borderRadius: 7, marginRight: 12 },
-    dutyText: { color: '#FFF', fontSize: 18, fontWeight: '900', letterSpacing: 1 },
+    dutyText: { color: '#FFF', fontSize: 18, fontWeight: '900', letterSpacing: 1, textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
     scrollContent: { padding: 20 },
-    activeOrderCard: { backgroundColor: '#1F2937', borderRadius: 24, padding: 24, marginBottom: 24, borderWidth: 1, borderColor: '#374151' },
-    newOrderPulse: { borderColor: '#FC8019', borderWidth: 2 },
+    activeOrderCard: { backgroundColor: '#1F2937', borderRadius: 28, padding: 24, marginBottom: 24, elevation: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 12 },
+    newOrderPulse: { borderColor: '#FC8019', borderWidth: 2, shadowColor: '#FC8019', elevation: 20, shadowOpacity: 0.8, shadowRadius: 16 },
     activeOrderHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-    activeOrderTitle: { color: '#FFF', fontSize: 22, fontWeight: 'bold' },
+    activeOrderTitle: { color: '#FFF', fontSize: 22, fontWeight: '900', letterSpacing: 1 },
     activeOrderId: { color: '#9CA3AF', fontSize: 18, fontWeight: '600' },
     locationContainer: { marginBottom: 24 },
     locationRow: { flexDirection: 'row', alignItems: 'center', paddingRight: 20 },
@@ -282,9 +282,9 @@ const styles = StyleSheet.create({
     dashLine: { width: 2, height: 24, backgroundColor: '#4B5563', marginLeft: 11, marginVertical: 4 },
     paymentRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#374151', padding: 16, borderRadius: 12, marginBottom: 24 },
     paymentLabel: { color: '#D1D5DB', fontSize: 18, fontWeight: '600' },
-    paymentAmount: { color: '#FFF', fontSize: 24, fontWeight: 'bold' },
-    massiveButton: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderRadius: 16 },
-    massiveButtonText: { color: '#FFF', fontSize: 20, fontWeight: '900', letterSpacing: 1 },
+    paymentAmount: { color: '#FFF', fontSize: 24, fontWeight: 'bold', textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
+    massiveButton: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderRadius: 20, elevation: 8, shadowColor: '#FC8019', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.6, shadowRadius: 8 },
+    massiveButtonText: { color: '#FFF', fontSize: 20, fontWeight: '900', letterSpacing: 1, textShadowColor: 'rgba(0,0,0,0.2)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
     acceptanceActions: { marginTop: 8 },
     timerText: { color: '#EF4444', textAlign: 'center', fontSize: 16, fontWeight: 'bold', marginBottom: 12 },
     actionButtonsRow: { flexDirection: 'row', justifyContent: 'space-between' },
@@ -293,15 +293,15 @@ const styles = StyleSheet.create({
     emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 80 },
     emptyStateTitle: { color: '#F3F4F6', fontSize: 24, fontWeight: 'bold', marginTop: 24, marginBottom: 8 },
     emptyStateSub: { color: '#9CA3AF', fontSize: 16, textAlign: 'center', paddingHorizontal: 40 },
-    sectionTitle: { color: '#FFF', fontSize: 20, fontWeight: 'bold', marginBottom: 16 },
-    performanceCard: { backgroundColor: '#1F2937', borderRadius: 16, padding: 20, marginBottom: 24, borderWidth: 1, borderColor: '#374151' },
+    sectionTitle: { color: '#FFF', fontSize: 22, fontWeight: '900', marginBottom: 16, letterSpacing: 0.5 },
+    performanceCard: { backgroundColor: '#1F2937', borderRadius: 24, padding: 20, marginBottom: 24, elevation: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6 },
     statsRow: { flexDirection: 'row', justifyContent: 'space-between' },
-    statBox: { flex: 1, backgroundColor: '#1F2937', padding: 20, borderRadius: 16, alignItems: 'center', marginHorizontal: 8, borderWidth: 1, borderColor: '#374151' },
-    statValue: { color: '#FFF', fontSize: 32, fontWeight: 'bold', marginBottom: 8 },
-    statLabel: { color: '#9CA3AF', fontSize: 14, fontWeight: '600' },
+    statBox: { flex: 1, backgroundColor: '#3B82F6', padding: 20, borderRadius: 20, alignItems: 'center', marginHorizontal: 8, elevation: 8, shadowColor: '#3B82F6', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 6 },
+    statValue: { color: '#FFF', fontSize: 32, fontWeight: '900', marginBottom: 8, textShadowColor: 'rgba(0,0,0,0.2)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
+    statLabel: { color: 'rgba(255,255,255,0.9)', fontSize: 14, fontWeight: '700' },
     statBoxSmall: { flex: 1, alignItems: 'center' },
-    statValueSmall: { color: '#34D399', fontSize: 24, fontWeight: 'bold', marginBottom: 4 },
-    statLabelSmall: { color: '#9CA3AF', fontSize: 12, fontWeight: '600' }
+    statValueSmall: { color: '#34D399', fontSize: 26, fontWeight: '900', marginBottom: 4, textShadowColor: 'rgba(52, 211, 153, 0.2)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
+    statLabelSmall: { color: '#9CA3AF', fontSize: 13, fontWeight: '700' }
 });
 
 export default DeliveryPartnerDashboard;

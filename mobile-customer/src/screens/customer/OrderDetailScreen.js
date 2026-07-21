@@ -143,6 +143,29 @@ const OrderDetailScreen = ({ route, navigation }) => {
 
     const handleRefundRequest = () => navigation.navigate('Refunds', { orderId: id });
 
+    const handleCancelOrder = () => {
+        Alert.alert(
+            'Cancel Order',
+            'Are you sure you want to cancel this order? This action cannot be undone.',
+            [
+                { text: 'No, Keep Order', style: 'cancel' },
+                {
+                    text: 'Yes, Cancel',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await apiService.updateOrderStatus(id, 'cancelled', 'Cancelled by customer');
+                            Alert.alert('Order Cancelled', 'Your order has been cancelled successfully.');
+                            fetchOrderDetails();
+                        } catch (error) {
+                            Alert.alert('Error', error?.response?.data?.message || 'Failed to cancel order. Please try again.');
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     const handleTrackOrder = () => Alert.alert('Live Tracking', 'Live map tracking is coming soon!');
 
     const formatDate = (ds) => {
@@ -331,10 +354,19 @@ const OrderDetailScreen = ({ route, navigation }) => {
                 <View style={{ height: 100 }} />
             </ScrollView>
 
-            {/* ── STICKY INVOICE BUTTON ── */}
+            {/* ── STICKY FOOTER ── */}
             <View style={styles.stickyFooter}>
+                {!['delivered', 'cancelled'].includes(order.orderStatus) && (
+                    <TouchableOpacity
+                        style={styles.cancelBtn}
+                        onPress={handleCancelOrder}
+                    >
+                        <Feather name="x-circle" size={18} color="#EF4444" />
+                        <Text style={styles.cancelBtnText}>Cancel Order</Text>
+                    </TouchableOpacity>
+                )}
                 <TouchableOpacity
-                    style={[styles.invoiceBtn, downloading && { opacity: 0.7 }]}
+                    style={[styles.invoiceBtn, downloading && { opacity: 0.7 }, !['delivered', 'cancelled'].includes(order.orderStatus) && { flex: 1 }]}
                     onPress={handleDownloadInvoice}
                     disabled={downloading}
                 >
@@ -342,7 +374,7 @@ const OrderDetailScreen = ({ route, navigation }) => {
                         ? <ActivityIndicator size="small" color="#fff" />
                         : <Feather name="download" size={18} color="#fff" />
                     }
-                    <Text style={styles.invoiceBtnText}>{downloading ? 'Preparing Invoice...' : 'Download Invoice'}</Text>
+                    <Text style={styles.invoiceBtnText}>{downloading ? 'Preparing...' : 'Invoice'}</Text>
                 </TouchableOpacity>
             </View>
         </SafeAreaView>
@@ -433,12 +465,18 @@ const styles = StyleSheet.create({
     addressPhone: { fontSize: 13, color: '#6B7280' },
 
     // Sticky footer
-    stickyFooter: { backgroundColor: '#fff', padding: 16, borderTopWidth: 1, borderTopColor: '#F3F4F6', elevation: 10 },
+    stickyFooter: { backgroundColor: '#fff', padding: 16, borderTopWidth: 1, borderTopColor: '#F3F4F6', elevation: 10, flexDirection: 'row', gap: 10 },
+    cancelBtn: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+        backgroundColor: '#FEF2F2', borderRadius: 16, paddingVertical: 16, paddingHorizontal: 18, gap: 8,
+        borderWidth: 1, borderColor: '#FECACA',
+    },
+    cancelBtnText: { color: '#EF4444', fontSize: 14, fontWeight: '700' },
     invoiceBtn: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-        backgroundColor: '#111827', borderRadius: 16, paddingVertical: 16, gap: 10,
+        backgroundColor: '#111827', borderRadius: 16, paddingVertical: 16, gap: 10, flex: 1,
     },
-    invoiceBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+    invoiceBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 });
 
 export default OrderDetailScreen;

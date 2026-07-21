@@ -1,6 +1,6 @@
 {
   "expo": {
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "name": "Rice Mill - Customer",
     "slug": "rice-mill-customer",
     "scheme": "ricemill",
@@ -16,10 +16,6 @@
     "assetBundlePatterns": [
       "**/*"
     ],
-    "updates": {
-      "url": "https://u.expo.dev/767b6310-f521-4865-8355-a409b3ec9c96",
-      "fallbackToCacheTimeout": 0
-    },
     "runtimeVersion": "1.0.0",
     "ios": {
       "supportsTablet": true,
@@ -79,11 +75,19 @@
           "locationAlwaysAndWhenInUsePermission": "Allow Rice Mill Express to use your location for delivery tracking"
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
     ],
     "extra": {
       "eas": {
-        "projectId": "767b6310-f521-4865-8355-a409b3ec9c96"
+        "projectId": "3bc5e2a9-740d-4d82-aaf0-d34e9577938e"
       }
     }
   }

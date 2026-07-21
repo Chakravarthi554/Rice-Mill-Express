@@ -47,6 +47,11 @@ import TwoFactorVerifyScreen from './screens/auth/TwoFactorVerifyScreen';
 import SellerScreen from './screens/SellerScreen';
 import SellerKycScreen from './screens/SellerKycScreen';
 import AddDeliveryPartnerScreen from './screens/AddDeliveryPartnerScreen';
+import ForumScreen from './screens/ForumScreen';
+import ForumPostDetailScreen from './screens/ForumPostDetailScreen';
+import CreateForumPostScreen from './screens/CreateForumPostScreen';
+import RecipesScreen from './screens/RecipesScreen';
+import RecipeDetailScreen from './screens/RecipeDetailScreen';
 
 
 
@@ -71,16 +76,8 @@ import AccessibilityScreen from './screens/shared/AccessibilityScreen';
 import AddProductScreen from './screens/AddProductScreen';
 import EditProductScreen from './screens/EditProductScreen';
 import OrderDetailScreen from './screens/shared/OrderDetailScreen';
-import RewardsScreen from './screens/shared/RewardsScreen';
-import ReferralScreen from './screens/shared/ReferralScreen';
-import MyReviewsScreen from './screens/shared/MyReviewsScreen';
 import PolicyDetailScreen from './screens/shared/PolicyDetailScreen';
 import ContactScreen from './screens/shared/ContactScreen';
-import ForumScreen from './screens/ForumScreen';
-import CreateForumPostScreen from './screens/CreateForumPostScreen';
-import ForumPostDetailScreen from './screens/ForumPostDetailScreen';
-import RecipesScreen from './screens/RecipesScreen';
-import RecipeDetailScreen from './screens/RecipeDetailScreen';
 import SellerOrdersScreen from './screens/SellerOrdersScreen';
 import SellerProductsScreen from './screens/SellerProductsScreen';
 import SellerPaymentsScreen from './screens/SellerPaymentsScreen';
@@ -121,7 +118,7 @@ function SellerTabs() {
       <Tab.Screen
         name="Dashboard"
         component={SellerScreen}
-        options={{ title: 'Seller Dashboard' }}
+        options={{ title: 'Rice Mill Express' }}
       />
       <Tab.Screen
         name="KYC"
@@ -157,22 +154,19 @@ function SellerStack() {
       <Stack.Screen name="Privacy" component={PrivacyScreen} options={{ title: 'Privacy' }} />
       <Stack.Screen name="Legal" component={LegalScreen} options={{ title: 'Legal' }} />
       <Stack.Screen name="Accessibility" component={AccessibilityScreen} options={{ title: 'Accessibility' }} />
-      <Stack.Screen name="Rewards" component={RewardsScreen} options={{ title: 'Rewards' }} />
-      <Stack.Screen name="Referral" component={ReferralScreen} options={{ title: 'Referral' }} />
-      <Stack.Screen name="MyReviews" component={MyReviewsScreen} options={{ title: 'My Reviews' }} />
       <Stack.Screen name="PolicyDetail" component={PolicyDetailScreen} options={{ title: 'Policy Details' }} />
       <Stack.Screen name="Contact" component={ContactScreen} options={{ title: 'Contact Us' }} />
-      <Stack.Screen name="Forum" component={ForumScreen} options={{ title: 'Community Forum' }} />
-      <Stack.Screen name="CreateForumPost" component={CreateForumPostScreen} options={{ title: 'Create Post' }} />
-      <Stack.Screen name="ForumPostDetail" component={ForumPostDetailScreen} options={{ title: 'Post Details' }} />
-      <Stack.Screen name="Recipes" component={RecipesScreen} options={{ title: 'Recipes' }} />
-      <Stack.Screen name="RecipeDetail" component={RecipeDetailScreen} options={{ title: 'Recipe Details' }} />
       <Stack.Screen name="AddDeliveryPartner" component={AddDeliveryPartnerScreen} options={{ title: 'Add Delivery Partner' }} />
       <Stack.Screen name="SellerOrders" component={SellerOrdersScreen} options={{ title: 'Manage Orders' }} />
       <Stack.Screen name="SellerProducts" component={SellerProductsScreen} options={{ title: 'Products' }} />
       <Stack.Screen name="SellerPayments" component={SellerPaymentsScreen} options={{ title: 'Payments' }} />
       <Stack.Screen name="SellerDelivery" component={SellerDeliveryScreen} options={{ title: 'Delivery Partners' }} />
       <Stack.Screen name="SellerAnalytics" component={SellerAnalyticsScreen} options={{ title: 'Analytics' }} />
+      <Stack.Screen name="Forum" component={ForumScreen} options={{ title: 'Forum' }} />
+      <Stack.Screen name="ForumPostDetail" component={ForumPostDetailScreen} options={{ title: 'Discussion' }} />
+      <Stack.Screen name="CreateForumPost" component={CreateForumPostScreen} options={{ title: 'New Post' }} />
+      <Stack.Screen name="Recipes" component={RecipesScreen} options={{ title: 'Recipes' }} />
+      <Stack.Screen name="RecipeDetail" component={RecipeDetailScreen} options={{ title: 'Recipe' }} />
     </Stack.Navigator>
   );
 }
@@ -310,52 +304,10 @@ function MainContent() {
 import { PersistGate } from 'redux-persist/integration/react';
 
 export default function App() {
-  const [backendError, setBackendError] = useState(false);
-  const [checking, setChecking] = useState(true);
 
-  useEffect(() => {
-    const checkBackend = async () => {
-      try {
-        const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://13.62.55.108:5001';
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        const res = await fetch(`${apiUrl}/api/v1/health`, { signal: controller.signal });
-        clearTimeout(timeoutId);
-        
-        if (res.ok) {
-          console.log('✅ Backend connectivity confirmed');
-        } else {
-          setBackendError(true);
-        }
-      } catch (e) {
-        console.error('Backend connection failed:', e);
-        setBackendError(true);
-      } finally {
-        setChecking(false);
-      }
-    };
-    checkBackend();
-  }, []);
 
-  if (checking) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-        <Text style={{ marginTop: 10, color: '#666' }}>Connecting to server...</Text>
-      </View>
-    );
-  }
+  // Backend checks now run silently in the background
 
-  if (backendError) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fee2e2', padding: 20 }}>
-        <MaterialIcons name="cloud-off" size={64} color="#991b1b" />
-        <Text style={{ fontSize: 18, color: '#991b1b', fontWeight: 'bold', textAlign: 'center', marginTop: 20 }}>
-          Cannot connect to server. Please check your connection.
-        </Text>
-      </View>
-    );
-  }
 
   return (
     <MobileErrorBoundary>
