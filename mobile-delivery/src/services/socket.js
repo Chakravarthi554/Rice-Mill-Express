@@ -29,8 +29,6 @@ export const connectSocket = async () => {
         // Force websocket transport in React Native to avoid HTTP polling timeout/server errors
         socket = io(API_URL, {
             auth: { token },
-            transports: ['websocket'],
-            upgrade: false,
             reconnection: true,
             reconnectionAttempts: 5,
             reconnectionDelay: 2000,
@@ -174,6 +172,60 @@ export const unsubscribeFromChatMessage = () => {
     }
 };
 
+export const emitDeliveryLocationUpdate = (data) => {
+    if (socket && socket.connected) {
+        socket.emit('deliveryLocationUpdate', data);
+    }
+};
+
+export const emitDeliveryStatusUpdate = (data) => {
+    if (socket && socket.connected) {
+        socket.emit('deliveryStatusUpdate', data);
+    }
+};
+
+export const emitDeliveryPartnerOnline = (userId) => {
+    if (socket && socket.connected) {
+        socket.emit('deliveryPartnerOnline', { userId });
+    }
+};
+
+export const emitDeliveryPartnerOffline = (userId) => {
+    if (socket && socket.connected) {
+        socket.emit('deliveryPartnerOffline', { userId });
+    }
+};
+
+export const subscribeToNewOrderAssigned = (callback) => {
+    if (socket) {
+        socket.on('newOrderAssigned', callback);
+        socket.on('ORDER_ASSIGNED', callback);
+    }
+};
+
+export const subscribeToOrderCancelled = (callback) => {
+    if (socket) {
+        socket.on('orderCancelled', callback);
+    }
+};
+
+export const subscribeToMessageReceived = (callback) => {
+    if (socket) {
+        socket.on('messageReceived', callback);
+        socket.on('chat:message', callback);
+    }
+};
+
+export const unsubscribeFromDeliveryPartnerEvents = () => {
+    if (socket) {
+        socket.off('newOrderAssigned');
+        socket.off('ORDER_ASSIGNED');
+        socket.off('orderCancelled');
+        socket.off('messageReceived');
+        socket.off('chat:message');
+    }
+};
+
 export const getSocket = () => socket;
 
 export default {
@@ -188,6 +240,14 @@ export default {
     unsubscribeFromEngagementUpdates,
     subscribeToChatMessage,
     unsubscribeFromChatMessage,
+    emitDeliveryLocationUpdate,
+    emitDeliveryStatusUpdate,
+    emitDeliveryPartnerOnline,
+    emitDeliveryPartnerOffline,
+    subscribeToNewOrderAssigned,
+    subscribeToOrderCancelled,
+    subscribeToMessageReceived,
+    unsubscribeFromDeliveryPartnerEvents,
     joinRoom,
     leaveRoom,
     getSocket,

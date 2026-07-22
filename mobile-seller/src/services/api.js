@@ -167,6 +167,7 @@ export const setupInterceptors = (store, logoutAction) => {
 export const apiService = {
     // ============ Products ============
     getProducts: (params = {}) => api.get('/api/v1/products', { params }),
+    getSellerProducts: () => api.get('/api/v1/seller/products'),
     getProductById: (id) => api.get(`/api/v1/products/${id}`),
     getProductComments: (id) => api.get(`/api/v1/products/${id}/comments`),
     getProductComments: (id) => api.get(`/api/v1/products/${id}/comments`),
@@ -177,6 +178,7 @@ export const apiService = {
     // ============ Orders ============
     // Customer orders endpoint (not admin)
     getOrders: () => api.get('/api/v1/orders/myorders'),
+    getSellerOrders: () => api.get('/api/v1/orders/sellerorders'),
     createOrder: (orderData) => api.post('/api/v1/orders', orderData),
     getDeliveryFeePreview: (data) => api.post('/api/v1/orders/delivery-fee-preview', data),
     getOrderById: (id) => api.get(`/api/v1/orders/${id}`),
@@ -192,6 +194,7 @@ export const apiService = {
     clearCart: () => api.delete('/api/v1/cart'),
 
     // ============ Delivery Partner ============
+    getDeliveryPartners: () => api.get('/api/v1/delivery-partners/partners'),
     getAssignedOrders: () => api.get('/api/v1/delivery-partners/my-deliveries'),
     getDeliveryOrderById: (id) => api.get(`/api/v1/delivery-partners/orders/${id}`),
     updateDeliveryStatus: (orderId, status, location) =>
@@ -295,6 +298,12 @@ export const apiService = {
 
     // ============ Recipes ============
     getRecipes: (params = {}) => api.get('/api/v1/recipes', { params }),
+    getMyRecipes: () => api.get('/api/v1/recipes/myrecipes'),
+    submitRecipe: (formData) => api.post('/api/v1/recipes/submit', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 60000,
+    }),
+    deleteRecipe: (id) => api.delete(`/api/v1/recipes/${id}`),
     getRecipeById: (id) => api.get(`/api/v1/recipes/${id}`),
     rateRecipe: (id, rating) => api.post(`/api/v1/social/recipes/${id}/rate`, { rating }),
     commentOnRecipe: (id, comment) => api.post(`/api/v1/social/recipes/${id}/comment`, { text: comment }),

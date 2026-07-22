@@ -13,8 +13,8 @@ const SellerProductsScreen = ({ navigation }) => {
 
   const fetchProducts = async () => {
     try {
-      const res = await apiService.getProducts();
-      // Assume the backend returns the seller's products when authenticated
+      const res = await apiService.getSellerProducts();
+      // Ensure backend returns only this seller's products
       setProducts(res.data?.products || res.data || []);
     } catch (error) {
       console.error('Error fetching products:', error);

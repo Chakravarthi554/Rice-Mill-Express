@@ -8,9 +8,10 @@ const asyncHandler = require('../middleware/asyncHandler.js');
 const getHistory = asyncHandler(async (req, res) => {
     const { days = 7, status } = req.query;
 
-    const partnerProfile = await DeliveryPartner.findOne({ user: req.user._id });
+    const partnerProfiles = await DeliveryPartner.find({ user: req.user._id });
+    const profileIds = partnerProfiles.map(p => p._id);
 
-    if (!partnerProfile) {
+    if (profileIds.length === 0) {
         res.status(404);
         throw new Error('Delivery partner profile not found');
     }
@@ -21,7 +22,7 @@ const getHistory = asyncHandler(async (req, res) => {
 
     // Build query
     const query = {
-        deliveryPartner: partnerProfile._id,
+        deliveryPartner: { $in: profileIds },
         createdAt: { $gte: daysAgo }
     };
 

@@ -29,8 +29,8 @@ export const connectSocket = async () => {
         // Force websocket transport in React Native to avoid HTTP polling timeout/server errors
         socket = io(API_URL, {
             auth: { token },
-            transports: ['websocket'],
-            upgrade: false,
+            // Removed forced 'websocket' transport so it can fallback to polling if needed
+            upgrade: true,
             reconnection: true,
             reconnectionAttempts: 5,
             reconnectionDelay: 2000,

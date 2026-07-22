@@ -69,8 +69,8 @@ const SellerKycScreen = ({ navigation }) => {
 
       Alert.alert(
         'Success',
-        'KYC application submitted successfully!',
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
+        'KYC application submitted successfully! Please wait for admin approval.',
+        [{ text: 'OK' }]
       );
     } catch (error) {
       console.error('KYC submission error:', error);

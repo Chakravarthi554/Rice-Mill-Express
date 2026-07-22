@@ -19,7 +19,7 @@ const getProducts = asyncHandler(async (req, res) => {
       }
       : {};
 
-    const query = { ...keyword, approvalStatus: { $ne: 'rejected', $ne: 'pending' }, status: { $ne: 'rejected', $ne: 'pending' } };
+    const query = { ...keyword, approvalStatus: 'approved' };
 
     const count = await Product.countDocuments(query);
     const products = await Product.find(query)

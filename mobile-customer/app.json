@@ -87,8 +87,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "3bc5e2a9-740d-4d82-aaf0-d34e9577938e"
+        "projectId": "4f6eac8d-8231-494d-b8f9-a82ae09ba0fa"
       }
-    }
+    },
+    "owner": "royya_chakravarthi"
   }
 }

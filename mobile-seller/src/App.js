@@ -52,6 +52,7 @@ import ForumPostDetailScreen from './screens/ForumPostDetailScreen';
 import CreateForumPostScreen from './screens/CreateForumPostScreen';
 import RecipesScreen from './screens/RecipesScreen';
 import RecipeDetailScreen from './screens/RecipeDetailScreen';
+import CreateRecipeScreen from './screens/CreateRecipeScreen';
 
 
 
@@ -107,7 +108,6 @@ function SellerTabs() {
         tabBarIcon: ({ color, size }) => {
           let iconName;
           if (route.name === 'Dashboard') iconName = 'dashboard';
-          else if (route.name === 'KYC') iconName = 'verified-user';
           else if (route.name === 'Profile') iconName = 'person';
           return <MaterialIcons name={iconName} size={size} color={color} />;
         },
@@ -119,11 +119,6 @@ function SellerTabs() {
         name="Dashboard"
         component={SellerScreen}
         options={{ title: 'Rice Mill Express' }}
-      />
-      <Tab.Screen
-        name="KYC"
-        component={SellerKycScreen}
-        options={{ title: 'KYC Application' }}
       />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
@@ -167,6 +162,7 @@ function SellerStack() {
       <Stack.Screen name="CreateForumPost" component={CreateForumPostScreen} options={{ title: 'New Post' }} />
       <Stack.Screen name="Recipes" component={RecipesScreen} options={{ title: 'Recipes' }} />
       <Stack.Screen name="RecipeDetail" component={RecipeDetailScreen} options={{ title: 'Recipe' }} />
+      <Stack.Screen name="CreateRecipe" component={CreateRecipeScreen} options={{ title: 'New Recipe' }} />
     </Stack.Navigator>
   );
 }
@@ -243,6 +239,17 @@ function AppNavigator() {
 
   const role = user?.role;
   if (role === 'seller') {
+    if (user?.kycStatus !== 'approved') {
+      return (
+        <Stack.Navigator>
+          <Stack.Screen 
+            name="KYC" 
+            component={SellerKycScreen} 
+            options={{ title: 'KYC Application', headerLeft: () => null }} 
+          />
+        </Stack.Navigator>
+      );
+    }
     return <SellerStack />;
   } else {
     return <SellerTabs />;

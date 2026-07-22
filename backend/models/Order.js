@@ -351,7 +351,7 @@ const orderSchema = new mongoose.Schema({
   // Delivery Partner Status Tracking
   deliveryPartnerStatus: {
     type: String,
-    enum: ['not_started', 'assigned', 'picked_up', 'in_transit', 'delivered'],
+    enum: ['not_started', 'assigned', 'accepted', 'picked_up', 'in_transit', 'delivered'],
     default: 'not_started'
   },
   deliveryStartedAt: {
@@ -392,6 +392,15 @@ const orderSchema = new mongoose.Schema({
   },
   deliveryPhotoCloudinaryId: {
     type: String
+  },
+
+  // OTP Verification for Delivery
+  deliveryOtp: {
+    type: String
+  },
+  deliveryOtpVerified: {
+    type: Boolean,
+    default: false
   },
 
   // COD Collection Tracking

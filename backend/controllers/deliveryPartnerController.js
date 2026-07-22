@@ -111,6 +111,7 @@ const getDashboard = asyncHandler(async (req, res) => {
             todayCompleted,
             totalEarnings,
             todayEarnings,
+            walletBalance: req.user.walletBalance || 0,
             statusCounts: statusCounts.reduce((acc, item) => {
                 acc[item._id] = item.count;
                 return acc;
@@ -237,9 +238,9 @@ const confirmPickup = asyncHandler(async (req, res) => {
     const partnerProfile = partnerProfiles.find(p => p._id.toString() === order.deliveryPartner.toString());
 
     // Verify order status
-    if (order.deliveryPartnerStatus !== 'assigned') {
+    if (order.deliveryPartnerStatus !== 'accepted') {
         res.status(400);
-        throw new Error(`Cannot confirm pickup for order with status: ${order.deliveryPartnerStatus}`);
+        throw new Error(`Cannot confirm pickup for order with status: ${order.deliveryPartnerStatus}. Order must be accepted first.`);
     }
 
     // Update order - AUTO-STATUS TRANSITION
@@ -452,6 +453,12 @@ const uploadDeliveryPhotoAndComplete = asyncHandler(async (req, res) => {
         throw new Error('Order is already marked as delivered');
     }
 
+    // Ensure OTP was verified (unless it's a legacy order without OTP)
+    if (order.deliveryOtp && !order.deliveryOtpVerified) {
+        res.status(400);
+        throw new Error('Customer OTP must be verified before completing delivery');
+    }
+
     // Upload photo to Cloudinary with overlays
     const photoResult = await uploadDeliveryPhoto(
         req.file.buffer,
@@ -475,11 +482,13 @@ const uploadDeliveryPhotoAndComplete = asyncHandler(async (req, res) => {
 
     // Update delivery confirmation
     order.deliveryConfirmation = {
-        otpVerified: false, // NO OTP USED
+        otpVerified: order.deliveryOtpVerified || false,
         verifiedAt: new Date(),
         verifiedBy: req.user._id,
         photoProofUrl: photoResult.url,
-        notes: 'Delivery confirmed with photo proof (no OTP required)'
+        notes: order.deliveryOtpVerified 
+            ? 'Delivery confirmed with OTP and photo proof' 
+            : 'Delivery confirmed with photo proof (legacy/no OTP)'
     };
 
     // Add to status history
@@ -730,6 +739,147 @@ const rejectOrder = asyncHandler(async (req, res) => {
     });
 });
 
+// @desc    Accept an assigned order
+// @route   POST /api/v1/dp/accept-order/:orderId
+// @access  Private/DeliveryPartner
+const acceptOrder = asyncHandler(async (req, res) => {
+    const { orderId } = req.params;
+
+    const partnerProfiles = await DeliveryPartner.find({ user: req.user._id });
+    const profileIds = partnerProfiles.map(p => p._id.toString());
+
+    if (profileIds.length === 0) {
+        res.status(404);
+        throw new Error('Delivery partner profile not found');
+    }
+
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+        res.status(404);
+        throw new Error('Order not found');
+    }
+
+    if (!order.deliveryPartner || !profileIds.includes(order.deliveryPartner.toString())) {
+        res.status(403);
+        throw new Error('Access denied: Order is not assigned to you');
+    }
+
+    if (order.deliveryPartnerStatus !== 'assigned') {
+        res.status(400);
+        throw new Error(`Cannot accept order with status: ${order.deliveryPartnerStatus}`);
+    }
+
+    order.deliveryPartnerStatus = 'accepted';
+    // Generate a 4-digit OTP for delivery verification
+    const otp = Math.floor(1000 + Math.random() * 9000).toString();
+    order.deliveryOtp = otp;
+    const note = `[ACCEPTED - ${new Date().toLocaleString()}] Delivery Partner ${req.user.name} accepted the order. OTP: ${otp}`;
+    order.notes = order.notes ? `${order.notes}\n${note}` : note;
+    await order.save();
+
+    // TODO: Send OTP to customer via SMS/notification
+
+    res.json({
+        success: true,
+        message: 'Order accepted successfully',
+        data: { otp } // Return OTP so it can be tested (in production, only send to customer)
+    });
+});
+
+// @desc    Verify delivery OTP from customer
+// @route   POST /api/v1/dp/verify-otp/:orderId
+// @access  Private/DeliveryPartner
+const verifyDeliveryOtp = asyncHandler(async (req, res) => {
+    const { orderId } = req.params;
+    const { otp } = req.body;
+
+    if (!otp || otp.length !== 4) {
+        res.status(400);
+        throw new Error('A valid 4-digit OTP is required');
+    }
+
+    const partnerProfiles = await DeliveryPartner.find({ user: req.user._id });
+    const profileIds = partnerProfiles.map(p => p._id.toString());
+
+    if (profileIds.length === 0) {
+        res.status(404);
+        throw new Error('Delivery partner profile not found');
+    }
+
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+        res.status(404);
+        throw new Error('Order not found');
+    }
+
+    if (!order.deliveryPartner || !profileIds.includes(order.deliveryPartner.toString())) {
+        res.status(403);
+        throw new Error('Access denied: Order is not assigned to you');
+    }
+
+    // Check OTP
+    if (order.deliveryOtp !== otp) {
+        res.status(400);
+        throw new Error('Invalid OTP. Please ask the customer for the correct code.');
+    }
+
+    // OTP verified — mark order
+    order.deliveryOtpVerified = true;
+    const note = `[OTP VERIFIED - ${new Date().toLocaleString()}] Delivery OTP verified by ${req.user.name}.`;
+    order.notes = order.notes ? `${order.notes}\n${note}` : note;
+    await order.save();
+
+    res.json({
+        success: true,
+        message: 'OTP verified successfully'
+    });
+});
+
+// @desc    Raise an issue for an order
+// @route   POST /api/v1/dp/raise-issue/:orderId
+// @access  Private/DeliveryPartner
+const raiseIssue = asyncHandler(async (req, res) => {
+    const { orderId } = req.params;
+    const { issueType, description } = req.body;
+
+    if (!issueType) {
+        res.status(400);
+        throw new Error('Issue type is required');
+    }
+
+    const partnerProfiles = await DeliveryPartner.find({ user: req.user._id });
+    const profileIds = partnerProfiles.map(p => p._id.toString());
+
+    if (profileIds.length === 0) {
+        res.status(404);
+        throw new Error('Delivery partner profile not found');
+    }
+
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+        res.status(404);
+        throw new Error('Order not found');
+    }
+
+    if (!order.deliveryPartner || !profileIds.includes(order.deliveryPartner.toString())) {
+        res.status(403);
+        throw new Error('Access denied: Order is not assigned to you');
+    }
+
+    // Save the issue as a note in the order (and ideally to an Issue model, but keeping it simple for now)
+    const issueNote = `[ISSUE REPORTED - ${new Date().toLocaleString()}] Delivery Partner reported issue: ${issueType}. Details: ${description || 'No description provided'}`;
+    order.notes = order.notes ? `${order.notes}\n${issueNote}` : issueNote;
+    await order.save();
+
+    res.json({
+        success: true,
+        message: 'Issue reported successfully'
+    });
+});
+
 module.exports = {
     getDashboard,
     getMyOrders,
@@ -741,4 +891,8 @@ module.exports = {
     requestReplacement,
     remitCash,
     rejectOrder,
+    acceptOrder,
+    verifyDeliveryOtp,
+    raiseIssue,
 };
+

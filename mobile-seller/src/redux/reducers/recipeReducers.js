@@ -11,6 +11,16 @@ import {
     RECIPE_SHARE_SUCCESS,
     RECIPE_COMMENT_LIKE_SUCCESS,
     RECIPE_COMMENT_REPLY_SUCCESS,
+    RECIPE_MY_LIST_REQUEST,
+    RECIPE_MY_LIST_SUCCESS,
+    RECIPE_MY_LIST_FAIL,
+    RECIPE_SUBMIT_REQUEST,
+    RECIPE_SUBMIT_SUCCESS,
+    RECIPE_SUBMIT_FAIL,
+    RECIPE_SUBMIT_RESET,
+    RECIPE_DELETE_REQUEST,
+    RECIPE_DELETE_SUCCESS,
+    RECIPE_DELETE_FAIL,
 } from '../../constants/recipeConstants';
 
 export const recipeListReducer = (state = { recipes: [] }, action) => {
@@ -109,6 +119,39 @@ export const recipeDetailsReducer = (state = { recipe: {} }, action) => {
                     ),
                 },
             };
+        default:
+            return state;
+    }
+};
+
+export const recipeMyListReducer = (state = { recipes: [] }, action) => {
+    switch (action.type) {
+        case RECIPE_MY_LIST_REQUEST:
+            return { ...state, loading: true, error: null };
+        case RECIPE_MY_LIST_SUCCESS:
+            return { loading: false, recipes: action.payload };
+        case RECIPE_MY_LIST_FAIL:
+            return { ...state, loading: false, error: action.payload };
+        case RECIPE_DELETE_SUCCESS:
+            return {
+                ...state,
+                recipes: state.recipes.filter(r => r._id !== action.payload)
+            };
+        default:
+            return state;
+    }
+};
+
+export const recipeSubmitReducer = (state = {}, action) => {
+    switch (action.type) {
+        case RECIPE_SUBMIT_REQUEST:
+            return { loading: true };
+        case RECIPE_SUBMIT_SUCCESS:
+            return { loading: false, success: true, recipe: action.payload };
+        case RECIPE_SUBMIT_FAIL:
+            return { loading: false, error: action.payload };
+        case RECIPE_SUBMIT_RESET:
+            return {};
         default:
             return state;
     }

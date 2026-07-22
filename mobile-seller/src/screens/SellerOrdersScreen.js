@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Modal, Alert, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Modal, Alert, RefreshControl, TextInput } from 'react-native';
 import { useSelector } from 'react-redux';
 import { Card, Button } from 'react-native-paper';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -71,6 +71,7 @@ const SellerOrdersScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('pending');
   const [dateFilter, setDateFilter] = useState('all');
+  const [customDate, setCustomDate] = useState('');
 
   // Status update modal
   const [statusModalVisible, setStatusModalVisible] = useState(false);
@@ -100,6 +101,13 @@ const SellerOrdersScreen = ({ navigation }) => {
   };
 
   const filterByDate = useCallback((ordersToFilter) => {
+    if (customDate && customDate.length === 10) {
+      return ordersToFilter.filter(order => {
+        const orderDateStr = new Date(order.createdAt).toISOString().split('T')[0];
+        return orderDateStr === customDate;
+      });
+    }
+
     if (dateFilter === 'all') return ordersToFilter;
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -118,7 +126,7 @@ const SellerOrdersScreen = ({ navigation }) => {
       }
       return true;
     });
-  }, [dateFilter]);
+  }, [dateFilter, customDate]);
 
   const filteredOrders = useMemo(() => {
     let result = orders.filter(order => {
@@ -127,6 +135,14 @@ const SellerOrdersScreen = ({ navigation }) => {
     });
     return filterByDate(result);
   }, [orders, activeTab, filterByDate]);
+
+  const getValidTransitions = (currentStatus) => {
+    if (currentStatus === 'placed') return ['packed', 'cancelled'];
+    if (currentStatus === 'packed') return ['shipped', 'cancelled'];
+    if (currentStatus === 'shipped') return ['out_for_delivery'];
+    if (currentStatus === 'out_for_delivery') return ['delivered'];
+    return [];
+  };
 
   // Status update
   const handleUpdateStatus = useCallback((order) => {
@@ -197,12 +213,21 @@ const SellerOrdersScreen = ({ navigation }) => {
       </View>
 
       {/* Date Filter */}
-      <View style={styles.dateFilterRow}>
-        {DATE_FILTERS.map(f => (
-          <TouchableOpacity key={f.key} style={[styles.dateChip, dateFilter === f.key && styles.dateChipActive]} onPress={() => setDateFilter(f.key)}>
-            <Text style={[styles.dateChipText, dateFilter === f.key && styles.dateChipTextActive]}>{f.label}</Text>
-          </TouchableOpacity>
-        ))}
+      <View style={{ paddingHorizontal: 16, marginTop: 10 }}>
+        <View style={styles.dateFilterRow}>
+          {DATE_FILTERS.map(f => (
+            <TouchableOpacity key={f.key} style={[styles.dateChip, dateFilter === f.key && !customDate && styles.dateChipActive]} onPress={() => { setDateFilter(f.key); setCustomDate(''); }}>
+              <Text style={[styles.dateChipText, dateFilter === f.key && !customDate && styles.dateChipTextActive]}>{f.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <TextInput 
+          style={styles.dateInput} 
+          placeholder="Or search specific date (YYYY-MM-DD)" 
+          value={customDate} 
+          onChangeText={setCustomDate} 
+          maxLength={10} 
+        />
       </View>
 
       {/* Order Count */}
@@ -237,12 +262,27 @@ const SellerOrdersScreen = ({ navigation }) => {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Update Order Status</Text>
             <Text style={styles.modalSubtitle}>Current: {STATUS_LABELS[selectedOrder?.orderStatus] || ''}</Text>
-            {STATUS_OPTIONS.filter(s => s !== selectedOrder?.orderStatus).map(status => (
-              <TouchableOpacity key={status} style={[styles.statusOption, { borderLeftColor: STATUS_COLORS[status] }]} onPress={() => confirmStatusUpdate(status)}>
-                <Text style={styles.statusOptionText}>{STATUS_LABELS[status]}</Text>
-                <MaterialIcons name="arrow-forward-ios" size={14} color="#9CA3AF" />
-              </TouchableOpacity>
-            ))}
+            {STATUS_OPTIONS.map(status => {
+              const isValid = getValidTransitions(selectedOrder?.orderStatus).includes(status);
+              const isCurrent = selectedOrder?.orderStatus === status;
+              return (
+                <TouchableOpacity 
+                  key={status} 
+                  style={[
+                    styles.statusOption, 
+                    { borderLeftColor: isValid ? STATUS_COLORS[status] : '#E5E7EB' },
+                    !isValid && { opacity: 0.5 }
+                  ]} 
+                  onPress={() => confirmStatusUpdate(status)}
+                  disabled={!isValid}
+                >
+                  <Text style={[styles.statusOptionText, !isValid && { color: '#9CA3AF' }]}>
+                    {STATUS_LABELS[status]} {isCurrent ? '(Current)' : ''}
+                  </Text>
+                  {isValid && <MaterialIcons name="arrow-forward-ios" size={14} color="#9CA3AF" />}
+                </TouchableOpacity>
+              );
+            })}
             <TouchableOpacity style={styles.cancelBtn} onPress={() => setStatusModalVisible(false)}>
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
@@ -293,6 +333,7 @@ const styles = StyleSheet.create({
   dateChipActive: { backgroundColor: '#F0FDF4', borderColor: '#16A34A' },
   dateChipText: { fontSize: 12, fontWeight: '600', color: '#6B7280' },
   dateChipTextActive: { color: '#16A34A', fontWeight: '700' },
+  dateInput: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginTop: 8, fontSize: 13, color: '#374151' },
   countText: { paddingHorizontal: 16, paddingTop: 10, fontSize: 12, color: '#9CA3AF', fontWeight: '600' },
   listContent: { padding: 12, paddingBottom: 80 },
   orderCard: { marginBottom: 12, backgroundColor: '#fff', elevation: 2, borderRadius: 14 },

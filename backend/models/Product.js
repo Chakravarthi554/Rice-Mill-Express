@@ -64,21 +64,11 @@ productSchema.virtual('availableStock').get(function () {
   return this.countInStock || this.stock || 0;
 });
 
-const formatImages = (ret) => {
-  const baseUrl = process.env.NODE_ENV === 'production' ? 'http://13.63.246.61:5001' : 'http://localhost:5001';
-  if (ret.images && Array.isArray(ret.images)) {
-    ret.images = ret.images.map(img => (img && img.startsWith('/')) ? `${baseUrl}${img}` : img);
-  }
-  return ret;
-};
-
 productSchema.set('toJSON', { 
-  virtuals: true,
-  transform: (doc, ret) => formatImages(ret)
+  virtuals: true
 });
 productSchema.set('toObject', { 
-  virtuals: true,
-  transform: (doc, ret) => formatImages(ret)
+  virtuals: true
 });
 
 productSchema.index({ category: 1, type: 1, quality: 1, price: 1, weight: 1 });

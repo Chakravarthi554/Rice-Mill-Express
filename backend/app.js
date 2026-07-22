@@ -62,16 +62,14 @@ app.set("trust proxy", 1);
 // 🌐 Global URL Rewriter for all images
 app.use((req, res, next) => {
   const originalSend = res.send;
-  const baseUrl = process.env.NODE_ENV === 'production' 
-    ? 'http://13.63.246.61:5001' 
-    : `http://localhost:${process.env.PORT || 5001}`;
+  const host = req.get('host') || `localhost:${process.env.PORT || 5001}`;
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+  const baseUrl = `${protocol}://${host}`;
 
   res.send = function(body) {
     if (typeof body === 'string' && (res.get('Content-Type') || '').includes('application/json')) {
-      // Replace "/uploads/..." and "/images/..." with full URLs anywhere in the JSON payload
       body = body.replace(/"\/uploads\//g, `"${baseUrl}/uploads/`)
-                 .replace(/"\/images\//g, `"${baseUrl}/images/`)
-                 .replace(/\\"\//g, `\\"${baseUrl}/`); // For escaped JSON inside strings if any
+                 .replace(/"\/images\//g, `"${baseUrl}/images/`);
     }
     return originalSend.call(this, body);
   };
@@ -408,7 +406,7 @@ if (!fs.existsSync(customerImagesDir)) {
 app.use("/uploads", express.static(uploadDir, {
   setHeaders: (res, filePath) => {
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
-    if (filePath.endsWith(".jpg") || filePath.endsWith(".jpeg")) {
+    if (filePath.endsWith(".jpg") || filePath.endsWith(".jpeg") || filePath.endsWith(".jfif")) {
       res.setHeader("Content-Type", "image/jpeg");
     } else if (filePath.endsWith(".png")) {
       res.setHeader("Content-Type", "image/png");
@@ -420,7 +418,7 @@ app.use("/uploads", express.static(uploadDir, {
 app.use("/customer", express.static(customerImagesDir, {
   setHeaders: (res, filePath) => {
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
-    if (filePath.endsWith(".jpg") || filePath.endsWith(".jpeg")) {
+    if (filePath.endsWith(".jpg") || filePath.endsWith(".jpeg") || filePath.endsWith(".jfif")) {
       res.setHeader("Content-Type", "image/jpeg");
     } else if (filePath.endsWith(".png")) {
       res.setHeader("Content-Type", "image/png");

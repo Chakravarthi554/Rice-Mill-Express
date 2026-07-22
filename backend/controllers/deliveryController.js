@@ -356,6 +356,21 @@ const assignDeliveryToOrder = asyncHandler(async (req, res) => {
       throw new Error('Not authorized to modify this order');
     }
 
+    const DeliveryPartner = require('../models/deliveryPartner');
+    const partner = await DeliveryPartner.findById(deliveryPartner);
+    
+    if (!partner) {
+      console.error(`❌ Delivery Partner ${deliveryPartner} not found`);
+      res.status(404);
+      throw new Error('Delivery partner not found');
+    }
+
+    if (partner.seller.toString() !== req.user._id.toString()) {
+      console.error(`❌ Seller ${req.user._id} attempting to assign someone else's delivery partner ${deliveryPartner}`);
+      res.status(403);
+      throw new Error('You can only assign delivery partners registered by you');
+    }
+
     console.log(`📦 Assigning partner ${deliveryPartner} to order ${req.params.id}`);
 
     // Use updateOne to bypass validation completely and only update specific fields
@@ -383,9 +398,7 @@ const assignDeliveryToOrder = asyncHandler(async (req, res) => {
     console.log(`✅ Order ${order._id} assigned to partner ${deliveryPartner} and set to shipped`);
 
     // ✅ FIXED: Send notification to delivery partner
-    const DeliveryPartner = require('../models/deliveryPartner');
     const Notification = require('../models/Notification');
-    const partner = await DeliveryPartner.findById(deliveryPartner);
     if (partner && partner.user) {
       await Notification.create({
         user: partner.user,

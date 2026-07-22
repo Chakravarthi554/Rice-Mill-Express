@@ -196,12 +196,15 @@ export const apiService = {
     triggerSOS: (locationData) => api.post('/api/v1/dp/emergency-alert', { locationData, type: 'emergency' }),
     getAssignedOrders: () => api.get('/api/v1/dp/my-orders'),
     getDeliveryOrderById: (id) => api.get(`/api/v1/dp/order/${id}`),
+    acceptOrder: (id) => api.post(`/api/v1/dp/accept-order/${id}`),
     rejectOrder: (id) => api.post(`/api/v1/dp/reject-order/${id}`),
     
     // Delivery Flow
     startNavigation: (orderId) => api.post(`/api/v1/dp/start-navigation/${orderId}`),
     confirmPickup: (orderId) => api.post(`/api/v1/dp/confirm-pickup/${orderId}`),
     confirmCOD: (orderId, amount) => api.post(`/api/v1/dp/confirm-cod/${orderId}`, { amount }),
+    verifyDeliveryOtp: (orderId, otp) => api.post(`/api/v1/dp/verify-otp/${orderId}`, { otp }),
+    updateDeliveryLocation: (orderId, location) => api.post(`/api/v1/dp/update-location/${orderId}`, location),
     uploadDeliveryPhoto: (orderId, formData) =>
         api.post(`/api/v1/dp/upload-delivery-photo/${orderId}`, formData, {
             headers: { 'Content-Type': 'multipart/form-data' },

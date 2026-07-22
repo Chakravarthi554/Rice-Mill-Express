@@ -31,6 +31,9 @@ const {
     requestReplacement,
     remitCash,
     rejectOrder,
+    acceptOrder,
+    verifyDeliveryOtp,
+    raiseIssue,
 } = require('../controllers/deliveryPartnerController.js');
 
 const {
@@ -40,7 +43,6 @@ const {
     getDevices,
     logoutAllDevices,
     sendEmergencyAlert,
-    raiseIssue,
     updateActivity,
     registerFCMToken,
 } = require('../controllers/deliveryPartnerSupportController.js');
@@ -75,6 +77,9 @@ router.post(
     requestReplacement
 );
 router.post('/reject-order/:orderId', protect, role('deliveryPartner'), rejectOrder);
+router.post('/accept-order/:orderId', protect, role('deliveryPartner'), acceptOrder);
+router.post('/verify-otp/:orderId', protect, role('deliveryPartner'), verifyDeliveryOtp);
+router.post('/raise-issue/:orderId', protect, role('deliveryPartner'), raiseIssue);
 router.post('/remit-cash', protect, role('deliveryPartner'), remitCash);
 
 // History & Profile
@@ -94,8 +99,6 @@ router.post('/saved-banks', protect, role('deliveryPartner'), saveBankAccount);
 
 // Support & Safety
 router.post('/emergency-alert', protect, role('deliveryPartner'), sendEmergencyAlert);
-router.post('/raise-issue/:orderId', protect, role('deliveryPartner'), raiseIssue);
-
 // Activity & Notifications
 router.post('/update-activity', protect, role('deliveryPartner'), updateActivity);
 router.post('/register-fcm', protect, role('deliveryPartner'), registerFCMToken);

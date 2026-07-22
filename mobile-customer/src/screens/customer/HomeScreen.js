@@ -202,7 +202,12 @@ export default function HomeScreen({ navigation }) {
     const getImageUri = (item) => {
         const img = item.images?.[0];
         if (!img) return null;
-        return img.startsWith('http') ? img : `${API_URL}${img}`;
+        let url = img.startsWith('http') ? img : `${API_URL}${img}`;
+        // If server sent localhost/127.0.0.1, rewrite to actual mobile API_URL host
+        if (url.includes('localhost:') || url.includes('127.0.0.1:')) {
+            url = url.replace(/http:\/\/(localhost|127\.0\.0\.1):\d+/, API_URL);
+        }
+        return url;
     };
 
     const ProductCard = React.memo(({ item, compact }) => {
@@ -210,7 +215,7 @@ export default function HomeScreen({ navigation }) {
         const hasOffer = typeof item.offerPrice === 'number' && item.offerPrice > 0 && item.offerPrice < item.price;
         const displayPrice = hasOffer ? item.offerPrice : item.price;
         const discount = hasOffer ? Math.round((1 - item.offerPrice / item.price) * 100) : 0;
-        const rating = item.rating || (Math.random() * (5.0 - 4.0) + 4.0).toFixed(1);
+        const rating = (item.rating && Number(item.rating) > 0) ? Number(item.rating).toFixed(1) : '4.5';
         const wishlisted = isWishlisted(item._id);
 
         return (

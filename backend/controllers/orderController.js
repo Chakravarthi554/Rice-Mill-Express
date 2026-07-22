@@ -874,6 +874,12 @@ exports.assignDeliveryPartner = asyncHandler(async (req, res) => {
   const partner = await DeliveryPartner.findById(partnerId);
   if (partnerId && !partner) { res.status(404); throw new Error('Delivery partner not found'); }
 
+  // Check if seller is trying to assign someone else's delivery partner
+  if (partnerId && req.user.role === 'seller' && partner.seller.toString() !== req.user._id.toString()) {
+    res.status(403); throw new Error('You can only assign delivery partners registered by you');
+  }
+
+
   order.deliveryPartner = partnerId || null;
   order.updatedBy = req.user._id;
 

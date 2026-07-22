@@ -13,7 +13,7 @@
 // Hardcoded fallback map (used if process.env is not populated)
 const ENV_MAP = {
   development: {
-    API_URL: 'http://13.63.246.61:5001',
+    API_URL: 'http://10.55.30.143:5001',
     ENVIRONMENT: 'development',
     DEBUG: true,
   },

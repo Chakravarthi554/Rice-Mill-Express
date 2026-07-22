@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, SafeAreaView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, FlatList, SafeAreaView, ActivityIndicator, TouchableOpacity, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { apiService } from '../../services/api';
 
 const DeliveryHistoryScreen = ({ navigation }) => {
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
 
     const PRIMARY_ACCENT = '#FC8019'; // Swiggy Orange
 
@@ -15,14 +16,19 @@ const DeliveryHistoryScreen = ({ navigation }) => {
 
     const fetchHistory = async () => {
         try {
-            setLoading(true);
             const response = await apiService.getDeliveryHistory();
-            setHistory(response.data?.history || []);
+            setHistory(response.data?.orders || []);
         } catch (error) {
             console.error('Error fetching history:', error);
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
+    };
+
+    const onRefresh = () => {
+        setRefreshing(true);
+        fetchHistory();
     };
 
     const renderHistoryItem = ({ item }) => (
@@ -49,7 +55,7 @@ const DeliveryHistoryScreen = ({ navigation }) => {
         </TouchableOpacity>
     );
 
-    if (loading) {
+    if (loading && !refreshing) {
         return (
             <SafeAreaView style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={PRIMARY_ACCENT} />
@@ -68,6 +74,9 @@ const DeliveryHistoryScreen = ({ navigation }) => {
                 keyExtractor={(item) => item._id}
                 renderItem={renderHistoryItem}
                 contentContainerStyle={styles.listContent}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FC8019" />
+                }
                 ListEmptyComponent={
                     <View style={styles.emptyState}>
                         <Ionicons name="time" size={64} color="#4B5563" />

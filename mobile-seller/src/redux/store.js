@@ -11,7 +11,7 @@ import {
   bulkOrderUpdateReducer,
   bulkOrderDetailsReducer
 } from './reducers/bulkOrderReducers';
-import { recipeListReducer, recipeDetailsReducer } from './reducers/recipeReducers';
+import { recipeListReducer, recipeDetailsReducer, recipeMyListReducer, recipeSubmitReducer } from './reducers/recipeReducers';
 import {
   forumPostListReducer,
   forumPostDetailsReducer,
@@ -80,6 +80,8 @@ const combinedReducer = combineReducers({
   bulkOrderDetails: bulkOrderDetailsReducer,
   recipeList: recipeListReducer,
   recipeDetails: recipeDetailsReducer,
+  recipeMyList: recipeMyListReducer,
+  recipeSubmit: recipeSubmitReducer,
   forumPostList: forumPostListReducer,
   forumPostDetails: forumPostDetailsReducer,
   forumPostCreate: forumPostCreateReducer,

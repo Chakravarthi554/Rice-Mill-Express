@@ -11,10 +11,11 @@ import {
     ActivityIndicator,
     RefreshControl,
     SafeAreaView,
+    Alert,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import { getRecipes } from '../redux/actions/recipeActions';
+import { getRecipes, getMyRecipes, deleteRecipe } from '../redux/actions/recipeActions';
 import { getImageUrl } from '../utils/url';
 import { COLORS, COMPONENTS, RADIUS, SHADOW, SPACING, TYPOGRAPHY } from '../styles/customerTheme';
 
@@ -33,22 +34,53 @@ const riceTypeStyles = {
 const RecipesScreen = ({ navigation }) => {
     const dispatch = useDispatch();
     const { recipes = [], loading, error } = useSelector((state) => state.recipeList || {});
+    const { recipes: myRecipes = [], loading: myLoading } = useSelector((state) => state.recipeMyList || {});
+
+    const [activeTab, setActiveTab] = useState('all'); // 'all' or 'my'
     const [searchQuery, setSearchQuery] = useState('');
     const [riceType, setRiceType] = useState('');
     const [refreshing, setRefreshing] = useState(false);
 
     useEffect(() => {
-        dispatch(getRecipes(searchQuery, '', riceType));
-    }, [dispatch, riceType]);
+        if (activeTab === 'all') {
+            dispatch(getRecipes(searchQuery, '', riceType));
+        } else {
+            dispatch(getMyRecipes());
+        }
+    }, [dispatch, activeTab, riceType]);
 
     const handleRefresh = () => {
         setRefreshing(true);
-        dispatch(getRecipes(searchQuery, '', riceType)).finally(() => setRefreshing(false));
+        if (activeTab === 'all') {
+            dispatch(getRecipes(searchQuery, '', riceType)).finally(() => setRefreshing(false));
+        } else {
+            dispatch(getMyRecipes()).finally(() => setRefreshing(false));
+        }
     };
 
     const handleSearch = () => {
         dispatch(getRecipes(searchQuery, '', riceType));
     };
+
+    const handleDeleteRecipe = (id, title) => {
+        Alert.alert(
+            'Delete Recipe',
+            `Are you sure you want to delete "${title}"?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: () => {
+                        dispatch(deleteRecipe(id));
+                    },
+                },
+            ]
+        );
+    };
+
+    const currentData = activeTab === 'all' ? recipes : myRecipes;
+    const isLoading = activeTab === 'all' ? loading : myLoading;
 
     const featuredRecipe = recipes?.[0];
 
@@ -61,6 +93,13 @@ const RecipesScreen = ({ navigation }) => {
     const renderRecipeCard = ({ item, index }) => {
         const chipStyle = riceTypeStyles[item.riceType] || riceTypeStyles.Other;
         const rating = Number(item.averageRating || item.rating || 0).toFixed(1);
+        const status = item.status || (item.isApproved ? 'approved' : 'pending');
+
+        const statusStyle = {
+            approved: { bg: '#DCFCE7', color: '#166534', label: 'Approved' },
+            pending: { bg: '#FEF3C7', color: '#B45309', label: 'Pending Review' },
+            rejected: { bg: '#FEE2E2', color: '#991B1B', label: 'Rejected' },
+        }[status] || { bg: '#E2E8F0', color: '#475569', label: status };
 
         return (
             <TouchableOpacity
@@ -69,8 +108,8 @@ const RecipesScreen = ({ navigation }) => {
                 onPress={() => navigation.navigate('RecipeDetail', { recipeId: item._id })}
             >
                 <View style={styles.imageWrap}>
-                    {item.image ? (
-                        <Image source={{ uri: getImageUrl(item.image) }} style={styles.recipeImage} />
+                    {item.image || item.images?.[0] ? (
+                        <Image source={{ uri: getImageUrl(item.image || item.images?.[0]) }} style={styles.recipeImage} />
                     ) : (
                         <View style={styles.imageFallback}>
                             <MaterialCommunityIcons name="rice" size={42} color={COLORS.greenPrimary} />
@@ -89,21 +128,31 @@ const RecipesScreen = ({ navigation }) => {
                 <View style={styles.cardBody}>
                     <View style={styles.cardHeaderRow}>
                         <Text style={styles.recipeTitle} numberOfLines={2}>{item.title}</Text>
-                        {index < 2 && (
+                        {activeTab === 'my' ? (
+                            <TouchableOpacity onPress={() => handleDeleteRecipe(item._id, item.title)} style={{ padding: 4 }}>
+                                <Feather name="trash-2" size={18} color="#EF4444" />
+                            </TouchableOpacity>
+                        ) : index < 2 && (
                             <View style={styles.trendingBadge}>
                                 <Feather name="trending-up" size={12} color={COLORS.orangeDark} />
                             </View>
                         )}
                     </View>
 
+                    {activeTab === 'my' && (
+                        <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
+                            <Text style={[styles.statusText, { color: statusStyle.color }]}>{statusStyle.label}</Text>
+                        </View>
+                    )}
+
                     <Text style={styles.recipeDescription} numberOfLines={2}>
-                        {item.description || 'Discover a fresh rice recipe with authentic flavor and easy steps.'}
+                        {item.description || item.steps?.[0] || 'Discover a fresh rice recipe with authentic flavor and easy steps.'}
                     </Text>
 
                     <View style={styles.metaRow}>
                         <View style={styles.metaItem}>
                             <Feather name="user" size={13} color={COLORS.textMuted} />
-                            <Text style={styles.metaText}>{item.sellerId?.name || 'Rice Mill Kitchen'}</Text>
+                            <Text style={styles.metaText}>{item.sellerId?.name || 'My Kitchen'}</Text>
                         </View>
                         {item.linkedProducts?.length > 0 && (
                             <View style={styles.metaItem}>
@@ -126,19 +175,30 @@ const RecipesScreen = ({ navigation }) => {
         );
     };
 
-    if (loading && !refreshing) {
-        return (
-            <View style={styles.centered}>
-                <ActivityIndicator size="large" color={COLORS.greenPrimary} />
-                <Text style={styles.loadingText}>Preparing fresh recipe ideas...</Text>
-            </View>
-        );
-    }
-
     return (
         <SafeAreaView style={styles.container}>
+            {/* Top Seller Recipe Tabs */}
+            <View style={styles.tabContainer}>
+                <TouchableOpacity
+                    style={[styles.mainTab, activeTab === 'all' && styles.mainTabActive]}
+                    onPress={() => setActiveTab('all')}
+                >
+                    <Text style={[styles.mainTabText, activeTab === 'all' && styles.mainTabTextActive]}>
+                        Community Recipes
+                    </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={[styles.mainTab, activeTab === 'my' && styles.mainTabActive]}
+                    onPress={() => setActiveTab('my')}
+                >
+                    <Text style={[styles.mainTabText, activeTab === 'my' && styles.mainTabTextActive]}>
+                        My Submitted Recipes ({myRecipes.length})
+                    </Text>
+                </TouchableOpacity>
+            </View>
+
             <FlatList
-                data={recipes}
+                data={currentData}
                 renderItem={renderRecipeCard}
                 keyExtractor={(item) => item._id}
                 numColumns={1}
@@ -146,110 +206,99 @@ const RecipesScreen = ({ navigation }) => {
                 showsVerticalScrollIndicator={false}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[COLORS.greenPrimary]} />}
                 ListHeaderComponent={
-                    <>
-                        <View style={styles.heroCard}>
-                            <View style={styles.heroGlow} />
-                            <Text style={styles.heroEyebrow}>Kitchen Stories</Text>
-                            <Text style={styles.heroTitle}>Recipes curated for every rice lover</Text>
-                            <Text style={styles.heroSubtitle}>
-                                Explore home-style favorites, premium serving ideas, and dishes matched to your grain preferences.
-                            </Text>
+                    activeTab === 'all' ? (
+                        <>
+                            <View style={styles.heroCard}>
+                                <View style={styles.heroGlow} />
+                                <Text style={styles.heroEyebrow}>Kitchen Stories</Text>
+                                <Text style={styles.heroTitle}>Recipes curated for every rice lover</Text>
+                                <Text style={styles.heroSubtitle}>
+                                    Explore home-style favorites, premium serving ideas, and dishes matched to your grain preferences.
+                                </Text>
 
-                            <View style={styles.searchBar}>
-                                <Feather name="search" size={18} color={COLORS.textMuted} />
-                                <TextInput
-                                    style={styles.searchInput}
-                                    placeholder="Search pulao, biryani, pongal..."
-                                    placeholderTextColor={COLORS.textMuted}
-                                    value={searchQuery}
-                                    onChangeText={setSearchQuery}
-                                    onSubmitEditing={handleSearch}
-                                />
-                                <TouchableOpacity style={styles.searchAction} onPress={handleSearch}>
-                                    <Feather name="arrow-right" size={16} color={COLORS.textInverse} />
-                                </TouchableOpacity>
+                                <View style={styles.searchBar}>
+                                    <Feather name="search" size={18} color={COLORS.textMuted} />
+                                    <TextInput
+                                        style={styles.searchInput}
+                                        placeholder="Search pulao, biryani, pongal..."
+                                        placeholderTextColor={COLORS.textMuted}
+                                        value={searchQuery}
+                                        onChangeText={setSearchQuery}
+                                        onSubmitEditing={handleSearch}
+                                    />
+                                    <TouchableOpacity style={styles.searchAction} onPress={handleSearch}>
+                                        <Feather name="arrow-right" size={16} color={COLORS.textInverse} />
+                                    </TouchableOpacity>
+                                </View>
+
+                                <View style={styles.statsRow}>
+                                    <View style={styles.statCard}>
+                                        <Text style={styles.statValue}>{filteredStats.total}</Text>
+                                        <Text style={styles.statLabel}>Recipes</Text>
+                                    </View>
+                                    <View style={styles.statCard}>
+                                        <Text style={styles.statValue}>{filteredStats.linked}</Text>
+                                        <Text style={styles.statLabel}>Shop-ready</Text>
+                                    </View>
+                                    <View style={styles.statCard}>
+                                        <Text style={styles.statValue}>{riceType || 'All'}</Text>
+                                        <Text style={styles.statLabel}>Rice Type</Text>
+                                    </View>
+                                </View>
                             </View>
 
-                            <View style={styles.statsRow}>
-                                <View style={styles.statCard}>
-                                    <Text style={styles.statValue}>{filteredStats.total}</Text>
-                                    <Text style={styles.statLabel}>Recipes</Text>
-                                </View>
-                                <View style={styles.statCard}>
-                                    <Text style={styles.statValue}>{filteredStats.linked}</Text>
-                                    <Text style={styles.statLabel}>Shop-ready</Text>
-                                </View>
-                                <View style={styles.statCard}>
-                                    <Text style={styles.statValue}>{riceType || 'All'}</Text>
-                                    <Text style={styles.statLabel}>Rice Type</Text>
-                                </View>
-                            </View>
-                        </View>
-
-                        <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={styles.filterRow}
-                        >
-                            <TouchableOpacity
-                                style={[styles.filterChip, !riceType && styles.filterChipActive]}
-                                onPress={() => setRiceType('')}
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={styles.filterRow}
                             >
-                                <Text style={[styles.filterText, !riceType && styles.filterTextActive]}>All Recipes</Text>
-                            </TouchableOpacity>
-                            {riceTypes.map((type) => (
                                 <TouchableOpacity
-                                    key={type}
-                                    style={[styles.filterChip, riceType === type && styles.filterChipActive]}
-                                    onPress={() => setRiceType(type)}
+                                    style={[styles.filterChip, !riceType && styles.filterChipActive]}
+                                    onPress={() => setRiceType('')}
                                 >
-                                    <Text style={[styles.filterText, riceType === type && styles.filterTextActive]}>{type}</Text>
+                                    <Text style={[styles.filterText, !riceType && styles.filterTextActive]}>All Recipes</Text>
                                 </TouchableOpacity>
-                            ))}
-                        </ScrollView>
-
-                        {featuredRecipe && (
-                            <TouchableOpacity
-                                style={styles.featuredCard}
-                                activeOpacity={0.95}
-                                onPress={() => navigation.navigate('RecipeDetail', { recipeId: featuredRecipe._id })}
-                            >
-                                <View style={styles.featuredCopy}>
-                                    <Text style={styles.featuredLabel}>Featured Recipe</Text>
-                                    <Text style={styles.featuredTitle} numberOfLines={2}>{featuredRecipe.title}</Text>
-                                    <Text style={styles.featuredSubtitle} numberOfLines={2}>
-                                        {featuredRecipe.description || 'Chef-picked flavors with a premium grain pairing.'}
-                                    </Text>
-                                </View>
-                                <View style={styles.featuredArt}>
-                                    <MaterialCommunityIcons name="chef-hat" size={34} color={COLORS.greenDeep} />
-                                </View>
-                            </TouchableOpacity>
-                        )}
-
-                        {error ? (
-                            <View style={styles.errorContainer}>
-                                <Feather name="alert-triangle" size={18} color={COLORS.red} />
-                                <Text style={styles.errorText}>{error}</Text>
-                            </View>
-                        ) : null}
-                    </>
-                }
-                ListEmptyComponent={
-                    !loading ? (
-                        <View style={styles.emptyContainer}>
-                            <View style={styles.emptyIcon}>
-                                <MaterialCommunityIcons name="silverware-fork-knife" size={34} color={COLORS.greenPrimary} />
-                            </View>
-                            <Text style={styles.emptyTitle}>No recipes found</Text>
-                            <Text style={styles.emptyText}>Try another search or switch the rice type filter.</Text>
-                            <TouchableOpacity style={styles.emptyButton} onPress={() => { setSearchQuery(''); setRiceType(''); dispatch(getRecipes('', '', '')); }}>
-                                <Text style={styles.emptyButtonText}>Clear Filters</Text>
-                            </TouchableOpacity>
-                        </View>
+                                {riceTypes.map((type) => (
+                                    <TouchableOpacity
+                                        key={type}
+                                        style={[styles.filterChip, riceType === type && styles.filterChipActive]}
+                                        onPress={() => setRiceType(type)}
+                                    >
+                                        <Text style={[styles.filterText, riceType === type && styles.filterTextActive]}>{type}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        </>
                     ) : null
                 }
+                ListEmptyComponent={
+                    isLoading ? (
+                        <ActivityIndicator size="large" color={COLORS.greenPrimary} style={{ marginTop: 40 }} />
+                    ) : (
+                        <View style={styles.emptyContainer}>
+                            <MaterialCommunityIcons name="rice" size={48} color="#9CA3AF" />
+                            <Text style={styles.emptyTitle}>
+                                {activeTab === 'my' ? 'No Recipes Submitted Yet' : 'No Recipes Found'}
+                            </Text>
+                            <Text style={styles.emptyText}>
+                                {activeTab === 'my'
+                                    ? 'Tap "+ Add Recipe" below to post your authentic rice recipe for customers!'
+                                    : 'Try searching for a different keyword or rice type.'}
+                            </Text>
+                        </View>
+                    )
+                }
             />
+
+            {/* Floating Action Button to Add Recipe */}
+            <TouchableOpacity
+                style={styles.fab}
+                activeOpacity={0.9}
+                onPress={() => navigation.navigate('CreateRecipe')}
+            >
+                <Feather name="plus" size={24} color="#fff" />
+                <Text style={styles.fabText}>Add Recipe</Text>
+            </TouchableOpacity>
         </SafeAreaView>
     );
 };
@@ -564,6 +613,60 @@ const styles = StyleSheet.create({
         color: COLORS.textInverse,
         fontSize: 14,
         fontWeight: '800',
+    },
+    tabContainer: {
+        flexDirection: 'row',
+        backgroundColor: '#fff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#E5E7EB',
+    },
+    mainTab: {
+        flex: 1,
+        paddingVertical: 14,
+        alignItems: 'center',
+        borderBottomWidth: 3,
+        borderBottomColor: 'transparent',
+    },
+    mainTabActive: {
+        borderBottomColor: '#16A34A',
+    },
+    mainTabText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#6B7280',
+    },
+    mainTabTextActive: {
+        color: '#16A34A',
+        fontWeight: '800',
+    },
+    statusBadge: {
+        alignSelf: 'flex-start',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+        marginVertical: 6,
+    },
+    statusText: {
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    fab: {
+        position: 'absolute',
+        bottom: 24,
+        right: 20,
+        backgroundColor: '#16A34A',
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 18,
+        paddingVertical: 12,
+        borderRadius: 30,
+        elevation: 6,
+        gap: 6,
+    },
+    fabText: {
+        color: '#fff',
+        fontWeight: '800',
+        fontSize: 14,
     },
 });
 

@@ -11,6 +11,15 @@ import {
     RECIPE_SHARE_SUCCESS,
     RECIPE_COMMENT_LIKE_SUCCESS,
     RECIPE_COMMENT_REPLY_SUCCESS,
+    RECIPE_MY_LIST_REQUEST,
+    RECIPE_MY_LIST_SUCCESS,
+    RECIPE_MY_LIST_FAIL,
+    RECIPE_SUBMIT_REQUEST,
+    RECIPE_SUBMIT_SUCCESS,
+    RECIPE_SUBMIT_FAIL,
+    RECIPE_DELETE_REQUEST,
+    RECIPE_DELETE_SUCCESS,
+    RECIPE_DELETE_FAIL,
 } from '../../constants/recipeConstants';
 import { apiService } from '../../services/api';
 
@@ -139,5 +148,56 @@ export const replyToRecipeComment = (recipeId, commentId, comment) => async (dis
         });
     } catch (error) {
         console.error('Error replying to recipe comment:', error);
+    }
+};
+
+export const getMyRecipes = () => async (dispatch) => {
+    try {
+        dispatch({ type: RECIPE_MY_LIST_REQUEST });
+        const response = await apiService.getMyRecipes();
+        dispatch({
+            type: RECIPE_MY_LIST_SUCCESS,
+            payload: response.data?.recipes || response.data || [],
+        });
+    } catch (error) {
+        dispatch({
+            type: RECIPE_MY_LIST_FAIL,
+            payload: error.response?.data?.message || error.message,
+        });
+    }
+};
+
+export const submitRecipe = (formData) => async (dispatch) => {
+    try {
+        dispatch({ type: RECIPE_SUBMIT_REQUEST });
+        const response = await apiService.submitRecipe(formData);
+        dispatch({
+            type: RECIPE_SUBMIT_SUCCESS,
+            payload: response.data,
+        });
+        return response.data;
+    } catch (error) {
+        const message = error.response?.data?.message || error.message;
+        dispatch({
+            type: RECIPE_SUBMIT_FAIL,
+            payload: message,
+        });
+        throw new Error(message);
+    }
+};
+
+export const deleteRecipe = (id) => async (dispatch) => {
+    try {
+        dispatch({ type: RECIPE_DELETE_REQUEST });
+        await apiService.deleteRecipe(id);
+        dispatch({
+            type: RECIPE_DELETE_SUCCESS,
+            payload: id,
+        });
+    } catch (error) {
+        dispatch({
+            type: RECIPE_DELETE_FAIL,
+            payload: error.response?.data?.message || error.message,
+        });
     }
 };

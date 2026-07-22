@@ -17,7 +17,7 @@ import {
     commentOnForumPost,
     likeForumComment,
     replyToForumComment,
-} from '../../redux/actions/forumActions';
+} from '../redux/actions/forumActions';
 import {
     getSocket,
     connectSocket,
@@ -25,7 +25,7 @@ import {
     leaveRoom,
     subscribeToSocialUpdates,
     unsubscribeFromSocialUpdates
-} from '../../services/socket';
+} from '../services/socket';
 
 const ForumPostDetailScreen = ({ route, navigation }) => {
     const { postId } = route.params;

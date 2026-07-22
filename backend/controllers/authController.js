@@ -366,12 +366,13 @@ const firebaseLogin = asyncHandler(async (req, res) => {
       // 🔥 BUG FIX: Auto-create user only if NOT found by email/phone either
       console.log('🆕 Firebase Login: Creating new user for UID:', uid);
 
+      const requestedRole = req.body.role || 'customer';
       user = await User.create({
         name: name || email?.split('@')[0] || phone_number || 'User',
         email: email || null,
         phone: sanitisedPhone || undefined,
         firebaseUid: uid,
-        role: 'customer', // Default role - ALWAYS from MongoDB
+        role: ['seller', 'deliveryPartner', 'admin'].includes(requestedRole) ? requestedRole : 'customer',
         isVerified: email_verified || false,
         profileImage: picture || '/uploads/default_avatar.jpg',
         referredBy: referrerId

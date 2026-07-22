@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, useColorScheme } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, useColorScheme, TouchableOpacity } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -52,6 +52,8 @@ import DeliveryHistoryScreen from './screens/delivery/DeliveryHistoryScreen';
 import DeliveryPartnerProfileScreen from './screens/delivery/DeliveryPartnerProfileScreen';
 import ReplacementRequestScreen from './screens/delivery/ReplacementRequestScreen';
 import DeliveryWithdrawalScreen from './screens/delivery/DeliveryWithdrawalScreen';
+import SupportChatScreen from './screens/delivery/SupportChatScreen';
+import RaiseIssueScreen from './screens/delivery/RaiseIssueScreen';
 
 
 
@@ -138,6 +140,16 @@ function DeliveryStack({ initialRoute }) {
         component={DeliveryWithdrawalScreen}
         options={{ title: 'Withdraw' }}
       />
+      <Stack.Screen
+        name="SupportChat"
+        component={SupportChatScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="RaiseIssue"
+        component={RaiseIssueScreen}
+        options={{ headerShown: false }}
+      />
     </Stack.Navigator>
   );
 }
@@ -215,6 +227,24 @@ function AppNavigator() {
 
   if (!isAuthenticated || !user) {
     return <AuthStack />;
+  }
+
+  if (user.role !== 'deliveryPartner') {
+    return (
+      <View style={styles.restrictionContainer}>
+        <MaterialIcons name="security" size={64} color="#EF4444" />
+        <Text style={styles.restrictionTitle}>Access Restricted</Text>
+        <Text style={styles.restrictionText}>
+          This app is strictly for registered Delivery Partners.
+        </Text>
+        <Text style={styles.restrictionSubtext}>
+          Logged in as: {user.email || user.name || 'User'} ({user.role || 'customer'})
+        </Text>
+        <TouchableOpacity style={styles.logoutBtn} onPress={() => dispatch(logout())}>
+          <Text style={styles.logoutBtnText}>Log Out & Switch Account</Text>
+        </TouchableOpacity>
+      </View>
+    );
   }
 
   return <DeliveryStack initialRoute={hasSeenOnboarding ? 'DeliveryTabs' : 'Onboarding'} />;
@@ -323,5 +353,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
     textAlign: 'center',
+    marginBottom: 20,
+  },
+  logoutBtn: {
+    backgroundColor: '#16A34A',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  logoutBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: 'bold',
   },
 });

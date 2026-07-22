@@ -15,8 +15,8 @@ export const listProducts = (keyword = '') => async (dispatch) => {
     try {
         dispatch({ type: PRODUCT_LIST_REQUEST });
 
-        // Pass keyword/params if needed. apiService.getProducts accepts params.
-        const { data } = await apiService.getProducts({ keyword });
+        // Use getSellerProducts to fetch only this seller's products
+        const { data } = await apiService.getSellerProducts();
 
         dispatch({
             type: PRODUCT_LIST_SUCCESS,
